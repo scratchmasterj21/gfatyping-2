@@ -20,6 +20,7 @@ import { getTheme } from "../states/theme";
 
 import { createEffectOn } from "../hooks/effects";
 import { wordsHaveNumbers } from "../test/test-state";
+import { fingerForKey } from "../lessons/finger-map";
 
 export const keyDataDelimiter = "\uE000";
 const keymap = qsr("#keymap");
@@ -327,7 +328,10 @@ function buildRow(options: {
         hide = ` invisible`;
       }
 
-      const keyElement = `<div class="keymapKey${hide}" data-key="${key
+      const finger = isSteno ? undefined : fingerForKey(rowId, keyId);
+      const fingerAttr = finger !== undefined ? ` data-finger="${finger}"` : "";
+
+      const keyElement = `<div class="keymapKey${hide}"${fingerAttr} data-key="${key
         .map((it) => it.replace('"', "&quot;"))
         .join(
           keyDataDelimiter,
@@ -481,6 +485,9 @@ export async function refresh(): Promise<void> {
       "steno_matrix",
     ]);
     keymap.addClass(Config.keymapStyle);
+    Config.keymapShowFingers
+      ? keymap.addClass("show-fingers")
+      : keymap.removeClass("show-fingers");
   } catch (e) {
     if (e instanceof Error) {
       console.log(
@@ -661,6 +668,11 @@ configEvent.subscribe(({ key }) => {
     key === "keymapMode"
   ) {
     void refresh();
+  }
+  if (key === "keymapShowFingers") {
+    Config.keymapShowFingers
+      ? keymap.addClass("show-fingers")
+      : keymap.removeClass("show-fingers");
   }
   if (key === "keymapMode") {
     handleMode();

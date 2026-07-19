@@ -9,7 +9,6 @@ import * as PageTest from "../pages/test";
 import * as PageLoading from "../pages/loading";
 import * as PageAccountSettings from "../pages/account-settings";
 import * as PageTransition from "../legacy-states/page-transition";
-import * as AdController from "../controllers/ad-controller";
 import * as Focus from "../test/focus";
 import Page, {
   PageName,
@@ -72,6 +71,11 @@ const pages = {
     },
   }),
   about: solidPage("about"),
+  lessons: solidPage("lessons"),
+  classroom: solidPage("classroom"),
+  certificate: solidPage("certificate"),
+  race: solidPage("race"),
+  racehost: solidPage("racehost"),
   account: solidPage("account", {
     loadingOptions: {
       loadingMode: () => {
@@ -169,7 +173,7 @@ function updateTitle(nextPage: { id: string; display?: string }): void {
   } else {
     const titleString =
       nextPage.display ?? Strings.capitalizeFirstLetterOfEachWord(nextPage.id);
-    Misc.updateTitle(`${titleString} | Monkeytype`);
+    Misc.updateTitle(`${titleString} | GFA Typing`);
   }
 }
 
@@ -397,7 +401,6 @@ export async function change(
 
   //wrapup
   PageTransition.set(false);
-  void AdController.reinstate();
   return true;
 }
 

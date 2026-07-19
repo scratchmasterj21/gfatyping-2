@@ -11,7 +11,11 @@ import {
 import { format as dateFormat } from "date-fns/format";
 import { createMemo, JSXElement, Show } from "solid-js";
 
-import { Selection } from "../../../states/leaderboard-selection";
+import {
+  ClassroomSelectionType,
+  isClassroomType,
+  Selection,
+} from "../../../states/leaderboard-selection";
 import { capitalizeFirstLetter } from "../../../utils/strings";
 import { Button } from "../../common/Button";
 import { H2 } from "../../common/Headers";
@@ -21,6 +25,27 @@ export function Title(props: {
   onPreviousSelect: () => void;
 }): JSXElement {
   const title = createMemo(() => {
+    if (isClassroomType(props.selection.type)) {
+      const cs = props.selection as ClassroomSelectionType;
+      const metric =
+        cs.metric === "wpm"
+          ? "WPM"
+          : cs.metric === "racewpm"
+            ? "Race WPM"
+            : cs.metric === "raceacc"
+              ? "Race Accuracy"
+              : cs.metric === "games"
+                ? "Games"
+                : "XP";
+      const scope =
+        cs.type === "class"
+          ? (cs.classId ?? "Class")
+          : cs.type === "grade"
+            ? (cs.grade ?? "Grade")
+            : "School";
+      return `${scope} ${metric} Leaderboard`;
+    }
+
     const type =
       props.selection.type === "allTime"
         ? "All-time"
@@ -77,12 +102,24 @@ export function Title(props: {
     return null;
   });
 
+  const isWpmMetric = createMemo(
+    () =>
+      isClassroomType(props.selection.type) &&
+      (props.selection as ClassroomSelectionType).metric === "wpm",
+  );
+
   return (
     <div>
       <H2
         text={title()}
         class="p-0 text-2xl text-text md:text-3xl xl:text-4xl"
       />
+      <Show when={isWpmMetric()}>
+        <div class="text-sub">
+          ranked by {(props.selection as ClassroomSelectionType).mode2 ?? "30"}
+          s English test scores only
+        </div>
+      </Show>
       <Show when={subTitle() !== null}>
         <div class="flex items-center gap-2">
           <div

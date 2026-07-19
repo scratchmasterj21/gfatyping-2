@@ -8,6 +8,7 @@ import {
 } from "../../../auth";
 import { resetConfig } from "../../../config/lifecycle";
 import { getSnapshot } from "../../../db";
+import { deleteAuthAccount } from "../../../firebase";
 import { isAuthenticated } from "../../../states/core";
 import { showNoticeNotification } from "../../../states/notifications";
 import { ExecReturn, showSimpleModal } from "../../../states/simple-modal";
@@ -30,6 +31,11 @@ export function showDeleteAccountModal(): void {
           notificationOptions: { response },
         };
       }
+
+      // Also delete the Firebase Auth account so the next Google sign-in is a
+      // fresh user and the account can be re-registered.
+      await deleteAuthAccount().catch(() => undefined);
+
       reloadAfter(3);
 
       return {

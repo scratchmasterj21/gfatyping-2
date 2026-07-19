@@ -1,0 +1,164 @@
+rules_version = '2';
+
+// Serverless backend for the GFA typing app.
+// All access requires a signed-in user whose email is on the felice.ed.jp domain.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isDomainUser() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.matches('.*@felice[.]ed[.]jp$');
+    }
+
+    function isOwner(uid) {
+      return isDomainUser() && request.auth.uid == uid;
+    }
+
+    // The classroom admin may manage other users' class assignments.
+    function isAdminUser() {
+      return isDomainUser()
+        && request.auth.token.email == 'john.limpiada@felice.ed.jp';
+    }
+
+    // --- users/{uid} and all user-scoped subcollections ---
+    match /users/{uid} {
+      allow read: if isDomainUser();
+      allow create, update: if isOwner(uid) || isAdminUser();
+      allow delete: if isOwner(uid);
+
+      // config + tags: owner full access
+      match /config/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // typing lesson progress: owner full access; admin may read for the
+      // teacher dashboard (writes stay owner-only).
+      match /lessonProgress/{lessonId} {
+        allow read: if isOwner(uid) || isAdminUser();
+        allow write: if isOwner(uid);
+      }
+
+      // achievements: owner full access; admin may read.
+      match /achievements/{achievementId} {
+        allow read: if isOwner(uid) || isAdminUser();
+        allow write: if isOwner(uid);
+      }
+
+      // daily-capped "repeat practice" coin buckets: owner full access.
+      match /testTryCoins/{bucketId} {
+        allow read: if isOwner(uid) || isAdminUser();
+        allow write: if isOwner(uid);
+      }
+      match /tags/{tagId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // results: owner can read/create/update; delete only allowed so account
+      // reset/delete can wipe history (otherwise those operations fail).
+      match /results/{resultId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid);
+        // tag labelling needs to update the tags array only
+        allow update: if isOwner(uid);
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // --- teacher-authored class word lists ---
+    match /wordLists/{id} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
+    }
+
+    // --- teacher-authored reading passages ---
+    match /readingPassages/{id} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
+    }
+
+    // --- teacher-authored assignments ---
+    match /assignments/{id} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
+    }
+
+    // --- live class races ---
+    // The teacher (admin) owns the race control doc; each student writes their
+    // own participant doc with live progress. Admin may also write/delete any
+    // participant doc, so a new round can be reset authoritatively even for
+    // students who disconnected instead of resetting their own doc.
+    match /races/{pin} {
+      allow read: if isDomainUser();
+      allow create, update, delete: if isAdminUser();
+      match /participants/{uid} {
+        allow read: if isDomainUser();
+        allow write: if (isOwner(uid)
+          && request.resource.data.uid == request.auth.uid)
+          || isAdminUser();
+        allow delete: if isOwner(uid) || isAdminUser();
+      }
+    }
+
+    // --- saved race history (teacher-readable review records) ---
+    match /raceHistory/{id} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
+    }
+
+    // --- username uniqueness registry ---
+    match /usernames/{name} {
+      allow read: if isDomainUser();
+      // a user may only claim a name for their own uid, and only if free
+      allow create: if isDomainUser()
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isDomainUser()
+        && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    // --- school-wide config (side images, etc.) ---
+    match /schoolConfig/{document} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
+    }
+
+    // --- leaderboards: readable by domain users, each user writes own entry ---
+    match /leaderboards/{key} {
+      allow read: if isDomainUser();
+      match /entries/{uid} {
+        allow read: if isDomainUser();
+        allow write: if isOwner(uid)
+          && request.resource.data.uid == request.auth.uid;
+      }
+    }
+
+    // --- daily speed leaderboards ---
+    match /dailyLeaderboards/{key} {
+      allow read: if isDomainUser();
+      match /entries/{uid} {
+        allow read: if isDomainUser();
+        allow write: if isOwner(uid)
+          && request.resource.data.uid == request.auth.uid;
+      }
+    }
+
+    // --- weekly xp leaderboards ---
+    match /weeklyXpLeaderboards/{week} {
+      allow read: if isDomainUser();
+      match /entries/{uid} {
+        allow read: if isDomainUser();
+        allow write: if isOwner(uid)
+          && request.resource.data.uid == request.auth.uid;
+      }
+    }
+
+    // --- cached grade/school classroom leaderboard rankings ---
+    // Only written by the /api/refresh-leaderboard-cache Vercel function via
+    // the Firebase Admin SDK, which bypasses these rules entirely.
+    match /leaderboardCache/{id} {
+      allow read: if isDomainUser();
+      allow write: if false;
+    }
+  }
+}

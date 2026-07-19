@@ -1,0 +1,899 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 683.3 254" style="enable-background:new 0 0 683.3 254;" xml:space="preserve" >
+<style type="text/css">
+    @import url('https://fonts.googleapis.com/css?family=Roboto');
+    path.deadkey{fill: orange;}
+    text {user-select: none;fill:#0b0b0b; opacity: 0;}
+    text.active{fill:#FFFFFF;}
+    text.correct{}
+    .t4{
+        font-family:'Roboto';
+        font-size: 11px;
+    }
+    .edc-st1{
+        font-family:'Roboto';
+        opacity: 0;
+        font-size:13px;
+        font-weight:100;
+    }
+
+
+    .edc-st2{
+        opacity: 1;
+        fill:#0b0b0b;
+    }
+
+    .b{font-size:18px;}
+    .b2{font-size:24px; transform: translate(0, -5); }
+    .s{font-size:12px;}
+
+    .background{
+        fill:#ffffff;
+        stroke: #8c939c;
+    }
+    .lower-shadow{
+        fill:none;
+        stroke: #8c939c;
+    }
+
+    .active .background{
+        fill: none;
+        stroke: none;
+    }
+    .active .lower-shadow{
+        fill:none;
+        stroke:none;
+    }
+    .active .on{
+        fill: #65B5FD;
+        stroke: #2b77b1;
+    }
+    .active .pressed{
+        fill:none;
+        stroke: #2b77b1;
+    }
+    text.active{
+        transform: tranaslate(-1, 4);
+    }
+    .correct .background{
+        fill:#ffffff;
+        stroke: #81d100;
+        stroke-width:2px;
+    }
+    text.correct{
+        fill:#3e5674;
+    }
+    .incorrect .background{
+        fill: #E97E7E;
+        stroke: #BC1E1E;
+    }
+    .incorrect .lower-shadow{
+        fill:none;
+        stroke:#BC1E1E;
+    }
+    .incorrect .edc-st2, text.incorrect{
+        fill:#fff;
+    }
+
+
+    .theme-yellow-taxi .background{
+        fill:#fff;
+        stroke: #bfa326;
+    }
+    .theme-yellow-taxi .lower-shadow{
+        fill:none;
+        stroke: #bfa326;
+    }
+    .theme-yellow-taxi text{
+        fill: #735d1b;
+    }
+    .theme-yellow-taxi .correct .background{
+        fill:#fff;
+        stroke: #81d100;
+        stroke-width:2px;
+    }
+
+
+    .theme-squirrel .background{
+        fill:#fff;
+        stroke: #56aba3;
+    }
+    .theme-squirrel .lower-shadow{
+        fill:none;
+        stroke: #56aba3;
+    }
+    .theme-squirrel text{
+        fill: #21796f;
+    }
+    .theme-squirrel .correct .background{
+        fill:#fff;
+        stroke: #81d100;
+        stroke-width:2px;
+    }
+
+
+    .theme-eddie .background{
+        fill:#fff;
+        stroke: #4ba2af;
+    }
+    .theme-eddie .lower-shadow{
+        fill:none;
+        stroke: #4ba2af;
+    }
+    .theme-eddie text{
+        fill: #2d6d75;
+    }
+    .theme-eddie .correct .background{
+        fill:#fff;
+        stroke: #81d100;
+        stroke-width:2px;
+    }
+
+
+    .theme-early-birds .background{
+        fill:#fff;
+        stroke: #808ac3;
+    }
+    .theme-early-birds .lower-shadow{
+        fill:none;
+        stroke: #808ac3;
+    }
+    .theme-early-birds text{
+        fill:#434b7b;
+    }
+    .theme-early-birds .correct .background{
+        fill:#fff;
+        stroke: #81d100;
+        stroke-width:2px;
+    }
+
+
+    .theme-penguin-land .background{
+        fill:#fff;
+        stroke: #d68394;
+    }
+    .theme-penguin-land .lower-shadow{
+        fill:none;
+        stroke: #d68394;
+    }
+    .theme-penguin-land text{
+        fill:#8c1e50;
+    }
+    .theme-penguin-land .correct .background{
+        fill:#fff;
+        stroke: #81d100;
+        stroke-width:2px;
+    }
+
+
+    .theme-kingfish .background{
+        fill:#1a2f48;
+        stroke: #81a0b7;
+    }
+    .theme-kingfish .lower-shadow{
+        fill:none;
+        stroke: #81a0b7;
+    }
+    .theme-kingfish text{
+        fill:#c1dbf1;
+    }
+    .theme-kingfish .correct .background{
+        fill:#1a2f48;
+        stroke: #B1E55E;
+        stroke-width:2px;
+    }
+
+
+    .theme-robot .background{
+        fill:#232738;
+        stroke: #8598b1;
+    }
+    .theme-robot .lower-shadow{
+        fill:none;
+        stroke: #8598b1;
+    }
+    .theme-robot text{
+        fill:#eaf3ff;
+    }
+    .theme-robot .correct .background{
+        fill:#232738;
+        stroke: #B1E55E;
+        stroke-width:2px;
+    }
+
+
+    .theme-dark .background{
+        fill:#3b3c37;
+        stroke: #bbbbbb;
+    }
+    .theme-dark .lower-shadow{
+        fill:none;
+        stroke: #bbbbbb;
+    }
+    .theme-dark text{
+        fill:#e7e7e7;
+    }
+    .theme-dark .correct .background{
+        fill:#3b3c37;
+        stroke: #B1E55E;
+        stroke-width:2px;
+    }
+
+
+    .theme-codder .background{
+        fill:#141b1c;
+        stroke: #749196;
+    }
+    .theme-codder .lower-shadow{
+        fill:none;
+        stroke: #749196;
+    }
+    .theme-codder text{
+        fill:#a2b2b6;
+    }
+    .theme-codder .correct .background{
+        fill:#141b1c;
+        stroke: #B1E55E;
+        stroke-width:2px;
+    }
+
+
+
+
+    .theme-robot .active .background, .theme-dark .active .background, .theme-codder .active .background, .theme-kingfish .active .background{
+        fill:none;
+        stroke:none;
+    }
+
+    .theme-robot .active .lower-shadow, .theme-dark .active .lower-shadow, .theme-codder .active .lower-shadow, .theme-kingfish .active .lower-shadow{
+        fill:none;
+        stroke:none;
+    }
+    .theme-robot .active .on, .theme-dark .active .on, .theme-codder .active .on{
+        fill: #65B5FD;
+        stroke: #2d84c5;
+    }
+    .theme-robot .active .pressed, .theme-dark .active .pressed, .theme-codder .active .pressed, .theme-kingfish .active .pressed{
+        fill:none;
+        stroke: #2970a4;
+    }
+
+    .theme-robot .incorrect .background, .theme-dark .incorrect .background, .theme-codder .incorrect .background{
+         fill: #E97E7E;
+        stroke: #BC1E1E;
+    }
+
+    .theme-robot .incorrect .lower-shadow, .theme-dark .incorrect .lower-shadow, .theme-codder .incorrect .lower-shadow{
+        fill:none;
+        stroke:#BC1E1E
+    }
+
+
+    .theme-yellow-taxi .active .background, .theme-penguin-land .active .background, .theme-squirrel .active .background, .theme-early-birds .active .background, .theme-eddie .active .background{
+        fill: none;
+        stroke: none;
+    }
+    .theme-yellow-taxi .active .lower-shadow, .theme-penguin-land .active .lower-shadow, .theme-squirrel .active .lower-shadow, .theme-early-birds .active .lower-shadow, .theme-eddie .active .lower-shadow{
+        fill:none;
+        stroke:none;
+    }
+    .theme-yellow-taxi .active .on, .theme-penguin-land .active .on, .theme-squirrel .active .on, .theme-early-birds .active .on, .theme-eddie .active .on{
+        fill: #65B5FD;
+        stroke: #2d84c5;
+    }
+    .theme-yellow-taxi .active .pressed, .theme-penguin-land .active .pressed, .theme-squirrel .active .pressed, .theme-early-birds .active .pressed, .theme-eddie .active .pressed{
+        fill:none;
+        stroke: #2d84c5;
+    }
+    .theme-yellow-taxi text.active , .theme-penguin-land text.active, .theme-squirrel text.active, .theme-early-birds text.active, .theme-eddie text.active, .theme-kingfish text.active, .theme-dark text.active, .theme-codder text.active, .theme-robot text.active{
+        fill:#fff;
+    }
+
+    .theme-yellow-taxi .incorrect .background, .theme-penguin-land .incorrect .background, .theme-squirrel .incorrect .background, .theme-early-birds .incorrect .background, .theme-eddie .incorrect .background, .theme-kingfish .incorrect .background{
+        fill: #E97E7E;
+        stroke: #BC1E1E;
+    }
+    .theme-yellow-taxi .incorrect .lower-shadow, .theme-penguin-land .incorrect .lower-shadow, .theme-squirrel .incorrect .lower-shadow, .theme-early-birds .incorrect .lower-shadow, .theme-eddie .incorrect .lower-shadow, .theme-kingfish .incorrect .lower-shadow{
+        fill:none;
+        stroke:#BC1E1E;
+    }
+    .theme-yellow-taxi text.incorrect , .theme-penguin-land text.incorrect, .theme-squirrel text.incorrect, .theme-early-birds text.active, .theme-eddie text.incorrect, .theme-kingfish text.incorrect, .theme-dark text.incorrect, .theme-codder text.incorrect, .theme-robot text.incorrect, .theme-bees text.incorrect{
+        fill:#fff;
+    }
+
+
+
+
+
+
+
+
+
+</style>
+<g id="keys" style="transform: translate(-59px, -18px);">
+    <g id="caps-lock">
+    <path class="on" d="M78.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5h66.4c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="pressed" d="M74,163.7c0,2.7,2.2,4.9,4.9,4.9h65.7c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M78.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5h66.4c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="lower-shadow" d="M74,161.7c0,2.7,2.2,4.9,4.9,4.9h65.7c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="tilda">
+    <path class="on" d="M78.5,82C76,82,74,80,74,77.5V49.1c0-2.5,2-4.5,4.5-4.5H111c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="pressed" d="M74,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M78.5,82C76,82,74,80,74,77.5V46.1c0-2.5,2-4.5,4.5-4.5H111c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="lower-shadow" d="M74,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-1">
+    <path class="on" d="M123.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H156c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H123.5z"></path>
+    <path class="pressed" d="M119,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M123.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H156c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H123.5z"></path>
+    <path class="lower-shadow" d="M119,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-2">
+    <path class="on" d="M168.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H201c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H168.5z"></path>
+    <path class="pressed" d="M164,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M168.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H201c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H168.5z"></path>
+    <path class="lower-shadow" d="M164,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-3">
+    <path class="on" d="M213.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H246c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H213.5z"></path>
+    <path class="pressed" d="M209,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M213.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H246c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H213.5z"></path>
+    <path class="lower-shadow" d="M209,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-4">
+    <path class="on" d="M258.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H291c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H258.5z"></path>
+    <path class="pressed" d="M254,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M258.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H291c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H258.5z"></path>
+    <path class="lower-shadow" d="M254,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-5">
+    <path class="on" d="M303.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H336c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H303.5z"></path>
+    <path class="pressed" d="M299,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M303.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H336c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H303.5z"></path>
+    <path class="lower-shadow" d="M299,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-6">
+    <path class="on" d="M348.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H381c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H348.5z"></path>
+    <path class="pressed" d="M344,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M348.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H381c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H348.5z"></path>
+    <path class="lower-shadow" d="M344,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-7">
+    <path class="on" d="M393.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H426c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H393.5z"></path>
+    <path class="pressed" d="M389.1,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M393.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H426c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H393.5z"></path>
+    <path class="lower-shadow" d="M389.1,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-8">
+    <path class="on" d="M438.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H471c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H438.5z"></path>
+    <path iclass="pressed" d="M434,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M438.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H471c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H438.5z"></path>
+    <path class="lower-shadow" d="M434,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-9">
+    <path class="on" d="M483.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H516c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H483.5z"></path>
+    <path class="pressed" d="M479,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M483.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H516c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H483.5z"></path>
+    <path class="lower-shadow" d="M479,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="key-0">
+    <path class="on" d="M528.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H561c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H528.5z"></path>
+    <path class="pressed" d="M524,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M528.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H561c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H528.5z"></path>
+    <path class="lower-shadow" d="M524,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="backslash">
+    <path class="on" d="M686.8,125.9c-2.5,0-4.5-2-4.5-4.5V93.2c0-2.5,2-4.5,4.5-4.5h34.6c2.5,0,4.5,2,4.5,4.5v28.2
+        c0,2.5-2,4.5-4.5,4.5C721.4,125.9,686.8,125.9,686.8,125.9z"></path>
+    <path class="pressed" d="M682.3,119.8c0,2.7,2.2,4.9,4.9,4.9h33.9c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M686.8,125.9c-2.5,0-4.5-2-4.5-4.5V90.2c0-2.5,2-4.5,4.5-4.5h34.6c2.5,0,4.5,2,4.5,4.5
+        v31.2c0,2.5-2,4.5-4.5,4.5C721.4,125.9,686.8,125.9,686.8,125.9z"></path>
+    <path class="lower-shadow" d="M682.3,117.8c0,2.7,2.2,4.9,4.9,4.9h33.9c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="close-bracket">
+    <path class="on" d="M641.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H641.8z"></path>
+    <path class="pressed" d="M637.3,119.8c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M641.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H641.8z"></path>
+    <path class="lower-shadow" d="M637.3,117.8c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="open-bracket">
+    <g>
+        <path class="on" d="M596.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+            c0,2.5-2,4.5-4.5,4.5H596.8z"></path>
+        <path class="pressed" d="M592.3,119.8c0,2.7,2.2,4.9,4.9,4.9H629c2.7,0,4.8-2.2,4.8-4.9"></path>
+    </g>
+    <path class="background" d="M596.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H596.8z"></path>
+    <path class="lower-shadow" d="M592.3,117.8c0,2.7,2.2,4.9,4.9,4.9H629c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="p">
+    <path class="on" d="M551.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H551.8z"></path>
+    <path class="pressed" d="M547.3,119.8c0,2.7,2.2,4.9,4.9,4.9H584c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M551.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H551.8z"></path>
+    <path class="lower-shadow" d="M547.3,117.8c0,2.7,2.2,4.9,4.9,4.9H584c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="o">
+    <path class="on" d="M506.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H506.8z"></path>
+    <path class="pressed" d="M502.3,119.8c0,2.7,2.2,4.9,4.9,4.9H539c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M506.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H506.8z"></path>
+    <path class="lower-shadow" d="M502.3,117.8c0,2.7,2.2,4.9,4.9,4.9H539c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="i">
+    <path class="on" d="M461.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H461.8z"></path>
+    <path class="pressed" d="M457.3,119.8c0,2.7,2.2,4.9,4.9,4.9H494c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M461.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H461.8z"></path>
+    <path class="lower-shadow" d="M457.3,117.8c0,2.7,2.2,4.9,4.9,4.9H494c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="u">
+    <path class="on" d="M416.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H416.8z"></path>
+    <path class="pressed" d="M412.3,119.8c0,2.7,2.2,4.9,4.9,4.9H449c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M416.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H416.8z"></path>
+    <path class="lower-shadow" d="M412.3,117.8c0,2.7,2.2,4.9,4.9,4.9H449c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="y">
+    <path class="on" d="M371.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H371.8z"></path>
+    <path class="pressed" d="M367.3,119.8c0,2.7,2.2,4.9,4.9,4.9H404c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M371.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H371.8z"></path>
+    <path class="lower-shadow" d="M367.3,117.8c0,2.7,2.2,4.9,4.9,4.9H404c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="t">
+    <path class="on" d="M326.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H326.8z"></path>
+    <path class="pressed" d="M322.3,119.8c0,2.7,2.2,4.9,4.9,4.9H359c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M326.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H326.8z"></path>
+    <path class="lower-shadow" d="M322.3,117.8c0,2.7,2.2,4.9,4.9,4.9H359c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="r">
+    <path class="on" d="M281.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H281.8z"></path>
+    <path class="pressed" d="M277.3,119.8c0,2.7,2.2,4.9,4.9,4.9H314c2.7,0,4.9-2.2,4.9-4.9"></path>
+        <path class="background" d="M281.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+            c0,2.5-2,4.5-4.5,4.5H281.8z"></path>
+    <path class="lower-shadow" d="M277.3,117.8c0,2.7,2.2,4.9,4.9,4.9H314c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="e">
+    <path class="on" d="M236.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H236.8z"></path>
+    <path class="pressed" d="M232.3,119.8c0,2.7,2.2,4.9,4.9,4.9H269c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M236.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H236.8z"></path>
+    <path class="lower-shadow" d="M232.3,117.8c0,2.7,2.2,4.9,4.9,4.9H269c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="w">
+    <path class="on" d="M191.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H191.8z"></path>
+    <path class="pressed" d="M187.3,119.8c0,2.7,2.2,4.9,4.9,4.9H224c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M191.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H191.8z"></path>
+    <path class="lower-shadow" d="M187.3,117.8c0,2.7,2.2,4.9,4.9,4.9H224c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="q">
+    <path class="on" d="M146.8,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H146.8z"></path>
+    <path class="pressed" d="M142.3,119.8c0,2.7,2.2,4.9,4.9,4.9H179c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M146.8,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H146.8z"></path>
+    <path class="lower-shadow" d="M142.3,117.8c0,2.7,2.2,4.9,4.9,4.9H179c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="a" class="active">
+    <path class="on" d="M157.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H190c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H157.5z"></path>
+    <path class="pressed" d="M153,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M157.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H190c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H157.5z"></path>
+    <path class="lower-shadow" d="M153,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="s">
+    <path class="on" d="M202.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H235c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H202.5z"></path>
+    <path class="pressed" d="M198,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M202.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H235c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H202.5z"></path>
+    <path class="lower-shadow" d="M198,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="d">
+    <path class="on" d="M247.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H280c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H247.5z"></path>
+    <path class="pressed" d="M243,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M247.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H280c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H247.5z"></path>
+    <path class="lower-shadow" d="M243,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="f">
+    <path class="on" d="M292.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H325c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H292.5z"></path>
+    <path class="pressed" d="M288,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M292.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H325c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H292.5z"></path>
+    <path class="lower-shadow" d="M288,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="g">
+    <path class="on" d="M337.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H370c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H337.5z"></path>
+    <path class="pressed" d="M333,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M337.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H370c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H337.5z"></path>
+    <path class="lower-shadow" d="M333,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="h">
+    <path class="on" d="M382.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H415c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H382.5z"></path>
+    <path class="pressed" d="M378,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M382.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H415c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H382.5z"></path>
+    <path class="lower-shadow" d="M378,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="j">
+    <path class="on" d="M427.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H460c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H427.5z"></path>
+    <path class="pressed" d="M423,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M427.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H460c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H427.5z"></path>
+    <path class="lower-shadow" d="M423,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="n">
+    <path class="on" d="M405.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H405.9z"></path>
+    <path class="pressed" d="M401.4,207.7c0,2.7,2.2,4.9,4.9,4.9H438c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M405.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H405.9z"></path>
+    <path class="lower-shadow" d="M401.4,205.7c0,2.7,2.2,4.9,4.9,4.9H438c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="b">
+    <path class="on" d="M360.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H360.9z"></path>
+    <path class="pressed" d="M356.4,207.7c0,2.7,2.2,4.9,4.9,4.9H393c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M360.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H360.9z"></path>
+    <path class="lower-shadow" d="M356.4,205.7c0,2.7,2.2,4.9,4.9,4.9H393c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="v">
+    <path class="on" d="M315.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H315.9z"></path>
+    <path class="pressed" d="M311.4,207.7c0,2.7,2.2,4.9,4.9,4.9H348c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M315.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H315.9z"></path>
+    <path class="lower-shadow" d="M311.4,205.7c0,2.7,2.2,4.9,4.9,4.9H348c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="c">
+    <path class="on" d="M270.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H270.9z"></path>
+    <path class="pressed" d="M266.4,207.7c0,2.7,2.2,4.9,4.9,4.9H303c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M270.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H270.9z"></path>
+    <path class="lower-shadow" d="M266.4,205.7c0,2.7,2.2,4.9,4.9,4.9H303c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="x">
+    <path class="on" d="M225.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H225.9z"></path>
+    <path class="pressed" d="M221.4,207.7c0,2.7,2.2,4.9,4.9,4.9H258c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M225.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H225.9z"></path>
+    <path class="lower-shadow" d="M221.4,205.7c0,2.7,2.2,4.9,4.9,4.9H258c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="z">
+    <path class="on" d="M180.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H180.9z"></path>
+    <path class="pressed" d="M176.4,207.7c0,2.7,2.2,4.9,4.9,4.9H213c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M180.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H180.9z"></path>
+    <path class="lower-shadow" d="M176.4,205.7c0,2.7,2.2,4.9,4.9,4.9H213c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="shift-left">
+    <path class="on" d="M78.5,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h89.8c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="pressed" d="M74.1,207.7c0,2.7,2.2,4.9,4.9,4.9h89.1c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M78.5,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h89.8c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="lower-shadow" d="M74.1,205.7c0,2.7,2.2,4.9,4.9,4.9h89.1c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="k">
+    <path class="on" d="M472.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H505c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H472.5z"></path>
+    <path class="pressed" d="M468,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M472.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H505c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H472.5z"></path>
+    <path class="lower-shadow" d="M468,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="l">
+    <path class="on" d="M517.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H550c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H517.5z"></path>
+    <path class="pressed" d="M513,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M517.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H550c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H517.5z"></path>
+    <path class="lower-shadow" d="M513,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="semicolon">
+    <path class="on" d="M562.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H595c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H562.5z"></path>
+    <path class="pressed" d="M558,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M562.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H595c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H562.5z"></path>
+    <path class="lower-shadow" d="M558,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="quote">
+    <path class="on" d="M607.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5H640c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H607.5z"></path>
+    <path class="pressed" d="M603,163.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M607.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5H640c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H607.5z"></path>
+    <path class="lower-shadow" d="M603,161.7c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="slash">
+    <path class="on" d="M585.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H585.9z"></path>
+    <path class="pressed" d="M581.4,207.7c0,2.7,2.2,4.9,4.9,4.9H618c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M585.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H585.9z"></path>
+    <path class="lower-shadow" d="M581.4,205.7c0,2.7,2.2,4.9,4.9,4.9H618c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g>
+    <path class="on" d="M599.9,264.4c-2.5,0-4.5-2-4.5-4.5v-35c0-2.5,2-4.5,4.5-4.5h121.5c2.5,0,4.5,2,4.5,4.5v35
+        c0,2.5-2,4.5-4.5,4.5H599.9z"></path>
+    <path class="pressed" d="M595.4,258.2c0,2.7,2.2,4.9,4.9,4.9h120.8c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M599.9,264.4c-2.5,0-4.5-2-4.5-4.5v-38c0-2.5,2-4.5,4.5-4.5h121.5c2.5,0,4.5,2,4.5,4.5v38
+        c0,2.5-2,4.5-4.5,4.5H599.9z"></path>
+    <path class="lower-shadow" d="M595.4,256.2c0,2.7,2.2,4.9,4.9,4.9h120.8c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="option-right">
+    <path class="on" d="M528.5,264.3c-2.5,0-4.5-2-4.5-4.5v-34.9c0-2.5,2-4.5,4.5-4.5h58.9c2.5,0,4.5,2,4.5,4.5v34.9
+        c0,2.5-2,4.5-4.5,4.5H528.5z"></path>
+    <path class="pressed" d="M524.1,258.2c0,2.7,2.1,4.9,4.8,4.9H587c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M528.5,264.3c-2.5,0-4.5-2-4.5-4.5v-37.9c0-2.5,2-4.5,4.5-4.5h58.9c2.5,0,4.5,2,4.5,4.5
+        v37.9c0,2.5-2,4.5-4.5,4.5H528.5z"></path>
+    <path class="lower-shadow" d="M524.1,256.2c0,2.7,2.1,4.9,4.8,4.9H587c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="option-left">
+    <path class="on" d="M170.2,264.3c-2.5,0-4.5-2-4.5-4.5v-34.9c0-2.5,2-4.5,4.5-4.5H235c2.5,0,4.5,2,4.5,4.5v34.9
+        c0,2.5-2,4.5-4.5,4.5H170.2z"></path>
+    <path class="pressed" d="M165.8,258.2c0,2.7,2.2,4.9,4.9,4.9h64.1c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M170.2,264.3c-2.5,0-4.5-2-4.5-4.5v-37.9c0-2.5,2-4.5,4.5-4.5H235c2.5,0,4.5,2,4.5,4.5
+        v37.9c0,2.5-2,4.5-4.5,4.5H170.2z"></path>
+    <path class="lower-shadow" d="M165.8,256.2c0,2.7,2.2,4.9,4.9,4.9h64.1c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="control">
+    <path class="on" d="M78.5,264.3c-2.5,0-4.5-2-4.5-4.5v-34.9c0-2.5,2-4.5,4.5-4.5h79.1c2.5,0,4.5,2,4.5,4.5v34.9
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="pressed" d="M74,258.2c0,2.7,2.1,4.9,4.8,4.9h78.4c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M78.5,264.3c-2.5,0-4.5-2-4.5-4.5v-37.9c0-2.5,2-4.5,4.5-4.5h79.1c2.5,0,4.5,2,4.5,4.5
+        v37.9c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="lower-shadow" d="M74,256.2c0,2.7,2.1,4.9,4.8,4.9h78.4c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="space">
+    <path class="on" d="M247.1,264.3c-2.5,0-4.5-2-4.5-4.5v-34.9c0-2.5,2-4.5,4.5-4.5H516c2.5,0,4.5,2,4.5,4.5v34.9
+        c0,2.5-2,4.5-4.5,4.5H247.1z"></path>
+    <path class="pressed" d="M242.6,258.2c0,2.7,2.2,4.9,4.9,4.9h268.1c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M247.1,264.3c-2.5,0-4.5-2-4.5-4.5v-37.9c0-2.5,2-4.5,4.5-4.5H516c2.5,0,4.5,2,4.5,4.5
+        v37.9c0,2.5-2,4.5-4.5,4.5H247.1z"></path>
+    <path class="lower-shadow" d="M242.6,256.2c0,2.7,2.2,4.9,4.9,4.9h268.1c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="m">
+    <path class="on" d="M450.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H450.9z"></path>
+    <path class="pressed" d="M446.5,207.7c0,2.7,2.1,4.9,4.8,4.9H483c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M450.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H450.9z"></path>
+    <path class="lower-shadow" d="M446.5,205.7c0,2.7,2.1,4.9,4.8,4.9H483c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="comma">
+    <path class="on" d="M495.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H495.9z"></path>
+    <path class="pressed" d="M491.4,207.7c0,2.7,2.2,4.9,4.9,4.9H528c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M495.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H495.9z"></path>
+    <path class="lower-shadow" d="M491.4,205.7c0,2.7,2.2,4.9,4.9,4.9H528c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="dot">
+    <path class="on" d="M540.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H540.9z"></path>
+    <path class="pressed" d="M536.4,207.7c0,2.7,2.2,4.9,4.9,4.9H573c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M540.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h32.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H540.9z"></path>
+    <path class="lower-shadow" d="M536.4,205.7c0,2.7,2.2,4.9,4.9,4.9H573c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="enter">
+    <path class="on" d="M652.5,169.9c-2.5,0-4.5-2-4.5-4.5V137c0-2.5,2-4.5,4.5-4.5h68.9c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H652.5z"></path>
+    <path class="pressed" d="M648,163.7c0,2.7,2.2,4.9,4.9,4.9h68.2c2.7,0,4.8-2.2,4.8-4.9"></path>
+    <path class="background" d="M652.5,169.9c-2.5,0-4.5-2-4.5-4.5V134c0-2.5,2-4.5,4.5-4.5h68.9c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H652.5z"></path>
+    <path class="lower-shadow" d="M648,161.7c0,2.7,2.2,4.9,4.9,4.9h68.2c2.7,0,4.8-2.2,4.8-4.9"></path>
+</g>
+<g id="shift-right" class="active">
+    <path class="on" d="M630.9,213.8c-2.5,0-4.5-2-4.5-4.5v-28.4c0-2.5,2-4.5,4.5-4.5h90.5c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H630.9z"></path>
+    <path class="pressed" d="M626.5,207.7c0,2.7,2.2,4.9,4.9,4.9h89.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M630.9,213.8c-2.5,0-4.5-2-4.5-4.5v-31.4c0-2.5,2-4.5,4.5-4.5h90.5c2.5,0,4.5,2,4.5,4.5
+        v31.4c0,2.5-2,4.5-4.5,4.5H630.9z"></path>
+    <path class="lower-shadow" d="M626.5,205.7c0,2.7,2.2,4.9,4.9,4.9h89.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="tab">
+    <path class="on" d="M78.5,125.9c-2.5,0-4.5-2-4.5-4.5V93c0-2.5,2-4.5,4.5-4.5h55.8c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="pressed" d="M74,119.8c0,2.7,2.2,4.9,4.9,4.9h55c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M78.5,125.9c-2.5,0-4.5-2-4.5-4.5V90c0-2.5,2-4.5,4.5-4.5h55.8c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H78.5z"></path>
+    <path class="lower-shadow" d="M74,117.8c0,2.7,2.2,4.9,4.9,4.9h55c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="minus">
+    <path class="on" d="M573.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H606c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H573.5z"></path>
+    <path class="pressed" d="M569,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M573.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H606c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H573.5z"></path>
+    <path class="lower-shadow" d="M569,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="equal">
+    <path class="on" d="M618.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5H651c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H618.5z"></path>
+    <path class="pressed" d="M614,75.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M618.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5H651c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H618.5z"></path>
+    <path class="lower-shadow" d="M614,73.9c0,2.7,2.2,4.9,4.9,4.9h31.7c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+<g id="backspace">
+    <path class="on" d="M663.5,82c-2.5,0-4.5-2-4.5-4.5V49.1c0-2.5,2-4.5,4.5-4.5h57.9c2.5,0,4.5,2,4.5,4.5v28.4
+        c0,2.5-2,4.5-4.5,4.5H663.5z"></path>
+    <path class="pressed" d="M659,75.9c0,2.7,2.3,4.9,5,4.9h57.1c2.7,0,4.9-2.2,4.9-4.9"></path>
+    <path class="background" d="M663.5,82c-2.5,0-4.5-2-4.5-4.5V46.1c0-2.5,2-4.5,4.5-4.5h57.9c2.5,0,4.5,2,4.5,4.5v31.4
+        c0,2.5-2,4.5-4.5,4.5H663.5z"></path>
+    <path class="lower-shadow" d="M659,73.9c0,2.7,2.3,4.9,5,4.9h57.1c2.7,0,4.9-2.2,4.9-4.9"></path>
+</g>
+</g>
+
+<g id="letters">
+    <g style="transform: translate(-1px, 5px);">
+        <text transform="matrix(1 0 0 1 33.4903 33.804)" class="edc-st1 edc-st2" dx="0" dy="0">~</text>
+        <text transform="matrix(1 0 0 1 35.8009 52.6643)" class="edc-st1 edc-st2" dx="0" dy="0">`</text>
+        <text transform="matrix(1 0 0 1 78.626 50.4071)" class="edc-st1 edc-st2" dx="0" dy="0">1</text>
+        <text transform="matrix(1 0 0 1 123.299 51.1765)" class="edc-st1 edc-st2" dx="0" dy="0">2</text>
+        <text transform="matrix(1 0 0 1 169.6841 51.404)" class="edc-st1 edc-st2" dx="0" dy="0">3</text>
+        <text transform="matrix(1 0 0 1 213.0758 51.404)" class="edc-st1 edc-st2" dx="0" dy="0">4</text>
+        <text transform="matrix(1 0 0 1 258.0724 51.404)" class="edc-st1 edc-st2" dx="0" dy="0">5</text>
+        <text transform="matrix(1 0 0 1 303.2822 51.0891)" class="edc-st1 edc-st2" dx="0" dy="0">6</text>
+        <text transform="matrix(1 0 0 1 349.5064 51.0891)" class="edc-st1 edc-st2" dx="0" dy="0">7</text>
+        <text transform="matrix(1 0 0 1 393.281 51.2157)" class="edc-st1 edc-st2" dx="0" dy="0">8</text>
+        <text transform="matrix(1 0 0 1 438.5742 51.2157)" class="edc-st1 edc-st2" dx="0" dy="0">9</text>
+        <text transform="matrix(1 0 0 1 483.4907 51.2157)" class="edc-st1 edc-st2" dx="0" dy="0">0</text>
+        <text transform="matrix(1 0 0 1 530.4011 50.4071)" class="edc-st1 edc-st2" dx="0" dy="0">-</text>
+        <text transform="matrix(1 0 0 1 573.5195 51.2157)" class="edc-st1 edc-st2" dx="0" dy="0">=</text>
+     </g>
+     <g style="transform: translate(-1px, 7px);">
+        <text transform="matrix(1 0 0 1 80.5513 31.7605)" class="edc-st1 edc-st2" dx="0" dy="0">!</text>
+        <text transform="matrix(1 0 0 1 119.8565 30.45)" class="edc-st1 edc-st2" dx="0" dy="0">@</text>
+        <text transform="matrix(1 0 0 1 169.6841 31.76)" class="edc-st1 edc-st2" dx="0" dy="0">#</text>
+        <text transform="matrix(1 0 0 1 213.0758 31.2171)" class="edc-st1 edc-st2" dx="0" dy="0">$</text>
+        <text transform="matrix(1 0 0 1 255.5748 30.8318)" class="edc-st1 edc-st2" dx="0" dy="0">%</text>
+        <text transform="matrix(1 0 0 1 303.9556 32.4427)" class="edc-st1 edc-st2" dx="0" dy="0">^</text>
+        <text transform="matrix(1 0 0 1 348.2554 31.76)" class="edc-st1 edc-st2" dx="0" dy="0">&amp;</text>
+        <text transform="matrix(1 0 0 1 394.5334 32.8236)" class="edc-st1 edc-st2" dx="0" dy="0">*</text>
+        <text transform="matrix(1 0 0 1 440.3076 30.6435)" class="edc-st1 edc-st2" dx="0" dy="0">(</text>
+        <text transform="matrix(1 0 0 1 485.1645 30.6435)" class="edc-st1 edc-st2" dx="0" dy="0">)</text>
+        <text transform="matrix(1 0 0 1 528.7588 25.5423)" class="edc-st1 edc-st2" dx="0" dy="0">_</text>
+        <text transform="matrix(1 0 0 1 573.5195 32.4422)" class="edc-st1 edc-st2" dx="0" dy="0">+</text>
+     </g>
+    <g style="transform: translate(-1px, 3px);">
+        <text transform="matrix(1 0 0 1 100.9088 75.4743)" class="edc-st1" dx="0" dy="0">Q</text>
+        <text transform="matrix(1 0 0 1 100.9088 93.4743)" class="edc-st1 edc-st2 b" dx="-1.46875" dy="-5">Q</text>
+        <text transform="matrix(1 0 0 1 145.3644 75.4744)" class="edc-st1" dx="0" dy="0">W</text>
+        <text transform="matrix(1 0 0 1 145.3644 93.4744)" class="edc-st1 edc-st2 b" dx="-2.1718673706054688" dy="-5">W</text>
+        <text transform="matrix(1 0 0 1 190.5943 75.4744)" class="edc-st1" dx="0" dy="0">E</text>
+        <text transform="matrix(1 0 0 1 190.5943 93.4744)" class="edc-st1 edc-st2 b" dx="-0.7578125" dy="-5">E</text>
+        <text transform="matrix(1 0 0 1 236.9933 75.4743)" class="edc-st1" dx="0" dy="0">R</text>
+        <text transform="matrix(1 0 0 1 236.9933 93.4743)" class="edc-st1 edc-st2 b" dx="-2.5390777587890625" dy="-5">R</text>
+        <text transform="matrix(1 0 0 1 280.6080 75.4744)" class="edc-st1" dx="0" dy="0">T</text>
+        <text transform="matrix(1 0 0 1 280.6080 93.4744)" class="edc-st1 edc-st2 b" dx="-2.2890472412109375" dy="-5">T</text>
+        <text transform="matrix(1 0 0 1 326.5138 75.4744)" class="edc-st1" dx="0" dy="0">Y</text>
+        <text transform="matrix(1 0 0 1 326.5138 93.4744)" class="edc-st1 edc-st2 b" dx="-1.3046875" dy="-5">Y</text>
+        <text transform="matrix(1 0 0 1 371.1386 75.4743)" class="edc-st1" dx="0" dy="0">U</text>
+        <text transform="matrix(1 0 0 1 371.1386 93.4743)" class="edc-st1 edc-st2 b" dx="-1.3515777587890625" dy="-5">U</text>
+        <text transform="matrix(1 0 0 1 418.5557 75.4743)" class="edc-st1" dx="0" dy="0">I</text>
+        <text transform="matrix(1 0 0 1 418.5557 93.4743)" class="edc-st1 edc-st2 b" dx="0.0624847412109375" dy="-5">I</text>
+        <text transform="matrix(1 0 0 1 459.9639 75.4743)" class="edc-st1" dx="0" dy="0">O</text>
+        <text transform="matrix(1 0 0 1 459.9639 93.4743)" class="edc-st1 edc-st2 b" dx="-1.453125" dy="-5">O</text>
+        <text transform="matrix(1 0 0 1 506.9335 75.4743)" class="edc-st1" dx="0" dy="0">P</text>
+        <text transform="matrix(1 0 0 1 506.9335 93.4743)" class="edc-st1 edc-st2 b" dx="-0.937469482421875" dy="-5">P</text>
+        <text transform="matrix(1 0 0 1 112.1346 120.3303)" class="edc-st1 active" dx="0" dy="0">A</text>
+        <text transform="matrix(1 0 0 1 112.1346 138.3303)" class="edc-st1 edc-st2 b active" dx="-1.1406326293945312" dy="-5">A</text>
+        <text transform="matrix(1 0 0 1 156.0135 120.3303)" class="edc-st1" dx="0" dy="0">S</text>
+        <text transform="matrix(1 0 0 1 156.0135 138.3303)" class="edc-st1 edc-st2 b" dx="-1.0468597412109375" dy="-5">S</text>
+        <text transform="matrix(1 0 0 1 201.5241 120.3303)" class="edc-st1" dx="0" dy="0">D</text>
+        <text transform="matrix(1 0 0 1 201.5241 138.3303)" class="edc-st1 edc-st2 b" dx="-1.2890625" dy="-5">D</text>
+        <text transform="matrix(1 0 0 1 247.1121 120.3303)" class="edc-st1" dx="0" dy="0">F</text>
+        <text transform="matrix(1 0 0 1 247.1121 138.3303)" class="edc-st1 edc-st2 b" dx="-1.883148193359375" dy="-5">F</text>
+        <text transform="matrix(1 0 0 1 289.4753 120.3303)" class="edc-st1" dx="0" dy="0">G</text>
+        <text transform="matrix(1 0 0 1 289.4753 138.3303)" class="edc-st1 edc-st2 b" dx="-1.554718017578125" dy="-5">G</text>
+        <text transform="matrix(1 0 0 1 335.5886 120.3303)" class="edc-st1" dx="0" dy="0">H</text>
+        <text transform="matrix(1 0 0 1 335.5886 138.3303)" class="edc-st1 edc-st2 b" dx="-1.8046875" dy="-5">H</text>
+        <text transform="matrix(1 0 0 1 382.2692 120.3303)" class="edc-st1" dx="0" dy="0">J</text>
+        <text transform="matrix(1 0 0 1 382.2692 138.3303)" class="edc-st1 edc-st2 b" dx="-2.145721435546875" dy="-5">J</text>
+        <text transform="matrix(1 0 0 1 426.0182 120.3303)" class="edc-st1" dx="0" dy="0">K</text>
+        <text transform="matrix(1 0 0 1 426.0182 138.3303)" class="edc-st1 edc-st2 b" dx="-1.5" dy="-5">K</text>
+        <text transform="matrix(1 0 0 1 470.8706 120.3303)" class="edc-st1" dx="0" dy="0">L</text>
+        <text transform="matrix(1 0 0 1 470.8706 138.3303)" class="edc-st1 edc-st2 b" dx="-2.2890625" dy="-5">L</text>
+        <text transform="matrix(1 0 0 1 134.7896 163.7458)" class="edc-st1" dx="0" dy="0">Z</text>
+        <text transform="matrix(1 0 0 1 134.7896 181.7458)" class="edc-st1 edc-st2 b" dx="-1.234375" dy="-5">Z</text>
+        <text transform="matrix(1 0 0 1 179.2339 163.7458)" class="edc-st1" dx="0" dy="0">X</text>
+        <text transform="matrix(1 0 0 1 179.2339 181.7458)" class="edc-st1 edc-st2 b" dx="-1.3515548706054688" dy="-5">X</text>
+        <text transform="matrix(1 0 0 1 222.5416 163.7458)" class="edc-st1" dx="0" dy="0">C</text>
+        <text transform="matrix(1 0 0 1 222.5416 181.7458)" class="edc-st1 edc-st2 b" dx="-1.5" dy="-5">C</text>
+        <text transform="matrix(1 0 0 1 269.3973 163.7458)" class="edc-st1" dx="0" dy="0">V</text>
+        <text transform="matrix(1 0 0 1 269.3973 181.7458)" class="edc-st1 edc-st2 b" dx="-1.4296722412109375" dy="-5">V</text>
+        <text transform="matrix(1 0 0 1 314.0098 163.7458)" class="edc-st1" dx="0" dy="0">B</text>
+        <text transform="matrix(1 0 0 1 314.0098 181.7458)" class="edc-st1 edc-st2 b" dx="-0.921875" dy="-5">B</text>
+        <text transform="matrix(1 0 0 1 358.4863 163.7458)" class="edc-st1" dx="0" dy="0">N</text>
+        <text transform="matrix(1 0 0 1 358.4863 181.7458)" class="edc-st1 edc-st2 b" dx="-1.828125" dy="-5">N</text>
+        <text transform="matrix(1 0 0 1 401.6816 163.7458)" class="edc-st1" dx="0" dy="0">M</text>
+        <text transform="matrix(1 0 0 1 401.6816 181.7458)" class="edc-st1 edc-st2 b" dx="-1.0234375" dy="-5">M</text>
+    </g>
+    <g style="transform: translate(-1px, 7px);">
+        <text transform="matrix(1 0 0 1 519.074 119.3763)" class="edc-st1 edc-st2" dx="0" dy="0">:</text>
+        <text transform="matrix(1 0 0 1 450.2827 164.3396)" class="edc-st1 edc-st2" dx="0" dy="0">&lt;</text>
+        <text transform="matrix(1 0 0 1 494.9274 164.3396)" class="edc-st1 edc-st2" dx="0" dy="0">&gt;</text>
+        <text transform="matrix(1 0 0 1 541.3276 163.2498)" class="edc-st1 edc-st2" dx="0" dy="0">?</text>
+        <text transform="matrix(1 0 0 1 565.621 138.7127)" class="edc-st1 edc-st2" dx="0" dy="0">'</text>
+        <text transform="matrix(1 0 0 1 565.621 120.3763)" class="edc-st1 edc-st2" dx="0" dy="0">"</text>
+        <text transform="matrix(1 0 0 1 552.9709 74.8769)" class="edc-st1 edc-st2" dx="0" dy="0">{</text>
+        <text transform="matrix(1 0 0 1 598.3443 74.7849)" class="edc-st1 edc-st2" dx="0" dy="0">}</text>
+        <text transform="matrix(1 0 0 1 644.4941 74.8769)" class="edc-st1 edc-st2" dx="0" dy="0">|</text>
+    </g>
+    <g style="transform: translate(-1px, 5px);">
+        <text transform="matrix(1 0 0 1 644.3574 96.8807)" class="edc-st1 edc-st2" dx="0" dy="0">\</text>
+        <text transform="matrix(1 0 0 1 598.7657 94.426)" class="edc-st1 edc-st2" dx="0" dy="0">]</text>
+        <text transform="matrix(1 0 0 1 553.3923 94.426)" class="edc-st1 edc-st2" dx="0" dy="0">[</text>
+        <text transform="matrix(1 0 0 1 519.074 136.7127)" class="edc-st1 edc-st2" dx="0" dy="0">;</text>
+        <text transform="matrix(1 0 0 1 543.4077 181.0408)" class="edc-st1 edc-st2" dx="0" dy="0">/</text>
+        <text transform="matrix(1 0 0 1 495.9731 181.0409)" class="edc-st1 edc-st2 b2" dx="-1.3203125" dy="0">.</text>
+        <text transform="matrix(1 0 0 1 451.3285 180.0409)" class="edc-st1 edc-st2 b2" dx="-1.0546875" dy="0">,</text>
+    </g>
+    <g style="transform: translate(-90px, -113px);">
+        <text id="text-tab" transform="matrix(1 0 0 1 114.1797 206.9351)" class="t4 edc-st2">tab</text>
+        <text id="text-shift-left" transform="matrix(1 0 0 1 114.1801 295.1812)" class="t4 edc-st2">shift</text>
+        <text id="text-shift-right" transform="matrix(1 0 0 1 726.8587 295.1812)" class="t4 edc-st2 active">shift</text>
+        <text id="text-backspace" transform="matrix(1 0 0 1 700.0173 164.2681)" class="t4 edc-st2">Backspace</text>
+        <text id="text-enter" transform="matrix(1 0 0 1 725.3914 251.1048)" class="t4 edc-st2">enter</text>
+        <text id="text-control" transform="matrix(1 0 0 1 114.1801 345.5731)" class="t4 edc-st2">control </text>
+        <text id="text-caps-lock" transform="matrix(1 0 0 1 114.1797 250.8896)" class="t4 edc-st2">caps lock</text>
+        <text id="text-option-left" transform="matrix(1 0 0 1 220.7212 345.5731)" class="t4 edc-st2">option</text>
+        <text id="text-space" transform="matrix(1 0 0 1 400.2044 345.5731)" class="t4 edc-st2">space</text>
+        <text id="text-option-right" transform="matrix(1 0 0 1 576.1799 345.5731)" class="t4 edc-st2">option</text>
+    </g>
+</g>
+</svg>

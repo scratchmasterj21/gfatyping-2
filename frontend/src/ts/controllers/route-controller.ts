@@ -43,11 +43,25 @@ const route404: Route = {
   },
 };
 
-// NOTE: whenever adding a route add the pathname to the `firebase.json` rewrite rule
+// NOTE: whenever adding a route add the pathname to the `firebase.json` and `vercel.json` rewrite rules
+
+// login is mandatory everywhere except /login, /verify and /about, so gated
+// routes bounce to /login when auth is configured but the user isn't signed in.
+// when auth isn't configured at all (self-hosted without firebase), there's no
+// login to force, so the page is allowed to render as normal instead.
+async function requireLogin(options: NavigateOptions): Promise<boolean> {
+  if (isAuthAvailable() && !isAuthenticated()) {
+    await navigate("/login", options);
+    return false;
+  }
+  return true;
+}
+
 const routes: Route[] = [
   {
     path: "/",
     load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
       await PageController.change("test", options);
     },
   },
@@ -60,6 +74,7 @@ const routes: Route[] = [
   {
     path: "/leaderboards",
     load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
       await PageController.change("leaderboards", options);
     },
   },
@@ -70,8 +85,44 @@ const routes: Route[] = [
     },
   },
   {
+    path: "/lessons",
+    load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
+      await PageController.change("lessons", options);
+    },
+  },
+  {
+    path: "/classroom",
+    load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
+      await PageController.change("classroom", options);
+    },
+  },
+  {
+    path: "/certificate",
+    load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
+      await PageController.change("certificate", options);
+    },
+  },
+  {
+    path: "/race",
+    load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
+      await PageController.change("race", options);
+    },
+  },
+  {
+    path: "/racehost",
+    load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
+      await PageController.change("racehost", options);
+    },
+  },
+  {
     path: "/settings",
     load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
       await PageController.change("settings", options);
     },
   },
@@ -120,12 +171,14 @@ const routes: Route[] = [
   {
     path: "/profile",
     load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
       await PageController.change("profileSearch", options);
     },
   },
   {
     path: "/profile/:uidOrName",
     load: async (params, options) => {
+      if (!(await requireLogin(options))) return;
       await PageController.change("profile", {
         ...options,
         force: true,

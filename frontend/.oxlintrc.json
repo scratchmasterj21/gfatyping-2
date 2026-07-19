@@ -1,5 +1,13 @@
 {
-  "ignorePatterns": ["node_modules", "dist", "coverage", ".firebase", ".turbo"],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "coverage",
+    ".firebase",
+    ".turbo",
+    "__tests__",
+    "storybook"
+  ],
   "extends": [
     "../packages/oxlint-config/index.jsonc",
     "../packages/oxlint-config/plugin.jsonc"
@@ -17,6 +25,20 @@
       }
     },
     {
+      "files": [
+        "src/ts/games/word-defender/**/*.ts",
+        "src/ts/games/balloon-pop/**/*.ts",
+        "src/ts/games/type-racer/**/*.ts"
+      ],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-argument": "off"
+      }
+    },
+    {
       "files": ["storybook/**/*.tsx"],
       "rules": {
         "explicit-function-return-type": "off",
@@ -26,9 +48,68 @@
       }
     },
     {
+      "files": ["src/**/*.tsx"],
+      "rules": {
+        "react/no-unknown-property": [
+          "error",
+          {
+            "ignore": [
+              "autocomplete",
+              "autocorrect",
+              "autocapitalize",
+              "spellcheck",
+              "class",
+              "classList",
+              "innerHTML",
+              "onScrollEnd",
+              "router-link",
+              "on:click",
+              "for",
+              "stroke-width",
+              "stroke-opacity",
+              "stroke-linejoin",
+              "stroke-linecap",
+              "text-anchor",
+              "dominant-baseline",
+              "fill-opacity",
+              "font-size",
+              "font-family"
+            ]
+          }
+        ]
+      }
+    },
+    {
       "jsPlugins": ["eslint-plugin-solid", "@tanstack/eslint-plugin-query"],
       "files": ["src/**/*.tsx"],
       "rules": {
+        "react/no-unknown-property": [
+          "error",
+          {
+            "ignore": [
+              "autocomplete",
+              "autocorrect",
+              "autocapitalize",
+              "spellcheck",
+              "class",
+              "classList",
+              "innerHTML",
+              "onScrollEnd",
+              "router-link",
+              "on:click",
+              "for",
+              "stroke-width",
+              "stroke-opacity",
+              "stroke-linejoin",
+              "stroke-linecap",
+              "text-anchor",
+              "dominant-baseline",
+              "fill-opacity",
+              "font-size",
+              "font-family"
+            ]
+          }
+        ],
         "explicit-function-return-type": "off",
         "solid/components-return-once": "error",
         "solid/event-handlers": "error",

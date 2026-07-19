@@ -1,3 +1,4 @@
+import { evaluateAchievements } from "./achievements/achievements";
 import Ape from "./ape";
 import { showErrorNotification } from "./states/notifications";
 import { isAuthenticated } from "./states/core";
@@ -93,6 +94,7 @@ export async function initSnapshot(): Promise<Snapshot | false> {
       );
     }
 
+    snap.uid = userData.uid;
     snap.name = userData.name;
     snap.personalBests = userData.personalBests;
     snap.personalBests ??= {
@@ -122,6 +124,8 @@ export async function initSnapshot(): Promise<Snapshot | false> {
     snap.favoriteQuotes = userData.favoriteQuotes ?? {};
     snap.quoteRatings = userData.quoteRatings;
     snap.details = userData.profileDetails;
+    snap.avatarUrl = (userData as { avatarUrl?: string }).avatarUrl;
+    snap.classId = (userData as { classId?: string }).classId;
     snap.addedAt = userData.addedAt;
     snap.inventory = userData.inventory;
     snap.xp = userData.xp ?? 0;
@@ -371,6 +375,12 @@ export function saveLocalResult(data: SaveLocalResultData): void {
       resultingXp: snapshot.xp,
       breakdown: data.xpBreakdown,
     });
+  }
+
+  // Evaluate achievements off the freshly-updated snapshot. Dynamic import
+  // avoids a circular dependency (achievements -> db.getSnapshot).
+  if (data.result !== undefined) {
+    void evaluateAchievements();
   }
 }
 

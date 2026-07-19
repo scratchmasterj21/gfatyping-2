@@ -64,13 +64,13 @@ const commands: Command[] = [
   {
     id: "nextTest",
     display: "Next test",
-    alias: "restart start begin type test typing",
+    alias: "restart start begin type test typing lesson",
     icon: "fa-chevron-right",
     available: (): boolean => {
       return TestState.resultVisible;
     },
     exec: (): void => {
-      TestLogic.restart();
+      void TestLogic.nextTest();
     },
   },
   {

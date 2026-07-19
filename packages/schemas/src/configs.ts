@@ -472,6 +472,12 @@ export const ConfigSchema = z
     keymapLegendStyle: KeymapLegendStyleSchema,
     keymapShowTopRow: KeymapShowTopRowSchema,
     keymapSize: KeymapSizeSchema,
+    keymapShowFingers: z.boolean(),
+    showGuidedHands: z.boolean(),
+
+    // learning (lessons)
+    lessonIntros: z.boolean(),
+    lessonIntroSpeech: z.boolean(),
 
     // theme
     flipTestColors: z.boolean(),

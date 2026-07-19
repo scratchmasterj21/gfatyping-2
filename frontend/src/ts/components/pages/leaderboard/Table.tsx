@@ -7,6 +7,7 @@ import { format as dateFormat } from "date-fns/format";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { Accessor, createMemo, JSXElement, Show } from "solid-js";
 
+import { RaceLeaderboardEntry } from "../../../classroom/classroom";
 import { hasConnection } from "../../../collections/connections";
 import { createEffectOn } from "../../../hooks/effects";
 import { bp, BreakpointKey } from "../../../states/breakpoints";
@@ -22,14 +23,16 @@ import { DataTable, DataTableColumnDef } from "../../ui/table/DataTable";
 
 type SpeedEntry = LeaderboardEntry;
 type XpEntry = XpLeaderboardEntry;
-export type TableEntry = SpeedEntry | XpEntry;
+export type TableEntry = SpeedEntry | XpEntry | RaceLeaderboardEntry;
 
 export function Table(
   props: {
-    type: "speed" | "xp";
+    type: "speed" | "xp" | "racewpm" | "raceacc";
     entries: TableEntry[];
     friendsOnly: boolean;
     hideHeader?: true;
+    /** Classroom XP boards only show rank + user + total xp. */
+    compactXp?: boolean;
   } & (
     | {
         scrollToUser: Accessor<boolean>;
@@ -79,7 +82,14 @@ export function Table(
       friendsOnly: props.friendsOnly,
       userOverride: props.userOverride,
       addHeader: props.userOverride !== undefined && bp().xl,
+      compact: props.compactXp,
     }),
+  );
+  const raceColumns = createMemo(() =>
+    getRaceColumns({ userOverride: props.userOverride }),
+  );
+  const raceAccColumns = createMemo(() =>
+    getRaceAccColumns({ userOverride: props.userOverride }),
   );
 
   createEffectOn(
@@ -98,25 +108,33 @@ export function Table(
 
   return (
     <Show
-      when={props.type === "speed"}
+      when={props.type === "racewpm" || props.type === "raceacc"}
       fallback={
-        <DataTable
-          {...commonProps()}
-          columns={xpColumns()}
-          data={props.entries as XpLeaderboardEntry[]}
-          noDataRow={{
-            content: <NoEntriesFound />,
-          }}
-        />
+        <Show
+          when={props.type === "speed"}
+          fallback={
+            <DataTable
+              {...commonProps()}
+              columns={xpColumns()}
+              data={props.entries as XpLeaderboardEntry[]}
+              noDataRow={{ content: <NoEntriesFound /> }}
+            />
+          }
+        >
+          <DataTable
+            {...commonProps()}
+            columns={speedColumns()}
+            data={props.entries as LeaderboardEntry[]}
+            noDataRow={{ content: <NoEntriesFound /> }}
+          />
+        </Show>
       }
     >
       <DataTable
         {...commonProps()}
-        columns={speedColumns()}
-        data={props.entries as LeaderboardEntry[]}
-        noDataRow={{
-          content: <NoEntriesFound />,
-        }}
+        columns={props.type === "raceacc" ? raceAccColumns() : raceColumns()}
+        data={props.entries as RaceLeaderboardEntry[]}
+        noDataRow={{ content: <NoEntriesFound /> }}
       />
     </Show>
   );
@@ -338,12 +356,38 @@ function getXpColumns({
   friendsOnly,
   userOverride,
   addHeader,
+  compact,
 }: {
   friendsOnly: boolean;
   userOverride?: Accessor<JSXElement>;
   addHeader?: boolean;
+  compact?: boolean;
 }): DataTableColumnDef<XpEntry>[] {
   const defineColumn = createColumnHelper<XpEntry>().accessor;
+
+  if (compact === true) {
+    const totalXpColumn: DataTableColumnDef<XpEntry> = {
+      id: "totalXp",
+      accessorFn: (row: XpEntry) => row.totalXp,
+      header: "xp",
+      cell: (info: { getValue: () => number }) =>
+        info.getValue() < 1000
+          ? info.getValue().toFixed(0)
+          : abbreviateNumber(info.getValue()),
+      meta: { align: "right" },
+    };
+    const compactColumns = [
+      friendsRankColumn() as DataTableColumnDef<XpEntry>,
+      rankColumn(friendsOnly) as DataTableColumnDef<XpEntry>,
+      userColumn({ userOverride }) as DataTableColumnDef<XpEntry>,
+      totalXpColumn,
+    ];
+    if (!friendsOnly) {
+      compactColumns.shift();
+    }
+    return compactColumns.map((it) => ({ ...it, enableSorting: false }));
+  }
+
   const columns = [
     friendsRankColumn() as DataTableColumnDef<XpEntry>,
     rankColumn(friendsOnly) as DataTableColumnDef<XpEntry>,
@@ -410,6 +454,96 @@ function getXpColumns({
     ...it,
     enableSorting: false,
   }));
+}
+
+function getRaceColumns({
+  userOverride,
+}: {
+  userOverride?: Accessor<JSXElement>;
+}): DataTableColumnDef<RaceLeaderboardEntry>[] {
+  const defineColumn = createColumnHelper<RaceLeaderboardEntry>().accessor;
+
+  const columns: DataTableColumnDef<RaceLeaderboardEntry>[] = [
+    rankColumn(false) as DataTableColumnDef<RaceLeaderboardEntry>,
+    userColumn({ userOverride }) as DataTableColumnDef<RaceLeaderboardEntry>,
+    ...defineResponsivePair<RaceLeaderboardEntry>()({
+      columns: [
+        {
+          path: "bestRaceWpm",
+          header: "best wpm",
+          format: (v) => Math.round(v).toString(),
+        },
+        {
+          path: "bestRaceAcc",
+          header: "accuracy",
+          format: (v) => `${Math.round(v)}%`,
+        },
+      ],
+      switchBreakpoint: "xl",
+    }),
+    defineColumn("wins", {
+      header: () => (
+        <>
+          <div>wins</div>
+          <div class="text-em-xs opacity-50">races</div>
+        </>
+      ),
+      cell: (info) => (
+        <>
+          <div>{info.getValue()}</div>
+          <div class="text-sub">{info.row.original.totalRaces}</div>
+        </>
+      ),
+      meta: { align: "right" },
+    }),
+  ];
+
+  return columns.map((it) => ({ ...it, enableSorting: false }));
+}
+
+function getRaceAccColumns({
+  userOverride,
+}: {
+  userOverride?: Accessor<JSXElement>;
+}): DataTableColumnDef<RaceLeaderboardEntry>[] {
+  const defineColumn = createColumnHelper<RaceLeaderboardEntry>().accessor;
+
+  const columns: DataTableColumnDef<RaceLeaderboardEntry>[] = [
+    rankColumn(false) as DataTableColumnDef<RaceLeaderboardEntry>,
+    userColumn({ userOverride }) as DataTableColumnDef<RaceLeaderboardEntry>,
+    ...defineResponsivePair<RaceLeaderboardEntry>()({
+      columns: [
+        {
+          path: "bestRaceAcc",
+          header: "best acc",
+          format: (v) => `${Math.round(v)}%`,
+        },
+        {
+          path: "bestRaceWpm",
+          header: "wpm",
+          format: (v) => Math.round(v).toString(),
+        },
+      ],
+      switchBreakpoint: "xl",
+    }),
+    defineColumn("wins", {
+      header: () => (
+        <>
+          <div>wins</div>
+          <div class="text-em-xs opacity-50">races</div>
+        </>
+      ),
+      cell: (info) => (
+        <>
+          <div>{info.getValue()}</div>
+          <div class="text-sub">{info.row.original.totalRaces}</div>
+        </>
+      ),
+      meta: { align: "right" },
+    }),
+  ];
+
+  return columns.map((it) => ({ ...it, enableSorting: false }));
 }
 
 function wrapWithHeader(options: {

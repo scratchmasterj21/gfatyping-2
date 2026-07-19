@@ -138,8 +138,10 @@ function getColumns<M extends Mode>({
     }),
     defineColumn("charStats", {
       header: "chars",
-      cell: (info) =>
-        `${info.row.original.charStats[0]}/${info.row.original.charStats[1]}/${info.row.original.charStats[2]}/${info.row.original.charStats[3]}`,
+      cell: (info) => {
+        const charStats = info.row.original.charStats ?? [0, 0, 0, 0];
+        return `${charStats[0]}/${charStats[1]}/${charStats[2]}/${charStats[3]}`;
+      },
       meta: {
         breakpoint: "lg",
       },

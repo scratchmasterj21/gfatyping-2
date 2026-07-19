@@ -11,6 +11,7 @@ import { Config } from "../config/store";
 import { get as getTypingSpeedUnit } from "../utils/typing-speed-units";
 import { getActivePage, isAuthenticated } from "../states/core";
 import { Fonts } from "../constants/fonts";
+import { LanguageList } from "../constants/languages";
 import { KnownFontName } from "@monkeytype/schemas/fonts";
 import * as UI from "../ui";
 import { typedKeys } from "../utils/misc";
@@ -20,6 +21,7 @@ import { Validation } from "../types/validation";
 // eventually this file should be fully merged into config metadata, probably under the 'commandline' property
 
 type ConfigKeysWithoutCommands =
+  | "ads"
   | "minWpmCustomSpeed"
   | "minAccCustom"
   | "minBurstCustomSpeed"
@@ -182,7 +184,7 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
   },
   language: {
     subgroup: {
-      options: "fromSchema",
+      options: LanguageList,
       display: (value) => {
         return getLanguageDisplayString(value);
       },
@@ -675,6 +677,30 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
     },
     alias: "keyboard",
   },
+  keymapShowFingers: {
+    subgroup: {
+      options: "fromSchema",
+    },
+    alias: "keyboard",
+  },
+  showGuidedHands: {
+    subgroup: {
+      options: "fromSchema",
+    },
+    alias: "guided hands",
+  },
+
+  //lessons
+  lessonIntros: {
+    subgroup: {
+      options: "fromSchema",
+    },
+  },
+  lessonIntroSpeech: {
+    subgroup: {
+      options: "fromSchema",
+    },
+  },
 
   //themes
   customTheme: {
@@ -755,13 +781,6 @@ export const commandlineConfigMetadata: CommandlineConfigMetadataObject = {
     },
   },
   monkey: {
-    subgroup: {
-      options: "fromSchema",
-    },
-  },
-
-  //danger zone
-  ads: {
     subgroup: {
       options: "fromSchema",
     },

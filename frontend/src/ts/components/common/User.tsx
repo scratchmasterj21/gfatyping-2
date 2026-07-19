@@ -12,9 +12,9 @@ import { cn } from "../../utils/cn";
 import { Anime } from "./anime";
 import { AnimePresence } from "./anime/AnimePresence";
 import { Button } from "./Button";
-import { DiscordAvatar } from "./DiscordAvatar";
 import { Fa } from "./Fa";
 import { NotificationBubble } from "./NotificationBubble";
+import { UserAvatar } from "./UserAvatar";
 import { UserBadge } from "./UserBadge";
 import { UserFlags } from "./UserFlags";
 
@@ -23,6 +23,7 @@ type Props = {
   user: SupportsFlags &
     Pick<UserType, "uid" | "name" | "discordId" | "discordAvatar" | "xp"> & {
       badgeId?: number;
+      avatarUrl?: string;
     };
   showAvatar?: boolean;
   avatarFallback?: "user" | "user-circle";
@@ -96,12 +97,11 @@ export function User(props: Props): JSXElement {
                     animate={{ opacity: 1, duration: 125 }}
                     exit={{ opacity: 0, duration: 125 }}
                   >
-                    <DiscordAvatar
+                    <UserAvatar
+                      uid={props.user.uid}
                       size={64}
-                      discordId={props.user.discordId}
-                      discordAvatar={props.user.discordAvatar}
-                      fallbackIcon={props.avatarFallback ?? "user"}
                       class={cn(
+                        "h-[1.25em] w-[1.25em]",
                         props.avatarColor === "text" && "text-text",
                         props.avatarColor === "sub" && "text-sub",
                       )}

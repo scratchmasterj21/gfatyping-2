@@ -7,14 +7,13 @@ import {
   Show,
 } from "solid-js";
 
+import { isCurrentUserAdmin } from "../../../auth";
 import { usePendingConnectionsQuery } from "../../../collections/connections";
 import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
-import {
-  prefetchAboutPage,
-  prefetchLeaderboardPage,
-} from "../../../queries/prefetch";
+import { useClassroomAlerts } from "../../../lessons/classroom-alerts";
+import { prefetchLeaderboardPage } from "../../../queries/prefetch";
 import { getServerConfigurationQueryOptions } from "../../../queries/server-configuration";
 import { getActivePage } from "../../../states/core";
 import {
@@ -68,7 +67,11 @@ export function Nav(): JSXElement {
     return pendingConnections().length > 0;
   });
 
+  const { alerts: classroomAlerts } = useClassroomAlerts();
+
   const showAlertsNotificationBubble = createMemo((): boolean => {
+    if (classroomAlerts().length > 0) return true;
+
     const snapshot = getSnapshot();
     if (snapshot === undefined) return false;
 
@@ -100,6 +103,19 @@ export function Nav(): JSXElement {
       <Button
         variant="text"
         fa={{
+          icon: "fa-graduation-cap",
+          fixedWidth: true,
+        }}
+        router-link
+        dataset={{
+          "data-nav-item": "lessons",
+        }}
+        class={buttonClass()}
+        href="/lessons"
+      />
+      <Button
+        variant="text"
+        fa={{
           icon: "fa-crown",
           fixedWidth: true,
         }}
@@ -113,22 +129,49 @@ export function Nav(): JSXElement {
           prefetchLeaderboardPage();
         }}
       />
-      <Button
-        variant="text"
-        fa={{
-          icon: "fa-info",
-          fixedWidth: true,
-        }}
-        class={buttonClass()}
-        dataset={{
-          "data-nav-item": "about",
-        }}
-        href="/about"
-        router-link
-        onMouseEnter={() => {
-          prefetchAboutPage();
-        }}
-      />
+      <Show when={getSnapshot() !== undefined}>
+        <Button
+          variant="text"
+          fa={{
+            icon: "fa-flag-checkered",
+            fixedWidth: true,
+          }}
+          router-link
+          dataset={{
+            "data-nav-item": "race",
+          }}
+          class={buttonClass()}
+          href="/race"
+        />
+      </Show>
+      <Show when={isCurrentUserAdmin()}>
+        <Button
+          variant="text"
+          fa={{
+            icon: "fa-chalkboard-teacher",
+            fixedWidth: true,
+          }}
+          router-link
+          dataset={{
+            "data-nav-item": "classroom",
+          }}
+          class={buttonClass()}
+          href="/classroom"
+        />
+        <Button
+          variant="text"
+          fa={{
+            icon: "fa-stopwatch",
+            fixedWidth: true,
+          }}
+          router-link
+          dataset={{
+            "data-nav-item": "racehost",
+          }}
+          class={buttonClass()}
+          href="/racehost"
+        />
+      </Show>
       <Button
         variant="text"
         fa={{

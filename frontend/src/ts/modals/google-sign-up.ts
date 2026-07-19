@@ -1,196 +1,77 @@
-import { ElementWithUtils, qsr } from "../utils/dom";
+import { UserCredential } from "firebase/auth";
+import Ape from "../ape";
+import * as AccountController from "../auth";
+import { isAllowedAuthEmail } from "../auth";
 import {
-  showNoticeNotification,
   showErrorNotification,
   showSuccessNotification,
 } from "../states/notifications";
-import {
-  sendEmailVerification,
-  updateProfile,
-  UserCredential,
-  getAdditionalUserInfo,
-} from "firebase/auth";
-import Ape from "../ape";
-import * as AccountController from "../auth";
-import * as CaptchaController from "../controllers/captcha-controller";
-
 import { showLoaderBar, hideLoaderBar } from "../states/loader-bar";
 import { googleSignUpEvent } from "../events/google-sign-up";
-import AnimatedModal from "../utils/animated-modal";
 import { resetIgnoreAuthCallback, setUserState } from "../firebase";
-import { ValidatedHtmlInputElement } from "../elements/input-validation";
-import { UserNameSchema } from "@monkeytype/schemas/users";
-import { remoteValidation } from "../utils/remote-validation";
 import { authEvent } from "../events/auth";
+import { provisionAccount } from "../account-provisioning";
 
-let signedInUser: UserCredential | undefined = undefined;
+/**
+ * Google-only, domain-locked sign up.
+ *
+ * Since there is no Express backend to verify a captcha, new Google users are
+ * created automatically with a username derived from their account. The captcha
+ * modal has been removed.
+ */
 
-function show(credential: UserCredential): void {
-  void modal.show({
-    mode: "dialog",
-    focusFirstInput: true,
-    beforeAnimation: async (modalEl) => {
-      signedInUser = credential;
-
-      if (!CaptchaController.isCaptchaAvailable()) {
-        showErrorNotification(
-          "Could not show google sign up popup: Captcha is not available. This could happen due to a blocked or failed network request. Please refresh the page or contact support if this issue persists.",
-        );
-        return;
-      }
-      CaptchaController.reset("googleSignUpModal");
-      CaptchaController.render(
-        modalEl.qsr(".captcha").native,
-        "googleSignUpModal",
-      );
-      enableInput();
-      disableButton();
-    },
-    afterAnimation: async () => {
-      if (!CaptchaController.isCaptchaAvailable()) {
-        void hide();
-      }
-    },
+async function cleanup(credential: UserCredential): Promise<void> {
+  await Ape.users.delete().catch(() => {
+    //ignore - user might not exist
   });
+  await credential.user.delete().catch(() => {
+    //user might be deleted already
+  });
+  AccountController.signOut();
 }
 
-async function hide(): Promise<void> {
-  void modal.hide({
-    afterAnimation: async () => {
-      resetIgnoreAuthCallback();
-      if (signedInUser !== undefined) {
-        showNoticeNotification("Sign up process cancelled", {
-          durationMs: 5000,
-        });
-        if (getAdditionalUserInfo(signedInUser)?.isNewUser) {
-          await Ape.users.delete();
-          await signedInUser?.user.delete().catch(() => {
-            //user might be deleted already by the server
-          });
-        }
-        AccountController.signOut();
-        signedInUser = undefined;
-      }
-    },
-  });
-}
+async function createAccount(credential: UserCredential): Promise<void> {
+  const user = credential.user;
 
-async function apply(): Promise<void> {
-  if (!signedInUser) {
+  if (!isAllowedAuthEmail(user.email)) {
     showErrorNotification(
-      "Missing user credential. Please close the popup and try again.",
+      `Only @${AccountController.ALLOWED_AUTH_DOMAIN} accounts are allowed to sign in.`,
+      { durationMs: 7000 },
     );
+    resetIgnoreAuthCallback();
+    await cleanup(credential);
     return;
   }
-
-  const captcha = CaptchaController.getResponse("googleSignUpModal");
-  if (!captcha) {
-    showNoticeNotification("Please complete the captcha");
-    return;
-  }
-
-  disableInput();
-  disableButton();
 
   showLoaderBar();
-  const name = modal
-    .getModal()
-    .qsr<HTMLInputElement>("input")
-    .getValue() as string;
   try {
-    if (name.length === 0) throw new Error("Name cannot be empty");
-    const response = await Ape.users.create({ body: { name, captcha } });
-    if (response.status !== 200) {
-      throw new Error(`Failed to create user: ${response.body.message}`);
-    }
+    setUserState(user);
+    await provisionAccount(user);
+    showSuccessNotification("Account created");
+    await AccountController.loadUser(user);
 
-    if (response.status === 200) {
-      setUserState(signedInUser.user);
-      await updateProfile(signedInUser.user, { displayName: name });
-      await sendEmailVerification(signedInUser.user);
-      showSuccessNotification("Account created");
-      await AccountController.loadUser(signedInUser.user);
+    // Only now re-arm the real onAuthStateChanged listener (suppressed since
+    // the popup opened) - doing this any earlier lets it fire its own
+    // redundant loadUser() call while this one is still in flight, racing
+    // the brand-new account's snapshot init.
+    resetIgnoreAuthCallback();
 
-      authEvent.dispatch({
-        type: "authStateChanged",
-        data: { isUserSignedIn: true, loadPromise: Promise.resolve() },
-      });
-
-      signedInUser = undefined;
-      hideLoaderBar();
-      void hide();
-    }
+    authEvent.dispatch({
+      type: "authStateChanged",
+      data: { isUserSignedIn: true, loadPromise: Promise.resolve() },
+    });
   } catch (e) {
-    console.log(e);
+    console.error(e);
     showErrorNotification("Failed to sign in with Google", { error: e });
-    if (signedInUser && getAdditionalUserInfo(signedInUser)?.isNewUser) {
-      await Ape.users.delete();
-      await signedInUser?.user.delete().catch(() => {
-        //user might be deleted already by the server
-      });
-    }
-    AccountController.signOut();
-    signedInUser = undefined;
-    void hide();
+    resetIgnoreAuthCallback();
+    await cleanup(credential);
+  } finally {
     hideLoaderBar();
-    return;
   }
-}
-
-function enableButton(): void {
-  modal.getModal().qsr("button").enable();
-}
-
-function disableButton(): void {
-  modal.getModal().qsr("button").disable();
-}
-
-const nameInputEl = qsr<HTMLInputElement>("#googleSignUpModal input");
-
-function enableInput(): void {
-  nameInputEl?.enable();
-}
-
-function disableInput(): void {
-  nameInputEl?.disable();
-}
-
-new ValidatedHtmlInputElement(nameInputEl, {
-  schema: UserNameSchema,
-  isValid: remoteValidation(
-    async (name) => Ape.users.getNameAvailability({ params: { name } }),
-    { check: (data) => data.available || "Name not available" },
-  ),
-  debounceDelay: 1000,
-  callback: (result) => {
-    if (result.status === "success") {
-      enableButton();
-    } else {
-      disableButton();
-    }
-  },
-});
-
-async function setup(modalEl: ElementWithUtils): Promise<void> {
-  modalEl.on("submit", (e) => {
-    e.preventDefault();
-    void apply();
-  });
 }
 
 googleSignUpEvent.subscribe(({ signedInUser, isNewUser }) => {
   if (signedInUser !== undefined && isNewUser) {
-    show(signedInUser);
+    void createAccount(signedInUser);
   }
-});
-
-const modal = new AnimatedModal({
-  dialogId: "googleSignUpModal",
-  setup,
-  customEscapeHandler: async (): Promise<void> => {
-    void hide();
-  },
-  customWrapperClickHandler: async (): Promise<void> => {
-    void hide();
-  },
 });

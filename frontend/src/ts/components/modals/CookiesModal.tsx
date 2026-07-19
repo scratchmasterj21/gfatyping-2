@@ -1,9 +1,7 @@
 import { createEffect, createSignal, JSXElement } from "solid-js";
 
-import { showConsentPopup } from "../../controllers/ad-controller";
 import { getAcceptedCookies, setAcceptedCookies } from "../../cookies";
 import { hideModal, isModalOpen } from "../../states/modals";
-import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { AnimeSwitch } from "../common/anime";
@@ -17,7 +15,6 @@ export function CookiesModal(): JSXElement {
     getAcceptedCookies() ?? {
       security: true,
       analytics: false,
-      sentry: false,
     },
   );
 
@@ -27,7 +24,6 @@ export function CookiesModal(): JSXElement {
       setAccepted({
         security: true,
         analytics: false,
-        sentry: false,
       });
     }
   });
@@ -75,7 +71,6 @@ export function CookiesModal(): JSXElement {
                   setAccepted({
                     security: true,
                     analytics: true,
-                    sentry: true,
                   });
                   setAcceptedCookies(accepted());
                   hideModal("Cookies");
@@ -87,7 +82,6 @@ export function CookiesModal(): JSXElement {
                   setAccepted({
                     security: true,
                     analytics: false,
-                    sentry: false,
                   });
                   setAcceptedCookies(accepted());
                   hideModal("Cookies");
@@ -122,49 +116,6 @@ export function CookiesModal(): JSXElement {
               onChange={(checked) =>
                 setAccepted({ ...accepted(), analytics: checked })
               }
-            />
-            <SettingsSection
-              title="sentry"
-              description="We use Sentry to track errors and performance issues on our site, as
-            well as record anonymized user sessions to help us debug issues and
-            improve experience."
-              checked={false}
-              onChange={(checked) =>
-                setAccepted({ ...accepted(), sentry: checked })
-              }
-            />
-            <SettingsSection
-              title="advertising"
-              description={
-                <div class="grid grid-cols-[auto_1fr] items-center gap-4">
-                  <div>
-                    Our advertising partner may use cookies to deliver ads that
-                    are more relevant to you.
-                  </div>
-                  <Button
-                    fa={{ icon: "fa-external-link-alt", fixedWidth: true }}
-                    class="text-[0.85em]"
-                    onClick={() => {
-                      try {
-                        showConsentPopup();
-                      } catch (e) {
-                        console.error("Failed to open ad consent UI");
-                        console.error(e);
-                        showErrorNotification(
-                          "Failed to open Ad consent popup. Do you have an ad or cookie popup blocker enabled?",
-                        );
-                      }
-                    }}
-                  />
-                  {/* <Button
-                    text="Click to change your preferences on ad related cookies"
-                    variant="text"
-                    class="text-left p-0 mt-2"
-                  /> */}
-                </div>
-              }
-              checked={false}
-              hideCheckbox={true}
             />
             <Button
               text="accept selected"

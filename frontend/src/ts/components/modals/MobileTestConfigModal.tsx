@@ -9,7 +9,8 @@ import { For, JSXElement, Show } from "solid-js";
 import { setConfig, setQuoteLengthAll } from "../../config/setters";
 import { getConfig } from "../../config/store";
 import { restartTestEvent } from "../../events/test";
-import { isAuthenticated } from "../../states/core";
+import { getActiveLesson } from "../../lessons/lesson-progress";
+import { getCustomTextIndicator, isAuthenticated } from "../../states/core";
 import { showModal } from "../../states/modals";
 import { areUnsortedArraysEqual } from "../../utils/arrays";
 import { AnimatedModal } from "../common/AnimatedModal";
@@ -52,7 +53,9 @@ function MCButton(props: {
 }
 
 const isPunctuationDisabled = () =>
-  getConfig.mode === "quote" || getConfig.mode === "zen";
+  getConfig.mode === "quote" ||
+  getConfig.mode === "zen" ||
+  getActiveLesson() !== null;
 
 export function MobileTestConfigModal(): JSXElement {
   const handleModeClick = (mode: Mode) => {
@@ -141,11 +144,21 @@ export function MobileTestConfigModal(): JSXElement {
       <Separator />
 
       <div class="grid gap-2">
+        <Show when={getActiveLesson() !== null}>
+          <MCButton
+            text={getCustomTextIndicator()?.name ?? "lesson"}
+            active={true}
+            onClick={() => {
+              // Informational only - a lesson isn't a mode you can switch
+              // into ad hoc, so this row doesn't do anything when clicked.
+            }}
+          />
+        </Show>
         <For each={modes}>
           {(mode) => (
             <MCButton
               text={mode}
-              active={getConfig.mode === mode}
+              active={getConfig.mode === mode && getActiveLesson() === null}
               onClick={() => handleModeClick(mode)}
             />
           )}
@@ -200,7 +213,16 @@ export function MobileTestConfigModal(): JSXElement {
           </Show>
 
           <Show when={getConfig.mode === "custom"}>
-            <MCButton text="change" onClick={() => showModal("CustomText")} />
+            <Show
+              when={getActiveLesson() === null}
+              fallback={
+                <div class="p-2 text-center opacity-70">
+                  {getCustomTextIndicator()?.name}
+                </div>
+              }
+            >
+              <MCButton text="change" onClick={() => showModal("CustomText")} />
+            </Show>
           </Show>
         </div>
         <Separator />

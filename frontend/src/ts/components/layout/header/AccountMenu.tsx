@@ -2,6 +2,7 @@ import { JSXElement, Show } from "solid-js";
 
 import { get as getServerConfiguration } from "../../../ape/server-configuration";
 import { signOut } from "../../../auth";
+import { showModal } from "../../../states/modals";
 import { getSnapshot } from "../../../states/snapshot";
 import { Button } from "../../common/Button";
 import { NotificationBubble } from "../../common/NotificationBubble";
@@ -53,6 +54,17 @@ export function AccountMenu(props: Props): JSXElement {
           </Button>
         </Show>
         <Button
+          text="My Avatar"
+          class={buttonClass}
+          fa={{
+            icon: "fa-user-astronaut",
+            fixedWidth: true,
+          }}
+          onClick={() => {
+            showModal("Avatar");
+          }}
+        />
+        <Button
           text="Public profile"
           class={buttonClass}
           fa={{
@@ -60,6 +72,16 @@ export function AccountMenu(props: Props): JSXElement {
             fixedWidth: true,
           }}
           href={`/profile/${getSnapshot()?.name ?? ""}`}
+          router-link
+        />
+        <Button
+          text="My certificate"
+          class={buttonClass}
+          fa={{
+            icon: "fa-certificate",
+            fixedWidth: true,
+          }}
+          href="/certificate"
           router-link
         />
         <Button

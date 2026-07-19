@@ -1,5 +1,6 @@
-import { JSXElement } from "solid-js";
+import { JSXElement, Show } from "solid-js";
 
+import { isCurrentUserAdmin } from "../../../auth";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
 
@@ -62,6 +63,15 @@ export function QuickNav(): JSXElement {
         <Button
           class={buttonClass}
           variant="text"
+          href="#group_learning"
+          text="learning"
+          fa={{
+            icon: "fa-graduation-cap",
+          }}
+        />
+        <Button
+          class={buttonClass}
+          variant="text"
           href="#group_theme"
           text="theme"
           fa={{
@@ -77,6 +87,17 @@ export function QuickNav(): JSXElement {
             icon: "fa-eye-slash",
           }}
         />
+        <Show when={isCurrentUserAdmin()}>
+          <Button
+            class={buttonClass}
+            variant="text"
+            href="#group_classroom"
+            text="classroom"
+            fa={{
+              icon: "fa-chalkboard-teacher",
+            }}
+          />
+        </Show>
         <Button
           class={cn(buttonClass, "pr-6")}
           variant="text"

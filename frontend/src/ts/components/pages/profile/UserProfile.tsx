@@ -3,13 +3,25 @@ import {
   RankAndCount,
   UserProfile as UserProfileType,
 } from "@monkeytype/schemas/users";
+import { useQuery } from "@tanstack/solid-query";
 import { formatDate } from "date-fns/format";
-import { createMemo, For, JSXElement, Show } from "solid-js";
+import { createMemo, For, JSXElement, onMount, Show } from "solid-js";
 
+import {
+  evaluateAchievements,
+  getEarnedAchievements,
+} from "../../../achievements/achievements";
+import { achievements } from "../../../achievements/achievements-data";
+import { goalForClass } from "../../../constants/grade-goals";
 import * as PbTablesModal from "../../../modals/pb-tables";
+import { queryClient } from "../../../queries";
 import { getFormatting } from "../../../states/core";
+import { getSnapshot } from "../../../states/snapshot";
+import { cn } from "../../../utils/cn";
 import { formatTopPercentage } from "../../../utils/misc";
+import { Bar } from "../../common/Bar";
 import { Button } from "../../common/Button";
+import { Fa } from "../../common/Fa";
 import { ActivityCalendar } from "./ActivityCalendar";
 import { UserDetails } from "./UserDetails";
 
@@ -23,6 +35,12 @@ export function UserProfile(props: {
         profile={props.profile}
         isAccountPage={props.isAccountPage}
       />
+      <Show when={props.isAccountPage}>
+        <GradeGoal />
+      </Show>
+      <Show when={props.isAccountPage}>
+        <AchievementsPanel />
+      </Show>
       <Show when={!props.profile.banned && !props.profile.lbOptOut}>
         <LeaderboardPosition
           top15={props.profile.allTimeLbs?.time?.["15"]?.["english"]}
@@ -179,6 +197,108 @@ function PbTable<M extends "time" | "words">(props: {
           />
         </div>
       </Show>
+    </div>
+  );
+}
+
+function bestDefaultPb(): { wpm: number; acc: number } {
+  const arr = getSnapshot()?.personalBests?.time?.["30"] ?? [];
+  let wpm = 0;
+  let acc = 0;
+  for (const pb of arr) {
+    if (pb.language === "english" && pb.wpm > wpm) {
+      wpm = pb.wpm;
+      acc = pb.acc;
+    }
+  }
+  return { wpm, acc };
+}
+
+function GradeGoal(): JSXElement {
+  const goal = createMemo(() => goalForClass(getSnapshot()?.classId));
+  const best = createMemo(() => bestDefaultPb());
+  const wpmPercent = (): number => {
+    const g = goal();
+    if (g === undefined) return 0;
+    return Math.min(100, (best().wpm / g.wpm) * 100);
+  };
+  const accPercent = (): number => {
+    const g = goal();
+    if (g === undefined) return 0;
+    return Math.min(100, (best().acc / g.acc) * 100);
+  };
+
+  return (
+    <Show when={goal()}>
+      {(g) => (
+        <div class="grid gap-3 rounded bg-sub-alt p-4 text-sub">
+          <span class="text-center">Grade goal ({getSnapshot()?.classId})</span>
+          <div class="grid grid-cols-[4rem_1fr_5rem] items-center gap-3 text-em-sm">
+            <span class="justify-self-end">speed</span>
+            <Bar percent={wpmPercent()} fill="main" bg="bg" />
+            <span class="justify-self-start text-text">
+              {Math.round(best().wpm)} / {g().wpm} wpm
+            </span>
+            <span class="justify-self-end">accuracy</span>
+            <Bar percent={accPercent()} fill="main" bg="bg" />
+            <span class="justify-self-start text-text">
+              {Math.round(best().acc)} / {g().acc}%
+            </span>
+          </div>
+        </div>
+      )}
+    </Show>
+  );
+}
+
+function AchievementsPanel(): JSXElement {
+  onMount(() => {
+    void evaluateAchievements().then(() => {
+      void queryClient.invalidateQueries({ queryKey: ["achievements"] });
+    });
+  });
+
+  const earnedQuery = useQuery(() => ({
+    queryKey: ["achievements"],
+    queryFn: getEarnedAchievements,
+  }));
+
+  const isEarned = (id: string): boolean => earnedQuery.data?.has(id) === true;
+
+  const earnedCount = createMemo(
+    () => achievements.filter((a) => isEarned(a.id)).length,
+  );
+
+  return (
+    <div class="grid gap-3 rounded bg-sub-alt p-4 text-sub">
+      <span class="text-center">
+        Achievements ({earnedCount()}/{achievements.length})
+      </span>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <For each={achievements}>
+          {(a) => (
+            <div
+              class={cn(
+                "flex items-start gap-3 rounded bg-bg p-3",
+                isEarned(a.id) ? "" : "opacity-40",
+              )}
+            >
+              <Fa
+                icon={a.icon}
+                fixedWidth
+                size={1.25}
+                class={cn("mt-0.5", isEarned(a.id) ? "text-main" : "text-sub")}
+              />
+              <div class="grid gap-0.5">
+                <span class="leading-tight text-text">{a.name}</span>
+                <span class="text-em-xs leading-tight text-sub">
+                  {a.description}
+                </span>
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
     </div>
   );
 }

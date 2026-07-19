@@ -1,6 +1,7 @@
 import { createStore } from "solid-js/store";
 
 export type ModalId =
+  | "Avatar"
   | "VersionHistory"
   | "Contact"
   | "Support"
@@ -30,7 +31,8 @@ export type ModalId =
   | "AddPresetModal"
   | "EditPresetModal"
   | "EditProfile"
-  | "ViewApeKey";
+  | "LessonIntro"
+  | "LessonIntroVideo";
 
 export type ModalVisibility = {
   visible: boolean;

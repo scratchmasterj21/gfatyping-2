@@ -9,8 +9,8 @@ const profilerModeLS = new LocalStorageWithSchema({
 });
 
 // Resolved at module load: profiler mode disables features that initialise
-// at load (signal tracker hook, sentry init, logger debug filter), so toggling
-// it requires a reload to take effect.
+// at load (signal tracker hook, logger debug filter), so toggling it requires
+// a reload to take effect.
 const active = isDevEnvironment() && profilerModeLS.get();
 
 export function isProfilerMode(): boolean {

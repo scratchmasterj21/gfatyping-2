@@ -1,3 +1,16 @@
+// Shared kid-friendly 8-finger palette, reused by the keymap key coloring and
+// the finger legend below it.
+$finger-colors: (
+  "lp": #ef4444,
+  "lr": #f97316,
+  "lm": #eab308,
+  "li": #22c55e,
+  "ri": #14b8a6,
+  "rm": #3b82f6,
+  "rr": #8b5cf6,
+  "rp": #ec4899,
+);
+
 #keymap {
   font-size: 1rem;
   display: grid;
@@ -12,6 +25,20 @@
   .row {
     height: 2rem;
     gap: 0.25rem;
+  }
+
+  // Finger guidance: color each key by the finger that should press it.
+  // :not(.activeKey) so the "next key" highlight still wins on that one key.
+  &.show-fingers {
+    @each $code, $color in $finger-colors {
+      .keymapKey[data-finger="#{$code}"]:not(.activeKey) {
+        background-color: $color;
+        color: #1a1a1a;
+        .bump {
+          background: #1a1a1a;
+        }
+      }
+    }
   }
 
   .keymapKey {
@@ -541,6 +568,57 @@
       width: 2rem;
       height: 2rem;
       position: relative;
+    }
+  }
+}
+
+// Big colored key tiles shown in the pre-lesson intro modal.
+.lessonKeyTile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--roundness);
+  background-color: var(--sub-alt-color);
+  color: var(--text-color);
+  font-size: 1.75rem;
+  font-weight: 600;
+
+  @each $code, $color in $finger-colors {
+    &[data-finger="#{$code}"] {
+      background-color: $color;
+      color: #1a1a1a;
+    }
+  }
+}
+
+.fingerLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--sub-color);
+  user-select: none;
+
+  .item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+
+  .swatch {
+    width: 0.85em;
+    height: 0.85em;
+    border-radius: 0.2em;
+    display: inline-block;
+  }
+
+  @each $code, $color in $finger-colors {
+    .swatch[data-finger="#{$code}"] {
+      background-color: $color;
     }
   }
 }

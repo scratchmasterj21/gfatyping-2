@@ -1,11 +1,13 @@
 import { JSXElement } from "solid-js";
 
-import { ViewApeKeyModal } from "./account-settings/ViewApeKeyModal";
+import { AvatarModal } from "./AvatarModal";
 import { ContactModal } from "./ContactModal";
 import { CookiesModal } from "./CookiesModal";
 import { CustomTestDurationModal } from "./CustomTestDurationModal";
 import { CustomTextModal } from "./CustomTextModal";
 import { CustomWordAmountModal } from "./CustomWordAmountModal";
+import { LessonIntroModal } from "./LessonIntroModal";
+import { LessonIntroVideoModal } from "./LessonIntroVideoModal";
 import { MobileTestConfigModal } from "./MobileTestConfigModal";
 import { AddPresetModal } from "./preset/AddPresetModal";
 import { EditPresetModal } from "./preset/EditPresetModal";
@@ -37,7 +39,9 @@ export function Modals(): JSXElement {
       <CookiesModal />
       <AddPresetModal />
       <EditPresetModal />
-      <ViewApeKeyModal />
+      <LessonIntroModal />
+      <LessonIntroVideoModal />
+      <AvatarModal />
     </>
   );
 }

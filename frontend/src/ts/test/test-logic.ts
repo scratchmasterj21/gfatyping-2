@@ -1,4 +1,10 @@
 import Ape from "../ape";
+import {
+  activeSeconds,
+  awardCoins,
+  awardTryCoin,
+  bumpWeeklyQuestCounter,
+} from "../coins";
 import * as TestUI from "./test-ui";
 import * as Strings from "../utils/strings";
 import * as Misc from "../utils/misc";
@@ -10,6 +16,7 @@ import {
   showErrorNotification,
   showSuccessNotification,
 } from "../states/notifications";
+import { triggerCelebration } from "../states/celebration";
 import * as CustomText from "./custom-text";
 import * as PractiseWords from "./practise-words";
 import * as ShiftTracker from "./shift-tracker";
@@ -23,6 +30,11 @@ import * as Replay from "./replay-ui";
 import { __nonReactive } from "../collections/tags";
 import * as TodayTracker from "./today-tracker";
 import * as ChallengeContoller from "../controllers/challenge-controller";
+import { navigationEvent } from "../events/navigation";
+import { LESSON_IDS_WITH_GAME_CHECKPOINT } from "../lessons/lesson-checkpoints";
+import { launchLessonWithIntro } from "../lessons/lesson-intro";
+import * as LessonProgress from "../lessons/lesson-progress";
+import { findNextLesson, lessonOrder } from "../lessons/lessons-data";
 import { clearQuoteStats } from "../states/quote-rate";
 import * as Result from "./result";
 import {
@@ -79,7 +91,6 @@ import * as CompositionState from "../legacy-states/composition";
 import { SnapshotResult } from "../constants/default-snapshot";
 import { WordGenError } from "../utils/word-gen-error";
 import { tryCatch } from "@monkeytype/util/trycatch";
-import * as Sentry from "../sentry";
 import { showLoaderBar, hideLoaderBar } from "../states/loader-bar";
 import * as TestInitFailed from "../elements/test-init-failed";
 import { canQuickRestart } from "../utils/quick-restart";
@@ -427,7 +438,6 @@ async function init(): Promise<boolean> {
   testReinitCount++;
   if (testReinitCount > 3) {
     if (lastInitError) {
-      void Sentry.captureException(lastInitError);
       TestInitFailed.showError(
         `${lastInitError.name}: ${lastInitError.message}`,
       );
@@ -942,6 +952,10 @@ export async function finish(difficultyFailed = false): Promise<void> {
   }
 
   let dontSave = false;
+  // Mirrors dontSave for every reason except isRepeated() - retrying a
+  // lesson to beat your own score is normal and should still save/update
+  // the streak, unlike repeating a quote/word test to farm the leaderboard.
+  let dontSaveLesson = false;
 
   if (countUndefined(ce) > 0) {
     console.log(ce);
@@ -949,6 +963,7 @@ export async function finish(difficultyFailed = false): Promise<void> {
       "Failed to build result object: One of the fields is undefined or NaN",
     );
     dontSave = true;
+    dontSaveLesson = true;
   }
 
   const completedEvent = structuredClone(ce) as CompletedEvent;
@@ -979,11 +994,13 @@ export async function finish(difficultyFailed = false): Promise<void> {
     console.error("Test duration inconsistent", ce.testDuration, dateDur);
     setIsTestInvalid(true);
     dontSave = true;
+    dontSaveLesson = true;
   } else if (difficultyFailed) {
     showNoticeNotification(`Test failed - ${failReason}`, {
       durationMs: 1000,
     });
     dontSave = true;
+    dontSaveLesson = true;
   } else if (
     completedEvent.testDuration < 1 ||
     (Config.mode === "time" && mode2Number < 15 && mode2Number > 0) ||
@@ -1007,14 +1024,17 @@ export async function finish(difficultyFailed = false): Promise<void> {
     setIsTestInvalid(true);
     tooShort = true;
     dontSave = true;
+    dontSaveLesson = true;
   } else if (afkDetected) {
     showNoticeNotification("Test invalid - AFK detected");
     setIsTestInvalid(true);
     dontSave = true;
+    dontSaveLesson = true;
   } else if (isRepeated()) {
     showNoticeNotification("Test invalid - repeated");
     setIsTestInvalid(true);
     dontSave = true;
+    // dontSaveLesson deliberately NOT set here - see its declaration above.
   } else if (
     completedEvent.wpm < 0 ||
     (completedEvent.wpm > 350 &&
@@ -1027,6 +1047,7 @@ export async function finish(difficultyFailed = false): Promise<void> {
     showNoticeNotification("Test invalid - wpm");
     setIsTestInvalid(true);
     dontSave = true;
+    dontSaveLesson = true;
   } else if (
     completedEvent.rawWpm < 0 ||
     (completedEvent.rawWpm > 350 &&
@@ -1039,6 +1060,7 @@ export async function finish(difficultyFailed = false): Promise<void> {
     showNoticeNotification("Test invalid - raw");
     setIsTestInvalid(true);
     dontSave = true;
+    dontSaveLesson = true;
   } else if (
     (!DB.getSnapshot()?.lbOptOut &&
       (completedEvent.acc < 75 || completedEvent.acc > 100)) ||
@@ -1048,9 +1070,14 @@ export async function finish(difficultyFailed = false): Promise<void> {
     showNoticeNotification("Test invalid - accuracy");
     setIsTestInvalid(true);
     dontSave = true;
+    dontSaveLesson = true;
   }
 
   // test is valid
+
+  if (!dontSaveLesson && LessonProgress.getActiveLesson() !== null) {
+    void LessonProgress.recordCompletion(completedEvent);
+  }
 
   if (isRepeated() || difficultyFailed) {
     if (Config.resultSaving) {
@@ -1292,6 +1319,26 @@ async function saveResult(
     );
   }
 
+  const uid = getAuthenticatedUser()?.uid;
+  if (uid !== undefined) {
+    const timeCoins = Math.floor(activeSeconds(result) / 30);
+    const pbCoins = data.isPb ? Math.floor(result.wpm / 5) : 0;
+    void awardCoins(uid, timeCoins + pbCoins);
+    void awardTryCoin(uid, `${result.mode}:${result.mode2}`);
+
+    if (data.isPb) {
+      void bumpWeeklyQuestCounter(uid, "newPbs").then((quests) => {
+        for (const quest of quests) {
+          triggerCelebration({
+            title: "Quest complete!",
+            message: `${quest.name} - +${quest.coinReward} coins`,
+            icon: "fa-flag-checkered",
+          });
+        }
+      });
+    }
+  }
+
   qs("#retrySavingResultButton")?.hide();
   if (isRetrying) {
     showSuccessNotification("Result saved", { important: true });
@@ -1354,8 +1401,61 @@ qs(".pageTest")?.onChild(
   retrySavingResult,
 );
 
-qs(".pageTest")?.onChild("click", "#nextTestButton", () => {
+/**
+ * "Next test" behaviour. During a built-in lesson this advances to the next
+ * lesson in the curriculum; if that lesson has a bonus mini-game checkpoint
+ * right after it, it sends the student back to the Lessons page instead
+ * (so the game doesn't get silently skipped); otherwise (normal tests,
+ * assignments, word lists, Japanese free-practice) it just restarts like
+ * before. If the next lesson is actually star-gate-locked (the lesson just
+ * finished didn't reach 2 stars), this repeats it instead of silently
+ * skipping the gate - same rule the Lessons page list enforces.
+ */
+export async function nextTest(): Promise<void> {
+  const activeLesson = LessonProgress.getActiveLesson();
+  if (activeLesson !== null) {
+    if (LESSON_IDS_WITH_GAME_CHECKPOINT.has(activeLesson)) {
+      LessonProgress.setActiveLesson(null);
+      navigationEvent.dispatch({ url: "/lessons", options: {} });
+      return;
+    }
+    const next = findNextLesson(activeLesson);
+    if (next !== undefined) {
+      const uid = getAuthenticatedUser()?.uid;
+      if (uid === undefined) {
+        launchLessonWithIntro(next);
+        return;
+      }
+
+      const progressMap = await LessonProgress.getAllProgress();
+      const grandfatherIndex = await LessonProgress.ensureStarsGateGrandfather(
+        uid,
+        progressMap,
+      );
+      const nextIndex = lessonOrder.indexOf(next.id);
+      const prevId = nextIndex > 0 ? lessonOrder[nextIndex - 1] : undefined;
+      const prevProgress =
+        prevId !== undefined ? progressMap.get(prevId) : undefined;
+
+      if (
+        !LessonProgress.isLessonLockedAt(
+          nextIndex,
+          prevProgress,
+          grandfatherIndex,
+        )
+      ) {
+        launchLessonWithIntro(next);
+        return;
+      }
+      restart();
+      return;
+    }
+  }
   restart();
+}
+
+qs(".pageTest")?.onChild("click", "#nextTestButton", () => {
+  void nextTest();
 });
 
 qs(".pageTest")?.onChild("click", "#restartTestButtonWithSameWordset", () => {

@@ -7,6 +7,19 @@ import {
 } from "date-fns";
 
 /**
+ * Local (not UTC) calendar date as YYYY-MM-DD. Use this instead of
+ * `date.toISOString().slice(0, 10)` for anything that should reset at local
+ * midnight (streaks, daily challenge) rather than UTC midnight - the two
+ * disagree by up to a full day depending on the student's timezone.
+ */
+export function localDateString(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Converts seconds to a human-readable string representation of time.
  * @param sec The number of seconds to convert.
  * @param alwaysShowMinutes Whether to always show minutes, even if the value is 0. Default is false.

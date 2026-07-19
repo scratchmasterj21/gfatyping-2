@@ -3,19 +3,15 @@ import { tryCatch } from "@monkeytype/util/trycatch";
 import { FirebaseError } from "firebase/app";
 import {
   AuthProvider,
-  EmailAuthProvider,
-  GithubAuthProvider,
   GoogleAuthProvider,
-  linkWithPopup,
-  reauthenticateWithCredential,
   reauthenticateWithPopup,
-  unlink,
   updateProfile,
   User,
   User as UserType,
 } from "firebase/auth";
 import { z, ZodString } from "zod";
 
+import { provisionAccount } from "./account-provisioning";
 import Ape from "./ape";
 import { waitForPresetsReady } from "./collections/presets";
 import { waitForTagsReady } from "./collections/tags";
@@ -31,8 +27,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "./firebase";
-import * as Sentry from "./sentry";
-import { isAuthenticated, setUserId } from "./states/core";
+import { getUserId, isAuthenticated, setUserId } from "./states/core";
 import { hideLoaderBar, showLoaderBar } from "./states/loader-bar";
 import {
   showErrorNotification,
@@ -53,21 +48,47 @@ type AuthMethodInfo = {
 }>;
 
 /**
+ * Only accounts from this Google Workspace domain may sign in.
+ */
+export const ALLOWED_AUTH_DOMAIN = "felice.ed.jp";
+
+function createGoogleProvider(): GoogleAuthProvider {
+  const provider = new GoogleAuthProvider();
+  // Restrict the Google account chooser to the school domain.
+  provider.setCustomParameters({ hd: ALLOWED_AUTH_DOMAIN });
+  return provider;
+}
+
+export function isAllowedAuthEmail(email: string | null | undefined): boolean {
+  return (
+    email !== null &&
+    email !== undefined &&
+    email.toLowerCase().endsWith(`@${ALLOWED_AUTH_DOMAIN}`)
+  );
+}
+
+/**
+ * The single admin account allowed to manage classroom assignments.
+ */
+export const ADMIN_EMAIL = "john.limpiada@felice.ed.jp";
+
+/**
+ * Whether the currently signed-in user is the classroom admin. Reads the
+ * reactive user id so Solid callers re-evaluate on login/logout.
+ */
+export function isCurrentUserAdmin(): boolean {
+  getUserId();
+  return getAuthenticatedUser()?.email?.toLowerCase() === ADMIN_EMAIL;
+}
+
+/**
  * auth methods, keep order from most to least preferred.
  * This is used for reauthenticate
  */
 const authMethods = {
-  password: {
-    display: "Password",
-    providerId: "password",
-  },
-  github: {
-    display: "GitHub",
-    provider: new GithubAuthProvider(),
-  },
   google: {
     display: "Google",
-    provider: new GoogleAuthProvider(),
+    provider: createGoogleProvider(),
   },
 } as const satisfies Record<string, AuthMethodInfo>;
 
@@ -115,7 +136,7 @@ export async function sendVerificationEmail(): Promise<void> {
   }
 }
 
-async function getDataAndInit(): Promise<boolean> {
+async function getDataAndInit(retryOnMissingUser = true): Promise<boolean> {
   try {
     console.log("getting account data");
     const snapshot = await DB.initSnapshot();
@@ -129,11 +150,34 @@ async function getDataAndInit(): Promise<boolean> {
       );
     }
 
-    void Sentry.setUser(snapshot.uid, snapshot.name);
-
     await updateConfigFromServer();
     return true;
   } catch (error) {
+    // A signed-in Firebase Auth user with no Firestore users/{uid} doc yet:
+    // either a genuine new sign-up, or a Google account stuck from a
+    // previously interrupted sign-up (isNewUser now reports false even
+    // though account creation never finished). Self-heal by provisioning
+    // the doc and retrying once, instead of just signing the user back out.
+    if (
+      retryOnMissingUser &&
+      error instanceof SnapshotInitError &&
+      error.responseCode === 404
+    ) {
+      const user = getAuthenticatedUser();
+      if (user !== null) {
+        const { error: provisionError } = await tryCatch(
+          provisionAccount(user),
+        );
+        if (provisionError === null) {
+          return getDataAndInit(false);
+        }
+        console.error(
+          "Failed to auto-provision missing account",
+          provisionError,
+        );
+      }
+    }
+
     console.error(error);
     if (error instanceof SnapshotInitError) {
       if (error.responseCode === 429) {
@@ -177,6 +221,21 @@ export async function onAuthStateChanged(
 
   if (authInitialisedAndConnected) {
     console.debug(`auth state changed, user ${user ? "true" : "false"}`);
+    if (user && !isAllowedAuthEmail(user.email)) {
+      // Account is not from the allowed domain. Reject and sign out.
+      showErrorNotification(
+        `Only @${ALLOWED_AUTH_DOMAIN} accounts are allowed to sign in.`,
+        { durationMs: 7000 },
+      );
+      setUserId(null);
+      DB.setSnapshot(undefined);
+      signOut();
+      authEvent.dispatch({
+        type: "authStateChanged",
+        data: { isUserSignedIn: false, loadPromise: Promise.resolve() },
+      });
+      return;
+    }
     if (user) {
       setUserId(user.uid);
       userPromise = loadUser(user);
@@ -184,10 +243,6 @@ export async function onAuthStateChanged(
       setUserId(null);
       DB.setSnapshot(undefined);
     }
-  }
-
-  if (!authInitialisedAndConnected || !user) {
-    void Sentry.clearUser();
   }
 
   authEvent.dispatch({
@@ -239,69 +294,6 @@ export async function signInWithProvider(
     return { success: false, message: error.message };
   }
   return { success: true };
-}
-
-export async function addAuthProvider(authMethod: AuthMethod): Promise<void> {
-  if (!isAuthAvailable()) {
-    showErrorNotification("Authentication uninitialized", { durationMs: 3000 });
-    return;
-  }
-  const provider = getAuthProvider(authMethod);
-  if (provider === undefined) {
-    showErrorNotification(`Authentication ${authMethod} is missing a provider`);
-    return;
-  }
-  const providerName = getAuthMethodDisplay(authMethod);
-
-  showLoaderBar();
-  const user = getAuthenticatedUser();
-  if (!user) return;
-  try {
-    await linkWithPopup(user, provider);
-    hideLoaderBar();
-    showSuccessNotification(`${providerName} authentication added`);
-    authEvent.dispatch({ type: "authConfigUpdated" });
-  } catch (error) {
-    hideLoaderBar();
-    showErrorNotification(`Failed to add ${providerName} authentication`, {
-      error,
-    });
-  }
-}
-
-export async function removeAuthProvider(
-  authMethod: AuthMethod,
-  options?: { password?: string },
-): Promise<ReauthSuccess | ReauthFailed> {
-  const reauth = await reauthenticate({
-    password: options?.password,
-    excludeMethod: authMethod,
-  });
-  if (reauth.status !== "success") {
-    return {
-      status: reauth.status,
-      message: reauth.message,
-    };
-  }
-  try {
-    await unlink(reauth.user, getProviderId(authMethod));
-  } catch (e) {
-    const message = createErrorMessage(
-      e,
-      authMethod === "password"
-        ? "Failed to remove password authentication"
-        : `Failed to unlink ${getAuthMethodDisplay(authMethod)} account`,
-    );
-    return {
-      status: "error",
-      message,
-    };
-  }
-  return {
-    status: "success",
-    message: `${getAuthMethodDisplay(authMethod)} authentication removed`,
-    user: reauth.user,
-  };
 }
 
 export function signOut(): void {
@@ -402,28 +394,14 @@ export async function reauthenticate(
       };
     }
 
-    if (authMethod === "password") {
-      if (options.password === undefined) {
-        return {
-          status: "error",
-          message: "Failed to reauthenticate using password: password missing.",
-        };
-      }
-      const credential = EmailAuthProvider.credential(
-        user.email as string,
-        options.password,
-      );
-      await reauthenticateWithCredential(user, credential);
-    } else {
-      const provider = getAuthProvider(authMethod);
-      if (provider === undefined) {
-        return {
-          status: "error",
-          message: `Authentication ${authMethod} is missing a provider`,
-        };
-      }
-      await reauthenticateWithPopup(user, provider);
+    const provider = getAuthProvider(authMethod);
+    if (provider === undefined) {
+      return {
+        status: "error",
+        message: `Authentication ${authMethod} is missing a provider`,
+      };
     }
+    await reauthenticateWithPopup(user, provider);
 
     return {
       status: "success",
@@ -478,7 +456,11 @@ export function getPasswordSchema(): ZodString {
 }
 
 export function isUsingPasswordAuthentication(): boolean {
-  return isUsingAuthentication("password");
+  return (
+    getAuthenticatedUser()?.providerData.some(
+      (p) => p.providerId === "password",
+    ) ?? false
+  );
 }
 
 export function hasAdditionalAuthMethods(authMethod: AuthMethod) {
@@ -492,9 +474,9 @@ export function getAuthMethodDisplay(authMethod: AuthMethod): string {
 }
 
 function getProviderId(authMethod: AuthMethod): string {
-  const info = authMethods[authMethod];
+  const info = authMethods[authMethod] as AuthMethodInfo;
 
-  if ("provider" in info) {
+  if ("provider" in info && info.provider !== undefined) {
     return info.provider.providerId;
   }
   return info.providerId;

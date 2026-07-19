@@ -17,6 +17,11 @@ export type PageName =
   | "404"
   | "accountSettings"
   | "leaderboards"
+  | "lessons"
+  | "classroom"
+  | "certificate"
+  | "race"
+  | "racehost"
   | "friends";
 
 type Options<T> = {

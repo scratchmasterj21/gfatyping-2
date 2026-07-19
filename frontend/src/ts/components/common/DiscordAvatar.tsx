@@ -10,17 +10,27 @@ const [avatar, setAvatar] = createStore<Record<string, boolean>>({});
 export function DiscordAvatar(props: {
   discordId: string | undefined;
   discordAvatar: string | undefined;
+  avatarUrl?: string;
   size?: number;
   class?: string;
   fallbackIcon?: "user-circle" | "user";
 }): JSXElement {
-  const cacheKey = (): string => `${props.discordId}/${props.discordAvatar}`;
+  const cacheKey = (): string =>
+    props.avatarUrl ?? `${props.discordId}/${props.discordAvatar}`;
   const [showSpinner, setShowSpinner] = createSignal(true);
 
+  const imageSrc = (): string | undefined => {
+    if (props.avatarUrl !== undefined && props.avatarUrl !== "") {
+      return props.avatarUrl;
+    }
+    if (props.discordId !== undefined && props.discordAvatar !== undefined) {
+      return `https://cdn.discordapp.com/avatars/${props.discordId}/${props.discordAvatar}.png?size=${props.size ?? 32}`;
+    }
+    return undefined;
+  };
+
   const showDiscordAvatar = () =>
-    props.discordId !== undefined &&
-    props.discordAvatar !== undefined &&
-    avatar[cacheKey()] !== false;
+    imageSrc() !== undefined && avatar[cacheKey()] !== false;
 
   const fallback = () => {
     if (
@@ -67,7 +77,7 @@ export function DiscordAvatar(props: {
           />
         </Show>
         <img
-          src={`https://cdn.discordapp.com/avatars/${props.discordId}/${props.discordAvatar}.png?size=${props.size ?? 32}`}
+          src={imageSrc()}
           class="col-start-1 row-start-1 rounded-full"
           onLoad={() => {
             setAvatar(cacheKey(), true);

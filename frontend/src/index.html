@@ -3,6 +3,8 @@
   <load src="html/head.html" />
 
   <body class="loading">
+    <mount data-component="raceoverlay"></mount>
+    <mount data-component="celebrationoverlay"></mount>
     <mount data-component="overlays"></mount>
     <load src="html/warnings.html" />
     <div class="customBackground"></div>
@@ -23,18 +25,33 @@
     <div id="app" class="content-grid focus hidden">
       <mount data-component="header"></mount>
       <main class="full-width content-grid" style="height: 100%">
-        <div id="ad-vertical-left-wrapper" class="ad advertisement ad-v focus">
-          <div class="icon"><i class="fas fa-ad"></i></div>
-          <div id="ad-vertical-left"></div>
-        </div>
-        <div id="ad-vertical-right-wrapper" class="ad advertisement ad-v focus">
-          <div class="icon"><i class="fas fa-ad"></i></div>
-          <div id="ad-vertical-right"></div>
-        </div>
         <load src="html/pages/loading.html" />
 
         <div class="page pageAbout hidden full-width" id="pageAbout">
           <mount data-component="aboutpage"></mount>
+        </div>
+
+        <div class="page pageLessons hidden full-width" id="pageLessons">
+          <mount data-component="lessonspage"></mount>
+        </div>
+
+        <div class="page pageClassroom hidden full-width" id="pageClassroom">
+          <mount data-component="classroompage"></mount>
+        </div>
+
+        <div
+          class="page pageCertificate hidden full-width"
+          id="pageCertificate"
+        >
+          <mount data-component="certificatepage"></mount>
+        </div>
+
+        <div class="page pageRace hidden full-width" id="pageRace">
+          <mount data-component="racepage"></mount>
+        </div>
+
+        <div class="page pageRacehost hidden full-width" id="pageRacehost">
+          <mount data-component="racehostpage"></mount>
         </div>
 
         <div class="page pageSettings hidden" id="pageSettings">
@@ -72,17 +89,6 @@
         </div>
       </main>
       <mount data-component="footer"></mount>
-      <div
-        id="ad-footer-wrapper"
-        class="full-width ad advertisement ad-h focus"
-      >
-        <div class="icon"><i class="fas fa-ad"></i></div>
-        <div id="ad-footer"></div>
-      </div>
-      <div id="ad-footer-small-wrapper" class="ad advertisement ad-h-s focus">
-        <div class="icon small"><i class="fas fa-ad"></i></div>
-        <div id="ad-footer-small"></div>
-      </div>
     </div>
     <script
       src="https://www.google.com/recaptcha/api.js?render=explicit"

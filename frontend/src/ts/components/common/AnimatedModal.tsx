@@ -55,6 +55,10 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
   // Refs are assigned by SolidJS via the ref attribute
   const [dialogRef, dialogEl] = useRefWithUtils<HTMLDialogElement>();
   const [modalRef, modalEl] = useRefWithUtils<HTMLDivElement>();
+  // Whatever had focus right before this modal opened (e.g. the hidden test
+  // input) - restored on close so focus doesn't get stranded on a control
+  // that no longer does anything once the modal is gone.
+  let previouslyFocused: HTMLElement | null = null;
 
   const visibility = (): boolean => isModalOpen(props.id);
 
@@ -76,6 +80,11 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
   const showModal = async (isChained: boolean): Promise<void> => {
     if (dialogEl() === undefined || modalEl() === undefined) return;
     if (dialogEl()?.native.open) return;
+
+    previouslyFocused =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
 
     await props.beforeShow?.(isChained);
 
@@ -262,6 +271,13 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
   const handleAfterHide = async (): Promise<void> => {
     await props.afterHide?.();
     storeHideModal(props.id);
+    if (
+      previouslyFocused !== null &&
+      document.body.contains(previouslyFocused)
+    ) {
+      previouslyFocused.focus();
+    }
+    previouslyFocused = null;
   };
 
   const handleAfterShow = async (): Promise<void> => {

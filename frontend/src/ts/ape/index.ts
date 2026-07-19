@@ -1,16 +1,15 @@
-import { envConfig } from "virtual:env-config";
-import { buildClient } from "./adapters/ts-rest-adapter";
+import { buildClient } from "./adapters/firestore-adapter";
 import { contract } from "@monkeytype/contracts";
 import { devContract } from "@monkeytype/contracts/dev";
 
-const BASE_URL = envConfig.backendUrl;
-
-const tsRestClient = buildClient(contract, BASE_URL, 10_000);
-const devClient = buildClient(devContract, BASE_URL, 240_000);
+// The transport no longer hits an HTTP backend. Requests are dispatched to
+// Firestore handlers (see ./firestore). Out-of-scope routes resolve to 501.
+const firestoreClient = buildClient(contract);
+const devClient = buildClient(devContract);
 
 // API Endpoints
 const Ape = {
-  ...tsRestClient,
+  ...firestoreClient,
   dev: devClient,
 };
 

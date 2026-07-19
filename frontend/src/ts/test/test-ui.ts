@@ -51,7 +51,6 @@ import {
 import * as MonkeyPower from "../elements/monkey-power";
 import * as SlowTimer from "../legacy-states/slow-timer";
 import * as CompositionDisplay from "../elements/composition-display";
-import * as AdController from "../controllers/ad-controller";
 import * as Joining from "./break-joining";
 import * as LayoutfluidFunboxTimer from "../test/funbox/layoutfluid-funbox-timer";
 import * as Keymap from "../elements/keymap";
@@ -1931,10 +1930,6 @@ export function onTestRestart(source: "testPage" | "resultPage"): void {
   }
 
   currentTestLine = 0;
-  if (getActivePage() === "test") {
-    AdController.updateFooterAndVerticalAds(false);
-  }
-  AdController.destroyResult();
   if (Config.compositionDisplay === "below") {
     CompositionDisplay.update(" ");
     CompositionDisplay.show();

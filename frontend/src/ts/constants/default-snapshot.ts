@@ -63,11 +63,13 @@ export type Snapshot = Omit<
     completedTests: number;
   };
   details?: UserProfileDetails;
+  avatarUrl?: string;
   inboxUnreadSize: number;
   streak: number;
   maxStreak: number;
   isPremium: boolean;
   streakHourOffset?: number;
+  classId?: string;
   xp: number;
   testActivity?: ModifiableTestActivityCalendar;
   testActivityByYear?: { [key: string]: TestActivityCalendar };

@@ -3,6 +3,7 @@ import { createMemo } from "solid-js";
 import { useActiveTagsLiveQuery } from "../../../../collections/tags";
 import * as Commandline from "../../../../commandline/commandline";
 import { getConfig } from "../../../../config/store";
+import { exitGame, isGameActive } from "../../../../games/game-launcher";
 import {
   getCustomTextIndicator,
   getFormatting,
@@ -56,6 +57,7 @@ export function TestModesNotice() {
       <MinAcc />
       <MinBurst />
       <Funbox />
+      <GameExit />
       <ConfidenceMode />
       <StopOnError />
       <Layout />
@@ -315,8 +317,25 @@ function Funbox() {
     <Notice
       when={funboxes() !== undefined}
       icon="fa-gamepad"
-      openCommandline="funbox"
       text={funboxes()}
+    />
+  );
+}
+
+function GameExit() {
+  const active = createMemo(() => {
+    //getConfig.funbox isn't reactive on its own, wrap in a memo
+    const _ = getConfig.funbox;
+    return isGameActive();
+  });
+
+  return (
+    <Notice
+      when={active()}
+      icon="fa-times-circle"
+      onClick={() => void exitGame()}
+      class="text-error"
+      text="exit game"
     />
   );
 }

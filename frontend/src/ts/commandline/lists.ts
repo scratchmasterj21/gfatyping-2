@@ -10,7 +10,6 @@ import AddOrRemoveThemeToFavorite from "./lists/add-or-remove-theme-to-favorites
 import TagsCommands from "./lists/tags";
 import CustomThemesListCommands from "./lists/custom-themes-list";
 import PresetsCommands from "./lists/presets";
-import FunboxCommands from "./lists/funbox";
 import ThemesCommands from "./lists/themes";
 import LoadChallengeCommands, {
   update as updateLoadChallengeCommands,
@@ -27,7 +26,6 @@ import {
   clearAllNotifications,
   showSuccessNotification,
 } from "../states/notifications";
-import * as VideoAdPopup from "../popups/video-ad-popup";
 import { Command, CommandlineListKey, CommandsSubgroup } from "./types";
 import { buildCommandForConfigKey } from "./util";
 import { CommandlineConfigMetadataObject } from "./commandline-metadata";
@@ -54,8 +52,6 @@ challengesPromise
       ),
     );
   });
-
-const adsCommands = buildCommands("ads");
 
 export const commands: CommandsSubgroup = {
   title: "",
@@ -119,7 +115,6 @@ export const commands: CommandsSubgroup = {
       "minAcc",
       ...MinBurstCommands,
       "britishEnglish",
-      ...FunboxCommands,
       "customLayoutfluid",
       "customPolyglot",
     ),
@@ -223,21 +218,9 @@ export const commands: CommandsSubgroup = {
       "monkey",
     ),
 
-    //danger zone
-    ...adsCommands,
-
     //other
     ...LoadChallengeCommands,
     ...NavigationCommands,
-    {
-      id: "watchVideoAd",
-      display: "Watch video ad",
-      alias: "support donate",
-      icon: "fa-ad",
-      exec: (): void => {
-        void VideoAdPopup.show();
-      },
-    },
     {
       id: "importSettingsJSON",
       display: "Import settings JSON",
@@ -384,9 +367,7 @@ const lists: Record<CommandlineListKey, CommandsSubgroup | undefined> = {
   themes: ThemesCommands[0]?.subgroup,
   loadChallenge: LoadChallengeCommands[0]?.subgroup,
   minBurst: MinBurstCommands[0]?.subgroup,
-  funbox: FunboxCommands[0]?.subgroup,
   tags: TagsCommands[0]?.subgroup,
-  ads: adsCommands[0]?.subgroup,
 };
 
 const subgroupByConfigKey = Object.fromEntries(

@@ -284,6 +284,21 @@ export const UserSchema = z.object({
   quoteMod: QuoteModSchema.optional(),
   resultFilterPresets: z.array(ResultFiltersSchema).optional(),
   testActivity: TestActivitySchema.optional(),
+  sideImages: z
+    .object({
+      sets: z
+        .array(
+          z.object({
+            left: z.string().url().nullable(),
+            right: z.string().url().nullable(),
+          }),
+        )
+        .nullable()
+        .optional(),
+      activeIndex: z.number().int().nonnegative().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 export type User = z.infer<typeof UserSchema>;
 

@@ -1,6 +1,4 @@
-import { Language, LanguageSchema } from "@monkeytype/schemas/languages";
-
-export const LanguageList: Language[] = LanguageSchema._def.values;
+import { Language } from "@monkeytype/schemas/languages";
 
 export const LanguageGroups: Record<string, Language[]> = {
   english: [
@@ -390,8 +388,12 @@ export const LanguageGroups: Record<string, Language[]> = {
 };
 
 export type LanguageGroupName = keyof typeof LanguageGroups;
-export const LanguageGroupNames: LanguageGroupName[] = Array.from(
-  Object.keys(LanguageGroups),
+
+// Only English + Japanese are offered (bilingual student focus).
+export const LanguageGroupNames: LanguageGroupName[] = ["english", "japanese"];
+
+export const LanguageList: Language[] = LanguageGroupNames.flatMap(
+  (group) => LanguageGroups[group] ?? [],
 );
 
 /**
@@ -402,5 +404,5 @@ export const LanguageGroupNames: LanguageGroupName[] = Array.from(
 export function getGroupForLanguage(
   language: Language,
 ): LanguageGroupName | undefined {
-  return LanguageGroupNames.find((group) => group.includes(language));
+  return Object.keys(LanguageGroups).find((group) => group.includes(language));
 }

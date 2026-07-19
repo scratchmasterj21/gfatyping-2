@@ -3,8 +3,16 @@ import { Language } from "@monkeytype/schemas/languages";
 import { Mode } from "@monkeytype/schemas/shared";
 import { Accessor, For, JSXElement, Show } from "solid-js";
 
+import { CLASS_IDS, gradeOf, GRADES } from "../../../constants/classes";
 import { isAuthenticated } from "../../../states/core";
-import { Selection } from "../../../states/leaderboard-selection";
+import {
+  ClassroomMetric,
+  ClassroomSelectionType,
+  isClassroomType,
+  Selection,
+  WpmMode2,
+} from "../../../states/leaderboard-selection";
+import { getSnapshot } from "../../../states/snapshot";
 import { FaSolidIcon } from "../../../types/font-awesome";
 import { Button } from "../../common/Button";
 
@@ -49,6 +57,24 @@ export function Sidebar(props: {
   const selectFriendsOnly = (friendsOnly: boolean) => {
     updateSelection({ friendsOnly });
   };
+  const selectMetric = (metric: ClassroomMetric) => {
+    updateSelection({ metric } as Partial<Selection>);
+  };
+  const selectGameId = (gameId: string) => {
+    updateSelection({ gameId } as Partial<Selection>);
+  };
+  const selectWpmMode2 = (mode2: WpmMode2) => {
+    updateSelection({ mode2 } as Partial<Selection>);
+  };
+  const selectClassId = (classId: string) => {
+    updateSelection({ classId } as Partial<Selection>);
+  };
+  const selectGrade = (grade: string) => {
+    updateSelection({ grade } as Partial<Selection>);
+  };
+
+  const classroom = () => props.selection() as ClassroomSelectionType;
+  const isClassroom = () => isClassroomType(props.selection().type);
 
   return (
     <>
@@ -65,7 +91,80 @@ export function Sidebar(props: {
           { id: "daily", text: "daily", icon: "fa-sun" },
         ]}
       />
-      <Show when={isAuthenticated() && props.connectionsEnabled}>
+      <Show when={isAuthenticated()}>
+        <Group
+          selected={props.selection().type}
+          onSelect={selectType}
+          items={[
+            { id: "class", text: "my class", icon: "fa-users" },
+            { id: "grade", text: "my grade", icon: "fa-user-friends" },
+            { id: "school", text: "school", icon: "fa-school" },
+          ]}
+        />
+      </Show>
+      <Show when={isClassroom()}>
+        <Group
+          selected={classroom().metric ?? "xp"}
+          onSelect={selectMetric}
+          items={[
+            { id: "xp", text: "xp", icon: "fa-star" },
+            { id: "wpm", text: "wpm", icon: "fa-bolt" },
+            { id: "racewpm", text: "race wpm", icon: "fa-flag-checkered" },
+            { id: "raceacc", text: "race acc", icon: "fa-bullseye" },
+            { id: "games", text: "games", icon: "fa-gamepad" },
+          ]}
+        />
+      </Show>
+      <Show when={isClassroom() && classroom().metric === "wpm"}>
+        <Group
+          selected={classroom().mode2 ?? "30"}
+          onSelect={selectWpmMode2}
+          items={[
+            { id: "15", text: "time 15", icon: "fa-clock" },
+            { id: "30", text: "time 30", icon: "fa-clock" },
+            { id: "60", text: "time 60", icon: "fa-clock" },
+          ]}
+        />
+      </Show>
+      <Show when={isClassroom() && classroom().metric === "games"}>
+        <Group
+          selected={classroom().gameId}
+          onSelect={selectGameId}
+          items={[
+            { id: "word-defender", text: "word defender", icon: "fa-rocket" },
+            { id: "balloon-pop", text: "balloon pop", icon: "fa-circle" },
+            { id: "type-racer", text: "type racer", icon: "fa-car" },
+            { id: "ghost-hunter", text: "ghost hunter", icon: "fa-ghost" },
+            { id: "fruit-ninja", text: "fruit ninja", icon: "fa-leaf" },
+            { id: "type-toss", text: "type toss", icon: "fa-basketball-ball" },
+          ]}
+        />
+      </Show>
+      <Show when={isClassroom() && props.selection().type === "class"}>
+        <Group
+          selected={classroom().classId}
+          onSelect={selectClassId}
+          items={CLASS_IDS.map((id) => ({
+            id: id as string,
+            text: id as string,
+            icon: "fa-chalkboard" as FaSolidIcon,
+          }))}
+        />
+      </Show>
+      <Show when={isClassroom() && props.selection().type === "grade"}>
+        <Group
+          selected={classroom().grade}
+          onSelect={selectGrade}
+          items={GRADES.map((id) => ({
+            id: id as string,
+            text: id as string,
+            icon: "fa-user-friends" as FaSolidIcon,
+          }))}
+        />
+      </Show>
+      <Show
+        when={isAuthenticated() && props.connectionsEnabled && !isClassroom()}
+      >
         <Group
           selected={props.selection().friendsOnly}
           onSelect={selectFriendsOnly}
@@ -76,7 +175,7 @@ export function Sidebar(props: {
         />
       </Show>
 
-      <Show when={props.selection().type !== "weekly"}>
+      <Show when={!isClassroom() && props.selection().type !== "weekly"}>
         <Group
           selected={{
             mode: props.selection().mode,
@@ -84,7 +183,9 @@ export function Sidebar(props: {
           }}
           onSelect={selectMode}
           items={getModeButtons(
-            getValidLeaderboards(props.validModeRules)[props.selection().type],
+            getValidLeaderboards(props.validModeRules)[
+              props.selection().type as "allTime" | "weekly" | "daily"
+            ],
             props.selection().language,
           )}
         />
@@ -133,6 +234,28 @@ function normalizeSelection(
   draft: Selection,
   valid: ValidLeaderboards,
 ): Selection {
+  if (isClassroomType(draft.type)) {
+    const cs = draft as ClassroomSelectionType;
+    // ?? undefined: classId can come back as a literal null from Firestore
+    // (teacher/unassigned accounts) even though the type says string |
+    // undefined - null fails the classId/grade schemas' z.string().optional().
+    const snapClassId = getSnapshot()?.classId ?? undefined;
+    return {
+      type: cs.type,
+      metric: cs.metric ?? "xp",
+      friendsOnly: false,
+      previous: false,
+      classId: cs.classId ?? snapClassId,
+      grade:
+        cs.grade ??
+        (snapClassId !== undefined ? gradeOf(snapClassId) : undefined),
+      gameId: cs.gameId,
+      mode: undefined,
+      mode2: cs.metric === "wpm" ? (cs.mode2 ?? "30") : undefined,
+      language: undefined,
+    } as Selection;
+  }
+
   if (draft.type === "weekly") {
     return {
       ...draft,
@@ -143,8 +266,9 @@ function normalizeSelection(
     };
   }
 
-  let { mode, mode2, language } = draft;
-  const validModes = valid[draft.type];
+  const speed = draft as Extract<Selection, { type: "allTime" | "daily" }>;
+  let { mode, mode2, language } = speed;
+  const validModes = valid[speed.type];
 
   if (validModes === undefined) throw new Error("no valid leaderboards");
 
@@ -177,7 +301,7 @@ function normalizeSelection(
     language = supportedLanguages.sort()[0] as Language;
   }
 
-  return { ...draft, mode, mode2, language };
+  return { ...speed, mode, mode2, language };
 }
 
 function getModeButtons(
@@ -232,6 +356,7 @@ function getValidLeaderboards(
     allTime: {
       time: {
         "15": ["english"],
+        "30": ["english"],
         "60": ["english"],
       },
     },

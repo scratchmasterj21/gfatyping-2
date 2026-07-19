@@ -62,9 +62,7 @@ export type CommandlineListKey =
   | "themes"
   | "loadChallenge"
   | "minBurst"
-  | "funbox"
-  | "tags"
-  | "ads";
+  | "tags";
 
 export function withValidation<T>(command: CommandWithValidation<T>): Command {
   return command as unknown as Command;

@@ -1,42 +1,24 @@
 import { PageWithUrlParams } from "./page";
 import * as Skeleton from "../utils/skeleton";
-import { getAuthenticatedUser } from "../firebase";
-import { getActivePage, isAuthenticated } from "../states/core";
+import { getActivePage } from "../states/core";
 import { swapElements } from "../utils/misc";
 import { getSnapshot } from "../db";
-import Ape from "../ape";
 import * as StreakHourOffsetModal from "../modals/streak-hour-offset";
-import { showLoaderBar } from "../states/loader-bar";
-import * as ApeKeyTable from "../elements/account-settings/ape-key-table";
-import { showErrorNotification } from "../states/notifications";
 import { z } from "zod";
 import { authEvent } from "../events/auth";
-import { qs, qsa, qsr, onDOMReady } from "../utils/dom";
-import { addAuthProvider } from "../auth";
-import { showUpdateEmailModal } from "../components/modals/account-settings/UpdateEmailModal";
+import { qs, qsr, onDOMReady } from "../utils/dom";
 import { showUpdateNameModal } from "../components/modals/account-settings/UpdateNameModal";
-import { showUpdatePasswordModal } from "../components/modals/account-settings/UpdatePasswordModal";
-import { showRemoveAuthMethodModal } from "../components/modals/account-settings/RemoveAuthMethodModal";
-import { showAddPasswordAuthModal } from "../components/modals/account-settings/AddPasswordAuthModal";
 import {
   showDeleteAccountModal,
   showOptOutOfLeaderboardsModal,
   showResetAccountModal,
   showResetPersonalBestsModal,
-  showRevokeAllTokensModal,
 } from "../components/modals/account-settings/ReauthConfirmModals";
-import { showUnlinkDiscordModal } from "../components/modals/account-settings/UnlinkDiscordModal";
 
 const pageElement = qsr(".page.pageAccountSettings");
 
 const StateSchema = z.object({
-  tab: z.enum([
-    "authentication",
-    "account",
-    "apeKeys",
-    "dangerZone",
-    "blockedUsers",
-  ]),
+  tab: z.enum(["account", "dangerZone", "blockedUsers"]),
 });
 type State = z.infer<typeof StateSchema>;
 
@@ -45,81 +27,6 @@ const UrlParameterSchema = StateSchema.partial();
 const state: State = {
   tab: "account",
 };
-
-function updateAuthenticationSections(): void {
-  pageElement.qsa(".section.passwordAuthSettings button")?.hide();
-  pageElement.qsa(".section.googleAuthSettings button")?.hide();
-  pageElement.qsa(".section.githubAuthSettings button")?.hide();
-
-  const user = getAuthenticatedUser();
-  if (user === null) return;
-
-  const passwordProvider = user.providerData.some(
-    (provider) => provider.providerId === "password",
-  );
-  const googleProvider = user.providerData.some(
-    (provider) => provider.providerId === "google.com",
-  );
-  const githubProvider = user.providerData.some(
-    (provider) => provider.providerId === "github.com",
-  );
-
-  if (passwordProvider) {
-    pageElement.qs(".section.passwordAuthSettings #emailPasswordAuth")?.show();
-    pageElement.qs(".section.passwordAuthSettings #passPasswordAuth")?.show();
-    if (googleProvider || githubProvider) {
-      pageElement
-        .qs(".section.passwordAuthSettings #removePasswordAuth")
-        ?.show();
-    }
-  } else {
-    pageElement.qs(".section.passwordAuthSettings #addPasswordAuth")?.show();
-  }
-
-  if (googleProvider) {
-    pageElement.qs(".section.googleAuthSettings #removeGoogleAuth")?.show();
-    if (passwordProvider || githubProvider) {
-      pageElement.qs(".section.googleAuthSettings #removeGoogleAuth")?.enable();
-    } else {
-      pageElement
-        .qs(".section.googleAuthSettings #removeGoogleAuth")
-        ?.disable();
-    }
-  } else {
-    pageElement.qs(".section.googleAuthSettings #addGoogleAuth")?.show();
-  }
-  if (githubProvider) {
-    pageElement.qs(".section.githubAuthSettings #removeGithubAuth")?.show();
-    if (passwordProvider || googleProvider) {
-      pageElement.qs(".section.githubAuthSettings #removeGithubAuth")?.enable();
-    } else {
-      pageElement
-        .qs(".section.githubAuthSettings #removeGithubAuth")
-        ?.disable();
-    }
-  } else {
-    pageElement.qs(".section.githubAuthSettings #addGithubAuth")?.show();
-  }
-}
-
-function updateIntegrationSections(): void {
-  //no code and no discord
-  if (!isAuthenticated()) {
-    pageElement.qs(".section.discordIntegration")?.hide();
-  } else {
-    if (!getSnapshot()) return;
-    pageElement.qs(".section.discordIntegration")?.show();
-
-    if (getSnapshot()?.discordId === undefined) {
-      //show button
-      pageElement.qs(".section.discordIntegration .buttons")?.show();
-      pageElement.qs(".section.discordIntegration .info")?.hide();
-    } else {
-      pageElement.qs(".section.discordIntegration .buttons")?.hide();
-      pageElement.qs(".section.discordIntegration .info")?.show();
-    }
-  }
-}
 
 function updateTabs(): void {
   void swapElements(
@@ -132,7 +39,6 @@ function updateTabs(): void {
     async () => {
       pageElement.qsa(".tab")?.removeClass("active");
       pageElement.qs(`.tab[data-tab="${state.tab}"]`)?.addClass("active");
-      if (state.tab === "apeKeys") void ApeKeyTable.update(updateUI);
     },
   );
   pageElement.qsa("button")?.removeClass("active");
@@ -162,8 +68,6 @@ function updateAccountSections(): void {
 
 export function updateUI(): void {
   if (getActivePage() !== "accountSettings") return;
-  updateAuthenticationSections();
-  updateIntegrationSections();
   updateAccountSections();
   updateTabs();
   page.setUrlParams(state);
@@ -177,55 +81,12 @@ qs(".page.pageAccountSettings")?.onChild("click", ".tabs button", (event) => {
   page.setUrlParams(state);
 });
 
-qsa(
-  ".page.pageAccountSettings .section.discordIntegration .getLinkAndGoToOauth",
-)?.on("click", () => {
-  showLoaderBar();
-  void Ape.users.getDiscordOAuth().then((response) => {
-    if (response.status === 200) {
-      window.open(response.body.data.url, "_self");
-    } else {
-      showErrorNotification(
-        `Failed to get OAuth from discord: ${response.body.message}`,
-      );
-    }
-  });
-});
-
 qs(".page.pageAccountSettings #setStreakHourOffset")?.on("click", () => {
   StreakHourOffsetModal.show();
 });
 
-qs(".pageAccountSettings")?.onChild("click", "#unlinkDiscordButton", () => {
-  showUnlinkDiscordModal({ callback: updateUI });
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#removeGoogleAuth", () => {
-  showRemoveAuthMethodModal({ authMethod: "google", callback: updateUI });
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#removeGithubAuth", () => {
-  showRemoveAuthMethodModal({ authMethod: "github", callback: updateUI });
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#removePasswordAuth", () => {
-  showRemoveAuthMethodModal({ authMethod: "password", callback: updateUI });
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#addPasswordAuth", () => {
-  showAddPasswordAuthModal({ callback: updateUI });
-});
-
 qs(".pageAccountSettings")?.onChild("click", "#updateAccountName", () => {
   showUpdateNameModal();
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#emailPasswordAuth", () => {
-  showUpdateEmailModal();
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#passPasswordAuth", () => {
-  showUpdatePasswordModal();
 });
 
 qs(".pageAccountSettings")?.onChild("click", "#deleteAccount", () => {
@@ -244,10 +105,6 @@ qs(".pageAccountSettings")?.onChild(
   },
 );
 
-qs(".pageAccountSettings")?.onChild("click", "#revokeAllTokens", () => {
-  showRevokeAllTokensModal();
-});
-
 qs(".pageAccountSettings")?.onChild(
   "click",
   "#resetPersonalBestsButton",
@@ -255,14 +112,6 @@ qs(".pageAccountSettings")?.onChild(
     showResetPersonalBestsModal();
   },
 );
-
-qs(".pageAccountSettings")?.onChild("click", "#addGoogleAuth", () => {
-  void addAuthProvider("google");
-});
-
-qs(".pageAccountSettings")?.onChild("click", "#addGithubAuth", () => {
-  void addAuthProvider("github");
-});
 
 authEvent.subscribe((event) => {
   if (event.type === "authConfigUpdated") {

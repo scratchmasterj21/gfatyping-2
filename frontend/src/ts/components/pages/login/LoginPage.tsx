@@ -1,17 +1,10 @@
-import { useQuery } from "@tanstack/solid-query";
 import { JSXElement, Show } from "solid-js";
 
-import { getServerConfigurationQueryOptions } from "../../../queries/server-configuration";
 import { getLoginPageInputsEnabled } from "../../../states/login";
 import { Page } from "../../common/Page";
 import { Login } from "./Login";
-import { Register } from "./Register";
 
 export function LoginPage(): JSXElement {
-  const serverConfig = useQuery(() => getServerConfigurationQueryOptions());
-  const isSignUpDisabled = (): boolean =>
-    !(serverConfig.data?.users.signUp ?? true);
-
   return (
     <Page id="login">
       <Show when={!getLoginPageInputsEnabled()}>
@@ -19,21 +12,9 @@ export function LoginPage(): JSXElement {
           <i class="fas fa-fw fa-spin fa-circle-notch"></i>
         </div>
       </Show>
-      <Show
-        when={isSignUpDisabled()}
-        fallback={
-          <div class="flex h-full flex-col items-center justify-around gap-4 md:flex-row">
-            <Register />
-            <Login />
-          </div>
-        }
-      >
-        <div class="grid h-full place-items-center">
-          <p>
-            Login/Signup is disabled or the server is down/under maintenance.
-          </p>
-        </div>
-      </Show>
+      <div class="grid h-full place-items-center">
+        <Login />
+      </div>
     </Page>
   );
 }

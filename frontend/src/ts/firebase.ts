@@ -14,6 +14,8 @@ import {
   browserSessionPersistence,
   signInWithEmailAndPassword as firebaseSignInWithEmailAndPassword,
   signInWithPopup as firebaseSignInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
   createUserWithEmailAndPassword as firebaseCreateUserWithEmailAndPassword,
   getIdToken as firebaseGetIdToken,
   UserCredential,
@@ -30,6 +32,13 @@ import {
   Analytics as AnalyticsType,
   getAnalytics as firebaseGetAnalytics,
 } from "firebase/analytics";
+import {
+  getFirestore,
+  Firestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { tryCatch } from "@monkeytype/util/trycatch";
 import { googleSignUpEvent } from "./events/google-sign-up";
 import { addBanner } from "./states/banners";
@@ -49,6 +58,47 @@ let readyCallback: ReadyCallback | undefined;
 const { promise: authPromise, resolve: resolveAuthPromise } =
   promiseWithResolvers();
 
+const GOOGLE_CLIENT_ID =
+  "462808707659-p03eibqftrou06lli01u1ue6peonqosm.apps.googleusercontent.com";
+
+type GisPromptNotification = {
+  isNotDisplayed(): boolean;
+  isDismissedMoment(): boolean;
+  getNotDisplayedReason(): string;
+  getDismissedReason(): string;
+};
+type GisId = {
+  initialize(config: {
+    client_id: string;
+    hd?: string;
+    callback: (response: { credential: string }) => void;
+  }): void;
+  prompt(callback?: (notification: GisPromptNotification) => void): void;
+  cancel(): void;
+};
+type WindowWithGis = Window & {
+  google?: { accounts?: { id?: GisId } };
+};
+
+let gisScriptPromise: Promise<void> | null = null;
+async function loadGisScript(): Promise<void> {
+  if (gisScriptPromise !== null) return gisScriptPromise;
+  gisScriptPromise = new Promise((resolve, reject) => {
+    if ((window as WindowWithGis).google?.accounts?.id !== undefined) {
+      resolve();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () =>
+      reject(new Error("Failed to load Google Identity Services"));
+    document.head.appendChild(script);
+  });
+  return gisScriptPromise;
+}
+
 export async function init(callback: ReadyCallback): Promise<void> {
   try {
     let firebaseConfig: FirebaseOptions | null;
@@ -66,6 +116,8 @@ export async function init(callback: ReadyCallback): Promise<void> {
     const rememberMe =
       window.localStorage.getItem("firebasePersistence") === "LOCAL";
     await setPersistence(rememberMe, false);
+
+    void loadGisScript();
 
     onAuthStateChanged(Auth, async (user) => {
       if (!ignoreAuthCallback) {
@@ -103,6 +155,30 @@ export function getAnalytics(): AnalyticsType {
   return firebaseGetAnalytics(app);
 }
 
+/**
+ * Cloud Firestore instance. Used as the serverless backend (see ape/firestore).
+ * `getFirestore` caches the instance per app, so calling this repeatedly is fine.
+ */
+let dbInstance: Firestore | undefined;
+
+export function getDb(): Firestore {
+  if (app === undefined) {
+    throw new Error("Firebase is not initialized");
+  }
+  if (!dbInstance) {
+    try {
+      dbInstance = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        }),
+      });
+    } catch (e) {
+      dbInstance = getFirestore(app);
+    }
+  }
+  return dbInstance;
+}
+
 export function isAuthAvailable(): boolean {
   return Auth !== undefined;
 }
@@ -110,6 +186,18 @@ export function isAuthAvailable(): boolean {
 export async function signOut(): Promise<void> {
   console.log("auth signout");
   await Auth?.signOut();
+}
+
+/**
+ * Delete the current Firebase Auth account. Required after deleting the user's
+ * Firestore data so the next Google sign-in is treated as a brand-new user and
+ * recreates the account. Requires a recent login (reauthenticate first).
+ */
+export async function deleteAuthAccount(): Promise<void> {
+  const user = getAuthenticatedUser();
+  if (user !== null) {
+    await user.delete();
+  }
 }
 
 export async function signInWithEmailAndPassword(
@@ -149,18 +237,105 @@ export function setUserState(
   }
 }
 
+async function signInWithGoogleOneTap(rememberMe: boolean): Promise<void> {
+  if (Auth === undefined) throw new Error("Authentication uninitialized");
+  await loadGisScript();
+  await setPersistence(rememberMe, true);
+
+  const gisId = (window as WindowWithGis).google?.accounts?.id;
+  if (gisId === undefined) {
+    throw new Error("Google Identity Services failed to load");
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    ignoreAuthCallback = true;
+    let settled = false;
+
+    gisId.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: (response: { credential: string }) => {
+        if (settled) return;
+        settled = true;
+        void (async () => {
+          try {
+            const credential = GoogleAuthProvider.credential(
+              response.credential,
+            );
+            const { data: userCredential, error } = await tryCatch(
+              // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+              signInWithCredential(Auth!, credential),
+            );
+            if (error !== null) {
+              ignoreAuthCallback = false;
+              reject(
+                translateFirebaseError(error, "Failed to sign in with Google"),
+              );
+              return;
+            }
+            const info = getAdditionalUserInfo(userCredential);
+            if (info?.isNewUser) {
+              googleSignUpEvent.dispatch({
+                signedInUser: userCredential,
+                isNewUser: true,
+              });
+            } else {
+              setUserState(userCredential.user);
+              ignoreAuthCallback = false;
+              await readyCallback?.(true, userCredential.user);
+            }
+            resolve();
+          } catch (e) {
+            ignoreAuthCallback = false;
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        })();
+      },
+    });
+
+    gisId.prompt((notification) => {
+      if (notification.isNotDisplayed()) {
+        if (!settled) {
+          settled = true;
+          ignoreAuthCallback = false;
+          reject(
+            new Error(
+              `Google sign-in unavailable (${notification.getNotDisplayedReason()}). Disable your adblocker or use email/password.`,
+            ),
+          );
+        }
+      } else if (
+        notification.isDismissedMoment() &&
+        notification.getDismissedReason() !== "credential_returned"
+      ) {
+        if (!settled) {
+          settled = true;
+          ignoreAuthCallback = false;
+          reject(new Error("Sign-in cancelled"));
+        }
+      }
+    });
+  });
+}
+
 export async function signInWithPopup(
   provider: AuthProvider,
   rememberMe: boolean,
 ): Promise<void> {
   if (Auth === undefined) throw new Error("Authentication uninitialized");
-  await setPersistence(rememberMe, true);
+  // Open the popup synchronously before any await so the browser/adblocker
+  // trust chain from the user click gesture is preserved.
   ignoreAuthCallback = true;
+  const popupPromise = firebaseSignInWithPopup(Auth, provider);
+  await setPersistence(rememberMe, true);
 
-  const { data: signedInUser, error } = await tryCatch(
-    firebaseSignInWithPopup(Auth, provider),
-  );
+  const { data: signedInUser, error } = await tryCatch(popupPromise);
   if (error !== null) {
+    if (error instanceof FirebaseError && error.code === "auth/popup-blocked") {
+      // Firebase popup blocked (adblocker filtering firebaseapp.com).
+      // Fall back to Google One Tap which bypasses firebaseapp.com entirely.
+      await signInWithGoogleOneTap(rememberMe);
+      return;
+    }
     ignoreAuthCallback = false;
     console.log(error);
     throw translateFirebaseError(error, "Failed to sign in with popup");

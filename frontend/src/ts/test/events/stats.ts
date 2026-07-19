@@ -904,6 +904,57 @@ export function getMissedWords(eventLog: EventLog): Record<string, number> {
   return missedWords;
 }
 
+export function getMissedCharacters(
+  eventLog: EventLog,
+): Record<string, number> {
+  const missedChars: Record<string, number> = Object.create(null) as Record<
+    string,
+    number
+  >;
+
+  for (const event of eventLog.events) {
+    if (
+      event.type === "input" &&
+      event.data.inputType === "insertText" &&
+      !event.data.correct
+    ) {
+      const word = eventLog.context.targetWords[event.data.wordIndex];
+      if (word === undefined) continue;
+
+      const expectedChar = word[event.data.charIndex];
+      if (expectedChar !== undefined && expectedChar !== "") {
+        missedChars[expectedChar] = (missedChars[expectedChar] ?? 0) + 1;
+      }
+    }
+  }
+
+  return missedChars;
+}
+
+export function getCorrectCharacters(
+  eventLog: EventLog,
+): Record<string, number> {
+  const correctChars: Record<string, number> = Object.create(null) as Record<
+    string,
+    number
+  >;
+  for (const event of eventLog.events) {
+    if (
+      event.type === "input" &&
+      event.data.inputType === "insertText" &&
+      event.data.correct
+    ) {
+      const word = eventLog.context.targetWords[event.data.wordIndex];
+      if (word === undefined) continue;
+      const expectedChar = word[event.data.charIndex];
+      if (expectedChar !== undefined && expectedChar !== "") {
+        correctChars[expectedChar] = (correctChars[expectedChar] ?? 0) + 1;
+      }
+    }
+  }
+  return correctChars;
+}
+
 export function getCorrectedWordsHistory(eventLog: EventLog): string[] {
   const ev = getEventsPerWord(eventLog.events);
   const correctedWords: string[] = [];

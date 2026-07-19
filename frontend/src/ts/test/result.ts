@@ -3,7 +3,6 @@ import { Chart, type PluginChartOptions } from "chart.js";
 
 import { Config } from "../config/store";
 import { setConfig } from "../config/setters";
-import * as AdController from "../controllers/ad-controller";
 import * as ChartController from "../controllers/chart-controller";
 import QuotesController, { Quote } from "../controllers/quotes-controller";
 import * as DB from "../db";
@@ -16,7 +15,8 @@ import {
   addNotificationWithLevel,
 } from "../states/notifications";
 import { getCustomTextIndicator, isAuthenticated } from "../states/core";
-import { getQuoteStats } from "../states/quote-rate";
+import * as LessonProgress from "../lessons/lesson-progress";
+import { getStudentGrade } from "../lessons/lessons-data";
 import * as GlarsesMode from "../legacy-states/glarses-mode";
 import * as SlowTimer from "../legacy-states/slow-timer";
 import * as DateTime from "../utils/date-and-time";
@@ -805,6 +805,34 @@ function updateTestType(randomQuote: Quote | null): void {
   qsa("#result .stats .testType .bottom")?.setHtml(testType);
 }
 
+// Shows a pass/redo message under the result for gated curriculum lessons.
+function updateLessonGate(res: CompletedEvent): void {
+  const el = qs("#lessonGateNotice");
+  const lessonId = LessonProgress.getActiveLesson();
+  if (
+    el === null ||
+    lessonId === null ||
+    !LessonProgress.isCurriculumLesson(lessonId)
+  ) {
+    el?.hide();
+    return;
+  }
+  const threshold = LessonProgress.lessonPassAccuracy(getStudentGrade());
+  if (res.acc >= threshold) {
+    el.removeClass("fail")
+      .addClass("pass")
+      .setHtml(`<i class="fas fa-check"></i> Passed! Great typing.`)
+      .show();
+  } else {
+    el.removeClass("pass")
+      .addClass("fail")
+      .setHtml(
+        `<i class="fas fa-redo"></i> You need ${threshold}% accuracy to pass this lesson - try again!`,
+      )
+      .show();
+  }
+}
+
 function updateOther(
   difficultyFailed: boolean,
   failReason: string,
@@ -873,26 +901,8 @@ export function updateRateQuote(randomQuote: Quote | null): void {
       return;
     }
 
-    const userqr =
-      DB.getSnapshot()?.quoteRatings?.[randomQuote.language]?.[randomQuote.id];
-    if (Numbers.isSafeNumber(userqr)) {
-      qs(".pageTest #result #rateQuoteButton .icon")
-        ?.removeClass("far")
-        ?.addClass("fas");
-    }
-    getQuoteStats(randomQuote)
-      .then((quoteStats) => {
-        qs(".pageTest #result #rateQuoteButton .rating")?.setText(
-          quoteStats?.average?.toFixed(1) ?? "",
-        );
-      })
-      .catch((_e: unknown) => {
-        qs(".pageTest #result #rateQuoteButton .rating")?.setText("?");
-      });
-    qs(".pageTest #result #rateQuoteButton")
-      ?.setStyle({ opacity: "0" })
-      ?.show()
-      ?.setStyle({ opacity: "1" });
+    // Quote ratings require backend storage, which isn't part of the serverless
+    // setup. Keep the rate button hidden and skip the (unsupported) stats fetch.
   }
 }
 
@@ -962,12 +972,6 @@ export async function update(
   } else {
     qs("#result .loginTip")?.show();
   }
-  if (Config.ads === "off" || Config.ads === "result") {
-    qs("#result #watchVideoAdButton")?.hide();
-  } else {
-    qs("#result #watchVideoAdButton")?.show();
-  }
-
   if (!ConnectionState.get()) {
     ConnectionState.showOfflineBanner();
   }
@@ -987,6 +991,7 @@ export async function update(
   applyMinMaxChartValues();
   await updateTags(dontSave);
   updateOther(difficultyFailed, failReason, afkDetected, isRepeated, tooShort);
+  updateLessonGate(res);
 
   ((ChartController.result.options as PluginChartOptions<"line" | "scatter">)
     .plugins.annotation.annotations as AnnotationOptions<"line">[]) =
@@ -1082,7 +1087,6 @@ export async function update(
   if (Config.alwaysShowWordsHistory && canQuickRestart && !GlarsesMode.get()) {
     void TestUI.toggleResultWords(true);
   }
-  AdController.updateFooterAndVerticalAds(true);
   void Funbox.clear();
 
   qs(".pageTest .loading")?.hide();
@@ -1099,7 +1103,6 @@ export async function update(
   });
 
   Misc.scrollToCenterOrTop(resultEl?.native ?? null);
-  void AdController.renderResult();
   TestState.setResultCalculating(false);
   qs("#words")?.empty();
   ChartController.result.resize();

@@ -15,6 +15,7 @@
     </div>
   </div>
   <div id="typingTest" class="content-grid full-width-padding">
+    <mount data-component="sideimagepanels"></mount>
     <div id="capsWarning" class="hidden">
       <i class="fas fa-lock"></i>
       Caps Lock
@@ -65,7 +66,11 @@
 
     <div id="compositionDisplay"></div>
 
-    <div id="keymap" class="hidden"></div>
+    <div style="position: relative" id="keymapWrapper" class="full-width">
+      <div id="keymap" class="hidden"></div>
+      <mount data-component="animatedhands"></mount>
+    </div>
+    <mount data-component="fingerlegend"></mount>
 
     <button
       id="restartTestButton"

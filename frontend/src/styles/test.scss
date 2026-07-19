@@ -790,6 +790,21 @@
       display: flex;
     }
 
+    #lessonGateNotice {
+      margin: 0 auto 1rem auto;
+      text-align: center;
+      font-size: 1.1rem;
+      i {
+        margin-right: 0.4em;
+      }
+      &.pass {
+        color: var(--main-color);
+      }
+      &.fail {
+        color: var(--error-color);
+      }
+    }
+
     #resultWordsHistory,
     #resultReplay {
       // grid-area: wordsHistory;

@@ -4,6 +4,13 @@ import {
 } from "@monkeytype/contracts/leaderboards";
 import { queryOptions } from "@tanstack/solid-query";
 import Ape from "../ape";
+import {
+  ClassroomMetric,
+  ClassroomScope,
+  getClassroomLeaderboard,
+  getClassroomLeaderboardFromCache,
+  WpmMode2,
+} from "../classroom/classroom";
 import { pageSize, Selection, setPage } from "../states/leaderboard-selection";
 
 const queryKeys = {
@@ -54,11 +61,15 @@ export const getLeaderboardQueryOptions = (
           },
         });
       } else {
+        const speed = options as Extract<
+          Selection,
+          { type: "allTime" | "daily" }
+        >;
         const modeQuery: GetLeaderboardQuery = {
           ...baseQuery,
-          mode: options.mode,
-          mode2: options.mode2,
-          language: options.language,
+          mode: speed.mode,
+          mode2: speed.mode2,
+          language: speed.language,
         };
 
         if (options.type === "allTime") {
@@ -97,6 +108,38 @@ export const getLeaderboardQueryOptions = (
     staleTime: options.type === "allTime" ? 1000 * 60 * 5 : 1000 * 60,
   });
 
+export const getClassroomLeaderboardQueryOptions = (options: {
+  scope: ClassroomScope;
+  classId?: string;
+  grade?: string;
+  metric: ClassroomMetric;
+  wpmMode2?: WpmMode2;
+  // oxlint-disable-next-line typescript/explicit-function-return-type
+}) =>
+  queryOptions({
+    queryKey: [
+      "leaderboard",
+      "classroom",
+      options.scope,
+      options.metric,
+      options.classId ?? null,
+      options.grade ?? null,
+      options.metric === "wpm" ? (options.wpmMode2 ?? "30") : null,
+    ],
+    queryFn: async () => {
+      if (options.scope === "class") {
+        return getClassroomLeaderboard(options);
+      }
+      return getClassroomLeaderboardFromCache({
+        scope: options.scope,
+        grade: options.grade,
+        metric: options.metric,
+        wpmMode2: options.wpmMode2,
+      });
+    },
+    staleTime: 1000 * 60,
+  });
+
 // oxlint-disable-next-line typescript/explicit-function-return-type
 export const getRankQueryOptions = (options: Selection) =>
   queryOptions({
@@ -111,11 +154,15 @@ export const getRankQueryOptions = (options: Selection) =>
           },
         });
       } else {
+        const speed = options as Extract<
+          Selection,
+          { type: "allTime" | "daily" }
+        >;
         const baseQuery: GetLeaderboardRankQuery = {
-          mode: options.mode,
-          mode2: options.mode2,
-          language: options.language,
-          friendsOnly: options.friendsOnly ? true : undefined,
+          mode: speed.mode,
+          mode2: speed.mode2,
+          language: speed.language,
+          friendsOnly: speed.friendsOnly ? true : undefined,
         };
         if (options.type === "allTime") {
           request = Ape.leaderboards.getRank({ query: baseQuery });

@@ -3,6 +3,7 @@ import { createForm } from "@tanstack/solid-form";
 import { createResource, createSignal, For, JSXElement, Show } from "solid-js";
 import { z } from "zod";
 
+import { isCurrentUserAdmin } from "../../../auth";
 import { resetConfig } from "../../../config/lifecycle";
 import { configMetadata, OptionMetadata } from "../../../config/metadata";
 import { setConfig } from "../../../config/setters";
@@ -30,6 +31,7 @@ import { InputField } from "../../ui/form/InputField";
 import { fromSchema } from "../../ui/form/utils";
 import { AnimationFpsLimit } from "./custom-setting/AnimationFpsLimit";
 import { AutoSwitchTheme } from "./custom-setting/AutoSwitchTheme";
+import { Classroom } from "./custom-setting/Classroom";
 import { CustomBackground } from "./custom-setting/CustomBackground";
 import { CustomBackgroundFilters } from "./custom-setting/CustomBackgroundFilters";
 import { CustomLayoutfluid } from "./custom-setting/CustomLayoutfluid";
@@ -167,7 +169,13 @@ export function SettingsPage(): JSXElement {
               <AutoSetting key="keymapLegendStyle" wide />
               <AutoSetting key="keymapShowTopRow" wide />
               <KeymapSize />
+              <AutoSetting key="keymapShowFingers" />
+              <AutoSetting key="showGuidedHands" />
             </Show>
+          </Section>
+          <Section title="learning">
+            <AutoSetting key="lessonIntros" />
+            <AutoSetting key="lessonIntroSpeech" />
           </Section>
           <Section title="theme">
             <AutoSetting key="flipTestColors" />
@@ -186,9 +194,13 @@ export function SettingsPage(): JSXElement {
             <AutoSetting key="capsLockWarning" />
             <AutoSetting key="showAverage" />
           </Section>
+          <Show when={isCurrentUserAdmin()}>
+            <Section title="classroom">
+              <Classroom />
+            </Section>
+          </Show>
           <Section title="danger zone">
             <ImportExport />
-            <AutoSetting key="ads" />
             <Setting
               key="cookies"
               title="update cookie preferences"
@@ -346,7 +358,8 @@ function AutoSetting<T extends keyof Config>(props: {
             }}
           >
             <form.Field
-              //@ts-expect-error what
+              // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+              // @ts-ignore oxlint triggers TS2589 here
               name={props.key}
               validators={{
                 onChange: ({ value }) => {

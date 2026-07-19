@@ -8,8 +8,6 @@ import { getDefaultConfig } from "../constants/default-config";
 import { isAuthenticated } from "../states/core";
 import { showNoticeNotification } from "../states/notifications";
 import { FaObject } from "../types/font-awesome";
-import { isDevEnvironment } from "../utils/env";
-import { reloadAfter } from "../utils/misc";
 import { capitalizeFirstLetter } from "../utils/strings";
 import { canSetFunboxWithConfig } from "./funbox-validation";
 // type SetBlock = {
@@ -1019,6 +1017,42 @@ export const configMetadata: ConfigMetadataObject = {
     overrideConfig: ({ currentConfig }) =>
       currentConfig.keymapMode === "off" ? { keymapMode: "static" } : {},
   },
+  keymapShowFingers: {
+    key: "keymapShowFingers",
+    fa: { icon: "fa-hand-paper" },
+    displayString: "keymap finger colors",
+    changeRequiresRestart: false,
+    group: "appearance",
+    description:
+      "Colors each key on the keymap by the finger that should press it, with a legend. Great for learning touch typing.",
+  },
+  showGuidedHands: {
+    key: "showGuidedHands",
+    fa: { icon: "fa-hand-paper" },
+    displayString: "show guided hands",
+    changeRequiresRestart: false,
+    group: "appearance",
+    description:
+      "Shows a pair of hands below the test that highlight which finger to use for the next key.",
+  },
+  lessonIntros: {
+    key: "lessonIntros",
+    fa: { icon: "fa-graduation-cap" },
+    displayString: "lesson intros",
+    changeRequiresRestart: false,
+    group: "behavior",
+    description:
+      "Show a quick intro before each typing lesson with the new keys and which finger to use.",
+  },
+  lessonIntroSpeech: {
+    key: "lessonIntroSpeech",
+    fa: { icon: "fa-volume-up" },
+    displayString: "lesson intro read-aloud",
+    changeRequiresRestart: false,
+    group: "behavior",
+    description:
+      "Read the lesson intro out loud using your browser's voice - helpful for young or pre-reading students.",
+  },
 
   // theme
   flipTestColors: {
@@ -1273,31 +1307,12 @@ export const configMetadata: ConfigMetadataObject = {
     group: "hidden",
   },
 
-  // ads
+  // ads (feature removed; kept as a hidden config key so stored configs stay valid)
   ads: {
     key: "ads",
     fa: { icon: "fa-ad" },
     changeRequiresRestart: false,
-    description: `You can disable or enable ads at any time. "Result" will show one ad on the result page, "on" will add floating vertical banners, and "sellout" will add multiple ads on every page.`,
-    group: "ads",
-    overrideValue: ({ value }) => {
-      if (isDevEnvironment()) {
-        return "off";
-      }
-      return value;
-    },
-    isBlocked: ({ value }) => {
-      if (value !== "off" && isDevEnvironment()) {
-        showNoticeNotification("Ads are disabled in development mode.");
-        return true;
-      }
-      return false;
-    },
-    afterSet: ({ nosave }) => {
-      if (!nosave && !isDevEnvironment()) {
-        reloadAfter(3);
-        showNoticeNotification("Ad settings changed. Refreshing...");
-      }
-    },
+    group: "hidden",
+    overrideValue: () => "off",
   },
 };

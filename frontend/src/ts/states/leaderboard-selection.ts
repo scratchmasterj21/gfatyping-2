@@ -28,15 +28,59 @@ const SpeedSelection = z.object({
   language: LanguageSchema,
 });
 
-export const SelectionSchema = SpeedSelection.or(XpSelection);
+export const ClassroomScopeSchema = z.enum(["class", "grade", "school"]);
+export type ClassroomScope = z.infer<typeof ClassroomScopeSchema>;
+export const ClassroomMetricSchema = z.enum([
+  "xp",
+  "wpm",
+  "racewpm",
+  "raceacc",
+  "games",
+]);
+export type ClassroomMetric = z.infer<typeof ClassroomMetricSchema>;
+
+export const WpmMode2Schema = z.enum(["15", "30", "60"]);
+export type WpmMode2 = z.infer<typeof WpmMode2Schema>;
+
+const ClassroomSelection = z.object({
+  type: ClassroomScopeSchema,
+  metric: ClassroomMetricSchema,
+  friendsOnly: z.boolean(),
+  previous: z.boolean(),
+  classId: z.string().optional(),
+  grade: z.string().optional(),
+  gameId: z.string().optional(),
+  language: z.never().optional(),
+  mode: z.never().optional(),
+  // only meaningful when metric === "wpm" - which duration's personal best to rank by
+  mode2: WpmMode2Schema.optional(),
+});
+
+export const SelectionSchema =
+  SpeedSelection.or(XpSelection).or(ClassroomSelection);
 export type Selection = z.infer<typeof SelectionSchema>;
+export type ClassroomSelectionType = z.infer<typeof ClassroomSelection>;
+
+export const CLASSROOM_TYPES: readonly Selection["type"][] = [
+  "class",
+  "grade",
+  "school",
+];
+
+export function isClassroomType(type: Selection["type"]): boolean {
+  return (CLASSROOM_TYPES as string[]).includes(type);
+}
 
 export const LeaderboardUrlParamsSchema = z
   .object({
-    type: z.enum(["allTime", "daily", "weekly"]),
+    type: z.enum(["allTime", "daily", "weekly", "class", "grade", "school"]),
     mode: ModeSchema.optional(),
     mode2: z.string().optional(),
     language: LanguageSchema.optional(),
+    metric: ClassroomMetricSchema.optional(),
+    classId: z.string().optional(),
+    grade: z.string().optional(),
+    gameId: z.string().optional(),
     yesterday: z.boolean().optional(),
     lastWeek: z.boolean().optional(),
     friendsOnly: z.boolean().optional(),
@@ -72,7 +116,27 @@ export function readGetParameters(
 ): void {
   if (params === undefined || params.type === undefined) return;
 
-  let newSelection: Partial<Selection> = {
+  if (isClassroomType(params.type)) {
+    setSelection({
+      type: params.type,
+      friendsOnly: false,
+      previous: false,
+      metric: params.metric ?? "xp",
+      classId: params.classId,
+      grade: params.grade,
+      gameId: params.gameId,
+      mode2: params.mode2,
+    } as Selection);
+
+    if (params.goToUserPage === true) {
+      setGoToUserPage(true);
+    } else if (params.page !== undefined) {
+      setPage(Math.max(0, params.page - 1));
+    }
+    return;
+  }
+
+  const newSelection: Partial<Selection> = {
     type: params.type,
     friendsOnly: params.friendsOnly ?? false,
   };
@@ -107,6 +171,14 @@ export function updateGetParameters(
     language: selection.language,
     page: pageNumber + 1,
   };
+
+  if (isClassroomType(selection.type)) {
+    const cs = selection as ClassroomSelectionType;
+    params.metric = cs.metric ?? "xp";
+    params.classId = cs.classId;
+    params.grade = cs.grade;
+    if (cs.gameId !== undefined) params.gameId = cs.gameId;
+  }
 
   if (selection.type === "weekly" && selection.previous) {
     params.lastWeek = true;

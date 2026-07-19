@@ -1,0 +1,338 @@
+<svg version="1.0" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="330 -124 683.3 263" style="enable-background:new 330 -124 683.3 263;" xml:space="preserve" >
+<style type="text/css">
+	.edc-st0{fill:none;stroke-width:0.5;stroke-miterlimit:10;}
+	.edc-st1{
+        opacity: 0;
+        font-family:'ArialMT', 'Arial', 'Helvetica', 'sans-serif';
+        font-size:15px;
+    }
+    .edc-st2{
+        opacity: 1;
+        fill:#777777;
+    }
+	.b{font-size:26px;}
+	.b2{font-size:24px;}
+
+	.edc-st7{font-size:12px;}
+	.edc-st8{font-size:11px;}
+
+	path.active{ fill: rgb(121, 187, 255); }
+	path.deadkey{fill: orange;}
+    text {user-select: none; opacity: 0;}
+	text.active{fill:#FFFFFF;}
+	path.correct{stroke:#C2EA9A;stroke-width:4;}
+	text.correct{}
+	path.incorrect{fill:#E97E7E;}
+	text.incorrect{fill:white;}
+
+</style>
+<image style="overflow:visible;" width="1000" height="349" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA+gAAAFdCAIAAAAfWdBcAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJ
+bWFnZVJlYWR5ccllPAAAAyhpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdp
+bj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6
+eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuNi1jMDY3IDc5LjE1
+Nzc0NywgMjAxNS8wMy8zMC0yMzo0MDo0MiAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJo
+dHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlw
+dGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAv
+IiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RS
+ZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpD
+cmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENDIDIwMTUgKE1hY2ludG9zaCkiIHhtcE1NOklu
+c3RhbmNlSUQ9InhtcC5paWQ6MzZEMUEwMDMxQjlBMTFFNjhGQUFBNjFENEE5Q0ZDMTgiIHhtcE1N
+OkRvY3VtZW50SUQ9InhtcC5kaWQ6MzZEMUEwMDQxQjlBMTFFNjhGQUFBNjFENEE5Q0ZDMTgiPiA8
+eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDozNkQxQTAwMTFCOUEx
+MUU2OEZBQUE2MUQ0QTlDRkMxOCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDozNkQxQTAwMjFC
+OUExMUU2OEZBQUE2MUQ0QTlDRkMxOCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8
+L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/Po+3hvUAABOkSURBVHja7N1rc1TFvgdgJjMJ
+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
+tEQAAAAASUVORK5CYII=" transform="matrix(0.6593 0 0 0.6593 343.9 -102.0405)">
+</image>
+<g id="keys">
+	<path id="tilda" class="edc-st0" d="M389.4-58.5c0,1.8-1.4,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.8,1.3-3.2,3-3.2h36.5
+		c1.6,0,3,1.4,3,3.2V-58.5z"></path>
+	<path id="key-1" class="edc-st0" d="M434.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.7,0-3-1.4-3-3.2v-37.4c0-1.7,1.3-3.2,3-3.2h36.5
+		c1.7,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="q" class="edc-st0" d="M457.7-14.4c0,1.6-1.3,3-3,3h-36.5c-1.7,0-3-1.4-3-3v-35.3c0-1.6,1.3-3,3-3h36.5c1.7,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="a" class="edc-st0" d="M468.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.7,0-3-1.4-3-3V-5.9c0-1.7,1.3-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="z" class="edc-st0" d="M491.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.7,0-3-1.3-3-3V38.1c0-1.7,1.3-3,3-3h36.5c1.6,0,3,1.3,3,3V73.4z"></path>
+	<path id="x" class="edc-st0" d="M536.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.7,0-3-1.3-3-3V38.1c0-1.6,1.3-3,3-3h36.5c1.6,0,3,1.4,3,3V73.4z"></path>
+	<path id="c" class="edc-st0" d="M581.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.7,0-3-1.3-3-3V38.1c0-1.6,1.3-3,3-3h36.5c1.6,0,3,1.4,3,3V73.4z"></path>
+	<path id="v" class="edc-st0" d="M626.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.7,0-3-1.3-3-3V38.1c0-1.6,1.3-3,3-3h36.5c1.6,0,3,1.4,3,3V73.4z"></path>
+	<path id="b" class="edc-st0" d="M671.8,73.4c0,1.7-1.4,3-3,3h-36.6c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h36.6c1.6,0,3,1.4,3,3V73.4z"></path>
+	<path id="n" class="edc-st0" d="M716.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V73.4z"></path>
+	<path id="m" class="edc-st0" d="M761.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V73.4z"></path>
+	<path id="comma" class="edc-st0" d="M806.8,73.4c0,1.7-1.4,3-3,3h-36.5c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3
+		V73.4z"></path>
+	<path id="dot" class="edc-st0" d="M851.8,73.4c0,1.7-1.3,3-3,3h-36.5c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h36.5c1.7,0,3,1.4,3,3V73.4
+		z"></path>
+	<path id="slash" class="edc-st0" d="M896.8,73.4c0,1.7-1.3,3-3,3h-36.5c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h36.5c1.7,0,3,1.4,3,3
+		V73.4z"></path>
+	<path id="s" class="edc-st0" d="M513.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="d" class="edc-st0" d="M558.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="f" class="edc-st0" d="M603.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="g" class="edc-st0" d="M648.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="h" class="edc-st0" d="M693.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="j" class="edc-st0" d="M738.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="k" class="edc-st0" d="M783.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="l" class="edc-st0" d="M828.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="semicolon" class="edc-st0" d="M873.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.4-3,3-3h36.5
+		c1.6,0,3,1.3,3,3V29.5z"></path>
+	<path id="quote" class="edc-st0" d="M918.4,29.5c0,1.6-1.4,3-3,3h-36.5c-1.7,0-3-1.4-3-3V-5.9c0-1.7,1.3-3,3-3h36.5c1.6,0,3,1.3,3,3
+		V29.5z"></path>
+	<path id="w" class="edc-st0" d="M502.7-14.4c0,1.6-1.3,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.7,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="e" class="edc-st0" d="M547.7-14.4c0,1.6-1.3,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.7,1.4-3,3-3h36.5c1.7,0,3,1.3,3,3V-14.4
+		z"></path>
+	<path id="r" class="edc-st0" d="M592.7-14.4c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="t" class="edc-st0" d="M637.7-14.4c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="y" class="edc-st0" d="M682.7-14.4c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="u" class="edc-st0" d="M727.7-14.4c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="i" class="edc-st0" d="M772.7-14.4c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="o" class="edc-st0" d="M817.7-14.4c0,1.6-1.4,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.6,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="p" class="edc-st0" d="M862.7-14.4c0,1.6-1.3,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5c1.7,0,3,1.4,3,3V-14.4
+		z"></path>
+	<path id="open-bracket" class="edc-st0" d="M907.7-14.4c0,1.6-1.3,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5
+		c1.7,0,3,1.4,3,3V-14.4z"></path>
+	<path id="close-bracket" class="edc-st0" d="M952.7-14.4c0,1.6-1.3,3-3,3h-36.5c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.4-3,3-3h36.5
+		c1.7,0,3,1.4,3,3V-14.4z"></path>
+	<path id="backslash" class="edc-st0" d="M999.8-14.4c0,1.6-1.3,3-3,3h-38.6c-1.6,0-3-1.4-3-3v-35.2c0-1.6,1.4-3,3-3h38.6
+		c1.7,0,3,1.4,3,3V-14.4z"></path>
+	<path id="key-2" class="edc-st0" d="M479.4-58.5c0,1.8-1.4,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.7,1.4-3.2,3-3.2h36.5
+		c1.6,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="key-3" class="edc-st0" d="M524.4-58.5c0,1.8-1.4,3.2-3,3.2h-36.5c-1.7,0-3-1.4-3-3.2v-37.4c0-1.7,1.3-3.2,3-3.2h36.5
+		c1.6,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="key-4" class="edc-st0" d="M569.4-58.5c0,1.8-1.4,3.2-3,3.2H530c-1.7,0-3-1.4-3-3.2v-37.4c0-1.8,1.3-3.2,3-3.2h36.5
+		c1.6,0,3,1.4,3,3.2L569.4-58.5L569.4-58.5z"></path>
+	<path id="key-5" class="edc-st0" d="M614.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.7,0-3-1.4-3-3.2v-37.4c0-1.8,1.3-3.2,3-3.2h36.5
+		c1.7,0,3,1.4,3,3.2V-58.5z"></path>
+	<path id="key-6" class="edc-st0" d="M659.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.8,1.4-3.2,3-3.2h36.5
+		c1.7,0,3,1.4,3,3.2V-58.5z"></path>
+	<path id="key-7" class="edc-st0" d="M704.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.7,1.4-3.2,3-3.2h36.5
+		c1.7,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="key-8" class="edc-st0" d="M749.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.7,1.4-3.2,3-3.2h36.5
+		c1.7,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="key-9" class="edc-st0" d="M794.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.7,1.4-3.2,3-3.2h36.5
+		c1.7,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="key-0" class="edc-st0" d="M839.4-58.5c0,1.8-1.3,3.2-3,3.2h-36.5c-1.6,0-3-1.4-3-3.2v-37.4c0-1.7,1.4-3.2,3-3.2h36.5
+		c1.7,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="minus" class="edc-st0" d="M884.4-58.5c0,1.8-1.4,3.2-3,3.2h-36.5c-1.7,0-3-1.4-3-3.2v-37.4c0-1.8,1.4-3.2,3-3.2h36.5
+		c1.6,0,3,1.4,3,3.2V-58.5z"></path>
+	<path id="equal" class="edc-st0" d="M929.4-58.5c0,1.8-1.4,3.2-3,3.2h-36.5c-1.7,0-3-1.4-3-3.2v-37.4c0-1.7,1.3-3.2,3-3.2h36.5
+		c1.6,0,3,1.5,3,3.2V-58.5z"></path>
+	<path id="backspace" class="edc-st0" d="M999.8-58.4c0,1.7-1.3,3.1-3,3.1h-61.9c-1.7,0-3-1.3-3-3.1v-36.4c0-1.6,1.3-3.1,3-3.1h61.9
+		c1.7,0,3,1.4,3,3.1V-58.4z"></path>
+	<path id="tab" class="edc-st0" d="M412.7-14.4c0,1.6-1.3,3-3,3h-59.8c-1.6,0-3-1.4-3-3v-35.3c0-1.6,1.3-3,3-3h59.8c1.7,0,3,1.4,3,3
+		V-14.4z"></path>
+	<path id="capslock" class="edc-st0" d="M423.4,29.5c0,1.6-1.3,3-3,3h-70.5c-1.6,0-3-1.4-3-3V-5.9c0-1.7,1.3-3,3-3h70.4c1.7,0,3,1.3,3,3
+		v35.4H423.4z"></path>
+	<path id="enter" class="edc-st0" d="M998.8,29.5c0,1.6-1.3,3-3,3h-72.9c-1.7,0-3-1.4-3-3V-5.9c0-1.7,1.3-3,3-3h72.9c1.7,0,3,1.3,3,3
+		V29.5z"></path>
+	<path id="shift-left" class="edc-st0" d="M446.8,73.4c0,1.7-1.3,3-3,3h-93.9c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.3-3,3-3h93.8
+		c1.7,0,3,1.4,3,3L446.8,73.4L446.8,73.4z"></path>
+	<path id="option-left" class="edc-st0" d="M513.9,118.7c0,1.5-1.4,2.6-3.1,2.6h-70c-1.7,0-3.1-1.1-3.1-2.6V81.6c0-1.5,1.3-2.6,3.1-2.6
+		h70c1.6,0,3.1,1.1,3.1,2.6V118.7z"></path>
+	<path id="option-right" class="edc-st0" d="M867.2,79c1.8,0,3.3,1.3,3.3,2.8v38.5c0,1.6-1.4,2.8-3.3,2.8h-68.4c-1.7,0-3.3-1.2-3.3-2.8
+		V81.8c0-1.5,1.5-2.8,3.3-2.8H867.2z"></path>
+	<path id="space" class="edc-st0" d="M791.4,79c1.6,0,3,1.2,3,2.6v37.1c0,1.5-1.4,2.6-3,2.6H516.9c-1.6,0-3-1.1-3-2.6V81.6
+		c0-1.4,1.4-2.6,3-2.6H791.4z"></path>
+	<path id="shift-right" class="edc-st0" d="M998.8,73.4c0,1.7-1.3,3-3,3h-93.8c-1.6,0-3-1.3-3-3V38.1c0-1.6,1.4-3,3-3h93.8
+		c1.7,0,3,1.4,3,3V73.4z"></path>
+</g>
+<g id="letters">
+	<text transform="matrix(1 0 0 1 363.4903 -80.196)" class="edc-st1 edc-st2" dx="0" dy="0">~</text>
+	<text transform="matrix(1 0 0 1 365.8009 -61.3357)" class="edc-st1 edc-st2" dx="0" dy="0">`</text>
+	<text transform="matrix(1 0 0 1 408.626 -62.5929)" class="edc-st1 edc-st2" dx="0" dy="0">1</text>
+	<text transform="matrix(1 0 0 1 453.299 -62.8235)" class="edc-st1 edc-st2" dx="0" dy="0">2</text>
+	<text transform="matrix(1 0 0 1 499.6841 -62.596)" class="edc-st1 edc-st2" dx="0" dy="0">3</text>
+	<text transform="matrix(1 0 0 1 543.0758 -62.596)" class="edc-st1 edc-st2" dx="0" dy="0">4</text>
+	<text transform="matrix(1 0 0 1 588.0724 -62.596)" class="edc-st1 edc-st2" dx="0" dy="0">5</text>
+	<text transform="matrix(1 0 0 1 633.2822 -62.9109)" class="edc-st1 edc-st2" dx="0" dy="0">6</text>
+	<text transform="matrix(1 0 0 1 679.5064 -62.9109)" class="edc-st1 edc-st2" dx="0" dy="0">7</text>
+	<text transform="matrix(1 0 0 1 723.281 -62.7843)" class="edc-st1 edc-st2" dx="0" dy="0">8</text>
+	<text transform="matrix(1 0 0 1 768.5742 -62.7843)" class="edc-st1 edc-st2" dx="0" dy="0">9</text>
+	<text transform="matrix(1 0 0 1 813.4907 -62.7843)" class="edc-st1 edc-st2" dx="0" dy="0">0</text>
+	<text transform="matrix(1 0 0 1 860.4011 -62.5929)" class="edc-st1 edc-st2" dx="0" dy="0">-</text>
+	<text transform="matrix(1 0 0 1 903.5195 -62.7843)" class="edc-st1 edc-st2" dx="0" dy="0">=</text>
+	<text transform="matrix(1 0 0 1 410.5513 -80.2395)" class="edc-st1 edc-st2" dx="0" dy="0">!</text>
+	<text transform="matrix(1 0 0 1 449.8565 -81.55)" class="edc-st1 edc-st2" dx="0" dy="0">@</text>
+	<text transform="matrix(1 0 0 1 499.6841 -80.24)" class="edc-st1 edc-st2" dx="0" dy="0">#</text>
+	<text transform="matrix(1 0 0 1 543.0758 -80.7829)" class="edc-st1 edc-st2" dx="0" dy="0">$</text>
+	<text transform="matrix(1 0 0 1 585.5748 -81.1682)" class="edc-st1 edc-st2" dx="0" dy="0">%</text>
+	<text transform="matrix(1 0 0 1 633.9556 -79.5573)" class="edc-st1 edc-st2" dx="0" dy="0">^</text>
+	<text transform="matrix(1 0 0 1 678.2554 -80.24)" class="edc-st1 edc-st2" dx="0" dy="0">&amp;</text>
+	<text transform="matrix(1 0 0 1 724.5334 -79.1764)" class="edc-st1 edc-st2" dx="0" dy="0">*</text>
+	<text transform="matrix(1 0 0 1 770.3076 -81.3565)" class="edc-st1 edc-st2" dx="0" dy="0">(</text>
+	<text transform="matrix(1 0 0 1 815.1645 -81.3565)" class="edc-st1 edc-st2" dx="0" dy="0">)</text>
+	<text transform="matrix(1 0 0 1 858.7588 -86.4577)" class="edc-st1 edc-st2" dx="0" dy="0">_</text>
+	<text transform="matrix(1 0 0 1 903.5195 -79.5578)" class="edc-st1 edc-st2" dx="0" dy="0">+</text>
+	<text transform="matrix(1 0 0 1 431.9088 -37.5257)" class="edc-st1" dx="0" dy="0">Q</text>
+	<text transform="matrix(1 0 0 1 431.9088 -17.5257)" class="edc-st1 edc-st2 b" dx="-4.9609375" dy="-5">Q</text>
+	<text transform="matrix(1 0 0 1 476.3644 -37.5257)" class="edc-st1" dx="0" dy="0">W</text>
+	<text transform="matrix(1 0 0 1 476.3644 -17.5257)" class="edc-st1 edc-st2 b" dx="-5.875" dy="-5">W</text>
+	<text transform="matrix(1 0 0 1 524.5943 -37.5257)" class="edc-st1" dx="0" dy="0">E</text>
+	<text transform="matrix(1 0 0 1 524.5943 -17.5257)" class="edc-st1 edc-st2 b" dx="-3.5156326293945312" dy="-5">E</text>
+	<text transform="matrix(1 0 0 1 567.9933 -37.5257)" class="edc-st1" dx="0" dy="0">R</text>
+	<text transform="matrix(1 0 0 1 567.9933 -17.5257)" class="edc-st1 edc-st2 b" dx="-5.8087615966796875" dy="-5">R</text>
+	<text transform="matrix(1 0 0 1 613.608 -37.5257)" class="edc-st1" dx="0" dy="0">T</text>
+	<text transform="matrix(1 0 0 1 613.608 -17.5257)" class="edc-st1 edc-st2 b" dx="-4.8672027587890625" dy="-5">T</text>
+	<text transform="matrix(1 0 0 1 656.5138 -37.5257)" class="edc-st1" dx="0" dy="0">Y</text>
+	<text transform="matrix(1 0 0 1 656.5138 -17.5257)" class="edc-st1 edc-st2 b" dx="-3.9374847412109375" dy="-5">Y</text>
+	<text transform="matrix(1 0 0 1 702.1386 -37.5257)" class="edc-st1" dx="0" dy="0">U</text>
+	<text transform="matrix(1 0 0 1 702.1386 -17.5257)" class="edc-st1 edc-st2 b" dx="-4.234405517578125" dy="-5">U</text>
+	<text transform="matrix(1 0 0 1 750.5557 -37.5257)" class="edc-st1" dx="0" dy="0">I</text>
+	<text transform="matrix(1 0 0 1 750.5557 -17.5257)" class="edc-st1 edc-st2 b" dx="-0.9531097412109375" dy="-5">I</text>
+	<text transform="matrix(1 0 0 1 791.9639 -37.5257)" class="edc-st1" dx="0" dy="0">O</text>
+	<text transform="matrix(1 0 0 1 791.9639 -17.5257)" class="edc-st1 edc-st2 b" dx="-4.960968017578125" dy="-5">O</text>
+	<text transform="matrix(1 0 0 1 836.9335 -37.5257)" class="edc-st1" dx="0" dy="0">P</text>
+	<text transform="matrix(1 0 0 1 836.9335 -17.5257)" class="edc-st1 edc-st2 b" dx="-3.515625" dy="-5">P</text>
+	<text transform="matrix(1 0 0 1 443.1346 5.3303)" class="edc-st1" dx="0" dy="0">A</text>
+	<text transform="matrix(1 0 0 1 443.1346 25.3303)" class="edc-st1 edc-st2 b" dx="-3.5494003295898438" dy="-5">A</text>
+	<text transform="matrix(1 0 0 1 492.0135 5.3303)" class="edc-st1" dx="0" dy="0">S</text>
+	<text transform="matrix(1 0 0 1 492.0135 25.3303)" class="edc-st1 edc-st2 b" dx="-3.9375" dy="-5">S</text>
+	<text transform="matrix(1 0 0 1 533.5241 5.3303)" class="edc-st1" dx="0" dy="0">D</text>
+	<text transform="matrix(1 0 0 1 533.5241 25.3303)" class="edc-st1 edc-st2 b" dx="-4.234413146972656" dy="-5">D</text>
+	<text transform="matrix(1 0 0 1 580.1121 5.3303)" class="edc-st1" dx="0" dy="0">F</text>
+	<text transform="matrix(1 0 0 1 580.1121 25.3303)" class="edc-st1 edc-st2 b" dx="-4.6124725341796875" dy="-5">F</text>
+	<text transform="matrix(1 0 0 1 622.4753 5.3303)" class="edc-st1" dx="0" dy="0">G</text>
+	<text transform="matrix(1 0 0 1 622.4753 25.3303)" class="edc-st1 edc-st2 b" dx="-4.9609527587890625" dy="-5">G</text>
+	<text transform="matrix(1 0 0 1 666.5886 5.3303)" class="edc-st1" dx="0" dy="0">H</text>
+	<text transform="matrix(1 0 0 1 666.5886 25.3303)" class="edc-st1 edc-st2 b" dx="-4.234375" dy="-5">H</text>
+	<text transform="matrix(1 0 0 1 713.2692 5.3303)" class="edc-st1" dx="0" dy="0">J</text>
+	<text transform="matrix(1 0 0 1 713.2692 25.3303)" class="edc-st1 edc-st2 b" dx="-3.49884033203125" dy="-5">J</text>
+	<text transform="matrix(1 0 0 1 758.0182 5.3303)" class="edc-st1" dx="0" dy="0">K</text>
+	<text transform="matrix(1 0 0 1 758.0182 25.3303)" class="edc-st1 edc-st2 b" dx="-3.9374847412109375" dy="-5">K</text>
+	<text transform="matrix(1 0 0 1 801.8706 5.3303)" class="edc-st1" dx="0" dy="0">L</text>
+	<text transform="matrix(1 0 0 1 801.8706 25.3303)" class="edc-st1 edc-st2 b" dx="-4.578125" dy="-5">L</text>
+	<text transform="matrix(1 0 0 1 466.7896 49.7458)" class="edc-st1" dx="0" dy="0">Z</text>
+	<text transform="matrix(1 0 0 1 466.7896 69.7458)" class="edc-st1 edc-st2 b" dx="-3.203125" dy="-5">Z</text>
+	<text transform="matrix(1 0 0 1 511.2339 49.7458)" class="edc-st1" dx="0" dy="0">X</text>
+	<text transform="matrix(1 0 0 1 511.2339 69.7458)" class="edc-st1 edc-st2 b" dx="-3.9374771118164062" dy="-5">X</text>
+	<text transform="matrix(1 0 0 1 554.5416 49.7458)" class="edc-st1" dx="0" dy="0">C</text>
+	<text transform="matrix(1 0 0 1 554.5416 69.7458)" class="edc-st1 edc-st2 b" dx="-4.6562042236328125" dy="-5">C</text>
+	<text transform="matrix(1 0 0 1 601.3973 49.7458)" class="edc-st1" dx="0" dy="0">V</text>
+	<text transform="matrix(1 0 0 1 601.3973 69.7458)" class="edc-st1 edc-st2 b" dx="-3.9375" dy="-5">V</text>
+	<text transform="matrix(1 0 0 1 646.0098 49.7458)" class="edc-st1" dx="0" dy="0">B</text>
+	<text transform="matrix(1 0 0 1 646.0098 69.7458)" class="edc-st1 edc-st2 b" dx="-3.5156707763671875" dy="-5">B</text>
+	<text transform="matrix(1 0 0 1 690.4863 49.7458)" class="edc-st1" dx="0" dy="0">N</text>
+	<text transform="matrix(1 0 0 1 690.4863 69.7458)" class="edc-st1 edc-st2 b" dx="-4.234375" dy="-5">N</text>
+	<text transform="matrix(1 0 0 1 733.6816 49.7458)" class="edc-st1" dx="0" dy="0">M</text>
+	<text transform="matrix(1 0 0 1 733.6816 69.7458)" class="edc-st1 edc-st2 b" dx="-3.59375" dy="-5">M</text>
+	<text transform="matrix(1 0 0 1 849.074 21.7127)" class="edc-st1 edc-st2" dx="0" dy="0">;</text>
+	<text transform="matrix(1 0 0 1 849.074 4.3763)" class="edc-st1 edc-st2" dx="0" dy="0">:</text>
+	<text transform="matrix(1 0 0 1 781.3285 65.0409)" class="edc-st1 edc-st2 b2" dx="-1.25" dy="0">,</text>
+	<text transform="matrix(1 0 0 1 780.2827 49.3396)" class="edc-st1 edc-st2" dx="0" dy="0">&lt;</text>
+	<text transform="matrix(1 0 0 1 825.9731 66.0409)" class="edc-st1 edc-st2 b2" dx="-1.25" dy="0">.</text>
+	<text transform="matrix(1 0 0 1 824.9274 49.3396)" class="edc-st1 edc-st2" dx="0" dy="0">&gt;</text>
+	<text transform="matrix(1 0 0 1 873.4077 66.0408)" class="edc-st1 edc-st2" dx="0" dy="0">/</text>
+	<text transform="matrix(1 0 0 1 871.3276 48.2498)" class="edc-st1 edc-st2" dx="0" dy="0">?</text>
+	<text transform="matrix(1 0 0 1 895.621 23.7127)" class="edc-st1 edc-st2" dx="0" dy="0">'</text>
+	<text transform="matrix(1 0 0 1 895.621 5.3763)" class="edc-st1 edc-st2" dx="0" dy="0">"</text>
+	<text transform="matrix(1 0 0 1 883.3923 -20.574)" class="edc-st1 edc-st2" dx="0" dy="0">[</text>
+	<text transform="matrix(1 0 0 1 882.9709 -39.1231)" class="edc-st1 edc-st2" dx="0" dy="0">{</text>
+	<text transform="matrix(1 0 0 1 928.7657 -20.574)" class="edc-st1 edc-st2" dx="0" dy="0">]</text>
+	<text transform="matrix(1 0 0 1 928.3443 -39.2151)" class="edc-st1 edc-st2" dx="0" dy="0">}</text>
+	<text transform="matrix(1 0 0 1 974.3574 -18.1193)" class="edc-st1 edc-st2" dx="0" dy="0">\</text>
+	<text transform="matrix(1 0 0 1 974.4941 -40.1231)" class="edc-st1 edc-st2" dx="0" dy="0">|</text>
+	<text id="text-tab" transform="matrix(1 0 0 1 357.3467 -23.7658)" class="edc-st1 edc-st7 edc-st2">tab</text>
+	<text id="text-caps-lock" transform="matrix(1 0 0 1 357.3467 20.7127)" class="edc-st1 edc-st7 edc-st2">caps lock</text>
+	<text id="text-shift-left" transform="matrix(1 0 0 1 357.3467 64.0408)" class="edc-st1 edc-st7 edc-st2">shift</text>
+	<text id="text-shift-right" transform="matrix(1 0 0 1 963.826 65.0408)" class="edc-st1 edc-st7 edc-st2">shift</text>
+	<text id="text-backspace" transform="matrix(1 0 0 1 939.4653 -64.8235)" class="edc-st1 edc-st8 edc-st2">backspace</text>
+	<text id="text-enter" transform="matrix(1 0 0 1 958.3144 22.7128)" class="edc-st1 edc-st7 edc-st2">enter</text>
+	<text id="text-option-left" transform="matrix(1 0 0 1 472.2338 108.4646)" class="edc-st1 edc-st7 edc-st2">option</text>
+	<text id="text-space" transform="matrix(1 0 0 1 538.7899 109.4646)" class="edc-st1 edc-st7 edc-st2">space</text>
+	<text id="text-option-right" transform="matrix(1 0 0 1 803.8864 108.4646)" class="edc-st1 edc-st7 edc-st2">option</text>
+</g>
+</svg>

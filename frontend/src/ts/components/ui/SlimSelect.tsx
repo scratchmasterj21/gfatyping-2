@@ -436,6 +436,23 @@ export default function SlimSelect(props: SlimSelectProps): JSXElement {
     }
   });
 
+  // Effect: Handle optionGroups prop changes
+  createEffect(() => {
+    const groups = props.optionGroups;
+    if (
+      !isInitialMount() &&
+      !isInitializing() &&
+      !isActiveInstance &&
+      slimSelect &&
+      groups !== undefined
+    ) {
+      updateSlimSelectData(slimSelect, groups, true);
+      if (props.selected !== undefined) {
+        syncSelectedToSlimSelect(getSelected(), false);
+      }
+    }
+  });
+
   // Effect: Handle options prop changes
   createEffect(() => {
     const options = getOptions();

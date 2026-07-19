@@ -1,5 +1,9 @@
+import { createSignal } from "solid-js";
 import { promiseWithResolvers } from "../utils/misc";
 import { EventLog } from "./events/types";
+
+export const [resultVisibleSignal, setResultVisibleSignal] =
+  createSignal(false);
 
 export let isActive = false;
 export let bailedOut = false;
@@ -84,6 +88,7 @@ export function setTestRestarting(val: boolean): void {
 
 export function setResultVisible(val: boolean): void {
   resultVisible = val;
+  setResultVisibleSignal(val);
 }
 
 export function setResultCalculating(val: boolean): void {

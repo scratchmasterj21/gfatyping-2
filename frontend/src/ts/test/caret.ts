@@ -5,6 +5,12 @@ import { configEvent } from "../events/config";
 import { Caret } from "../elements/caret";
 import * as CompositionState from "../legacy-states/composition";
 import { qsr } from "../utils/dom";
+import {
+  setActiveFinger,
+  setActiveChar,
+} from "../components/pages/test/AnimatedHands";
+import { fingerForChar } from "../lessons/finger-map";
+import * as TestWords from "./test-words";
 
 export function stopAnimation(): void {
   caret.stopBlinking();
@@ -31,13 +37,27 @@ export function resetPosition(): void {
 }
 
 export function updatePosition(noAnim = false): void {
+  const letterIndex =
+    getCurrentInput().length + CompositionState.getData().length;
   caret.goTo({
     wordIndex: TestState.activeWordIndex,
-    letterIndex: getCurrentInput().length + CompositionState.getData().length,
+    letterIndex,
     isLanguageRightToLeft: TestState.isLanguageRightToLeft,
     isDirectionReversed: TestState.isDirectionReversed,
     animate: Config.smoothCaret !== "off" && !noAnim,
   });
+
+  if (Config.showGuidedHands) {
+    const word = TestWords.words.getCurrentText();
+    if (word && letterIndex < word.length) {
+      const char = word[letterIndex] as string;
+      setActiveFinger(fingerForChar(char) ?? null);
+      setActiveChar(char);
+    } else {
+      setActiveFinger("thumb");
+      setActiveChar(" ");
+    }
+  }
 }
 
 export const caret = new Caret(qsr("#caret"), Config.caretStyle);

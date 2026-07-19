@@ -6,7 +6,8 @@ import { getConfig } from "../../../config/store";
 import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
-import { isAuthenticated } from "../../../states/core";
+import { getActiveLesson } from "../../../lessons/lesson-progress";
+import { getCustomTextIndicator, isAuthenticated } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { getResultVisible, getFocus } from "../../../states/test";
 import { FaObject } from "../../../types/font-awesome";
@@ -84,17 +85,19 @@ function TCButton(props: {
 
 function PuncAndNum(): JSXElement {
   const buttons = ["punctuation", "numbers"] as const;
+  const hidden = (): boolean =>
+    getConfig.mode === "zen" || getActiveLesson() !== null;
 
   return (
     <Anime
       class="mr-(--card-gap) w-max place-self-end"
       animation={{
-        opacity: getConfig.mode === "zen" ? 0 : 1,
+        opacity: hidden() ? 0 : 1,
         // marginRight: getConfig.mode === "zen" ? "0" : "var(--card-gap)",
         duration: durationMs,
       }}
     >
-      <AnimeShow when={getConfig.mode !== "zen"} duration={durationMs}>
+      <AnimeShow when={!hidden()} duration={durationMs}>
         <div class={cardClass}>
           <For each={buttons}>
             {(configKey) => (
@@ -123,6 +126,17 @@ function Mode(): JSXElement {
 
   return (
     <div class={cn("z-2", cardClass)}>
+      <Show when={getActiveLesson() !== null}>
+        <TCButton
+          fa={{ icon: "fa-graduation-cap" }}
+          text={getCustomTextIndicator()?.name ?? "lesson"}
+          active={true}
+          onClick={() => {
+            // Informational only - a lesson isn't a mode you can switch into
+            // ad hoc, so this pill doesn't do anything when clicked.
+          }}
+        />
+      </Show>
       <For each={modeOptions}>
         {(modeOption) => (
           <TCButton
@@ -134,7 +148,7 @@ function Mode(): JSXElement {
               configMetadata.mode.optionsMetadata?.[modeOption]
                 ?.displayString ?? modeOption
             }
-            active={getConfig.mode === modeOption}
+            active={getConfig.mode === modeOption && getActiveLesson() === null}
             onClick={() => {
               setConfig("mode", modeOption);
               restartTestEvent.dispatch();
@@ -360,12 +374,21 @@ function Mode2Quote(props: ComponentProps<"div">): JSXElement {
 function Mode2Custom(props: ComponentProps<"div">): JSXElement {
   return (
     <div {...props}>
-      <TCButton
-        text="change"
-        onClick={() => {
-          showModal("CustomText");
-        }}
-      />
+      <Show
+        when={getActiveLesson() === null}
+        fallback={
+          <span class="px-(--horizontal-padding) py-(--vertical-padding) opacity-70">
+            {getCustomTextIndicator()?.name}
+          </span>
+        }
+      >
+        <TCButton
+          text="change"
+          onClick={() => {
+            showModal("CustomText");
+          }}
+        />
+      </Show>
     </div>
   );
 }
