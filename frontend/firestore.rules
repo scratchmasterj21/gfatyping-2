@@ -54,10 +54,11 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // results: owner can read/create/update; delete only allowed so account
-      // reset/delete can wipe history (otherwise those operations fail).
+      // results: owner can read/create/update; admin may also read, for the
+      // teacher dashboard's PDF/CSV progress reports (writes stay owner-only).
+      // delete stays owner-only too, so account reset/delete can wipe history.
       match /results/{resultId} {
-        allow read: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdminUser();
         allow create: if isOwner(uid);
         // tag labelling needs to update the tags array only
         allow update: if isOwner(uid);
@@ -79,6 +80,12 @@ service cloud.firestore {
 
     // --- teacher-authored assignments ---
     match /assignments/{id} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
+    }
+
+    // --- teacher announcements ---
+    match /announcements/{id} {
       allow read: if isDomainUser();
       allow write: if isAdminUser();
     }

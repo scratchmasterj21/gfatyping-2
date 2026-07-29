@@ -8,7 +8,11 @@ import {
   Show,
 } from "solid-js";
 
-import { parseSets, SideImageSet } from "../../../classroom/side-images";
+import {
+  getSideImagesVersion,
+  parseSets,
+  SideImageSet,
+} from "../../../classroom/side-images";
 import { getDb } from "../../../firebase";
 import { getUserId } from "../../../states/core";
 import { resultVisibleSignal } from "../../../test/test-state";
@@ -154,6 +158,7 @@ export function SideImagePanels(): JSXElement {
 
   createEffect(() => {
     const uid = getUserId();
+    getSideImagesVersion(); // tracked read: refetch whenever a purchase bumps this
     if (uid === null) return;
 
     void (async () => {
@@ -162,34 +167,39 @@ export function SideImagePanels(): JSXElement {
         getDoc(doc(getDb(), "schoolConfig", "sideImages")),
       ]);
 
-      const school = parseSets(schoolSnap.exists() ? schoolSnap.data() : null);
+      const schoolCatalog = parseSets(
+        schoolSnap.exists() ? schoolSnap.data() : null,
+      );
+      const userData = userSnap.exists() ? userSnap.data() : undefined;
 
-      const rawUser = userSnap.exists()
-        ? (userSnap.data() as { sideImages?: unknown }).sideImages
-        : undefined;
+      // School-wide sets are shop items - only show ones this student has
+      // bought (see side-images.ts's buySideImageSet / ownedSideImageSets).
+      const ownedIds =
+        (userData?.["ownedSideImageSets"] as
+          | Record<string, true>
+          | undefined) ?? {};
+      const ownedSchoolSets = schoolCatalog.filter(
+        (s) => s.id !== undefined && ownedIds[s.id] === true,
+      );
 
-      let effectiveSets: SideImageSet[];
+      // Per-student teacher-assigned sets are a free bonus, always shown in
+      // addition to anything bought from the shop - never a purchase.
+      const rawUser = (userData as { sideImages?: unknown } | undefined)
+        ?.sideImages;
+      let perStudentSets: SideImageSet[] = [];
       let rawIdx: number | undefined;
-
-      if (rawUser === undefined || rawUser === null) {
-        effectiveSets = school;
-        rawIdx = undefined;
-      } else {
+      if (rawUser !== undefined && rawUser !== null) {
         const d = rawUser as Record<string, unknown>;
         rawIdx = d["activeIndex"] as number | undefined;
-        if ("sets" in d) {
-          // new format — sets can be array or null (null = use school)
-          effectiveSets = Array.isArray(d["sets"])
-            ? (d["sets"] as SideImageSet[])
-            : school;
+        if (Array.isArray(d["sets"])) {
+          perStudentSets = d["sets"] as SideImageSet[];
         } else if ("left" in d || "right" in d) {
           // legacy single-pair format
-          effectiveSets = parseSets(rawUser);
-        } else {
-          // only metadata saved (e.g. activeIndex only) — use school
-          effectiveSets = school;
+          perStudentSets = parseSets(rawUser);
         }
       }
+
+      const effectiveSets = [...perStudentSets, ...ownedSchoolSets];
 
       // allow idx === effectiveSets.length (the "off" slot)
       const idx = Math.max(0, Math.min(rawIdx ?? 0, effectiveSets.length));

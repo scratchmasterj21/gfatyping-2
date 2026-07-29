@@ -10,10 +10,9 @@ const TTL_MS = 5 * 60 * 1000;
 const WPM_MODE2_OPTIONS = ["15", "30", "60"] as const;
 type WpmMode2 = (typeof WPM_MODE2_OPTIONS)[number];
 const DEFAULT_WPM_MODE2: WpmMode2 = "30";
-const WPM_LANGUAGE = "english";
 const DOMAIN = "@felice.ed.jp";
 
-type ClassroomMetric = "xp" | "wpm" | "racewpm" | "raceacc";
+type ClassroomMetric = "xp" | "xpAllTime" | "wpm" | "racewpm" | "raceacc";
 
 type StoredPersonalBest = {
   wpm?: number;
@@ -24,6 +23,24 @@ type StoredPersonalBest = {
   language?: string;
 };
 
+type StoredWeeklyWpm = {
+  wpm: number;
+  acc: number;
+  raw: number;
+  consistency?: number;
+  timestamp: number;
+};
+
+// Written directly at test-submission time by ape/firestore/results.ts
+// (computeWeeklyPeriod in scoring.ts) - a fresh bucket per weekId, no cron
+// needed. Mirrors classroom.ts's StoredWeeklyPeriod.
+type StoredWeeklyPeriod = {
+  weekId: number;
+  xp: number;
+  lastActivityTimestamp: number;
+  wpm?: Partial<Record<WpmMode2, StoredWeeklyWpm>>;
+};
+
 type StoredUserDoc = {
   uid?: string;
   name?: string;
@@ -31,6 +48,8 @@ type StoredUserDoc = {
   xp?: number;
   classId?: string;
   personalBests?: { time?: Record<string, StoredPersonalBest[]> };
+  streak?: { lastResultTimestamp?: number };
+  weeklyPeriod?: StoredWeeklyPeriod;
   raceBestWpm?: number;
   raceBestWpmAcc?: number;
   raceBestAcc?: number;
@@ -65,33 +84,12 @@ function gradeOf(classId: string): string {
   return classId.slice(0, 2);
 }
 
-/** Mirrors classroom.ts's bestWpm(): personal best on time/{mode2}/english only. */
-function bestWpm(
+/** Mirrors classroom.ts's weeklyWpm(): best wpm within the current week. */
+function weeklyWpm(
   doc: StoredUserDoc,
   mode2: WpmMode2,
-): {
-  wpm: number;
-  acc: number;
-  raw: number;
-  consistency?: number;
-  timestamp: number;
-} | null {
-  const arr = doc.personalBests?.time?.[mode2];
-  if (arr === undefined || arr.length === 0) return null;
-  const english = arr.filter((p) => p.language === WPM_LANGUAGE);
-  if (english.length === 0) return null;
-
-  let best = english[0] as StoredPersonalBest;
-  for (const pb of english) {
-    if ((pb.wpm ?? 0) > (best.wpm ?? 0)) best = pb;
-  }
-  return {
-    wpm: best.wpm ?? 0,
-    acc: best.acc ?? 0,
-    raw: best.raw ?? 0,
-    consistency: best.consistency,
-    timestamp: best.timestamp ?? 0,
-  };
+): StoredWeeklyWpm | null {
+  return doc.weeklyPeriod?.wpm?.[mode2] ?? null;
 }
 
 /** Mirrors the grade/school branches of classroom.ts's getClassroomLeaderboard. */
@@ -136,12 +134,14 @@ function rankStudents(
 
   if (metric === "wpm") {
     const ranked = students
-      .map((d) => ({ d, best: bestWpm(d, wpmMode2) }))
+      .map((d) => ({ d, best: weeklyWpm(d, wpmMode2) }))
       .filter(
         (
           x,
-        ): x is { d: Student; best: NonNullable<ReturnType<typeof bestWpm>> } =>
-          x.best !== null,
+        ): x is {
+          d: Student;
+          best: NonNullable<ReturnType<typeof weeklyWpm>>;
+        } => x.best !== null,
       )
       .sort((a, b) => b.best.wpm - a.best.wpm)
       .map((x, i) => ({
@@ -158,15 +158,31 @@ function rankStudents(
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
+  if (metric === "xpAllTime") {
+    const ranked = students
+      .slice()
+      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
+      .map((d, i) => ({
+        uid: d.uid,
+        name: d.name ?? "",
+        totalXp: d.xp ?? 0,
+        timeTypedSeconds: 0,
+        lastActivityTimestamp: d.streak?.lastResultTimestamp ?? 0,
+        rank: i + 1,
+        avatarUrl: d.avatarUrl,
+      }));
+    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+  }
+
   const ranked = students
     .slice()
-    .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
+    .sort((a, b) => (b.weeklyPeriod?.xp ?? 0) - (a.weeklyPeriod?.xp ?? 0))
     .map((d, i) => ({
       uid: d.uid,
       name: d.name ?? "",
-      totalXp: d.xp ?? 0,
+      totalXp: d.weeklyPeriod?.xp ?? 0,
       timeTypedSeconds: 0,
-      lastActivityTimestamp: 0,
+      lastActivityTimestamp: d.weeklyPeriod?.lastActivityTimestamp ?? 0,
       rank: i + 1,
       avatarUrl: d.avatarUrl,
     }));
@@ -241,7 +257,7 @@ export default async function handler(
   } else if (
     (scope !== "grade" && scope !== "school") ||
     typeof metric !== "string" ||
-    !["xp", "wpm", "racewpm", "raceacc"].includes(metric) ||
+    !["xp", "xpAllTime", "wpm", "racewpm", "raceacc"].includes(metric) ||
     (scope === "grade" && typeof grade !== "string") ||
     (metric === "wpm" &&
       mode2Param !== undefined &&
@@ -304,11 +320,11 @@ export default async function handler(
 
   const usersSnap = await db.collection("users").get();
   let students: Student[] = usersSnap.docs
-    .map((d) => {
+    .map((d: admin.firestore.QueryDocumentSnapshot) => {
       const data = d.data() as StoredUserDoc;
       return { ...data, uid: data.uid ?? d.id };
     })
-    .filter((d) => typeof d.classId === "string" && d.classId !== "");
+    .filter((d: Student) => typeof d.classId === "string" && d.classId !== "");
 
   if (isClassCompare) {
     const result = rankClassPairs(students, grade as string);

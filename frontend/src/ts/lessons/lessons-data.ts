@@ -872,6 +872,47 @@ export const lessonGroups: LessonGroup[] = [
       },
     ],
   },
+  {
+    id: "tab-enter",
+    name: "Tab & Enter",
+    icon: "fa-indent",
+    description: "Move between fields and start new lines without looking down",
+    lessons: [
+      {
+        id: "tab-enter-1",
+        name: "Tab key",
+        generate: async () => {
+          const words = await realWords("english", 30, (w) => w.length <= 6);
+          return words.map((w) => `${w}\t`);
+        },
+      },
+      {
+        id: "tab-enter-2",
+        name: "Enter key",
+        generate: async () => {
+          const words = await realWords("english", 30, (w) => w.length <= 6);
+          return words.map((w) => `${w}\n`);
+        },
+      },
+      {
+        id: "tab-enter-3",
+        name: "Tab + Enter together",
+        preserveOrder: true,
+        generate: async () => {
+          // Simulates filling out a short form: two tabbed fields per row,
+          // then Enter to move to the next row.
+          const words = await realWords("english", 36, (w) => w.length <= 6);
+          const tokens: string[] = [];
+          for (let i = 0; i + 2 < words.length; i += 3) {
+            tokens.push(`${words[i]}\t`);
+            tokens.push(`${words[i + 1]}\t`);
+            tokens.push(`${words[i + 2]}\n`);
+          }
+          return tokens;
+        },
+      },
+    ],
+  },
 ];
 
 export function findLesson(id: string): Lesson | undefined {

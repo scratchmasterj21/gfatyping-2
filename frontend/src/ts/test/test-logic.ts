@@ -1326,17 +1326,17 @@ async function saveResult(
     void awardCoins(uid, timeCoins + pbCoins);
     void awardTryCoin(uid, `${result.mode}:${result.mode2}`);
 
-    if (data.isPb) {
-      void bumpWeeklyQuestCounter(uid, "newPbs").then((quests) => {
-        for (const quest of quests) {
-          triggerCelebration({
-            title: "Quest complete!",
-            message: `${quest.name} - +${quest.coinReward} coins`,
-            icon: "fa-flag-checkered",
-          });
-        }
-      });
-    }
+    void bumpWeeklyQuestCounter(uid, "typingSeconds", {
+      amount: activeSeconds(result),
+    }).then((quests) => {
+      for (const quest of quests) {
+        triggerCelebration({
+          title: "Quest complete!",
+          message: `${quest.name} - +${quest.coinReward} coins`,
+          icon: "fa-flag-checkered",
+        });
+      }
+    });
   }
 
   qs("#retrySavingResultButton")?.hide();

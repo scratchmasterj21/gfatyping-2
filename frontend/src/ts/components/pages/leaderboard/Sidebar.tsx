@@ -107,7 +107,8 @@ export function Sidebar(props: {
           selected={classroom().metric ?? "xp"}
           onSelect={selectMetric}
           items={[
-            { id: "xp", text: "xp", icon: "fa-star" },
+            { id: "xp", text: "xp (weekly)", icon: "fa-star" },
+            { id: "xpAllTime", text: "xp (all-time)", icon: "fa-crown" },
             { id: "wpm", text: "wpm", icon: "fa-bolt" },
             { id: "racewpm", text: "race wpm", icon: "fa-flag-checkered" },
             { id: "raceacc", text: "race acc", icon: "fa-bullseye" },

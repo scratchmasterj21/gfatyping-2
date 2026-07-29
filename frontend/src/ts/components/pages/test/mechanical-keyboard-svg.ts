@@ -1,3 +1,9 @@
+import { KeyboardSkinItemId } from "../../../keyboard-skins/keyboard-skin-items";
+import {
+  RGB_PALETTE_HUES,
+  RgbPaletteItemId,
+} from "../../../rgb-palettes/rgb-palette-items";
+
 type KeyDef = { id: string; label: string; w: number };
 
 // Standard QWERTY layout. All rows sum to exactly 15 units wide.
@@ -87,7 +93,9 @@ function escXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-export function generateMechanicalKeyboardSvg(): string {
+export function generateMechanicalKeyboardSvg(
+  palette: RgbPaletteItemId = "rainbow",
+): string {
   const U = 42; // one key unit in px
   const GAP = 3; // gap between keys
   const PAD = 14; // board padding
@@ -148,7 +156,7 @@ export function generateMechanicalKeyboardSvg(): string {
     }
   }
 
-  const gradStops = [0, 60, 120, 180, 240, 300, 360]
+  const gradStops = RGB_PALETTE_HUES[palette]
     .map(
       (h, i) =>
         `<stop offset="${((i / 6) * 100).toFixed(1)}%" stop-color="hsl(${h},88%,57%)"/>`,
@@ -180,6 +188,105 @@ export function generateMechanicalKeyboardSvg(): string {
     `</g>`,
     `</g>`,
     // Key caps
+    ...keys,
+    `</svg>`,
+  ].join("\n");
+}
+
+type SkinColors = {
+  board: string;
+  boardInner: string;
+  boardStroke: string;
+  keyShadow: string;
+  keyBody: string;
+  keySide: string;
+  keyTop: string;
+  highlightOpacity: number;
+  label: string;
+};
+
+const SKIN_COLORS: Record<KeyboardSkinItemId, SkinColors> = {
+  wood: {
+    board: "#3b2415",
+    boardInner: "#4a2d16",
+    boardStroke: "#5c3a1e",
+    keyShadow: "#1a0f08",
+    keyBody: "#6b4423",
+    keySide: "#4a2d16",
+    keyTop: "#8b5a2b",
+    highlightOpacity: 0.15,
+    label: "#f0dcc0",
+  },
+  glass: {
+    board: "#0d1b2a",
+    boardInner: "#132639",
+    boardStroke: "#1e3a52",
+    keyShadow: "#050b12",
+    keyBody: "#3a5d78",
+    keySide: "#274558",
+    keyTop: "#7fb3d5",
+    highlightOpacity: 0.35,
+    label: "#eaf4fb",
+  },
+};
+
+// Same 15x5-unit layout/geometry as generateMechanicalKeyboardSvg (so hand
+// overlay positioning can be reused as-is) but a plain recolor - no RGB
+// glow/underglow layers, just a themed keycap palette.
+export function generateSkinKeyboardSvg(skin: KeyboardSkinItemId): string {
+  const U = 42;
+  const GAP = 3;
+  const PAD = 14;
+  const BW = 15 * U + PAD * 2;
+  const BH = 5 * U + PAD * 2;
+  const c = SKIN_COLORS[skin];
+
+  const keys: string[] = [];
+
+  for (let ri = 0; ri < ROWS.length; ri++) {
+    const row = ROWS[ri];
+    if (row === undefined) continue;
+    let slotX = PAD;
+
+    for (const key of row) {
+      const sw = key.w * U;
+      const kx = slotX + 1.5;
+      const ky = PAD + ri * U + 1.5;
+      const kw = sw - GAP;
+      const kh = U - GAP;
+
+      const tx = kx + 1;
+      const ty = ky + 1;
+      const tw = kw - 2;
+      const th = kh - 8;
+
+      const lx = kx + kw / 2;
+      const ly = ky + 1 + th / 2;
+      const isMod = key.label.length > 2;
+      const fs = isMod ? (kw > 70 ? 9 : 7) : 12;
+
+      const bump =
+        key.id === "f" || key.id === "j"
+          ? `<rect x="${px(lx - 4)}" y="${px(ky + kh - 9)}" ` +
+            `width="8" height="3" rx="1.5" fill="${c.keySide}"/>`
+          : "";
+
+      const labelEl = key.label
+        ? `<text x="${px(lx)}" y="${px(ly)}" font-family="monospace" font-size="${fs}" fill="${c.label}" text-anchor="middle" dominant-baseline="middle">${escXml(key.label)}</text>`
+        : "";
+
+      keys.push(
+        `<g id="${key.id}"><rect x="${px(kx + 1.5)}" y="${px(ky + 1.5)}" width="${px(kw)}" height="${px(kh)}" rx="3" fill="${c.keyShadow}" opacity="0.55"/><rect x="${px(kx)}" y="${px(ky)}" width="${px(kw)}" height="${px(kh)}" rx="3" fill="${c.keyBody}"/><rect x="${px(kx)}" y="${px(ky + kh - 7)}" width="${px(kw)}" height="7" rx="2" fill="${c.keySide}"/><rect x="${px(tx)}" y="${px(ty)}" width="${px(tw)}" height="${px(th)}" rx="2" fill="${c.keyTop}" class="key-top"/><rect x="${px(kx + 3)}" y="${px(ky + 2)}" width="${px(Math.max(kw - 10, 4))}" height="2" rx="1" fill="#fff" opacity="${c.highlightOpacity}"/>${bump}${labelEl}</g>`,
+      );
+
+      slotX += sw;
+    }
+  }
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BW} ${BH}">`,
+    `<rect x="0" y="0" width="${BW}" height="${BH}" rx="10" fill="${c.board}"/>`,
+    `<rect x="3" y="3" width="${BW - 6}" height="${BH - 6}" rx="8" fill="${c.boardInner}" stroke="${c.boardStroke}" stroke-width="1"/>`,
     ...keys,
     `</svg>`,
   ].join("\n");

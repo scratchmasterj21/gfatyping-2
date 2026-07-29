@@ -10,7 +10,12 @@ import {
 } from "firebase/firestore";
 import { createSignal } from "solid-js";
 
-import { activeSeconds, awardCoins, bumpWeeklyQuestCounter } from "../coins";
+import {
+  activeSeconds,
+  awardCoins,
+  bumpWeeklyQuestCounter,
+  WeeklyQuest,
+} from "../coins";
 import { configEvent } from "../events/config";
 import { getAuthenticatedUser, getDb } from "../firebase";
 import {
@@ -32,6 +37,16 @@ import { localDateString } from "../utils/date-and-time";
 import { checkNewAchievements } from "./achievements";
 
 export const GAME_PREFIX = "game:";
+
+function celebrateCompletedQuests(quests: WeeklyQuest[]): void {
+  for (const quest of quests) {
+    triggerCelebration({
+      title: "Quest complete!",
+      message: `${quest.name} - +${quest.coinReward} coins`,
+      icon: "fa-flag-checkered",
+    });
+  }
+}
 
 export type LessonProgress = {
   lessonId: string;
@@ -262,20 +277,20 @@ export async function recordCompletion(ce: CompletedEvent): Promise<void> {
     const timeCoins = Math.floor(activeSeconds(ce) / 30);
     void awardCoins(uid, timeCoins + completionCoins + repeatCoins);
 
-    // Weekly quest progress: only counts genuine progress (same gate as the
-    // completion bonus above), not plain repeats - so the "finish N lessons"
-    // quest can't be farmed by replaying one already-mastered lesson.
-    if (bonusDue) {
-      void bumpWeeklyQuestCounter(uid, "lessonsCompleted").then((quests) => {
-        for (const quest of quests) {
-          triggerCelebration({
-            title: "Quest complete!",
-            message: `${quest.name} - +${quest.coinReward} coins`,
-            icon: "fa-flag-checkered",
-          });
-        }
-      });
+    // Weekly quest progress: counts a passed attempt toward "practice N
+    // lessons" once per distinct lesson per week (dedupeKey), so replaying
+    // one already-mastered lesson repeatedly can't farm it, but genuine
+    // review of an already-completed lesson still counts - unlike the old
+    // bonusDue-only gate, which became permanently unachievable once every
+    // lesson was maxed at 3 stars.
+    if (completed) {
+      void bumpWeeklyQuestCounter(uid, "lessonsCompleted", {
+        dedupeKey: lessonId,
+      }).then(celebrateCompletedQuests);
     }
+    void bumpWeeklyQuestCounter(uid, "typingSeconds", {
+      amount: activeSeconds(ce),
+    }).then(celebrateCompletedQuests);
   } catch (e) {
     console.error("Failed to save lesson progress:", e);
     showNoticeNotification(
@@ -410,6 +425,15 @@ async function updateEngagement(
   }
 }
 
+// Tab/Enter are excluded from weak-key tracking entirely: the review drill
+// this feeds (generateWeakKeysDrill -> muscleDrill) repeats a weak key
+// back-to-back in one "word" (e.g. "\n\n"), and the typing engine treats any
+// newline as "end of word, advance" - so a repeated-newline word gets marked
+// wrong after the very first Enter press. Tab/Enter already have their own
+// dedicated lesson group that handles them correctly (always one at a time,
+// at the end of a real word).
+const WEAK_KEY_SKIP_CHARS = new Set(["\t", "\n"]);
+
 export async function updateWeakKeys(
   uid: string,
   missedChars: Record<string, number>,
@@ -423,16 +447,22 @@ export async function updateWeakKeys(
   }
   const userRef = doc(collection(getDb(), "users"), uid);
   const snap = await getDoc(userRef);
-  const current = snap.exists()
+  const stored = snap.exists()
     ? ((snap.data()["weakKeys"] as Record<string, number> | undefined) ?? {})
     : {};
+  // Clean up any stale Tab/Enter entries saved before this exclusion existed.
+  const current = Object.fromEntries(
+    Object.entries(stored).filter(([char]) => !WEAK_KEY_SKIP_CHARS.has(char)),
+  );
 
   for (const [char, count] of Object.entries(missedChars)) {
+    if (WEAK_KEY_SKIP_CHARS.has(char)) continue;
     current[char] = (current[char] ?? 0) + count;
   }
   // Decay: each correct keystroke reduces weakness by 0.3, so consistent
   // accuracy on a key eventually clears it from the list.
   for (const [char, count] of Object.entries(correctChars)) {
+    if (WEAK_KEY_SKIP_CHARS.has(char)) continue;
     if (current[char] !== undefined) {
       current[char] = Math.max(0, current[char] - Math.floor(count * 0.3));
     }
@@ -459,7 +489,14 @@ export async function getWeakKeys(
     const userRef = doc(collection(getDb(), "users"), uid);
     const snap = await getDoc(userRef);
     if (snap.exists() && snap.data()["weakKeys"] !== undefined) {
-      return snap.data()["weakKeys"] as Record<string, number>;
+      // Defensive filter for data saved before Tab/Enter were excluded
+      // above - self-heals immediately instead of waiting for the next
+      // updateWeakKeys() call to clean it up.
+      return Object.fromEntries(
+        Object.entries(
+          snap.data()["weakKeys"] as Record<string, number>,
+        ).filter(([char]) => !WEAK_KEY_SKIP_CHARS.has(char)),
+      );
     }
   } catch (e) {
     console.error("Failed to get weak keys:", e);

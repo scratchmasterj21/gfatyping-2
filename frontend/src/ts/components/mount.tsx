@@ -5,6 +5,7 @@ import { render } from "solid-js/web";
 import { queryClient } from "../queries";
 import { qsa } from "../utils/dom";
 import { CelebrationOverlay } from "./common/CelebrationOverlay";
+import { CaretEffectController } from "./core/CaretEffectController";
 import { Theme } from "./core/Theme";
 import { DevTools } from "./dev/DevTools";
 import { CommandlineHotkey } from "./hotkeys/CommandlineHotkey";
@@ -54,6 +55,7 @@ const components: Record<string, () => JSXElement> = {
   profilesearchpage: () => <ProfileSearchPage />,
   myprofile: () => <MyProfile />,
   modals: () => <Modals />,
+  caretfx: () => <CaretEffectController />,
   popups: () => <Popups />,
   overlays: () => <Overlays />,
   theme: () => <Theme />,

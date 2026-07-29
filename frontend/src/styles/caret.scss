@@ -83,3 +83,83 @@
     width: 0.5em;
   }
 }
+
+// Purely cosmetic shop effects, additive on top of whatever caret style/color
+// is already selected above - toggled by CaretEffectController.tsx, which
+// just adds/removes these classes and never touches the caret's own classes.
+@keyframes caretFxGlowPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 4px 1px var(--caret-color);
+  }
+  50% {
+    box-shadow: 0 0 10px 3px var(--caret-color);
+  }
+}
+
+@keyframes caretFxCometPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes caretFxSparkleTwinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+#caret {
+  &.fx-glow {
+    animation:
+      caretFlashSmooth 1s infinite,
+      caretFxGlowPulse 1.4s ease-in-out infinite;
+  }
+
+  &.fx-comet {
+    box-shadow: -8px 0 10px -1px var(--caret-color);
+    animation:
+      caretFlashSmooth 1s infinite,
+      caretFxCometPulse 0.9s ease-in-out infinite;
+  }
+
+  &.fx-sparkle {
+    // #caret is already position: absolute (see base rule above) - that's
+    // already a valid containing block for these ::before/::after, no need
+    // to override it. Overriding to relative here previously pulled #caret
+    // into normal document flow, making it take up real space and push the
+    // words below it down.
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--caret-color);
+      animation: caretFxSparkleTwinkle 1.2s ease-in-out infinite;
+    }
+
+    &::before {
+      top: -4px;
+      right: -3px;
+      animation-delay: 0s;
+    }
+
+    &::after {
+      bottom: -4px;
+      left: -3px;
+      animation-delay: 0.6s;
+    }
+  }
+}

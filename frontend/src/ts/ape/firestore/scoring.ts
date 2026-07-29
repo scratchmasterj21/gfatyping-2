@@ -181,3 +181,72 @@ export function computeXp(result: CompletedEvent): {
 
   return { xp, breakdown };
 }
+
+const WPM_MODE2_OPTIONS = ["15", "30", "60"] as const;
+type WpmMode2 = (typeof WPM_MODE2_OPTIONS)[number];
+const WPM_LANGUAGE = "english";
+
+export type WeeklyPeriodWpm = {
+  wpm: number;
+  acc: number;
+  raw: number;
+  consistency?: number;
+  timestamp: number;
+};
+
+// Mirrors the classroom leaderboard's read side (classroom.ts /
+// api/refresh-leaderboard-cache.ts). weekId is the same Monday-UTC bucket
+// used by currentWeekId() in leaderboards.ts, so this stays in lockstep with
+// the real weekly xp leaderboard's reset boundary.
+export type WeeklyPeriodData = {
+  weekId: number;
+  xp: number;
+  lastActivityTimestamp: number;
+  wpm: Partial<Record<WpmMode2, WeeklyPeriodWpm>>;
+};
+
+/**
+ * Accumulates xp and best wpm-per-duration for the current week. Starts a
+ * fresh bucket whenever weekId no longer matches the stored one - that
+ * bucket swap *is* the weekly reset, computed at write time instead of via
+ * a scheduled job scanning history.
+ */
+export function computeWeeklyPeriod(
+  current: WeeklyPeriodData | undefined,
+  result: CompletedEvent,
+  xpEarned: number,
+  timestamp: number,
+  weekId: number,
+): WeeklyPeriodData {
+  const base: WeeklyPeriodData =
+    current?.weekId === weekId
+      ? current
+      : { weekId, xp: 0, lastActivityTimestamp: 0, wpm: {} };
+
+  const wpm = { ...base.wpm };
+  const mode2 = String(result.mode2);
+  if (
+    result.mode === "time" &&
+    result.language === WPM_LANGUAGE &&
+    (WPM_MODE2_OPTIONS as readonly string[]).includes(mode2)
+  ) {
+    const key = mode2 as WpmMode2;
+    const existing = wpm[key];
+    if (existing === undefined || result.wpm > existing.wpm) {
+      wpm[key] = {
+        wpm: result.wpm,
+        acc: result.acc,
+        raw: result.rawWpm,
+        consistency: result.consistency,
+        timestamp,
+      };
+    }
+  }
+
+  return {
+    weekId,
+    xp: base.xp + xpEarned,
+    lastActivityTimestamp: timestamp,
+    wpm,
+  };
+}

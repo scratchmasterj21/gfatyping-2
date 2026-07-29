@@ -32,6 +32,7 @@ export const ClassroomScopeSchema = z.enum(["class", "grade", "school"]);
 export type ClassroomScope = z.infer<typeof ClassroomScopeSchema>;
 export const ClassroomMetricSchema = z.enum([
   "xp",
+  "xpAllTime",
   "wpm",
   "racewpm",
   "raceacc",

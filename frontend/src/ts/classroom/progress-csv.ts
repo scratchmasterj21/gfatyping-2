@@ -5,6 +5,7 @@ import {
   StudentProgressRow,
   WordList,
 } from "./assignments";
+import { formatWeakKeys } from "./progress-pdf";
 
 /** Quote a CSV field and escape embedded quotes. */
 function csvCell(value: string | number): string {
@@ -31,13 +32,16 @@ export function buildProgressCsv(
   const header = [
     "class",
     "name",
-    "best wpm",
-    "best acc %",
+    "best wpm (30s test)",
+    "best acc % (30s test)",
     "xp",
+    "current streak (days)",
+    "longest streak (days)",
     "lessons completed",
     "lesson attempts",
     "lesson avg acc %",
     "lesson time (min)",
+    "top weak keys",
     "completed tests",
     "time typing (min)",
     "last active",
@@ -58,10 +62,13 @@ export function buildProgressCsv(
       Math.round(row.bestWpm),
       Math.round(row.bestAcc),
       row.xp,
+      row.streakLength,
+      row.streakMaxLength,
       row.lessonsCompleted,
       row.lessonAttempts,
       Math.round(row.lessonAvgAcc),
       Math.round(row.lessonTime / 60),
+      formatWeakKeys(row.weakKeys),
       row.completedTests,
       Math.round(row.timeTyping / 60),
       isoDate(row.lastActive),

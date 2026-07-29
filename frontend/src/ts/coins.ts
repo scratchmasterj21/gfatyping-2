@@ -66,7 +66,7 @@ export async function awardTryCoin(
 }
 
 /** A counter that feeds one or more weekly quests. */
-export type WeeklyQuestCounterKey = "lessonsCompleted" | "newPbs";
+export type WeeklyQuestCounterKey = "lessonsCompleted" | "typingSeconds";
 
 export type WeeklyQuest = {
   id: string;
@@ -75,25 +75,34 @@ export type WeeklyQuest = {
   counterKey: WeeklyQuestCounterKey;
   target: number;
   coinReward: number;
+  /** When set, progress renders in minutes instead of a raw count. */
+  unit?: "seconds";
 };
 
-/** v1 quest set - small on purpose, matching the rest of the shop's "start small" catalogs. */
+// v1 quest set - small on purpose, matching the rest of the shop's "start
+// small" catalogs. Both quests are effort-based (practice volume/time)
+// rather than tied to a skill ceiling - a "beat your personal best" quest
+// used to live here, but became permanently unachievable for any student
+// who'd already maxed the curriculum or plateaued on wpm, since there was
+// nothing left to improve on. Effort-based goals stay completable every
+// week regardless of skill level.
 export const WEEKLY_QUESTS: WeeklyQuest[] = [
   {
     id: "lessons-3",
     name: "Lesson Streaker",
-    description: "Finish 3 lessons this week",
+    description: "Practice 3 different lessons this week",
     counterKey: "lessonsCompleted",
     target: 3,
     coinReward: 15,
   },
   {
-    id: "new-pb",
-    name: "Personal Best",
-    description: "Beat a personal best this week",
-    counterKey: "newPbs",
-    target: 1,
+    id: "practice-time",
+    name: "Practice Time",
+    description: "Type for 15 minutes this week",
+    counterKey: "typingSeconds",
+    target: 15 * 60,
     coinReward: 15,
+    unit: "seconds",
   },
 ];
 
@@ -135,15 +144,26 @@ export async function getWeeklyQuestState(
 /**
  * Increments a weekly-quest counter and, in the same transaction, claims and
  * pays out any quest tied to it that just reached its target for the first
- * time this week. Counters/claims lazily reset whenever the stored week
- * doesn't match the current one (same idea as the lesson repeat-coin
+ * time this week. Counters/claims/dedupe lazily reset whenever the stored
+ * week doesn't match the current one (same idea as the lesson repeat-coin
  * counters - no cron/migration needed). Returns any quests newly completed
  * by this call, so the caller can show a celebration.
+ *
+ * `dedupeKey`, when given, makes this a no-op if the same key was already
+ * counted this week (e.g. a lesson id) - so "practice 3 different lessons"
+ * can't be satisfied by replaying one lesson three times, while still
+ * counting genuine repeat practice on lessons the student has already
+ * mastered (unlike the old bonusDue-gated version, which became permanently
+ * unachievable once every lesson was maxed out).
  */
 export async function bumpWeeklyQuestCounter(
   uid: string,
   counterKey: WeeklyQuestCounterKey,
+  options?: { amount?: number; dedupeKey?: string },
 ): Promise<WeeklyQuest[]> {
+  const amount = options?.amount ?? 1;
+  if (amount <= 0) return [];
+
   const userRef = doc(collection(getDb(), "users"), uid);
   const weekId = currentWeekId(0);
   const newlyCompleted: WeeklyQuest[] = [];
@@ -158,8 +178,17 @@ export async function bumpWeeklyQuestCounter(
       const claimed: string[] = sameWeek
         ? [...((data["questsClaimed"] as string[]) ?? [])]
         : [];
+      const dedupe: Record<string, string[]> = sameWeek
+        ? { ...((data["questDedupe"] as Record<string, string[]>) ?? {}) }
+        : {};
 
-      const newCount = (progress[counterKey] ?? 0) + 1;
+      if (options?.dedupeKey !== undefined) {
+        const seen = dedupe[counterKey] ?? [];
+        if (seen.includes(options.dedupeKey)) return;
+        dedupe[counterKey] = [...seen, options.dedupeKey];
+      }
+
+      const newCount = (progress[counterKey] ?? 0) + amount;
       progress[counterKey] = newCount;
 
       let coinsToAward = 0;
@@ -179,6 +208,7 @@ export async function bumpWeeklyQuestCounter(
           questsWeekId: weekId,
           questProgress: progress,
           questsClaimed: claimed,
+          questDedupe: dedupe,
           ...(coinsToAward > 0 ? { coins: increment(coinsToAward) } : {}),
         },
         { merge: true },

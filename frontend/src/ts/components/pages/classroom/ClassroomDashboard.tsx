@@ -10,7 +10,18 @@ import {
 
 import { isCurrentUserAdmin } from "../../../auth";
 import {
+  getClassActivity,
+  getStudentActivity,
+} from "../../../classroom/activity-report";
+import {
+  Announcement,
+  createAnnouncement,
+  deleteAnnouncement,
+  listAnnouncements,
+} from "../../../classroom/announcements";
+import {
   Assignment,
+  AssignmentScope,
   ContentScope,
   ContentType,
   createAssignment,
@@ -32,11 +43,17 @@ import {
   WordList,
 } from "../../../classroom/assignments";
 import { buildProgressCsv } from "../../../classroom/progress-csv";
+import {
+  buildClassReportPdf,
+  buildStudentReportPdf,
+} from "../../../classroom/progress-pdf";
+import { awardCoins } from "../../../coins";
 import { CLASS_IDS, GRADES } from "../../../constants/classes";
 import { lessonGroups } from "../../../lessons/lessons-data";
 import { queryClient } from "../../../queries";
 import { listHistoryForClass } from "../../../race/race-db";
 import { RaceHistory } from "../../../race/race-types";
+import { getUserId } from "../../../states/core";
 import {
   showErrorNotification,
   showSuccessNotification,
@@ -60,7 +77,8 @@ type Tab =
   | "wordlists"
   | "passages"
   | "races"
-  | "images";
+  | "images"
+  | "announcements";
 
 function formatDate(ts: number): string {
   if (ts <= 0) return "never";
@@ -71,12 +89,24 @@ function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)}m`;
 }
 
+/** YYYY-MM-DD, for binding to <input type="date"> value. */
+function formatDateInput(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function ScopeFields(props: {
-  scope: ContentScope;
+  scope: AssignmentScope;
   classId: string;
   grade: string;
   onClassId: (v: string) => void;
   onGrade: (v: string) => void;
+  /** Only used when scope can be "student" (assignments only). */
+  studentUid?: string;
+  students?: { uid: string; name: string }[];
+  onStudentUid?: (v: string) => void;
 }): JSXElement {
   return (
     <>
@@ -98,6 +128,18 @@ function ScopeFields(props: {
           <For each={GRADES}>{(g) => <option value={g}>{g}</option>}</For>
         </select>
       </Show>
+      <Show when={props.scope === "student"}>
+        <select
+          class={selectClass}
+          value={props.studentUid ?? ""}
+          onChange={(e) => props.onStudentUid?.(e.currentTarget.value)}
+        >
+          <option value="">select student...</option>
+          <For each={props.students ?? []}>
+            {(s) => <option value={s.uid}>{s.name}</option>}
+          </For>
+        </select>
+      </Show>
     </>
   );
 }
@@ -110,9 +152,15 @@ function ProgressTab(props: {
   passages: ReadingPassage[];
   loading: boolean;
 }): JSXElement {
-  const assignmentTotal = (): number => props.assignments.length;
+  // row.assignmentStatus is already scoped to exactly the assignments
+  // relevant to that student (class/grade/school + any student-targeted
+  // ones aimed at them - see getClassProgress), so its own keys double as
+  // the per-row total instead of props.assignments.length, which would
+  // wrongly include every other class/student's assignments too.
+  const assignmentTotal = (row: StudentProgressRow): number =>
+    Object.keys(row.assignmentStatus).length;
   const assignmentsDone = (row: StudentProgressRow): number =>
-    props.assignments.filter((a) => row.assignmentStatus[a.id] === true).length;
+    Object.values(row.assignmentStatus).filter(Boolean).length;
 
   // Surfaces students who've gone quiet without needing a separate filter -
   // there's no push/email notification in this app, so a teacher noticing
@@ -140,12 +188,140 @@ function ProgressTab(props: {
     });
   };
 
+  // PDF reports only date-range the typing activity (tests/wpm/acc/time) -
+  // lessons/assignments/xp have no history to filter, so those always show
+  // lifetime totals regardless of the range picked here (see activity-report.ts).
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const [rangeStart, setRangeStart] = createSignal(
+    formatDateInput(new Date(Date.now() - THIRTY_DAYS_MS)),
+  );
+  const [rangeEnd, setRangeEnd] = createSignal(formatDateInput(new Date()));
+  const [downloadingAll, setDownloadingAll] = createSignal(false);
+  const [downloadingUid, setDownloadingUid] = createSignal<string | null>(null);
+
+  const [coinAmount, setCoinAmount] = createSignal(10);
+  const [rewardingUid, setRewardingUid] = createSignal<string | null>(null);
+
+  const giveCoins = async (row: StudentProgressRow): Promise<void> => {
+    const amount = coinAmount();
+    if (rewardingUid() !== null || amount <= 0) return;
+    setRewardingUid(row.uid);
+    try {
+      await awardCoins(row.uid, amount);
+      showSuccessNotification(`Gave ${amount} coins to ${row.name}`);
+    } catch (e) {
+      showErrorNotification("Failed to give coins");
+      console.error(e);
+    } finally {
+      setRewardingUid(null);
+    }
+  };
+
+  const dateRange = (): { start: number; end: number } => ({
+    start: new Date(rangeStart()).getTime(),
+    end: new Date(rangeEnd()).getTime() + 24 * 60 * 60 * 1000 - 1,
+  });
+
+  const downloadStudentPdf = async (row: StudentProgressRow): Promise<void> => {
+    if (downloadingUid() !== null) return;
+    setDownloadingUid(row.uid);
+    try {
+      const range = dateRange();
+      const [activity, lessonDetails] = await Promise.all([
+        getStudentActivity(row.uid, range.start, range.end),
+        getStudentLessonDetails(row.uid),
+      ]);
+      const doc = buildStudentReportPdf({
+        classId: props.classId,
+        row,
+        activity,
+        lessonDetails,
+        assignments: props.assignments,
+        range,
+      });
+      doc.save(`progress-${props.classId}-${row.name}.pdf`);
+    } catch (e) {
+      showErrorNotification("Failed to build PDF report");
+      console.error(e);
+    } finally {
+      setDownloadingUid(null);
+    }
+  };
+
+  const downloadAllPdf = async (): Promise<void> => {
+    if (downloadingAll() || props.rows.length === 0) return;
+    setDownloadingAll(true);
+    try {
+      const range = dateRange();
+      const uids = props.rows.map((r) => r.uid);
+      const [activity, lessonDetailsEntries] = await Promise.all([
+        getClassActivity(uids, range.start, range.end),
+        Promise.all(
+          uids.map(
+            async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
+          ),
+        ),
+      ]);
+      const doc = buildClassReportPdf({
+        classId: props.classId,
+        rows: props.rows,
+        activityByUid: activity,
+        lessonDetailsByUid: Object.fromEntries(lessonDetailsEntries),
+        assignments: props.assignments,
+        range,
+      });
+      doc.save(`progress-${props.classId}.pdf`);
+    } catch (e) {
+      showErrorNotification("Failed to build PDF reports");
+      console.error(e);
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   return (
     <Show
       when={!props.loading}
       fallback={<div class="text-sub">loading progress...</div>}
     >
-      <div class="mb-3 flex justify-end">
+      <div class="mb-3 flex flex-wrap items-center justify-end gap-3">
+        <div class="flex items-center gap-1.5 text-sm text-sub">
+          <Fa icon="fa-coins" />
+          <span>coins to give:</span>
+          <input
+            type="number"
+            min="1"
+            class={cn(selectClass, "w-20")}
+            value={coinAmount()}
+            onChange={(e) =>
+              setCoinAmount(Math.max(1, Number(e.currentTarget.value) || 1))
+            }
+          />
+        </div>
+        <div class="flex items-center gap-1.5 text-sm text-sub">
+          <span>PDF period:</span>
+          <input
+            type="date"
+            class={selectClass}
+            value={rangeStart()}
+            max={rangeEnd()}
+            onChange={(e) => setRangeStart(e.currentTarget.value)}
+          />
+          <span>to</span>
+          <input
+            type="date"
+            class={selectClass}
+            value={rangeEnd()}
+            min={rangeStart()}
+            onChange={(e) => setRangeEnd(e.currentTarget.value)}
+          />
+        </div>
+        <Button
+          text={downloadingAll() ? "building…" : "download all (pdf)"}
+          fa={{ icon: "fa-file-pdf" }}
+          onClick={() => void downloadAllPdf()}
+          disabled={props.rows.length === 0 || downloadingAll()}
+        />
         <Button
           text="export csv"
           fa={{ icon: "fa-file-csv" }}
@@ -205,7 +381,7 @@ function ProgressTab(props: {
                       {formatMinutes(row.lessonTime)}
                     </td>
                     <td class="p-2 text-right">
-                      {assignmentsDone(row)}/{assignmentTotal()}
+                      {assignmentsDone(row)}/{assignmentTotal(row)}
                     </td>
                     <td
                       class={cn(
@@ -218,7 +394,33 @@ function ProgressTab(props: {
                     >
                       {formatDate(row.lastActive)}
                     </td>
-                    <td class="p-2 text-right">
+                    <td class="p-2 text-right whitespace-nowrap">
+                      <Button
+                        variant="text"
+                        fa={{ icon: "fa-coins" }}
+                        balloon={{
+                          text: `give ${coinAmount()} coins`,
+                          position: "left",
+                        }}
+                        disabled={rewardingUid() !== null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void giveCoins(row);
+                        }}
+                      />
+                      <Button
+                        variant="text"
+                        fa={{ icon: "fa-file-pdf" }}
+                        balloon={{
+                          text: "download progress report (pdf)",
+                          position: "left",
+                        }}
+                        disabled={downloadingUid() !== null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void downloadStudentPdf(row);
+                        }}
+                      />
                       <Button
                         variant="text"
                         fa={{ icon: "fa-certificate" }}
@@ -415,9 +617,10 @@ function AssignmentsTab(props: {
   onChanged: () => Promise<void>;
 }): JSXElement {
   const [title, setTitle] = createSignal("");
-  const [scope, setScope] = createSignal<ContentScope>("class");
+  const [scope, setScope] = createSignal<AssignmentScope>("class");
   const [classId, setClassId] = createSignal<string>(CLASS_IDS[0]);
   const [grade, setGrade] = createSignal<string>(GRADES[0]);
+  const [studentUid, setStudentUid] = createSignal<string>("");
   const [contentType, setContentType] = createSignal<ContentType>("lesson");
   const [lessonId, setLessonId] = createSignal<string>(
     lessonGroups[0]?.lessons[0]?.id ?? "",
@@ -428,9 +631,10 @@ function AssignmentsTab(props: {
 
   const [editingId, setEditingId] = createSignal<string | null>(null);
   const [editTitle, setEditTitle] = createSignal("");
-  const [editScope, setEditScope] = createSignal<ContentScope>("class");
+  const [editScope, setEditScope] = createSignal<AssignmentScope>("class");
   const [editClassId, setEditClassId] = createSignal<string>(CLASS_IDS[0]);
   const [editGrade, setEditGrade] = createSignal<string>(GRADES[0]);
+  const [editStudentUid, setEditStudentUid] = createSignal<string>("");
   const [editContentType, setEditContentType] =
     createSignal<ContentType>("lesson");
   const [editLessonId, setEditLessonId] = createSignal<string>("");
@@ -449,6 +653,7 @@ function AssignmentsTab(props: {
     setEditScope(a.scope);
     setEditClassId(a.classId ?? CLASS_IDS[0]);
     setEditGrade(a.grade ?? GRADES[0]);
+    setEditStudentUid(a.studentUid ?? "");
     setEditContentType(a.contentType);
     setEditLessonId(a.lessonId ?? "");
     setEditWordListId(a.wordListId ?? "");
@@ -465,6 +670,10 @@ function AssignmentsTab(props: {
       showErrorNotification("Title is required");
       return;
     }
+    if (editScope() === "student" && editStudentUid() === "") {
+      showErrorNotification("Pick a student");
+      return;
+    }
     setEditBusy(true);
     try {
       await updateAssignment(id, {
@@ -472,6 +681,7 @@ function AssignmentsTab(props: {
         scope: editScope(),
         classId: editClassId(),
         grade: editGrade(),
+        studentUid: editStudentUid(),
         contentType: editContentType(),
         lessonId: editLessonId() || undefined,
         wordListId: editWordListId() || undefined,
@@ -488,17 +698,23 @@ function AssignmentsTab(props: {
     }
   };
 
+  /** A student-scoped assignment only applies to its one target, not the whole class. */
+  const relevantRows = (a: Assignment): StudentProgressRow[] =>
+    a.scope === "student"
+      ? props.rows.filter((r) => r.uid === a.studentUid)
+      : props.rows;
+
   const completionStudents = (
     a: Assignment,
   ): { name: string; done: boolean }[] =>
-    props.rows.map((r) => ({
+    relevantRows(a).map((r) => ({
       name: r.name,
       done: r.assignmentStatus[a.id] === true,
     }));
   const [busy, setBusy] = createSignal(false);
 
   const completedCount = (a: Assignment): number =>
-    props.rows.filter((r) => r.assignmentStatus[a.id] === true).length;
+    relevantRows(a).filter((r) => r.assignmentStatus[a.id] === true).length;
 
   const submit = async (): Promise<void> => {
     if (title().trim() === "") {
@@ -513,6 +729,10 @@ function AssignmentsTab(props: {
       showErrorNotification("Pick a reading passage");
       return;
     }
+    if (scope() === "student" && studentUid() === "") {
+      showErrorNotification("Pick a student");
+      return;
+    }
     setBusy(true);
     try {
       await createAssignment({
@@ -520,6 +740,7 @@ function AssignmentsTab(props: {
         scope: scope(),
         classId: classId(),
         grade: grade(),
+        studentUid: studentUid(),
         contentType: contentType(),
         lessonId: lessonId(),
         wordListId: wordListId(),
@@ -559,11 +780,12 @@ function AssignmentsTab(props: {
           <select
             class={selectClass}
             value={scope()}
-            onChange={(e) => setScope(e.currentTarget.value as ContentScope)}
+            onChange={(e) => setScope(e.currentTarget.value as AssignmentScope)}
           >
             <option value="class">a class</option>
             <option value="grade">a grade</option>
             <option value="school">whole school</option>
+            <option value="student">one student</option>
           </select>
           <ScopeFields
             scope={scope()}
@@ -571,6 +793,9 @@ function AssignmentsTab(props: {
             grade={grade()}
             onClassId={setClassId}
             onGrade={setGrade}
+            studentUid={studentUid()}
+            students={props.rows}
+            onStudentUid={setStudentUid}
           />
           <select
             class={selectClass}
@@ -657,7 +882,10 @@ function AssignmentsTab(props: {
                           ? a.classId
                           : a.scope === "grade"
                             ? a.grade
-                            : "school"}{" "}
+                            : a.scope === "student"
+                              ? (props.rows.find((r) => r.uid === a.studentUid)
+                                  ?.name ?? "student")
+                              : "school"}{" "}
                         · {a.contentType}
                         <Show when={a.dueAt !== undefined}>
                           {" "}
@@ -675,7 +903,7 @@ function AssignmentsTab(props: {
                           )
                         }
                       >
-                        {completedCount(a)}/{props.rows.length} done
+                        {completedCount(a)}/{relevantRows(a).length} done
                       </button>
                       <Button
                         variant="text"
@@ -704,12 +932,13 @@ function AssignmentsTab(props: {
                       class={selectClass}
                       value={editScope()}
                       onChange={(e) =>
-                        setEditScope(e.currentTarget.value as ContentScope)
+                        setEditScope(e.currentTarget.value as AssignmentScope)
                       }
                     >
                       <option value="class">a class</option>
                       <option value="grade">a grade</option>
                       <option value="school">whole school</option>
+                      <option value="student">one student</option>
                     </select>
                     <ScopeFields
                       scope={editScope()}
@@ -717,6 +946,9 @@ function AssignmentsTab(props: {
                       grade={editGrade()}
                       onClassId={setEditClassId}
                       onGrade={setEditGrade}
+                      studentUid={editStudentUid()}
+                      students={props.rows}
+                      onStudentUid={setEditStudentUid}
                     />
                     <select
                       class={selectClass}
@@ -817,6 +1049,146 @@ function AssignmentsTab(props: {
                   </div>
                 </div>
               </Show>
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
+function AnnouncementsTab(props: {
+  announcements: Announcement[];
+  rows: StudentProgressRow[];
+  onChanged: () => Promise<void>;
+}): JSXElement {
+  const [title, setTitle] = createSignal("");
+  const [message, setMessage] = createSignal("");
+  const [scope, setScope] = createSignal<AssignmentScope>("class");
+  const [classId, setClassId] = createSignal<string>(CLASS_IDS[0]);
+  const [grade, setGrade] = createSignal<string>(GRADES[0]);
+  const [studentUid, setStudentUid] = createSignal<string>("");
+  const [busy, setBusy] = createSignal(false);
+
+  const submit = async (): Promise<void> => {
+    if (title().trim() === "") {
+      showErrorNotification("Title is required");
+      return;
+    }
+    if (message().trim() === "") {
+      showErrorNotification("Message is required");
+      return;
+    }
+    if (scope() === "student" && studentUid() === "") {
+      showErrorNotification("Pick a student");
+      return;
+    }
+    setBusy(true);
+    try {
+      await createAnnouncement({
+        title: title().trim(),
+        message: message().trim(),
+        scope: scope(),
+        classId: classId(),
+        grade: grade(),
+        studentUid: studentUid(),
+      });
+      setTitle("");
+      setMessage("");
+      await props.onChanged();
+      showSuccessNotification("Announcement sent");
+    } catch (e) {
+      showErrorNotification("Failed to send announcement", { error: e });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string): Promise<void> => {
+    try {
+      await deleteAnnouncement(id);
+      await props.onChanged();
+    } catch (e) {
+      showErrorNotification("Failed to delete announcement", { error: e });
+    }
+  };
+
+  const scopeLabel = (a: Announcement): string => {
+    if (a.scope === "class") return a.classId ?? "";
+    if (a.scope === "grade") return a.grade ?? "";
+    if (a.scope === "student") {
+      return props.rows.find((r) => r.uid === a.studentUid)?.name ?? "student";
+    }
+    return "school";
+  };
+
+  return (
+    <div class="grid gap-4">
+      <div class="grid gap-2 rounded bg-bg p-3">
+        <input
+          type="text"
+          class={inputClass}
+          placeholder="announcement title..."
+          value={title()}
+          onInput={(e) => setTitle(e.currentTarget.value)}
+        />
+        <textarea
+          class={inputClass}
+          placeholder="message..."
+          rows={3}
+          value={message()}
+          onInput={(e) => setMessage(e.currentTarget.value)}
+        ></textarea>
+        <div class="flex flex-wrap items-center gap-2">
+          <select
+            class={selectClass}
+            value={scope()}
+            onChange={(e) => setScope(e.currentTarget.value as AssignmentScope)}
+          >
+            <option value="class">a class</option>
+            <option value="grade">a grade</option>
+            <option value="school">whole school</option>
+            <option value="student">one student</option>
+          </select>
+          <ScopeFields
+            scope={scope()}
+            classId={classId()}
+            grade={grade()}
+            onClassId={setClassId}
+            onGrade={setGrade}
+            studentUid={studentUid()}
+            students={props.rows}
+            onStudentUid={setStudentUid}
+          />
+          <Button
+            text={busy() ? "sending..." : "send"}
+            fa={{ icon: "fa-bullhorn" }}
+            onClick={() => void submit()}
+            disabled={busy()}
+          />
+        </div>
+      </div>
+
+      <div class="grid gap-2">
+        <For
+          each={props.announcements}
+          fallback={<div class="text-sub">no announcements yet</div>}
+        >
+          {(a) => (
+            <div class="flex items-start justify-between gap-2 rounded bg-sub-alt p-3">
+              <div>
+                <div class="font-medium text-text">{a.title}</div>
+                <div class="text-sm text-sub">{a.message}</div>
+                <div class="text-em-xs text-sub">
+                  {scopeLabel(a)} · {formatDate(a.createdAt)}
+                </div>
+              </div>
+              <Button
+                variant="text"
+                fa={{ icon: "fa-trash" }}
+                danger
+                onClick={() => void remove(a.id)}
+              />
             </div>
           )}
         </For>
@@ -1316,6 +1688,25 @@ export function ClassroomDashboard(): JSXElement {
   const [selectedClass, setSelectedClass] = createSignal<string>(CLASS_IDS[0]);
   const [tab, setTab] = createSignal<Tab>("progress");
 
+  const [selfCoinAmount, setSelfCoinAmount] = createSignal(10);
+  const [rewardingSelf, setRewardingSelf] = createSignal(false);
+
+  const rewardSelf = async (): Promise<void> => {
+    const uid = getUserId();
+    const amount = selfCoinAmount();
+    if (uid === null || rewardingSelf() || amount <= 0) return;
+    setRewardingSelf(true);
+    try {
+      await awardCoins(uid, amount);
+      showSuccessNotification(`Gave yourself ${amount} coins`);
+    } catch (e) {
+      showErrorNotification("Failed to give coins");
+      console.error(e);
+    } finally {
+      setRewardingSelf(false);
+    }
+  };
+
   const progressQuery = useQuery(() => ({
     queryKey: ["classroom", "progress", selectedClass()],
     queryFn: async () => getClassProgress(selectedClass()),
@@ -1346,6 +1737,18 @@ export function ClassroomDashboard(): JSXElement {
     enabled: isCurrentUserAdmin(),
   }));
 
+  const announcementsQuery = useQuery(() => ({
+    queryKey: ["classroom", "announcements"],
+    queryFn: listAnnouncements,
+    enabled: isCurrentUserAdmin(),
+  }));
+
+  const refetchAnnouncements = async (): Promise<void> => {
+    await queryClient.invalidateQueries({
+      queryKey: ["classroom", "announcements"],
+    });
+  };
+
   const refetchAssignments = async (): Promise<void> => {
     await queryClient.invalidateQueries({
       queryKey: ["classroom", "assignments"],
@@ -1372,6 +1775,9 @@ export function ClassroomDashboard(): JSXElement {
   const wordLists = createMemo<WordList[]>(() => wordListsQuery.data ?? []);
   const passages = createMemo<ReadingPassage[]>(() => passagesQuery.data ?? []);
   const races = createMemo<RaceHistory[]>(() => racesQuery.data ?? []);
+  const announcements = createMemo<Announcement[]>(
+    () => announcementsQuery.data ?? [],
+  );
 
   const tabButton = (id: Tab, text: string): JSXElement => (
     <Button
@@ -1396,15 +1802,36 @@ export function ClassroomDashboard(): JSXElement {
         <div class="content-grid grid gap-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <H2 fa={{ icon: "fa-chalkboard-teacher" }} text="classroom" />
-            <select
-              class={selectClass}
-              value={selectedClass()}
-              onChange={(e) => setSelectedClass(e.currentTarget.value)}
-            >
-              <For each={CLASS_IDS}>
-                {(c) => <option value={c}>{c}</option>}
-              </For>
-            </select>
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex items-center gap-1.5 text-sm text-sub">
+                <Fa icon="fa-coins" />
+                <input
+                  type="number"
+                  min="1"
+                  class={cn(selectClass, "w-20")}
+                  value={selfCoinAmount()}
+                  onChange={(e) =>
+                    setSelfCoinAmount(
+                      Math.max(1, Number(e.currentTarget.value) || 1),
+                    )
+                  }
+                />
+                <Button
+                  text={rewardingSelf() ? "giving…" : "reward myself"}
+                  disabled={rewardingSelf()}
+                  onClick={() => void rewardSelf()}
+                />
+              </div>
+              <select
+                class={selectClass}
+                value={selectedClass()}
+                onChange={(e) => setSelectedClass(e.currentTarget.value)}
+              >
+                <For each={CLASS_IDS}>
+                  {(c) => <option value={c}>{c}</option>}
+                </For>
+              </select>
+            </div>
           </div>
 
           <div class="flex flex-wrap gap-2 border-b border-sub-alt pb-2">
@@ -1414,6 +1841,7 @@ export function ClassroomDashboard(): JSXElement {
             {tabButton("passages", "passages")}
             {tabButton("races", "races")}
             {tabButton("images", "side images")}
+            {tabButton("announcements", "announcements")}
           </div>
 
           <Show when={tab() === "progress"}>
@@ -1449,6 +1877,13 @@ export function ClassroomDashboard(): JSXElement {
           </Show>
           <Show when={tab() === "images"}>
             <SideImageApprovals />
+          </Show>
+          <Show when={tab() === "announcements"}>
+            <AnnouncementsTab
+              announcements={announcements()}
+              rows={rows()}
+              onChanged={refetchAnnouncements}
+            />
           </Show>
         </div>
       </Show>

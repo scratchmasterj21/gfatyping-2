@@ -46,7 +46,6 @@ import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
 import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
-import { ACHIEVEMENTS } from "../../../lessons/achievements";
 import {
   HOME_ROW_GAME_IDS,
   HomeRowCheckpoint,
@@ -541,6 +540,10 @@ function ProgressSummary(props: {
 // before a student's grandfathered frontier (ensureStarsGateGrandfather),
 // which stay unlocked regardless of stars. Assignments and class practice
 // are exempt from this gating entirely.
+// Disabled per admin decision (unused by students) - flip back to true to
+// bring the section back. Deliberately not deleted/removed, just hidden.
+const FUNBOX_GAMES_ENABLED = false;
+
 const previousLessonId = new Map<string, string | undefined>();
 const lessonIndex = new Map<string, number>();
 lessonOrder.forEach((id, i) => {
@@ -605,37 +608,6 @@ function ContentButton(props: {
         </div>
       </Show>
     </button>
-  );
-}
-
-function AchievementsSection(props: { earned: string[] }): JSXElement {
-  const earnedSet = (): Set<string> => new Set(props.earned);
-  return (
-    <section>
-      <H2 fa={{ icon: "fa-trophy" }} text="achievements" />
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <For each={ACHIEVEMENTS}>
-          {(a) => {
-            const done = (): boolean => earnedSet().has(a.id);
-            return (
-              <div
-                class={cn(
-                  "flex flex-col gap-1.5 rounded p-3 transition-opacity",
-                  done() ? "bg-sub-alt" : "bg-sub-alt opacity-50",
-                )}
-              >
-                <Fa
-                  icon={done() ? a.icon : "fa-lock"}
-                  class={done() ? "text-main" : "text-sub"}
-                />
-                <div class="text-sm font-medium text-text">{a.name}</div>
-                <div class="text-em-xs text-sub">{a.description}</div>
-              </div>
-            );
-          }}
-        </For>
-      </div>
-    </section>
   );
 }
 
@@ -745,6 +717,10 @@ function WeeklyQuests(props: {
             Math.min(props.progress[quest.counterKey] ?? 0, quest.target);
           const done = (): boolean => props.claimed.includes(quest.id);
           const percent = (): number => (current() / quest.target) * 100;
+          const formatProgress = (value: number): string =>
+            quest.unit === "seconds"
+              ? `${Math.round(value / 60)}m`
+              : `${value}`;
           return (
             <div class="grid gap-1">
               <div class="flex items-center justify-between text-em-xs">
@@ -766,7 +742,7 @@ function WeeklyQuests(props: {
                 ></div>
               </div>
               <span class="text-em-xs text-sub">
-                {current()}/{quest.target}
+                {formatProgress(current())}/{formatProgress(quest.target)}
               </span>
             </div>
           );
@@ -982,9 +958,17 @@ export function LessonsPage(): JSXElement {
   const classId = (): string | undefined => getSnapshot()?.classId ?? undefined;
 
   const assignmentsQuery = useQuery(() => ({
-    queryKey: ["studentAssignments", classId()],
-    queryFn: async () => getAssignmentsForStudent(classId() as string),
-    enabled: isOpen() && isAuthenticated() && classId() !== undefined,
+    queryKey: ["studentAssignments", classId(), getAuthenticatedUser()?.uid],
+    queryFn: async () =>
+      getAssignmentsForStudent(
+        classId() as string,
+        getAuthenticatedUser()?.uid as string,
+      ),
+    enabled:
+      isOpen() &&
+      isAuthenticated() &&
+      classId() !== undefined &&
+      getAuthenticatedUser()?.uid !== undefined,
     staleTime: 1000 * 30,
   }));
 
@@ -1327,13 +1311,87 @@ export function LessonsPage(): JSXElement {
                 {avatarStateQuery.data?.coins ?? 0}
               </div>
             </div>
-            <button
-              type="button"
-              class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-              onClick={() => showModal("Avatar")}
-            >
-              customize
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("Avatar")}
+              >
+                customize
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("SideImagesShop")}
+              >
+                <Fa icon="fa-image" class="mr-1.5" />
+                side images
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("House")}
+              >
+                <Fa icon="fa-home" class="mr-1.5" />
+                my house
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("HandsShop")}
+              >
+                <Fa icon="fa-hand-paper" class="mr-1.5" />
+                hand styles
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("RgbPaletteShop")}
+              >
+                <Fa icon="fa-palette" class="mr-1.5" />
+                rgb palettes
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("KeyboardSkinShop")}
+              >
+                <Fa icon="fa-keyboard" class="mr-1.5" />
+                keyboard skins
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("KeypressEffectShop")}
+              >
+                <Fa icon="fa-star" class="mr-1.5" />
+                keypress effects
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("CaretEffectShop")}
+              >
+                <Fa icon="fa-i-cursor" class="mr-1.5" />
+                caret effects
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("BackdropShop")}
+              >
+                <Fa icon="fa-mountain" class="mr-1.5" />
+                backdrops
+              </button>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                onClick={() => showModal("Achievements")}
+              >
+                <Fa icon="fa-trophy" class="mr-1.5" />
+                achievements
+              </button>
+            </div>
           </section>
         </Show>
 
@@ -1908,43 +1966,45 @@ export function LessonsPage(): JSXElement {
         </section>
 
         {/* 8b. Fun Box */}
-        <section>
-          <div class="flex items-center justify-between">
-            <H2 fa={{ icon: "fa-magic" }} text="fun box" />
-            <button
-              type="button"
-              class="rounded p-1.5 text-sub transition-colors hover:text-text"
-              onClick={() => toggle("funbox")}
-            >
-              <Fa
-                icon="fa-chevron-down"
-                class={cn(
-                  "transition-transform duration-200",
-                  collapsed().has("funbox") ? "-rotate-90" : "",
-                )}
-              />
-            </button>
-          </div>
-          <Show when={!collapsed().has("funbox")}>
-            <p class="mb-4 text-sub">
-              Weird typing modes that change how the test feels.
-            </p>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <For each={games.filter((g) => g.type === "funbox")}>
-                {(game) => (
-                  <GameButton
-                    name={game.name}
-                    description={game.description}
-                    icon={game.icon}
-                    onClick={() => {
-                      if (game.type === "funbox") startGame(game);
-                    }}
-                  />
-                )}
-              </For>
+        <Show when={FUNBOX_GAMES_ENABLED}>
+          <section>
+            <div class="flex items-center justify-between">
+              <H2 fa={{ icon: "fa-magic" }} text="fun box" />
+              <button
+                type="button"
+                class="rounded p-1.5 text-sub transition-colors hover:text-text"
+                onClick={() => toggle("funbox")}
+              >
+                <Fa
+                  icon="fa-chevron-down"
+                  class={cn(
+                    "transition-transform duration-200",
+                    collapsed().has("funbox") ? "-rotate-90" : "",
+                  )}
+                />
+              </button>
             </div>
-          </Show>
-        </section>
+            <Show when={!collapsed().has("funbox")}>
+              <p class="mb-4 text-sub">
+                Weird typing modes that change how the test feels.
+              </p>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <For each={games.filter((g) => g.type === "funbox")}>
+                  {(game) => (
+                    <GameButton
+                      name={game.name}
+                      description={game.description}
+                      icon={game.icon}
+                      onClick={() => {
+                        if (game.type === "funbox") startGame(game);
+                      }}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+          </section>
+        </Show>
 
         <WordDefenderModal
           open={defenderOpen()}
@@ -2073,13 +2133,6 @@ export function LessonsPage(): JSXElement {
             }
           }}
         />
-
-        {/* 9. Achievements — reward section, best discovered by scrolling */}
-        <Show when={isAuthenticated()}>
-          <AchievementsSection
-            earned={userStatsQuery.data?.achievements ?? []}
-          />
-        </Show>
       </div>
     </Page>
   );

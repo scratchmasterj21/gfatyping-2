@@ -10,7 +10,12 @@ import {
 import { createStore, produce, reconcile } from "solid-js/store";
 
 import { listAllStudents, Student } from "../../../classroom/classroom";
-import { parseSets, SideImageSet } from "../../../classroom/side-images";
+import {
+  DEFAULT_SIDE_IMAGES_PRICE,
+  generateSetId,
+  parseSets,
+  SideImageSet,
+} from "../../../classroom/side-images";
 import { getDb } from "../../../firebase";
 import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
@@ -38,6 +43,8 @@ function ImageSetListEditor(props: {
   initialSets: SideImageSet[];
   onSave: (sets: SideImageSet[]) => Promise<void>;
   onClear?: () => Promise<void>;
+  /** School-wide catalog sets are purchasable (id + coin price); per-student sets stay free. */
+  withPricing?: boolean;
 }): JSXElement {
   const [sets, setSets] = createStore<SideImageSet[]>(
     props.initialSets.length > 0
@@ -75,6 +82,15 @@ function ImageSetListEditor(props: {
     setSets(idx, "label", value.trim() || undefined);
   };
 
+  const updatePrice = (idx: number, value: string): void => {
+    const parsed = Number(value);
+    setSets(
+      idx,
+      "price",
+      Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : undefined,
+    );
+  };
+
   const remove = (idx: number): void => {
     setSets(produce((s) => s.splice(idx, 1)));
   };
@@ -93,14 +109,36 @@ function ImageSetListEditor(props: {
   };
 
   const add = (): void => {
-    setSets(produce((s) => s.push({ left: null, right: null })));
+    setSets(
+      produce((s) =>
+        s.push(
+          props.withPricing === true
+            ? {
+                id: generateSetId(),
+                left: null,
+                right: null,
+                price: DEFAULT_SIDE_IMAGES_PRICE,
+              }
+            : { left: null, right: null },
+        ),
+      ),
+    );
   };
 
   const save = async (): Promise<void> => {
     setSaving(true);
     setError(null);
     setSaved(false);
-    const finalSets = sets.filter((s) => s.left !== null || s.right !== null);
+    let finalSets = sets.filter((s) => s.left !== null || s.right !== null);
+    if (props.withPricing === true) {
+      // Backfill id/price for any row that predates this field (or was
+      // somehow cleared) - every saved catalog set must be purchasable.
+      finalSets = finalSets.map((s) => ({
+        ...s,
+        id: s.id ?? generateSetId(),
+        price: s.price ?? DEFAULT_SIDE_IMAGES_PRICE,
+      }));
+    }
     for (const s of finalSets) {
       for (const field of ["left", "right"] as const) {
         const url = s[field];
@@ -168,6 +206,19 @@ function ImageSetListEditor(props: {
                 value={sets[idx]?.label ?? ""}
                 onInput={(e) => updateLabel(idx, e.currentTarget.value)}
               />
+              <Show when={props.withPricing === true}>
+                <div class="flex w-24 items-center gap-1">
+                  <Fa icon="fa-coins" class="text-sub" />
+                  <input
+                    type="number"
+                    min="0"
+                    class={inputClass}
+                    placeholder="Price"
+                    value={sets[idx]?.price ?? DEFAULT_SIDE_IMAGES_PRICE}
+                    onInput={(e) => updatePrice(idx, e.currentTarget.value)}
+                  />
+                </div>
+              </Show>
               <button
                 type="button"
                 class="rounded px-1.5 py-1 text-xs text-sub transition-colors enabled:hover:text-text disabled:opacity-30"
@@ -245,7 +296,7 @@ function ImageSetListEditor(props: {
             onClick={() => void clear()}
             disabled={saving()}
           >
-            <Fa icon="fa-times" /> use school images
+            <Fa icon="fa-times" /> remove bonus images
           </button>
         </Show>
       </div>
@@ -300,7 +351,11 @@ export function SideImageApprovals(): JSXElement {
   };
 
   const saveSchool = async (sets: SideImageSet[]): Promise<void> => {
-    await setDoc(doc(getDb(), "schoolConfig", "sideImages"), { sets });
+    await setDoc(
+      doc(getDb(), "schoolConfig", "sideImages"),
+      { sets },
+      { merge: true },
+    );
     setSchoolSets(sets);
   };
 
@@ -323,8 +378,8 @@ export function SideImageApprovals(): JSXElement {
       <div class="flex flex-col gap-2">
         <H3 fa={{ icon: "fa-school" }} text="school-wide images" />
         <p class="text-sm text-sub">
-          Shown to all students unless overridden per-student. Students can
-          cycle through sets and pick their favourite.
+          The shop catalog every student can browse and buy with coins. Set a
+          price per set - students only see the ones they&apos;ve bought.
         </p>
         <Show
           when={schoolLoaded()}
@@ -334,6 +389,7 @@ export function SideImageApprovals(): JSXElement {
             title="School-wide sets"
             initialSets={schoolSets()}
             onSave={saveSchool}
+            withPricing
           />
         </Show>
       </div>
@@ -341,8 +397,9 @@ export function SideImageApprovals(): JSXElement {
       <div class="flex flex-col gap-2">
         <H3 fa={{ icon: "fa-user" }} text="per-student images" />
         <p class="text-sm text-sub">
-          Overrides school-wide for a specific student. Clear to fall back to
-          school-wide.
+          A free bonus for one specific student - always visible to them, in
+          addition to anything they&apos;ve bought from the shop. Clear to
+          remove.
         </p>
         <select
           class="rounded bg-bg px-3 py-2 text-sm text-text outline-none focus:ring-2 focus:ring-sub"

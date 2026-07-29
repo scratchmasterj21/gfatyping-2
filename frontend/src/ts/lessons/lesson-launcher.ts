@@ -37,6 +37,11 @@ export function startCustomDrill(drill: {
   setConfig("stopOnError", "off", { nosave: true });
   setConfig("difficulty", "normal", { nosave: true });
   setConfig("strictSpace", false, { nosave: true });
+  // Funbox is disabled for lessons (not a curated part of the experience -
+  // see commandline/lists/funbox.ts's `available` guard); reset here too in
+  // case one was left active from a prior commandline pick or settings-page
+  // change, so it can't silently carry into this lesson's run.
+  setConfig("funbox", [], { nosave: true });
 
   CustomText.setPipeDelimiter(false);
   CustomText.setMode(drill.preserveOrder === true ? "repeat" : "shuffle");

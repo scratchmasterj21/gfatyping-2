@@ -3,6 +3,10 @@ import { Accessor, createMemo } from "solid-js";
 
 import { isCurrentUserAdmin } from "../auth";
 import {
+  Announcement,
+  getAnnouncementsForStudent,
+} from "../classroom/announcements";
+import {
   Assignment,
   getAssignmentsForStudent,
   getPassagesForStudent,
@@ -36,6 +40,7 @@ type DeriveAlertsInput = {
   assignments: Assignment[];
   wordLists: WordList[];
   passages: ReadingPassage[];
+  announcements: Announcement[];
   lastSeenAssignmentsAt: number;
   achievements: string[];
   seenAchievementIds: string[];
@@ -51,6 +56,19 @@ function yesterday(): string {
 
 export function deriveAlerts(input: DeriveAlertsInput): ClassroomAlert[] {
   const alerts: ClassroomAlert[] = [];
+
+  // Announcements first - a direct message from the teacher is more
+  // pressing than the "new content exists" nudges below it.
+  for (const a of input.announcements) {
+    if (a.createdAt > input.lastSeenAssignmentsAt) {
+      alerts.push({
+        id: `announcement:${a.id}`,
+        icon: "fa-bullhorn",
+        title: a.title,
+        message: a.message,
+      });
+    }
+  }
 
   for (const a of input.assignments) {
     if (a.createdAt > input.lastSeenAssignmentsAt) {
@@ -121,9 +139,30 @@ export function useClassroomAlerts(): {
   const classId = (): string | undefined => getSnapshot()?.classId ?? undefined;
 
   const assignmentsQuery = useQuery(() => ({
-    queryKey: ["studentAssignments", classId()],
-    queryFn: async () => getAssignmentsForStudent(classId() as string),
-    enabled: isAuthenticated() && classId() !== undefined,
+    queryKey: ["studentAssignments", classId(), getAuthenticatedUser()?.uid],
+    queryFn: async () =>
+      getAssignmentsForStudent(
+        classId() as string,
+        getAuthenticatedUser()?.uid as string,
+      ),
+    enabled:
+      isAuthenticated() &&
+      classId() !== undefined &&
+      getAuthenticatedUser()?.uid !== undefined,
+    staleTime: 1000 * 30,
+  }));
+
+  const announcementsQuery = useQuery(() => ({
+    queryKey: ["studentAnnouncements", classId(), getAuthenticatedUser()?.uid],
+    queryFn: async () =>
+      getAnnouncementsForStudent(
+        classId() as string,
+        getAuthenticatedUser()?.uid as string,
+      ),
+    enabled:
+      isAuthenticated() &&
+      classId() !== undefined &&
+      getAuthenticatedUser()?.uid !== undefined,
     staleTime: 1000 * 30,
   }));
 
@@ -177,6 +216,7 @@ export function useClassroomAlerts(): {
       assignments: assignmentsQuery.data ?? [],
       wordLists: wordListsQuery.data ?? [],
       passages: passagesQuery.data ?? [],
+      announcements: announcementsQuery.data ?? [],
       lastSeenAssignmentsAt: userStatsQuery.data?.lastSeenAssignmentsAt ?? 0,
       achievements: userStatsQuery.data?.achievements ?? [],
       seenAchievementIds: userStatsQuery.data?.seenAchievementIds ?? [],

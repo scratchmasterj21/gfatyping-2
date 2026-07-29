@@ -21,6 +21,7 @@ import {
   stripUndefined,
 } from "./common";
 import {
+  currentWeekId,
   incrementWeeklyXp,
   upsertDailyLeaderboardEntry,
   upsertLeaderboardEntry,
@@ -28,10 +29,12 @@ import {
 import {
   checkAndUpdatePersonalBest,
   computeStreak,
+  computeWeeklyPeriod,
   computeXp,
   emptyPersonalBests,
   PersonalBestsLike,
   StreakData,
+  WeeklyPeriodData,
 } from "./scoring";
 
 type StoredUserData = {
@@ -42,6 +45,7 @@ type StoredUserData = {
   startedTests?: number;
   completedTests?: number;
   personalBests?: PersonalBestsLike;
+  weeklyPeriod?: WeeklyPeriodData;
 };
 
 type StoredTagData = {
@@ -147,6 +151,13 @@ export const add: Handler = async (ctx) => {
     const { xp, breakdown } = computeXp(result);
     const newXp = (user.xp ?? 0) + xp;
     const streak = computeStreak(user.streak, timestamp);
+    const weeklyPeriod = computeWeeklyPeriod(
+      user.weeklyPeriod,
+      result,
+      xp,
+      timestamp,
+      currentWeekId(0),
+    );
 
     const time =
       result.testDuration +
@@ -189,6 +200,7 @@ export const add: Handler = async (ctx) => {
         timeTyping,
         startedTests,
         completedTests,
+        weeklyPeriod,
       }),
       { merge: true },
     );

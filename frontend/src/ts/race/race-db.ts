@@ -383,10 +383,27 @@ type RaceStatsDoc = {
   raceWins?: number;
 };
 
+const RACE_PARTICIPATION_COINS = 5;
+const RACE_RANK_BONUS: Record<number, number> = { 1: 20, 2: 10, 3: 5 };
+
+/**
+ * Coins a standing earns for this race: a flat participation reward for
+ * anyone who actually finished the text, plus a podium bonus for the top 3.
+ * Never finishing (finishedAt === 0, e.g. left early or ran out of time
+ * without completing) earns nothing. Pure function of already-computed
+ * standings, so the results overlay (RaceOverlay.tsx) can show the same
+ * number to each student locally without waiting on the host's write.
+ */
+export function raceCoinsEarned(s: RaceStanding): number {
+  if (s.finishedAt <= 0) return 0;
+  return RACE_PARTICIPATION_COINS + (RACE_RANK_BONUS[s.rank] ?? 0);
+}
+
 /**
  * Denormalize each participant's race bests onto their own user doc, so the
  * classroom racewpm/raceacc leaderboards can rank from `users` directly
- * instead of scanning the entire (ever-growing) raceHistory collection.
+ * instead of scanning the entire (ever-growing) raceHistory collection. Also
+ * awards race-completion coins (see raceCoinsEarned) in the same write.
  */
 async function updateRaceStats(standings: RaceStanding[]): Promise<void> {
   await Promise.all(
@@ -403,6 +420,7 @@ async function updateRaceStats(standings: RaceStanding[]): Promise<void> {
         s.finalAcc > (prev.raceBestAcc ?? 0)
           ? { raceBestAcc: s.finalAcc, raceBestAccWpm: s.finalWpm }
           : {};
+      const coinsEarned = raceCoinsEarned(s);
 
       await setDoc(
         ref,
@@ -411,6 +429,7 @@ async function updateRaceStats(standings: RaceStanding[]): Promise<void> {
           ...bestAcc,
           raceTotalRaces: increment(1),
           raceWins: increment(s.rank === 1 ? 1 : 0),
+          ...(coinsEarned > 0 ? { coins: increment(coinsEarned) } : {}),
         },
         { merge: true },
       );

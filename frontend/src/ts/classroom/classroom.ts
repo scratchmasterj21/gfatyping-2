@@ -24,7 +24,12 @@ export type Student = {
 };
 
 export type ClassroomScope = "class" | "grade" | "school";
-export type ClassroomMetric = "xp" | "wpm" | "racewpm" | "raceacc";
+export type ClassroomMetric =
+  | "xp"
+  | "xpAllTime"
+  | "wpm"
+  | "racewpm"
+  | "raceacc";
 
 export type RaceLeaderboardEntry = {
   uid: string;
@@ -52,6 +57,26 @@ type StoredPersonalBest = {
   language?: string;
 };
 
+type StoredWeeklyWpm = {
+  wpm: number;
+  acc: number;
+  raw: number;
+  consistency?: number;
+  timestamp: number;
+};
+
+// Written directly at test-submission time (see computeWeeklyPeriod in
+// ape/firestore/scoring.ts) - a fresh bucket starts whenever weekId changes,
+// which *is* the weekly reset. No cron/backfill needed: the wpm/xp classroom
+// leaderboards rank by this instead of lifetime personalBests/xp so a
+// student can't set one high score and coast on it indefinitely.
+export type StoredWeeklyPeriod = {
+  weekId: number;
+  xp: number;
+  lastActivityTimestamp: number;
+  wpm?: Partial<Record<WpmMode2, StoredWeeklyWpm>>;
+};
+
 export type StoredUserDoc = {
   uid?: string;
   name?: string;
@@ -60,10 +85,17 @@ export type StoredUserDoc = {
   classId?: string;
   timeTyping?: number;
   completedTests?: number;
-  streak?: { lastResultTimestamp?: number };
+  streak?: {
+    lastResultTimestamp?: number;
+    length?: number;
+    maxLength?: number;
+  };
   personalBests?: {
     time?: Record<string, StoredPersonalBest[]>;
   };
+  weeklyPeriod?: StoredWeeklyPeriod;
+  /** char -> weakness score, capped to top 10, see lesson-progress.ts's updateWeakKeys */
+  weakKeys?: Record<string, number>;
   lessonStars?: number;
   gameScores?: Record<string, number>;
   raceBestWpm?: number;
@@ -147,6 +179,18 @@ export function bestWpm(
   };
 }
 
+/**
+ * Best wpm within the current week (see StoredWeeklyPeriod), or null if the
+ * student has no results this week. Used for leaderboard ranking; bestWpm()
+ * (lifetime) is still used for teacher progress views.
+ */
+export function weeklyWpm(
+  userDoc: StoredUserDoc,
+  mode2: WpmMode2 = DEFAULT_WPM_MODE2,
+): BestWpm | null {
+  return userDoc.weeklyPeriod?.wpm?.[mode2] ?? null;
+}
+
 export async function getClassroomLeaderboard(options: {
   scope: ClassroomScope;
   classId?: string;
@@ -214,7 +258,7 @@ export async function getClassroomLeaderboard(options: {
 
   if (options.metric === "wpm") {
     const ranked: (LeaderboardEntry & { avatarUrl?: string })[] = students
-      .map((d) => ({ d, best: bestWpm(d, options.wpmMode2) }))
+      .map((d) => ({ d, best: weeklyWpm(d, options.wpmMode2) }))
       .filter((x): x is { d: StudentDoc; best: BestWpm } => x.best !== null)
       .sort((a, b) => b.best.wpm - a.best.wpm)
       .map((x, i) => ({
@@ -231,15 +275,31 @@ export async function getClassroomLeaderboard(options: {
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
+  if (options.metric === "xpAllTime") {
+    const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] = students
+      .slice()
+      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
+      .map((d, i) => ({
+        uid: d.uid,
+        name: d.name ?? "",
+        totalXp: d.xp ?? 0,
+        timeTypedSeconds: 0,
+        lastActivityTimestamp: d.streak?.lastResultTimestamp ?? 0,
+        rank: i + 1,
+        avatarUrl: d.avatarUrl,
+      }));
+    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+  }
+
   const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] = students
     .slice()
-    .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
+    .sort((a, b) => (b.weeklyPeriod?.xp ?? 0) - (a.weeklyPeriod?.xp ?? 0))
     .map((d, i) => ({
       uid: d.uid,
       name: d.name ?? "",
-      totalXp: d.xp ?? 0,
+      totalXp: d.weeklyPeriod?.xp ?? 0,
       timeTypedSeconds: 0,
-      lastActivityTimestamp: 0,
+      lastActivityTimestamp: d.weeklyPeriod?.lastActivityTimestamp ?? 0,
       rank: i + 1,
       avatarUrl: d.avatarUrl,
     }));

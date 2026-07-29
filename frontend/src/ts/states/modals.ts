@@ -1,7 +1,18 @@
 import { createStore } from "solid-js/store";
 
 export type ModalId =
+  | "Achievements"
   | "Avatar"
+  | "SideImagesShop"
+  | "HouseShop"
+  | "House"
+  | "PetShop"
+  | "HandsShop"
+  | "RgbPaletteShop"
+  | "KeyboardSkinShop"
+  | "KeypressEffectShop"
+  | "CaretEffectShop"
+  | "BackdropShop"
   | "VersionHistory"
   | "Contact"
   | "Support"

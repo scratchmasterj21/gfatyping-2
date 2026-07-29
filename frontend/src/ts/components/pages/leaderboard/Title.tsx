@@ -19,6 +19,7 @@ import {
 import { capitalizeFirstLetter } from "../../../utils/strings";
 import { Button } from "../../common/Button";
 import { H2 } from "../../common/Headers";
+import { NextUpdate } from "./NextUpdate";
 
 export function Title(props: {
   selection: Selection;
@@ -36,7 +37,9 @@ export function Title(props: {
               ? "Race Accuracy"
               : cs.metric === "games"
                 ? "Games"
-                : "XP";
+                : cs.metric === "xpAllTime"
+                  ? "All-time XP"
+                  : "XP";
       const scope =
         cs.type === "class"
           ? (cs.classId ?? "Class")
@@ -108,6 +111,14 @@ export function Title(props: {
       (props.selection as ClassroomSelectionType).metric === "wpm",
   );
 
+  const isWeeklyPeriodMetric = createMemo(
+    () =>
+      isClassroomType(props.selection.type) &&
+      ["wpm", "xp"].includes(
+        (props.selection as ClassroomSelectionType).metric ?? "",
+      ),
+  );
+
   return (
     <div>
       <H2
@@ -119,6 +130,9 @@ export function Title(props: {
           ranked by {(props.selection as ClassroomSelectionType).mode2 ?? "30"}
           s English test scores only
         </div>
+      </Show>
+      <Show when={isWeeklyPeriodMetric()}>
+        <NextUpdate type="weekly" />
       </Show>
       <Show when={subTitle() !== null}>
         <div class="flex items-center gap-2">

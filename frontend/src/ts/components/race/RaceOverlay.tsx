@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 
 import { getAuthenticatedUser } from "../../firebase";
+import { raceCoinsEarned } from "../../race/race-db";
 import { exitRace, tryReconnectRace } from "../../race/race-runner";
 import {
   getCurrentRace,
@@ -227,6 +228,11 @@ export function RaceOverlay(): JSXElement {
                         ? `${Math.round(s.finalWpm)} wpm`
                         : `${Math.round(s.finalAcc)}%`}
                     </span>
+                    <Show when={raceCoinsEarned(s) > 0}>
+                      <span class="flex items-center gap-1 text-em-xs text-main">
+                        <Fa icon="fa-coins" size={0.7} />+{raceCoinsEarned(s)}
+                      </span>
+                    </Show>
                   </div>
                 )}
               </For>

@@ -16,6 +16,8 @@ import { findLesson, lessonOrder } from "../lessons/lessons-data";
 import { bestWpm, StoredUserDoc } from "./classroom";
 
 export type ContentScope = "class" | "grade" | "school";
+/** Assignments (unlike word lists/passages) can also target a single student. */
+export type AssignmentScope = ContentScope | "student";
 export type ContentType = "lesson" | "wordlist" | "passage";
 
 export type ReadingPassage = {
@@ -43,9 +45,11 @@ export type WordList = {
 export type Assignment = {
   id: string;
   title: string;
-  scope: ContentScope;
+  scope: AssignmentScope;
   classId?: string;
   grade?: string;
+  /** Only set when scope === "student". */
+  studentUid?: string;
   contentType: ContentType;
   lessonId?: string;
   wordListId?: string;
@@ -73,7 +77,7 @@ function passagesCol(): CollectionReference {
 }
 
 /** Drop undefined keys so Firestore writes don't fail. */
-function clean<T extends Record<string, unknown>>(obj: T): T {
+export function clean<T extends Record<string, unknown>>(obj: T): T {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v !== undefined) out[k] = v;
@@ -91,11 +95,23 @@ export function wordListTokens(text: string): string[] {
 
 export const passageTokens = wordListTokens;
 
-/** Whether an item scoped to (scope/classId/grade) applies to a student's class. */
-function appliesToClass(
-  item: { scope: ContentScope; classId?: string; grade?: string },
+/**
+ * Whether an item scoped to (scope/classId/grade/studentUid) applies to a
+ * given student. `uid` is only needed for assignments/announcements, which
+ * can also be scoped to a single student - word lists/passages never use
+ * that scope, so they can omit it.
+ */
+export function appliesToClass(
+  item: {
+    scope: AssignmentScope;
+    classId?: string;
+    grade?: string;
+    studentUid?: string;
+  },
   classId: string,
+  uid?: string,
 ): boolean {
+  if (item.scope === "student") return item.studentUid === uid;
   if (item.scope === "school") return true;
   if (item.scope === "grade") return item.grade === gradeOf(classId);
   return item.classId === classId;
@@ -188,9 +204,10 @@ export async function getWordListsForStudent(
 
 export async function createAssignment(input: {
   title: string;
-  scope: ContentScope;
+  scope: AssignmentScope;
   classId?: string;
   grade?: string;
+  studentUid?: string;
   contentType: ContentType;
   lessonId?: string;
   wordListId?: string;
@@ -207,6 +224,7 @@ export async function createAssignment(input: {
       scope: input.scope,
       classId: input.scope === "class" ? input.classId : undefined,
       grade: input.scope === "grade" ? input.grade : undefined,
+      studentUid: input.scope === "student" ? input.studentUid : undefined,
       contentType: input.contentType,
       lessonId: input.contentType === "lesson" ? input.lessonId : undefined,
       wordListId:
@@ -230,9 +248,10 @@ export async function updateAssignment(
   id: string,
   input: {
     title: string;
-    scope: ContentScope;
+    scope: AssignmentScope;
     classId?: string;
     grade?: string;
+    studentUid?: string;
     contentType: ContentType;
     lessonId?: string;
     wordListId?: string;
@@ -247,6 +266,7 @@ export async function updateAssignment(
       scope: input.scope,
       classId: input.scope === "class" ? input.classId : undefined,
       grade: input.scope === "grade" ? input.grade : undefined,
+      studentUid: input.scope === "student" ? input.studentUid : undefined,
       contentType: input.contentType,
       lessonId: input.contentType === "lesson" ? input.lessonId : undefined,
       wordListId:
@@ -264,9 +284,10 @@ export async function deleteAssignment(id: string): Promise<void> {
 
 export async function getAssignmentsForStudent(
   classId: string,
+  uid: string,
 ): Promise<Assignment[]> {
   const all = await listAssignments();
-  return all.filter((a) => appliesToClass(a, classId));
+  return all.filter((a) => appliesToClass(a, classId, uid));
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +391,10 @@ export type StudentProgressRow = {
   lessonTime: number;
   /** average best accuracy across attempted curriculum lessons (0 if none) */
   lessonAvgAcc: number;
+  /** char -> weakness score, from lessons only (see StoredUserDoc.weakKeys) */
+  weakKeys: Record<string, number>;
+  streakLength: number;
+  streakMaxLength: number;
   /** assignmentId -> completed */
   assignmentStatus: Record<string, boolean>;
   /** wordListId -> completed */
@@ -430,13 +455,17 @@ export async function getClassProgress(
     return { ...data, uid: data.uid ?? d.id };
   });
 
-  const assignments = (await listAssignments()).filter((a) =>
-    appliesToClass(a, classId),
-  );
+  const allAssignments = await listAssignments();
 
   const rows = await Promise.all(
     docs.map(async (d) => {
       const progress = await readLessonProgress(d.uid);
+
+      // Filtered per-student (not once for the whole class) so a
+      // student-scoped assignment only ever shows up on its target's row.
+      const assignments = allAssignments.filter((a) =>
+        appliesToClass(a, classId, d.uid),
+      );
 
       let lessonsCompleted = 0;
       let lessonAttempts = 0;
@@ -487,6 +516,9 @@ export async function getClassProgress(
         lessonAttempts,
         lessonTime,
         lessonAvgAcc: accCount > 0 ? accSum / accCount : 0,
+        weakKeys: d.weakKeys ?? {},
+        streakLength: d.streak?.length ?? 0,
+        streakMaxLength: d.streak?.maxLength ?? 0,
         assignmentStatus,
         wordListStatus,
         passageStatus,

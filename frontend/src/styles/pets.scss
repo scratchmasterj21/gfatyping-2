@@ -1,0 +1,63 @@
+// Procedural pet sprites (see components/common/PetSprite.tsx) - shared
+// keyframes/classes so multiple pets on screen at once don't each carry
+// their own duplicate <style> block.
+
+@keyframes pet-leg-swing {
+  0%,
+  100% {
+    transform: rotate(-18deg);
+  }
+  50% {
+    transform: rotate(18deg);
+  }
+}
+
+@keyframes pet-tail-wag {
+  0%,
+  100% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+}
+
+@keyframes pet-wing-flap {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.3);
+  }
+}
+
+.pet-leg {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: pet-leg-swing 0.6s ease-in-out infinite;
+}
+
+// Diagonal-pair gait: legs 2 and 4 swing opposite legs 1 and 3.
+.pet-leg-b {
+  animation-delay: -0.3s;
+}
+
+.pet-tail {
+  transform-box: fill-box;
+  transform-origin: 100% 100%;
+  animation: pet-tail-wag 0.9s ease-in-out infinite;
+}
+
+.pet-wing {
+  transform-box: fill-box;
+  transform-origin: 100% 0%;
+  animation-name: pet-wing-flap;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+// Mirrored wing - its fill-box is mirrored too, so the attachment corner flips.
+.pet-wing-flip {
+  transform-origin: 0% 0%;
+}

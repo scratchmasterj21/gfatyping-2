@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/solid-query";
 import {
   createSignal,
   createEffect,
@@ -17,17 +18,42 @@ import marbleKeyboardSvgRaw from "../../../../assets/keyboard-marble.svg?raw";
 import modernKeyboardSvgRaw from "../../../../assets/keyboard-modern.svg?raw";
 // eslint-disable-next-line no-restricted-imports
 import keyboardSvgRaw from "../../../../assets/keyboard.svg?raw";
+import { BackdropItemId } from "../../../backdrops/backdrop-items";
+import { getBackdropState } from "../../../backdrops/backdrop-state";
 import { getConfig } from "../../../config/store";
+import { HandStyleId } from "../../../hands/hand-styles";
+import { getHandsState } from "../../../hands/hands-state";
+import { KeyboardSkinItemId } from "../../../keyboard-skins/keyboard-skin-items";
+import { getKeyboardSkinState } from "../../../keyboard-skins/keyboard-skin-state";
+import { KeypressEffectItemId } from "../../../keypress-effects/keypress-effect-items";
+import { getKeypressEffectState } from "../../../keypress-effects/keypress-effect-state";
 import { fingerForChar, Finger } from "../../../lessons/finger-map";
+import {
+  RGB_PALETTE_HUES,
+  RgbPaletteItemId,
+} from "../../../rgb-palettes/rgb-palette-items";
+import { getRgbPaletteState } from "../../../rgb-palettes/rgb-palette-state";
+import { getUserId } from "../../../states/core";
+import { showModal } from "../../../states/modals";
 import { cn } from "../../../utils/cn";
-import { generateMechanicalKeyboardSvg } from "./mechanical-keyboard-svg";
+import { Fa } from "../../common/Fa";
+import {
+  generateMechanicalKeyboardSvg,
+  generateSkinKeyboardSvg,
+} from "./mechanical-keyboard-svg";
 
 export const [activeFinger, setActiveFinger] = createSignal<Finger | null>(
   null,
 );
 export const [activeChar, setActiveChar] = createSignal<string | null>(null);
 
-type KeyboardStyle = "flat" | "cartoon" | "modern" | "marble" | "rgb";
+type KeyboardStyle =
+  | "flat"
+  | "cartoon"
+  | "modern"
+  | "marble"
+  | "rgb"
+  | KeyboardSkinItemId;
 type RgbMode = "wave" | "breathe" | "solid" | "static";
 type RgbBrightness = "low" | "med" | "high";
 
@@ -37,17 +63,19 @@ function loadKeyboardStyle(): KeyboardStyle {
     stored === "cartoon" ||
     stored === "modern" ||
     stored === "marble" ||
-    stored === "rgb"
+    stored === "rgb" ||
+    stored === "wood" ||
+    stored === "glass"
   ) {
     return stored;
   }
   return "flat";
 }
 
-const [keyboardStyle, setKeyboardStyleSignal] =
+export const [keyboardStyle, setKeyboardStyleSignal] =
   createSignal<KeyboardStyle>(loadKeyboardStyle());
 
-function setKeyboardStyle(style: KeyboardStyle): void {
+export function setKeyboardStyle(style: KeyboardStyle): void {
   localStorage.setItem("keyboardGraphicStyle", style);
   setKeyboardStyleSignal(style);
 }
@@ -99,7 +127,11 @@ const BRIGHTNESS_STEPS: RgbBrightness[] = ["low", "med", "high"];
 
 // Returns CSS overrides for the current RGB mode + brightness combination.
 // Injected into the AnimatedHands <style> block only when rgb style is active.
-function buildRgbOverrideCss(mode: RgbMode, brightness: RgbBrightness): string {
+function buildRgbOverrideCss(
+  mode: RgbMode,
+  brightness: RgbBrightness,
+  palette: RgbPaletteItemId,
+): string {
   const KEY_OP: Record<RgbBrightness, number> = {
     low: 0.18,
     med: 0.45,
@@ -143,8 +175,10 @@ function buildRgbOverrideCss(mode: RgbMode, brightness: RgbBrightness): string {
     );
   }
 
-  // solid — all keys cycle the same hue simultaneously
-  return `@keyframes mech-rgb-solid{from{filter:blur(3px) hue-rotate(0deg)}to{filter:blur(3px) hue-rotate(360deg)}}@keyframes mech-rgb-solid-under{from{filter:blur(9px) hue-rotate(0deg)}to{filter:blur(9px) hue-rotate(360deg)}}.mech-rgb{animation:none}.mech-rgb rect{fill:#ff2200}.mech-rgb-key-glow{animation:mech-rgb-solid 3s linear infinite}.mech-rgb-under{animation:mech-rgb-solid-under 3s linear infinite}${opCss}`;
+  // solid — all keys cycle the same hue simultaneously, starting from the
+  // palette's first hue stop instead of a hardcoded red
+  const solidBase = `hsl(${RGB_PALETTE_HUES[palette][0]},88%,57%)`;
+  return `@keyframes mech-rgb-solid{from{filter:blur(3px) hue-rotate(0deg)}to{filter:blur(3px) hue-rotate(360deg)}}@keyframes mech-rgb-solid-under{from{filter:blur(9px) hue-rotate(0deg)}to{filter:blur(9px) hue-rotate(360deg)}}.mech-rgb{animation:none}.mech-rgb rect{fill:${solidBase}}.mech-rgb-key-glow{animation:mech-rgb-solid 3s linear infinite}.mech-rgb-under{animation:mech-rgb-solid-under 3s linear infinite}${opCss}`;
 }
 
 // Per-style keypress flourish for the non-rgb styles (rgb has its own
@@ -268,7 +302,18 @@ const MODERN_FINGER_CSS = buildFingerCss(PATH_ID_SELECTOR); // same selector as 
 const MARBLE_FINGER_CSS = buildFingerCss(MARBLE_SELECTOR);
 const RGB_FINGER_CSS = buildFingerCss(RGB_SELECTOR);
 
-const rgbKeyboardSvgRaw = generateMechanicalKeyboardSvg();
+// One pre-generated SVG per RGB palette (cheap - pure string building, runs
+// once at module load) so switching palettes is just picking a different
+// pre-built string instead of regenerating on every render.
+const RGB_KEYBOARD_SVGS: Record<RgbPaletteItemId, string> = Object.fromEntries(
+  (Object.keys(RGB_PALETTE_HUES) as RgbPaletteItemId[]).map((id) => [
+    id,
+    generateMechanicalKeyboardSvg(id),
+  ]),
+) as Record<RgbPaletteItemId, string>;
+
+const woodKeyboardSvgRaw = generateSkinKeyboardSvg("wood");
+const glassKeyboardSvgRaw = generateSkinKeyboardSvg("glass");
 
 type StyleConfig = {
   svgRaw: string;
@@ -323,8 +368,25 @@ const STYLE_CONFIG: Record<KeyboardStyle, StyleConfig> = {
     hands: { width: "82%", left: "4.3%", top: "-37.7%" },
   },
   rgb: {
-    svgRaw: rgbKeyboardSvgRaw,
-    // viewBox 658 × 238 — generated by mechanical-keyboard-svg.ts
+    svgRaw: RGB_KEYBOARD_SVGS.rainbow,
+    // viewBox 658 × 238 — generated by mechanical-keyboard-svg.ts. svgRaw
+    // gets swapped per-palette in config() below; this is just the default.
+    aspectRatio: "658 / 238",
+    activeKeySelector: RGB_SELECTOR,
+    fingerCss: RGB_FINGER_CSS,
+    edcSt1Css: "",
+    hands: { width: "82.06%", left: "4.95%", top: "-40.69%" },
+  },
+  wood: {
+    svgRaw: woodKeyboardSvgRaw,
+    aspectRatio: "658 / 238",
+    activeKeySelector: RGB_SELECTOR,
+    fingerCss: RGB_FINGER_CSS,
+    edcSt1Css: "",
+    hands: { width: "82.06%", left: "4.95%", top: "-40.69%" },
+  },
+  glass: {
+    svgRaw: glassKeyboardSvgRaw,
     aspectRatio: "658 / 238",
     activeKeySelector: RGB_SELECTOR,
     fingerCss: RGB_FINGER_CSS,
@@ -341,7 +403,151 @@ const croppedHandsSvgRaw = handsSvgRaw.replace(
   'viewBox="100 0 390 380"',
 );
 
+// "robot"/"kingfish"/"dark" reuse .theme-X color rules already baked into
+// hands.svg itself - just applying the class name to #hands-wrapper is
+// enough, nothing to inject here. "warmtone"/"golden" don't exist in the
+// SVG, so their .theme-X overrides are defined here instead, following the
+// exact same .theme-X .stN selector shape as the baked-in ones.
+function buildHandStyleCss(style: HandStyleId): string {
+  if (style === "warmtone") {
+    return `#hands-wrapper.theme-warmtone .st1{fill:#e8b892;opacity:0.55}#hands-wrapper.theme-warmtone .st2{stroke:#8a5a3c}#hands-wrapper.theme-warmtone .st5{stroke:#c0392b}`;
+  }
+  if (style === "golden") {
+    return (
+      `#hands-wrapper.theme-golden .st1{fill:#f5cf6b;opacity:0.5}` +
+      `#hands-wrapper.theme-golden .st2{stroke:#c99a2e}` +
+      `#hands-wrapper.theme-golden .st5{stroke:#f5cf6b}` +
+      `@keyframes hand-golden-shimmer{0%,100%{filter:drop-shadow(0 0 2px rgba(245,207,107,.35))}50%{filter:drop-shadow(0 0 8px rgba(245,207,107,.8))}}` +
+      `#hands-wrapper.theme-golden{animation:hand-golden-shimmer 2.4s ease-in-out infinite}`
+    );
+  }
+  return "";
+}
+
+// Static keyframes/classes for the keypress-effect bursts - always injected
+// (cheap, inert unless a burst div using these classes actually gets
+// rendered) so spawning a burst doesn't need to rebuild the <style> block.
+const KEYPRESS_EFFECT_CSS = `
+  @keyframes kp-spark{0%{opacity:1;transform:translate(-50%,-50%) scale(0.4)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.4)}}
+  .kp-burst-spark{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle, var(--main-color) 0%, transparent 70%);animation:kp-spark 350ms ease-out forwards;}
+  @keyframes kp-ripple{0%{opacity:0.8;transform:translate(-50%,-50%) scale(0.3)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.8)}}
+  .kp-burst-ripple{width:24px;height:24px;border-radius:50%;border:2px solid var(--main-color);animation:kp-ripple 450ms ease-out forwards;}
+  @keyframes kp-confetti{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3);opacity:0}}
+  .kp-confetti-piece{position:absolute;width:5px;height:5px;border-radius:1px;animation:kp-confetti 500ms ease-out forwards;}
+`;
+
+const CONFETTI_PARTICLES = [
+  { dx: 22, dy: -18, color: "#ef4444" },
+  { dx: -22, dy: -18, color: "#f97316" },
+  { dx: 26, dy: 10, color: "#eab308" },
+  { dx: -26, dy: 10, color: "#22c55e" },
+  { dx: 0, dy: -28, color: "#3b82f6" },
+];
+
+type Burst = {
+  id: number;
+  x: number;
+  y: number;
+  effect: Exclude<KeypressEffectItemId, "none">;
+};
+
+const BACKDROP_BG: Record<BackdropItemId, string> = {
+  none: "transparent",
+  ocean: "linear-gradient(135deg, #0f2942, #1c6ea4, #4fc0d0)",
+  wood: "linear-gradient(135deg, #3b2415, #6b4423, #8b5a2b)",
+  space: "linear-gradient(135deg, #05010d, #1a0b2e, #3d1a5e)",
+};
+
 export function AnimatedHands(): JSXElement {
+  const handsStateQuery = useQuery(() => ({
+    queryKey: ["handsState", getUserId()],
+    queryFn: async () => {
+      const uid = getUserId();
+      if (uid === null) {
+        return { coins: 0, ownedStyles: {}, selectedStyle: "classic" as const };
+      }
+      return getHandsState(uid);
+    },
+    staleTime: 0,
+  }));
+
+  const handStyle = (): HandStyleId =>
+    handsStateQuery.data?.selectedStyle ?? "classic";
+  const handStyleThemeClass = (): string =>
+    handStyle() === "classic" ? "" : `theme-${handStyle()}`;
+
+  const rgbPaletteStateQuery = useQuery(() => ({
+    queryKey: ["rgbPaletteState", getUserId()],
+    queryFn: async () => {
+      const uid = getUserId();
+      if (uid === null) {
+        return {
+          coins: 0,
+          ownedPalettes: {},
+          selectedPalette: "rainbow" as const,
+        };
+      }
+      return getRgbPaletteState(uid);
+    },
+    staleTime: 0,
+  }));
+  const rgbPalette = (): RgbPaletteItemId =>
+    rgbPaletteStateQuery.data?.selectedPalette ?? "rainbow";
+
+  const keyboardSkinStateQuery = useQuery(() => ({
+    queryKey: ["keyboardSkinState", getUserId()],
+    queryFn: async () => {
+      const uid = getUserId();
+      if (uid === null) return { coins: 0, ownedSkins: {} };
+      return getKeyboardSkinState(uid);
+    },
+    staleTime: 0,
+  }));
+  const isSkinOwned = (id: KeyboardSkinItemId): boolean =>
+    keyboardSkinStateQuery.data?.ownedSkins[id] === true;
+
+  const keypressEffectStateQuery = useQuery(() => ({
+    queryKey: ["keypressEffectState", getUserId()],
+    queryFn: async () => {
+      const uid = getUserId();
+      if (uid === null) {
+        return {
+          coins: 0,
+          ownedEffects: {},
+          selectedEffect: "none" as const,
+        };
+      }
+      return getKeypressEffectState(uid);
+    },
+    staleTime: 0,
+  }));
+  const keypressEffect = (): KeypressEffectItemId =>
+    keypressEffectStateQuery.data?.selectedEffect ?? "none";
+
+  const backdropStateQuery = useQuery(() => ({
+    queryKey: ["backdropState", getUserId()],
+    queryFn: async () => {
+      const uid = getUserId();
+      if (uid === null) {
+        return {
+          coins: 0,
+          ownedBackdrops: {},
+          selectedBackdrop: "none" as const,
+        };
+      }
+      return getBackdropState(uid);
+    },
+    staleTime: 0,
+  }));
+  const backdrop = (): BackdropItemId =>
+    backdropStateQuery.data?.selectedBackdrop ?? "none";
+
+  // oxlint-disable-next-line no-unassigned-vars -- assigned via SolidJS ref
+  let burstContainerRef: HTMLDivElement | undefined;
+  const [bursts, setBursts] = createSignal<Burst[]>([]);
+  let burstCounter = 0;
+  let lastBurstKeyId: string | null = null;
+
   const [activeLeftId, setActiveLeftId] = createSignal<string>("neutral-left");
   const [activeRightId, setActiveRightId] =
     createSignal<string>("neutral-right");
@@ -389,6 +595,39 @@ export function AnimatedHands(): JSXElement {
   };
 
   createEffect(() => {
+    const keyId = activeKeyId();
+    const effect = keypressEffect();
+
+    if (keyId === null || effect === "none") {
+      lastBurstKeyId = keyId;
+      return;
+    }
+    if (keyId === lastBurstKeyId) return;
+    lastBurstKeyId = keyId;
+
+    const keyEl = document.querySelector(
+      `#animatedKeyboard-svg svg #${CSS.escape(keyId)}`,
+    );
+    if (!keyEl || !burstContainerRef) return;
+
+    const keyRect = keyEl.getBoundingClientRect();
+    const containerRect = burstContainerRef.getBoundingClientRect();
+    const id = ++burstCounter;
+    setBursts((prev) => [
+      ...prev,
+      {
+        id,
+        x: keyRect.left - containerRect.left + keyRect.width / 2,
+        y: keyRect.top - containerRect.top + keyRect.height / 2,
+        effect,
+      },
+    ]);
+    setTimeout(() => {
+      setBursts((prev) => prev.filter((b) => b.id !== id));
+    }, 550);
+  });
+
+  createEffect(() => {
     const keymapEl = document.getElementById("keymap");
     if (keymapEl) {
       keymapEl.style.display = getConfig.showGuidedHands ? "none" : "";
@@ -400,14 +639,20 @@ export function AnimatedHands(): JSXElement {
     if (keymapEl) keymapEl.style.display = "";
   });
 
-  const config = (): StyleConfig => STYLE_CONFIG[keyboardStyle()];
+  const config = (): StyleConfig => {
+    const base = STYLE_CONFIG[keyboardStyle()];
+    if (keyboardStyle() === "rgb") {
+      return { ...base, svgRaw: RGB_KEYBOARD_SVGS[rgbPalette()] };
+    }
+    return base;
+  };
 
   const pressAnimationCss = (): string =>
     buildPressAnimationCss(keyboardStyle(), activeKeyId());
 
   const rgbCss = (): string => {
     if (keyboardStyle() !== "rgb") return "";
-    return buildRgbOverrideCss(rgbMode(), rgbBrightness());
+    return buildRgbOverrideCss(rgbMode(), rgbBrightness(), rgbPalette());
   };
 
   const activeHighlightCss = (): string => {
@@ -423,6 +668,8 @@ export function AnimatedHands(): JSXElement {
     "modern",
     "marble",
     "rgb",
+    "wood",
+    "glass",
   ];
   const LABELS: Record<KeyboardStyle, string> = {
     flat: "Classic",
@@ -430,7 +677,11 @@ export function AnimatedHands(): JSXElement {
     modern: "Modern",
     marble: "Marble",
     rgb: "RGB",
+    wood: "Wood",
+    glass: "Glass",
   };
+  const isSkinStyle = (style: KeyboardStyle): style is KeyboardSkinItemId =>
+    style === "wood" || style === "glass";
 
   return (
     <Show when={getConfig.showGuidedHands}>
@@ -448,8 +699,28 @@ export function AnimatedHands(): JSXElement {
           "z-index": 10,
         }}
       >
+        <Show when={backdrop() !== "none"}>
+          <div
+            class="pointer-events-none absolute rounded-lg"
+            style={{
+              // Only bleed out on the sides/bottom, never up past the
+              // container's own top edge - the hands already extend above
+              // that edge (see hands-wrapper's negative top offset below),
+              // and any upward bleed here would render over the words above
+              // the keyboard since this whole container sits at z-index 10.
+              top: "0",
+              left: "-14px",
+              right: "-14px",
+              bottom: "-14px",
+              "z-index": -1,
+              background: BACKDROP_BG[backdrop()],
+            }}
+          ></div>
+        </Show>
+
         {/* Keyboard + hands — pointer-events-none so typing isn't blocked */}
         <div
+          ref={burstContainerRef}
           class="pointer-events-none"
           style={{
             position: "relative",
@@ -507,33 +778,85 @@ export function AnimatedHands(): JSXElement {
               ${pressAnimationCss()}
 
               ${rgbCss()}
+
+              ${buildHandStyleCss(handStyle())}
+
+              ${KEYPRESS_EFFECT_CSS}
             `}
           </style>
 
           {/* eslint-disable-next-line solid/no-innerhtml */}
           <div id="animatedKeyboard-svg" innerHTML={config().svgRaw}></div>
 
-          {/* eslint-disable-next-line solid/no-innerhtml */}
-          <div id="hands-wrapper" innerHTML={croppedHandsSvgRaw}></div>
+          <div
+            id="hands-wrapper"
+            class={handStyleThemeClass()}
+            // oxlint-disable-next-line solid/no-innerhtml
+            innerHTML={croppedHandsSvgRaw}
+          ></div>
+
+          <For each={bursts()}>
+            {(burst) => (
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${burst.x}px`,
+                  top: `${burst.y}px`,
+                }}
+              >
+                <Show
+                  when={burst.effect === "confetti"}
+                  fallback={<div class={`kp-burst-${burst.effect}`}></div>}
+                >
+                  <For each={CONFETTI_PARTICLES}>
+                    {(p) => (
+                      <div
+                        class="kp-confetti-piece"
+                        style={{
+                          "--dx": `${p.dx}px`,
+                          "--dy": `${p.dy}px`,
+                          "background-color": p.color,
+                        }}
+                      ></div>
+                    )}
+                  </For>
+                </Show>
+              </div>
+            )}
+          </For>
         </div>
 
         {/* Style picker + color toggle */}
         <div class="mt-1 flex justify-center gap-2">
           <For each={STYLES}>
-            {(style) => (
-              <button
-                type="button"
-                class={cn(
-                  "rounded px-3 py-0.5 text-sm transition-colors",
-                  keyboardStyle() === style
-                    ? "bg-main text-bg"
-                    : "bg-sub-alt text-sub hover:text-text",
-                )}
-                onClick={() => setKeyboardStyle(style)}
-              >
-                {LABELS[style]}
-              </button>
-            )}
+            {(style) => {
+              const locked = (): boolean =>
+                isSkinStyle(style) && !isSkinOwned(style);
+              return (
+                <button
+                  type="button"
+                  class={cn(
+                    "rounded px-3 py-0.5 text-sm transition-colors",
+                    keyboardStyle() === style
+                      ? "bg-main text-bg"
+                      : "bg-sub-alt text-sub hover:text-text",
+                    locked() && "opacity-60",
+                  )}
+                  onClick={() => {
+                    if (locked()) {
+                      showModal("KeyboardSkinShop");
+                      return;
+                    }
+                    setKeyboardStyle(style);
+                  }}
+                >
+                  <Show when={locked()}>
+                    <Fa icon="fa-lock" size={0.65} class="mr-1" />
+                  </Show>
+                  {LABELS[style]}
+                </button>
+              );
+            }}
           </For>
           <div class="mx-1 w-px bg-sub opacity-40"></div>
           <button
