@@ -60,7 +60,7 @@
     "update-oxc": "pnpm up -D -r oxlint@latest oxfmt@latest oxlint-tsgolint@latest"
   },
   "dependencies": {
-    "firebase-admin": "12.0.0"
+    "firebase-admin": "14.2.0"
   },
   "devDependencies": {
     "@commitlint/cli": "20.5.2",
