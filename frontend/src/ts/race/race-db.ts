@@ -13,6 +13,7 @@ import {
   where,
 } from "firebase/firestore";
 
+import { callApi } from "../api-client";
 import { getPassage, getWordList } from "../classroom/assignments";
 import { findLesson, realWords } from "../lessons/lessons-data";
 import { getAuthenticatedUser, getDb } from "../firebase";
@@ -322,26 +323,23 @@ export async function writeProgress(
   );
 }
 
-/** Final result write for the current student when their test completes. */
+/**
+ * Final result write for the current student when their test completes -
+ * sanity-checked server-side (see api/submit-race-result.ts) since this
+ * feeds rank and coin payouts; a direct client write here used to let a
+ * student self-report an arbitrary wpm/acc to win unfairly.
+ */
 export async function writeFinal(
   pin: string,
   data: { wpm: number; acc: number; progress: number; wordIndex: number },
 ): Promise<void> {
   const user = getAuthenticatedUser();
   if (user === null) return;
-  await setDoc(
-    doc(participantsCol(pin), user.uid),
-    {
-      finished: true,
-      finishedAt: Date.now(),
-      finalWpm: data.wpm,
-      finalAcc: data.acc,
-      progress: data.progress,
-      wordIndex: data.wordIndex,
-      lastSeen: Date.now(),
-    },
-    { merge: true },
-  );
+  try {
+    await callApi("/api/submit-race-result", { pin, ...data });
+  } catch (e) {
+    console.error("Failed to submit race result:", e);
+  }
 }
 
 /** One-shot read of all participant docs. */

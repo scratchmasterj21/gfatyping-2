@@ -3,12 +3,12 @@ import {
   doc,
   DocumentReference,
   getDoc,
-  increment,
-  runTransaction,
   setDoc,
 } from "firebase/firestore";
 
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 import { HandStyle, HandStyleId, isHandStyleId } from "./hand-styles";
 
 export type HandsState = {
@@ -43,51 +43,19 @@ export async function getHandsState(uid: string): Promise<HandsState> {
   return { coins: 0, ownedStyles: {}, selectedStyle: "classic" };
 }
 
-class HandsShopError extends Error {}
-
-/**
- * Buys a hand style and selects it immediately. Runs as a transaction (same
- * as buyAvatarItem/buyHouseItem) so two near-simultaneous purchases can't
- * both pass the "enough coins" check against the same stale balance.
- */
+/** Buys a hand style and selects it immediately - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyHandStyle(
-  uid: string,
+  _uid: string,
   item: HandStyle,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const price = item.price;
-  if (price === undefined) {
-    return { ok: false, reason: "This style can't be bought with coins" };
-  }
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedHandStyles"] as Record<string, true> | undefined) ?? {};
-      if (owned[item.id] === true) {
-        throw new HandsShopError("You already own this");
-      }
-      if (coins < price) {
-        throw new HandsShopError("Not enough coins");
-      }
-
-      tx.set(
-        ref,
-        {
-          coins: increment(-price),
-          ownedHandStyles: { [item.id]: true },
-          selectedHandStyle: item.id,
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "hands", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof HandsShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy hand style:", e);
     return { ok: false, reason: "Something went wrong" };
   }

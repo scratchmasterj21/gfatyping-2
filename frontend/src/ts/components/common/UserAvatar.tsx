@@ -32,6 +32,7 @@ export function UserAvatar(props: Props): JSXElement {
       celebrate={props.celebrate}
       size={props.size}
       class={props.class}
+      animalImage={equippedQuery.data?.animalImage}
     />
   );
 }

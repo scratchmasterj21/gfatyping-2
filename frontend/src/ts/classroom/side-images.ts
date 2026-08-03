@@ -1,13 +1,8 @@
-import {
-  collection,
-  doc,
-  DocumentReference,
-  getDoc,
-  increment,
-  runTransaction,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
 import { createSignal } from "solid-js";
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 
 // Bumped whenever ownership changes (buySideImageSet) so long-lived
 // components that already fetched sets once - like SideImagePanels, which
@@ -83,49 +78,26 @@ export async function getSideImagesShopState(
   };
 }
 
-class SideImagesShopError extends Error {}
-
 /**
- * Buys one catalog set. Runs as a transaction (rather than a plain
- * read-then-write), same reasoning as buyAvatarItem in avatar-state.ts: a
- * double click / multiple tabs racing each other can't both pass an "enough
- * coins" check against the same stale balance.
+ * Buys one catalog set - the real price is looked up server-side from
+ * schoolConfig/sideImages (see api/buy-item.ts), never trusted from the
+ * client, since this used to take price as a plain caller-supplied argument.
  */
 export async function buySideImageSet(
-  uid: string,
+  _uid: string,
   setId: string,
-  price: number,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedSideImageSets"] as Record<string, true> | undefined) ?? {};
-      if (owned[setId] === true) {
-        throw new SideImagesShopError("Already owned");
-      }
-      if (coins < price) {
-        throw new SideImagesShopError("Not enough coins");
-      }
-
-      tx.set(
-        ref,
-        {
-          coins: increment(-price),
-          ownedSideImageSets: { [setId]: true },
-        },
-        { merge: true },
-      );
-    });
-    bumpSideImagesVersion((v) => v + 1);
-    return { ok: true };
-  } catch (e) {
-    if (e instanceof SideImagesShopError) {
-      return { ok: false, reason: e.message };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "sideImages", itemId: setId },
+    );
+    if (result.ok) {
+      bumpSideImagesVersion((v) => v + 1);
+      invalidateCoinQueries();
     }
+    return result;
+  } catch (e) {
     console.error("Failed to buy side image set:", e);
     return { ok: false, reason: "Something went wrong" };
   }

@@ -7,6 +7,7 @@ import {
   getSideImagesShopState,
   SideImageSet,
 } from "../../classroom/side-images";
+import { useBuyGuard } from "../../hooks/useBuyGuard";
 import { queryClient } from "../../queries";
 import { getUserId } from "../../states/core";
 import { showErrorNotification } from "../../states/notifications";
@@ -15,6 +16,8 @@ import { AnimatedModal } from "../common/AnimatedModal";
 import { Fa } from "../common/Fa";
 
 export function SideImagesModal(): JSXElement {
+  const { pendingId, guardedBuy } = useBuyGuard();
+
   // Modals mount once at app boot (see Modals.tsx), often before Firebase
   // Auth resolves, so this can't read the uid once via a plain function call
   // like AvatarModal does - it needs getUserId() (the reactive signal) in
@@ -41,11 +44,7 @@ export function SideImagesModal(): JSXElement {
   const handleBuy = async (item: SideImageSet): Promise<void> => {
     const uid = getUserId();
     if (uid === null || item.id === undefined) return;
-    const result = await buySideImageSet(
-      uid,
-      item.id,
-      item.price ?? DEFAULT_SIDE_IMAGES_PRICE,
-    );
+    const result = await buySideImageSet(uid, item.id);
     if (!result.ok) {
       showErrorNotification(result.reason ?? "Couldn't buy that");
       return;
@@ -118,10 +117,21 @@ export function SideImagesModal(): JSXElement {
                       <button
                         type="button"
                         class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canAfford()}
-                        onClick={() => void handleBuy(item)}
+                        disabled={!canAfford() || pendingId() !== null}
+                        onClick={() =>
+                          void guardedBuy(item.id ?? "", async () =>
+                            handleBuy(item),
+                          )
+                        }
                       >
-                        <Fa icon="fa-coins" size={0.7} />
+                        <Show
+                          when={pendingId() !== item.id}
+                          fallback={
+                            <Fa icon="fa-circle-notch" spin size={0.7} />
+                          }
+                        >
+                          <Fa icon="fa-coins" size={0.7} />
+                        </Show>
                         {item.price ?? DEFAULT_SIDE_IMAGES_PRICE}
                       </button>
                     </Show>

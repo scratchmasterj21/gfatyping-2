@@ -11,6 +11,7 @@ import {
   getCaretEffectState,
   selectCaretEffect,
 } from "../../caret-effects/caret-effect-state";
+import { useBuyGuard } from "../../hooks/useBuyGuard";
 import { queryClient } from "../../queries";
 import { getUserId } from "../../states/core";
 import { showErrorNotification } from "../../states/notifications";
@@ -27,6 +28,8 @@ const PREVIEW_ICONS: Record<CaretEffectItemId, FaSolidIcon> = {
 };
 
 export function CaretEffectShopModal(): JSXElement {
+  const { pendingId, guardedBuy } = useBuyGuard();
+
   const stateQuery = useQuery(() => ({
     queryKey: ["caretEffectState", getUserId()],
     queryFn: async () => {
@@ -113,8 +116,13 @@ export function CaretEffectShopModal(): JSXElement {
                       >
                         <button
                           type="button"
-                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main"
-                          onClick={() => void handleSelect(item.id)}
+                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={pendingId() !== null}
+                          onClick={() =>
+                            void guardedBuy(item.id, async () =>
+                              handleSelect(item.id),
+                            )
+                          }
                         >
                           select
                         </button>
@@ -124,10 +132,17 @@ export function CaretEffectShopModal(): JSXElement {
                     <button
                       type="button"
                       class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford()}
-                      onClick={() => void handleBuy(item)}
+                      disabled={!canAfford() || pendingId() !== null}
+                      onClick={() =>
+                        void guardedBuy(item.id, async () => handleBuy(item))
+                      }
                     >
-                      <Fa icon="fa-coins" size={0.7} />
+                      <Show
+                        when={pendingId() !== item.id}
+                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
+                      >
+                        <Fa icon="fa-coins" size={0.7} />
+                      </Show>
                       {item.price}
                     </button>
                   </Show>

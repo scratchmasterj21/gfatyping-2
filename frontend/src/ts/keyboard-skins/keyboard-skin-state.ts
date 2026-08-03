@@ -1,13 +1,8 @@
-import {
-  collection,
-  doc,
-  DocumentReference,
-  getDoc,
-  increment,
-  runTransaction,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
 
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 import { KeyboardSkinItem } from "./keyboard-skin-items";
 
 export type KeyboardSkinState = {
@@ -44,41 +39,19 @@ export async function getKeyboardSkinState(
   return { coins: 0, ownedSkins: {} };
 }
 
-class KeyboardSkinShopError extends Error {}
-
+/** Buys a keyboard skin - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyKeyboardSkin(
-  uid: string,
+  _uid: string,
   item: KeyboardSkinItem,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedKeyboardSkins"] as Record<string, true> | undefined) ?? {};
-      if (owned[item.id] === true) {
-        throw new KeyboardSkinShopError("You already own this");
-      }
-      if (coins < item.price) {
-        throw new KeyboardSkinShopError("Not enough coins");
-      }
-
-      tx.set(
-        ref,
-        {
-          coins: increment(-item.price),
-          ownedKeyboardSkins: { [item.id]: true },
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "keyboardSkin", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof KeyboardSkinShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy keyboard skin:", e);
     return { ok: false, reason: "Something went wrong" };
   }

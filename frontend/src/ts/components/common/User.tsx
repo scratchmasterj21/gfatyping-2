@@ -99,7 +99,6 @@ export function User(props: Props): JSXElement {
                   >
                     <UserAvatar
                       uid={props.user.uid}
-                      size={64}
                       class={cn(
                         "h-[1.25em] w-[1.25em]",
                         props.avatarColor === "text" && "text-text",

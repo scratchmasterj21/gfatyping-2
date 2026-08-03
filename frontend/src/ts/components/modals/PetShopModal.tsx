@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/solid-query";
 import { For, JSXElement, Show } from "solid-js";
 
+import { useBuyGuard } from "../../hooks/useBuyGuard";
 import { PET_ITEMS, PetItem } from "../../pet-shop/pet-items";
 import {
   buyPetItem,
@@ -16,6 +17,8 @@ import { Fa } from "../common/Fa";
 import { PetSprite } from "../common/PetSprite";
 
 export function PetShopModal(): JSXElement {
+  const { pendingId, guardedBuy } = useBuyGuard();
+
   const stateQuery = useQuery(() => ({
     queryKey: ["petState", getUserId()],
     queryFn: async () => {
@@ -90,13 +93,25 @@ export function PetShopModal(): JSXElement {
                     fallback={
                       <button
                         type="button"
-                        class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main"
-                        onClick={() => void handleToggleStored(item)}
+                        class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={pendingId() !== null}
+                        onClick={() =>
+                          void guardedBuy(item.id, async () =>
+                            handleToggleStored(item),
+                          )
+                        }
                       >
-                        <Fa
-                          icon={stored() ? "fa-box-open" : "fa-box"}
-                          size={0.7}
-                        />
+                        <Show
+                          when={pendingId() !== item.id}
+                          fallback={
+                            <Fa icon="fa-circle-notch" spin size={0.7} />
+                          }
+                        >
+                          <Fa
+                            icon={stored() ? "fa-box-open" : "fa-box"}
+                            size={0.7}
+                          />
+                        </Show>
                         {stored() ? "place" : "store"}
                       </button>
                     }
@@ -104,10 +119,17 @@ export function PetShopModal(): JSXElement {
                     <button
                       type="button"
                       class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford()}
-                      onClick={() => void handleBuy(item)}
+                      disabled={!canAfford() || pendingId() !== null}
+                      onClick={() =>
+                        void guardedBuy(item.id, async () => handleBuy(item))
+                      }
                     >
-                      <Fa icon="fa-coins" size={0.7} />
+                      <Show
+                        when={pendingId() !== item.id}
+                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
+                      >
+                        <Fa icon="fa-coins" size={0.7} />
+                      </Show>
                       {item.price}
                     </button>
                   </Show>

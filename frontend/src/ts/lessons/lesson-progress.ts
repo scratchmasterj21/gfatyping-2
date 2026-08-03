@@ -10,20 +10,11 @@ import {
 } from "firebase/firestore";
 import { createSignal } from "solid-js";
 
-import {
-  activeSeconds,
-  awardCoins,
-  bumpWeeklyQuestCounter,
-  WeeklyQuest,
-} from "../coins";
+import { callApi } from "../api-client";
 import { configEvent } from "../events/config";
 import { getAuthenticatedUser, getDb } from "../firebase";
-import {
-  findLesson,
-  getStudentGrade,
-  lessonGroups,
-  lessonOrder,
-} from "./lessons-data";
+import { findLesson, lessonGroups, lessonOrder } from "./lessons-data";
+import { invalidateCoinQueries } from "../queries/coins";
 import { isAuthenticated } from "../states/core";
 import { showNoticeNotification } from "../states/notifications";
 import { getSnapshot } from "../states/snapshot";
@@ -38,7 +29,9 @@ import { checkNewAchievements } from "./achievements";
 
 export const GAME_PREFIX = "game:";
 
-function celebrateCompletedQuests(quests: WeeklyQuest[]): void {
+function celebrateCompletedQuests(
+  quests: { name: string; coinReward: number }[],
+): void {
   for (const quest of quests) {
     triggerCelebration({
       title: "Quest complete!",
@@ -209,60 +202,33 @@ export async function recordCompletion(ce: CompletedEvent): Promise<void> {
   const snap = await getDoc(ref);
   const prev = snap.exists() ? (snap.data() as Partial<LessonProgress>) : {};
 
-  const bestWpm = Math.max(prev.bestWpm ?? 0, ce.wpm);
-  const bestAcc = Math.max(prev.bestAcc ?? 0, ce.acc);
-
-  // Curriculum lessons must clear the accuracy bar to count as passed/unlocked;
-  // assignments, word lists and Japanese free-practice complete on finish.
-  // Never downgrade a lesson that was already completed.
-  const gated = isCurriculumLesson(lessonId);
-  const passed = !gated || ce.acc >= lessonPassAccuracy(getStudentGrade());
-  const completed = prev.completed === true || passed;
-
-  const newStars = completed ? starsForGrade(bestWpm, getStudentGrade()) : 0;
-  const wasFirst3Star = (prev.stars ?? 0) < 3 && newStars === 3;
-
-  // Completion bonus: pays once per lesson for the first-ever clear - including
-  // retroactively for lessons finished before coin rewards existed, since
-  // bonusPaid simply starts unset for those - and again on a genuine star
-  // improvement. Never for a plain repeat at the same star rating.
-  const bonusDue =
-    completed && (prev.bonusPaid !== true || newStars > (prev.stars ?? 0));
-  const completionCoins = bonusDue ? 5 + newStars * 5 : 0;
-
-  // Repeat coins: once a lesson is already mastered (no bonus due this
-  // attempt), still pay a small flat reward for genuine repeat practice -
-  // capped per lesson per day so grinding one easy lesson can't farm
-  // unlimited coins.
-  const REPEAT_DAILY_CAP = 5;
-  const today = localDateString();
-  const repeatCountSoFar =
-    prev.repeatCoinsDate === today ? (prev.repeatCoinsCount ?? 0) : 0;
-  const repeatEligible =
-    completed && !bonusDue && repeatCountSoFar < REPEAT_DAILY_CAP;
-  const repeatCoins = repeatEligible ? 1 : 0;
-  const repeatCoinsCount = repeatEligible
-    ? repeatCountSoFar + 1
-    : repeatCountSoFar;
-
+  // Stars/completion/coins/quests are computed and written server-side (see
+  // api/complete-lesson.ts) - this used to be a direct client write, which
+  // let any student self-report an arbitrary wpm/acc straight into their own
+  // progress doc and mint coins for it.
   try {
-    await setDoc(
-      ref,
-      {
-        lessonId,
-        bestWpm,
-        bestAcc,
-        stars: newStars,
-        completed,
-        attempts: increment(1),
-        timeSpent: increment(activeSeconds(ce)),
-        lastAt: Date.now(),
-        ...(bonusDue ? { bonusPaid: true } : {}),
-        repeatCoinsDate: today,
-        repeatCoinsCount,
-      },
-      { merge: true },
-    );
+    const result = await callApi<{
+      ok: boolean;
+      reason?: string;
+      completed?: boolean;
+      coinsAwarded?: number;
+      stars?: number;
+      newlyCompletedQuests?: { name: string; coinReward: number }[];
+    }>("/api/complete-lesson", {
+      lessonId,
+      wpm: ce.wpm,
+      acc: ce.acc,
+      testDuration: ce.testDuration,
+      incompleteTestSeconds: ce.incompleteTestSeconds,
+      afkDuration: ce.afkDuration,
+    });
+    if (!result.ok) {
+      console.error("Failed to save lesson progress:", result.reason);
+      return;
+    }
+
+    const newStars = result.stars ?? 0;
+    const wasFirst3Star = (prev.stars ?? 0) < 3 && newStars === 3;
 
     if (lastEventLog) {
       void updateWeakKeys(
@@ -274,23 +240,8 @@ export async function recordCompletion(ce: CompletedEvent): Promise<void> {
 
     void updateEngagement(uid, lessonId, ce.wpm, ce.acc, wasFirst3Star);
 
-    const timeCoins = Math.floor(activeSeconds(ce) / 30);
-    void awardCoins(uid, timeCoins + completionCoins + repeatCoins);
-
-    // Weekly quest progress: counts a passed attempt toward "practice N
-    // lessons" once per distinct lesson per week (dedupeKey), so replaying
-    // one already-mastered lesson repeatedly can't farm it, but genuine
-    // review of an already-completed lesson still counts - unlike the old
-    // bonusDue-only gate, which became permanently unachievable once every
-    // lesson was maxed at 3 stars.
-    if (completed) {
-      void bumpWeeklyQuestCounter(uid, "lessonsCompleted", {
-        dedupeKey: lessonId,
-      }).then(celebrateCompletedQuests);
-    }
-    void bumpWeeklyQuestCounter(uid, "typingSeconds", {
-      amount: activeSeconds(ce),
-    }).then(celebrateCompletedQuests);
+    if ((result.coinsAwarded ?? 0) > 0) invalidateCoinQueries();
+    celebrateCompletedQuests(result.newlyCompletedQuests ?? []);
   } catch (e) {
     console.error("Failed to save lesson progress:", e);
     showNoticeNotification(
@@ -389,8 +340,12 @@ async function updateEngagement(
   );
 
   // Update class member stats so classmates can see this student's stars.
+  // classId can be stored as null in Firestore (see setStudentClass) for an
+  // unassigned student - the field is typed string|undefined but that's not
+  // enforced at the data layer, so a plain !== undefined check let a literal
+  // null through into a Firestore path segment and crashed the SDK.
   const classId = getSnapshot()?.classId;
-  if (classId !== undefined) {
+  if (classId !== undefined && classId !== null) {
     const snap = getSnapshot();
     const memberRef = doc(
       collection(getDb(), "classrooms", classId, "memberStats"),

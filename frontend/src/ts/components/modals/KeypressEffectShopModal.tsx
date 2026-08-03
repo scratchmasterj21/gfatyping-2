@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/solid-query";
 import { For, JSXElement, Show } from "solid-js";
 
+import { useBuyGuard } from "../../hooks/useBuyGuard";
 import {
   KEYPRESS_EFFECT_ITEMS,
   KeypressEffectItem,
@@ -27,6 +28,8 @@ const PREVIEW_ICONS: Record<KeypressEffectItemId, FaSolidIcon> = {
 };
 
 export function KeypressEffectShopModal(): JSXElement {
+  const { pendingId, guardedBuy } = useBuyGuard();
+
   const stateQuery = useQuery(() => ({
     queryKey: ["keypressEffectState", getUserId()],
     queryFn: async () => {
@@ -113,8 +116,13 @@ export function KeypressEffectShopModal(): JSXElement {
                       >
                         <button
                           type="button"
-                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main"
-                          onClick={() => void handleSelect(item.id)}
+                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={pendingId() !== null}
+                          onClick={() =>
+                            void guardedBuy(item.id, async () =>
+                              handleSelect(item.id),
+                            )
+                          }
                         >
                           select
                         </button>
@@ -124,10 +132,17 @@ export function KeypressEffectShopModal(): JSXElement {
                     <button
                       type="button"
                       class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford()}
-                      onClick={() => void handleBuy(item)}
+                      disabled={!canAfford() || pendingId() !== null}
+                      onClick={() =>
+                        void guardedBuy(item.id, async () => handleBuy(item))
+                      }
                     >
-                      <Fa icon="fa-coins" size={0.7} />
+                      <Show
+                        when={pendingId() !== item.id}
+                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
+                      >
+                        <Fa icon="fa-coins" size={0.7} />
+                      </Show>
                       {item.price}
                     </button>
                   </Show>

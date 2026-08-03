@@ -859,6 +859,19 @@ export function LessonsPage(): JSXElement {
       : AVATAR_ITEMS.find((i) => i.id === id)?.value;
   };
 
+  // Same queryKey UserAvatar.tsx uses, so both share one cache entry - just
+  // need the animal-avatar override here, not the whole procedural avatar.
+  const animalAvatarQuery = useQuery(() => ({
+    queryKey: ["avatarEquipped", getAuthenticatedUser()?.uid],
+    queryFn: async () => {
+      const uid = getAuthenticatedUser()?.uid;
+      if (uid === undefined) return {};
+      return getEquippedAvatar(uid);
+    },
+    enabled: isOpen() && isAuthenticated(),
+    staleTime: 5 * 60 * 1000,
+  }));
+
   const progressFor = (id: string): LessonProgress | undefined =>
     progress.data?.get(id);
 
@@ -1295,18 +1308,21 @@ export function LessonsPage(): JSXElement {
         <Show when={isAuthenticated()}>
           <section class="flex items-center justify-between gap-4 rounded bg-sub-alt p-4">
             <div class="flex items-center gap-4">
-              <Avatar
-                color={equippedAvatarColor()}
-                shape={avatarStateQuery.data?.shape}
-                hair={avatarStateQuery.data?.equipped.hair}
-                hat={avatarStateQuery.data?.equipped.hat}
-                accessory={avatarStateQuery.data?.equipped.accessory}
-                face={avatarStateQuery.data?.equipped.face}
-                background={avatarStateQuery.data?.equipped.background}
-                highlightColor={equippedAvatarHighlight()}
-                size={56}
-              />
-              <div class="flex items-center gap-1.5 font-bold text-main">
+              <div class="shrink-0">
+                <Avatar
+                  color={equippedAvatarColor()}
+                  shape={avatarStateQuery.data?.shape}
+                  hair={avatarStateQuery.data?.equipped.hair}
+                  hat={avatarStateQuery.data?.equipped.hat}
+                  accessory={avatarStateQuery.data?.equipped.accessory}
+                  face={avatarStateQuery.data?.equipped.face}
+                  background={avatarStateQuery.data?.equipped.background}
+                  highlightColor={equippedAvatarHighlight()}
+                  size={56}
+                  animalImage={animalAvatarQuery.data?.animalImage}
+                />
+              </div>
+              <div class="flex shrink-0 items-center gap-1.5 rounded bg-bg px-2.5 py-1.5 font-bold text-main">
                 <Fa icon="fa-coins" size={0.9} />
                 {avatarStateQuery.data?.coins ?? 0}
               </div>

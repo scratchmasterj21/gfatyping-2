@@ -9,6 +9,17 @@ export type HouseItem = {
   slot: { xPct: number; yPct: number };
 };
 
+/** A pixel-art sprite item (furniture or small decor) - see house-sprite-items.ts / house-small-items.ts. */
+export type HouseSpriteItem = {
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  /** Display width in px - height follows the sprite's own aspect ratio. */
+  sizePx: number;
+  slot: { xPct: number; yPct: number };
+};
+
 // Emoji "stickers" on fixed spots, not illustrated art - matches the scope
 // of a first version, and reads much friendlier than a flat icon-in-a-box.
 // Positions are laid out around the room's edges so the roaming avatar
@@ -157,6 +168,54 @@ export const HOUSE_ITEMS: HouseItem[] = [
     emoji: "🏆",
     sizePx: 95,
     slot: { xPct: 65, yPct: 60 },
+  },
+  {
+    id: "table",
+    name: "Table",
+    price: 30,
+    emoji: "🟫",
+    sizePx: 85,
+    slot: { xPct: 45, yPct: 72 },
+  },
+  {
+    id: "tv",
+    name: "TV",
+    price: 65,
+    emoji: "📺",
+    sizePx: 90,
+    slot: { xPct: 25, yPct: 35 },
+  },
+  {
+    id: "mirror",
+    name: "Mirror",
+    price: 30,
+    emoji: "🪞",
+    sizePx: 55,
+    slot: { xPct: 97, yPct: 20 },
+  },
+  {
+    id: "piano",
+    name: "Piano",
+    price: 100,
+    emoji: "🎹",
+    sizePx: 120,
+    slot: { xPct: 8, yPct: 85 },
+  },
+  {
+    id: "lamp",
+    name: "Table lamp",
+    price: 25,
+    emoji: "🪔",
+    sizePx: 55,
+    slot: { xPct: 5, yPct: 75 },
+  },
+  {
+    id: "cabinet",
+    name: "Storage cabinet",
+    price: 45,
+    emoji: "🗄️",
+    sizePx: 85,
+    slot: { xPct: 70, yPct: 25 },
   },
 ];
 

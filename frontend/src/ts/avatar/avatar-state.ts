@@ -4,13 +4,13 @@ import {
   doc,
   DocumentReference,
   getDoc,
-  increment,
-  runTransaction,
   setDoc,
 } from "firebase/firestore";
 
-import { getEarnedAchievements } from "../achievements/achievements";
+import { findAnimalAvatarItem } from "../animal-avatars/animal-avatar-items";
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 import {
   AvatarCategory,
   AvatarItem,
@@ -35,6 +35,12 @@ export type EquippedAvatar = {
   /** Hex color for the equipped leaderboard-row highlight, if any. */
   highlight?: string;
   shape?: AvatarShape;
+  /**
+   * Image URL for an equipped animal avatar, if any - takes over the whole
+   * avatar display in place of the procedural color/hair/hat/etc pieces
+   * above.
+   */
+  animalImage?: string;
 };
 
 function userRef(uid: string): DocumentReference {
@@ -71,6 +77,10 @@ export async function getEquippedAvatar(uid: string): Promise<EquippedAvatar> {
           ? undefined
           : findAvatarItem(equipped.highlight)?.value,
       shape: data["avatarShape"] as AvatarShape | undefined,
+      animalImage: (() => {
+        const id = data["equippedAnimalAvatar"] as string | undefined;
+        return id === undefined ? undefined : findAnimalAvatarItem(id)?.image;
+      })(),
     };
   } catch (e) {
     console.error("Failed to get equipped avatar:", e);
@@ -132,92 +142,41 @@ export async function setAvatarShape(
   await setDoc(ref, payload, { merge: true });
 }
 
-class AvatarShopError extends Error {}
-
-/**
- * Buys an item and equips it immediately. Runs as a transaction (rather than
- * a plain read-then-write) so two purchases racing each other - a double
- * click, multiple tabs, clicking a second item before the first one's balance
- * refresh lands - can't both pass the "enough coins" check against the same
- * stale balance and drive coins negative.
- */
+/** Buys an item and equips it immediately - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyAvatarItem(
-  uid: string,
+  _uid: string,
   item: AvatarItem,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const price = item.price;
-  if (price === undefined) {
-    return { ok: false, reason: "This item can't be bought with coins" };
-  }
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedCostumes"] as Record<string, true> | undefined) ?? {};
-      if (owned[item.id] === true) {
-        throw new AvatarShopError("You already own this");
-      }
-      if (coins < price) {
-        throw new AvatarShopError("Not enough coins");
-      }
-
-      // Nested-object merge writes only touch the specific keys given below -
-      // Firestore's client SDK merges nested map fields deeply, not as a
-      // whole-field overwrite, so other owned items/equipped categories are untouched.
-      tx.set(
-        ref,
-        {
-          coins: increment(-price),
-          ownedCostumes: { [item.id]: true },
-          equipped: { [item.category]: item.id },
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "avatar", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof AvatarShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy avatar item:", e);
     return { ok: false, reason: "Something went wrong" };
   }
 }
 
-/** Grants an achievement-gated item for free once its achievement is earned. */
+/** Grants an achievement-gated item for free once its achievement is earned - checked server-side, see api/buy-item.ts. */
 export async function claimAvatarItem(
-  uid: string,
+  _uid: string,
   item: AvatarItem,
 ): Promise<{ ok: boolean; reason?: string }> {
   if (item.requiresAchievement === undefined) {
     return { ok: false, reason: "This item isn't achievement-gated" };
   }
-  const ref = userRef(uid);
-  const snap = await getDoc(ref);
-  const data = snap.exists() ? snap.data() : {};
-  const owned =
-    (data["ownedCostumes"] as Record<string, true> | undefined) ?? {};
-  if (owned[item.id] === true) {
-    return { ok: false, reason: "You already own this" };
+  try {
+    return await callApi<{ ok: boolean; reason?: string }>("/api/buy-item", {
+      shop: "avatar",
+      itemId: item.id,
+    });
+  } catch (e) {
+    console.error("Failed to claim avatar item:", e);
+    return { ok: false, reason: "Something went wrong" };
   }
-
-  const earned = await getEarnedAchievements();
-  if (!earned.has(item.requiresAchievement)) {
-    return { ok: false, reason: "Achievement not earned yet" };
-  }
-
-  await setDoc(
-    ref,
-    {
-      ownedCostumes: { [item.id]: true },
-      equipped: { [item.category]: item.id },
-    },
-    { merge: true },
-  );
-  return { ok: true };
 }
 
 export async function equipAvatarItem(

@@ -4,12 +4,12 @@ import {
   doc,
   DocumentReference,
   getDoc,
-  increment,
-  runTransaction,
   setDoc,
 } from "firebase/firestore";
 
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 import { PetItem } from "./pet-items";
 
 function userRef(uid: string): DocumentReference {
@@ -52,42 +52,19 @@ export async function setPetStored(
   );
 }
 
-class PetShopError extends Error {}
-
-/** Buys one pet. Transaction-based, same reasoning as buyHouseItem/buyAvatarItem. */
+/** Buys one pet - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyPetItem(
-  uid: string,
+  _uid: string,
   item: PetItem,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedPets"] as Record<string, true> | undefined) ?? {};
-      if (owned[item.id] === true) {
-        throw new PetShopError("Already owned");
-      }
-      if (coins < item.price) {
-        throw new PetShopError("Not enough coins");
-      }
-
-      tx.set(
-        ref,
-        {
-          coins: increment(-item.price),
-          ownedPets: { [item.id]: true },
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "pet", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof PetShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy pet:", e);
     return { ok: false, reason: "Something went wrong" };
   }

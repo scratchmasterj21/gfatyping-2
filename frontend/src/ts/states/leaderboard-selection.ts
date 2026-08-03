@@ -95,6 +95,13 @@ const [getSelectionLs, setSelection] = lsSelection();
 export const [getPage, setPage] = createSignal(0);
 export const [getGoToUserPage, setGoToUserPage] = createSignal(false);
 
+/** Whether the signed-in student has opted to hide the admin/teacher's own entry from the all-time English leaderboard. */
+export const [getHideAdmin, setHideAdmin] = useLocalStorage<boolean>({
+  key: "leaderboardHideAdmin",
+  schema: z.boolean(),
+  fallback: false,
+});
+
 // Reset friendsOnly when connections are disabled
 createEffect(() => {
   if (

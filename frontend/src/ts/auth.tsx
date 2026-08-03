@@ -73,6 +73,14 @@ export function isAllowedAuthEmail(email: string | null | undefined): boolean {
 export const ADMIN_EMAIL = "john.limpiada@felice.ed.jp";
 
 /**
+ * The admin's Firebase uid - used to filter the admin out of student-facing
+ * leaderboards (see states/leaderboard-selection.ts's hideAdmin toggle).
+ * Leaderboard entries only carry uid/name, not email, so email alone can't
+ * identify the admin's row.
+ */
+export const ADMIN_UID = "VCCAWzj9oGfj8JEpKYCCwifqMpk1";
+
+/**
  * Whether the currently signed-in user is the classroom admin. Reads the
  * reactive user id so Solid callers re-evaluate on login/logout.
  */

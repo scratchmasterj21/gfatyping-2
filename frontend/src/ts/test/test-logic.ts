@@ -1,10 +1,5 @@
 import Ape from "../ape";
-import {
-  activeSeconds,
-  awardCoins,
-  awardTryCoin,
-  bumpWeeklyQuestCounter,
-} from "../coins";
+import { invalidateCoinQueries } from "../queries/coins";
 import * as TestUI from "./test-ui";
 import * as Strings from "../utils/strings";
 import * as Misc from "../utils/misc";
@@ -16,7 +11,6 @@ import {
   showErrorNotification,
   showSuccessNotification,
 } from "../states/notifications";
-import { triggerCelebration } from "../states/celebration";
 import * as CustomText from "./custom-text";
 import * as PractiseWords from "./practise-words";
 import * as ShiftTracker from "./shift-tracker";
@@ -1319,25 +1313,10 @@ async function saveResult(
     );
   }
 
-  const uid = getAuthenticatedUser()?.uid;
-  if (uid !== undefined) {
-    const timeCoins = Math.floor(activeSeconds(result) / 30);
-    const pbCoins = data.isPb ? Math.floor(result.wpm / 5) : 0;
-    void awardCoins(uid, timeCoins + pbCoins);
-    void awardTryCoin(uid, `${result.mode}:${result.mode2}`);
-
-    void bumpWeeklyQuestCounter(uid, "typingSeconds", {
-      amount: activeSeconds(result),
-    }).then((quests) => {
-      for (const quest of quests) {
-        triggerCelebration({
-          title: "Quest complete!",
-          message: `${quest.name} - +${quest.coinReward} coins`,
-          icon: "fa-flag-checkered",
-        });
-      }
-    });
-  }
+  // Coins (time/PB/try-coin) and weekly quest progress are awarded
+  // server-side as part of the /api/submit-result call behind Ape.results.add
+  // - just refresh the cached balance for display.
+  invalidateCoinQueries();
 
   qs("#retrySavingResultButton")?.hide();
   if (isRetrying) {

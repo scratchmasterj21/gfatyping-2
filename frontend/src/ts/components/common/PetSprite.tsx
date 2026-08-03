@@ -174,11 +174,14 @@ export function PetSprite(props: {
   species: PetSpecies;
   sizePx: number;
   facingLeft?: boolean;
+  /** Freezes the walk cycle - used while a pet is idling between roams. Fliers keep flapping, since a hovering animal that stops moving its wings reads as falling. */
+  resting?: boolean;
 }): JSXElement {
   const config = (): WalkerConfig | FlierConfig => PET_CONFIG[props.species];
 
   return (
     <div
+      class={props.resting === true ? "pet-resting" : undefined}
       style={{
         width: `${props.sizePx}px`,
         height: `${props.sizePx * 0.6}px`,

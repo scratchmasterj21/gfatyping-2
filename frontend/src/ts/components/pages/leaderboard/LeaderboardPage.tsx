@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, JSXElement, Show } from "solid-js";
 
+import { ADMIN_UID } from "../../../auth";
 import { ClassroomScope } from "../../../classroom/classroom";
 import { getSnapshot, updateLbMemory } from "../../../db";
 import { createEffectOn } from "../../../hooks/effects";
@@ -16,12 +17,14 @@ import { getActivePage, isAuthenticated } from "../../../states/core";
 import {
   ClassroomSelectionType,
   getGoToUserPage,
+  getHideAdmin,
   getPage,
   getSelection,
   isClassroomType,
   pageSize,
   Selection,
   setGoToUserPage,
+  setHideAdmin,
   setPage,
   setSelection,
   updateGetParameters,
@@ -35,9 +38,26 @@ import { GameScoresSection } from "./GameScoresSection";
 import { Navigation } from "./Navigation";
 import { NextUpdate } from "./NextUpdate";
 import { Sidebar } from "./Sidebar";
-import { Table } from "./Table";
+import { Table, TableEntry } from "./Table";
 import { Title } from "./Title";
 import { UserRank } from "./UserRank";
+
+/**
+ * Removes the admin/teacher's own row from a ranked entries list and shifts
+ * every entry that was ranked below them up by one, so e.g. #2 becomes #1.
+ * Only correct within the entries actually passed in - on a paginated board,
+ * a page that doesn't contain the admin's row can't know their rank and
+ * skips the shift, which only matters once a board has more than one page.
+ */
+function hideAdminFromEntries<T extends TableEntry>(entries: T[]): T[] {
+  const adminEntry = entries.find((e) => e.uid === ADMIN_UID);
+  if (adminEntry === undefined) {
+    return entries.filter((e) => e.uid !== ADMIN_UID);
+  }
+  return entries
+    .filter((e) => e.uid !== ADMIN_UID)
+    .map((e) => (e.rank > adminEntry.rank ? { ...e, rank: e.rank - 1 } : e));
+}
 
 const pageName: PageName = "leaderboards";
 
@@ -59,6 +79,13 @@ export function LeaderboardPage(): JSXElement {
   });
 
   const isClassroom = () => isClassroomType(getSelection().type);
+
+  // The "hide admin" checkbox only makes sense on the all-time English speed
+  // board, which is the specific board students asked to filter.
+  const canHideAdmin = () => {
+    const sel = getSelection();
+    return sel.type === "allTime" && sel.language === "english";
+  };
 
   const isGamesMetric = () =>
     isClassroom() &&
@@ -338,11 +365,28 @@ export function LeaderboardPage(): JSXElement {
                     </div>
                   </Show>
 
+                  <Show when={canHideAdmin()}>
+                    <label class="mb-2 flex w-max items-center gap-2 text-sm text-sub">
+                      <input
+                        type="checkbox"
+                        checked={getHideAdmin()}
+                        onChange={(e) => setHideAdmin(e.currentTarget.checked)}
+                      />
+                      Hide teacher from rankings
+                    </label>
+                  </Show>
+
                   <div>
                     <Table
                       type={tableType()}
                       compactXp={isClassroom()}
-                      entries={entriesQueryData()?.entries ?? []}
+                      entries={
+                        canHideAdmin() && getHideAdmin()
+                          ? hideAdminFromEntries(
+                              entriesQueryData()?.entries ?? [],
+                            )
+                          : (entriesQueryData()?.entries ?? [])
+                      }
                       friendsOnly={getSelection().friendsOnly}
                       scrollToUser={scrollToUser}
                       onScrolledToUser={() => setScrollToUser(false)}

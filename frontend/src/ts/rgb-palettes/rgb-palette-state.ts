@@ -3,12 +3,12 @@ import {
   doc,
   DocumentReference,
   getDoc,
-  increment,
-  runTransaction,
   setDoc,
 } from "firebase/firestore";
 
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 import {
   isRgbPaletteItemId,
   RgbPaletteItem,
@@ -49,46 +49,19 @@ export async function getRgbPaletteState(
   return { coins: 0, ownedPalettes: {}, selectedPalette: "rainbow" };
 }
 
-class RgbPaletteShopError extends Error {}
-
+/** Buys a palette and selects it immediately - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyRgbPalette(
-  uid: string,
+  _uid: string,
   item: RgbPaletteItem,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const price = item.price;
-  if (price === undefined) {
-    return { ok: false, reason: "This palette can't be bought with coins" };
-  }
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedRgbPalettes"] as Record<string, true> | undefined) ?? {};
-      if (owned[item.id] === true) {
-        throw new RgbPaletteShopError("You already own this");
-      }
-      if (coins < price) {
-        throw new RgbPaletteShopError("Not enough coins");
-      }
-
-      tx.set(
-        ref,
-        {
-          coins: increment(-price),
-          ownedRgbPalettes: { [item.id]: true },
-          selectedRgbPalette: item.id,
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "rgbPalette", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof RgbPaletteShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy rgb palette:", e);
     return { ok: false, reason: "Something went wrong" };
   }

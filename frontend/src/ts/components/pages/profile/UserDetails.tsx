@@ -264,14 +264,10 @@ function AvatarAndName(props: {
     >
       <Show
         when={props.profile.uid}
-        fallback={<Avatar class="h-auto w-full place-self-center" size={256} />}
+        fallback={<Avatar class="h-auto w-full place-self-center" />}
       >
         {(uid) => (
-          <UserAvatar
-            class="h-auto w-full place-self-center"
-            size={256}
-            uid={uid()}
-          />
+          <UserAvatar class="h-auto w-full place-self-center" uid={uid()} />
         )}
       </Show>
 

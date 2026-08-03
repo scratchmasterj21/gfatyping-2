@@ -3,12 +3,12 @@ import {
   doc,
   DocumentReference,
   getDoc,
-  increment,
-  runTransaction,
   setDoc,
 } from "firebase/firestore";
 
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
+import { invalidateCoinQueries } from "../queries/coins";
 import {
   isKeypressEffectItemId,
   KeypressEffectItem,
@@ -50,47 +50,19 @@ export async function getKeypressEffectState(
   return { coins: 0, ownedEffects: {}, selectedEffect: "none" };
 }
 
-class KeypressEffectShopError extends Error {}
-
+/** Buys an effect and selects it immediately - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyKeypressEffect(
-  uid: string,
+  _uid: string,
   item: KeypressEffectItem,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const price = item.price;
-  if (price === undefined) {
-    return { ok: false, reason: "This effect can't be bought with coins" };
-  }
-  const ref = userRef(uid);
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedKeypressEffects"] as Record<string, true> | undefined) ??
-        {};
-      if (owned[item.id] === true) {
-        throw new KeypressEffectShopError("You already own this");
-      }
-      if (coins < price) {
-        throw new KeypressEffectShopError("Not enough coins");
-      }
-
-      tx.set(
-        ref,
-        {
-          coins: increment(-price),
-          ownedKeypressEffects: { [item.id]: true },
-          selectedKeypressEffect: item.id,
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "keypressEffect", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof KeypressEffectShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy keypress effect:", e);
     return { ok: false, reason: "Something went wrong" };
   }

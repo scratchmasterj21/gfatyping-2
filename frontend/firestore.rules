@@ -21,10 +21,42 @@ service cloud.firestore {
         && request.auth.token.email == 'john.limpiada@felice.ed.jp';
     }
 
+    // Fields on users/{uid} that grant coins/xp, own an item, or feed a
+    // leaderboard/rank. These are only ever written by the Vercel API
+    // endpoints (via the Admin SDK, which bypasses these rules entirely) or
+    // by the admin - never directly by a student's own client, since that
+    // client is untrusted (anyone can open devtools and call the Firebase
+    // SDK directly with whatever value they want). See api/_lib and
+    // api/buy-item.ts, api/complete-lesson.ts, api/submit-result.ts,
+    // api/claim-reward.ts for the validated write paths.
+    function economyFields() {
+      return [
+        'coins', 'xp', 'personalBests', 'streak', 'weeklyPeriod',
+        'timeTyping', 'startedTests', 'completedTests',
+        'ownedBackdrops', 'ownedPets', 'ownedRgbPalettes', 'ownedCostumes',
+        'ownedHouseItems', 'ownedHandStyles', 'ownedCaretEffects',
+        'ownedKeyboardSkins', 'ownedKeypressEffects', 'ownedSideImageSets',
+        'ownedAnimalAvatars',
+        'houseGreetingDate',
+        'questsWeekId', 'questProgress', 'questsClaimed', 'questDedupe',
+        'raceBestWpm', 'raceBestWpmAcc', 'raceBestAcc', 'raceBestAccWpm',
+        'raceTotalRaces', 'raceWins'
+      ];
+    }
+
     // --- users/{uid} and all user-scoped subcollections ---
     match /users/{uid} {
       allow read: if isDomainUser();
-      allow create, update: if isOwner(uid) || isAdminUser();
+      // create: one-time account bootstrap (ape/firestore/users.ts) writes
+      // every field at its default/zero value - not an exploit surface.
+      allow create: if isOwner(uid) || isAdminUser();
+      // update: students keep direct write access to cosmetic/preference
+      // fields (equipped items, selected palettes, layout, ...); economy
+      // fields are blocked here and must go through a validated endpoint.
+      allow update: if isAdminUser()
+        || (isOwner(uid)
+          && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(economyFields()));
       allow delete: if isOwner(uid);
 
       // config + tags: owner full access
@@ -32,11 +64,11 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // typing lesson progress: owner full access; admin may read for the
-      // teacher dashboard (writes stay owner-only).
+      // typing lesson progress: written only by api/complete-lesson.ts
+      // (Admin SDK); admin may read for the teacher dashboard.
       match /lessonProgress/{lessonId} {
         allow read: if isOwner(uid) || isAdminUser();
-        allow write: if isOwner(uid);
+        allow write: if isAdminUser();
       }
 
       // achievements: owner full access; admin may read.
@@ -45,22 +77,22 @@ service cloud.firestore {
         allow write: if isOwner(uid);
       }
 
-      // daily-capped "repeat practice" coin buckets: owner full access.
+      // daily-capped "repeat practice" coin buckets: written only by
+      // api/submit-result.ts (Admin SDK).
       match /testTryCoins/{bucketId} {
         allow read: if isOwner(uid) || isAdminUser();
-        allow write: if isOwner(uid);
+        allow write: if isAdminUser();
       }
       match /tags/{tagId} {
         allow read, write: if isOwner(uid);
       }
 
-      // results: owner can read/create/update; admin may also read, for the
-      // teacher dashboard's PDF/CSV progress reports (writes stay owner-only).
-      // delete stays owner-only too, so account reset/delete can wipe history.
+      // results: created only by api/submit-result.ts (Admin SDK), since
+      // wpm/acc/xp there feed personal bests and leaderboards. Owner may
+      // still update (tag labelling only) and delete (account reset).
       match /results/{resultId} {
         allow read: if isOwner(uid) || isAdminUser();
-        allow create: if isOwner(uid);
-        // tag labelling needs to update the tags array only
+        allow create: if false;
         allow update: if isOwner(uid);
         allow delete: if isOwner(uid);
       }
@@ -100,9 +132,24 @@ service cloud.firestore {
       allow create, update, delete: if isAdminUser();
       match /participants/{uid} {
         allow read: if isDomainUser();
-        allow write: if (isOwner(uid)
+        allow create: if (isOwner(uid)
           && request.resource.data.uid == request.auth.uid)
           || isAdminUser();
+        // Live progress ticks (wordIndex/progress/liveWpm/lastSeen) and
+        // resetting back to zero stay student-writable; an actual final
+        // result (finished/finishedAt/finalWpm/finalAcc going non-zero)
+        // must go through api/submit-race-result.ts so it gets sanity
+        // checked against the race's real content instead of trusted as-is.
+        allow update: if isAdminUser()
+          || (isOwner(uid)
+            && request.resource.data.uid == request.auth.uid
+            && (
+              !request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['finished', 'finishedAt', 'finalWpm', 'finalAcc'])
+              || (request.resource.data.finished == false
+                && request.resource.data.finalWpm == 0
+                && request.resource.data.finalAcc == 0)
+            ));
         allow delete: if isOwner(uid) || isAdminUser();
       }
     }
@@ -130,13 +177,14 @@ service cloud.firestore {
       allow write: if isAdminUser();
     }
 
-    // --- leaderboards: readable by domain users, each user writes own entry ---
+    // --- leaderboards: readable by domain users, written only by
+    // api/submit-result.ts (Admin SDK) - a direct client write here used to
+    // let any student self-report an arbitrary wpm straight onto the board.
     match /leaderboards/{key} {
       allow read: if isDomainUser();
       match /entries/{uid} {
         allow read: if isDomainUser();
-        allow write: if isOwner(uid)
-          && request.resource.data.uid == request.auth.uid;
+        allow write: if false;
       }
     }
 
@@ -145,8 +193,7 @@ service cloud.firestore {
       allow read: if isDomainUser();
       match /entries/{uid} {
         allow read: if isDomainUser();
-        allow write: if isOwner(uid)
-          && request.resource.data.uid == request.auth.uid;
+        allow write: if false;
       }
     }
 
@@ -155,8 +202,7 @@ service cloud.firestore {
       allow read: if isDomainUser();
       match /entries/{uid} {
         allow read: if isDomainUser();
-        allow write: if isOwner(uid)
-          && request.resource.data.uid == request.auth.uid;
+        allow write: if false;
       }
     }
 

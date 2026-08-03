@@ -5,6 +5,7 @@ import {
   keyboardStyle,
   setKeyboardStyle,
 } from "../../components/pages/test/AnimatedHands";
+import { useBuyGuard } from "../../hooks/useBuyGuard";
 import {
   KEYBOARD_SKIN_ITEMS,
   KeyboardSkinItem,
@@ -26,6 +27,8 @@ const PREVIEW_COLORS: Record<string, string> = {
 };
 
 export function KeyboardSkinShopModal(): JSXElement {
+  const { pendingId, guardedBuy } = useBuyGuard();
+
   const stateQuery = useQuery(() => ({
     queryKey: ["keyboardSkinState", getUserId()],
     queryFn: async () => {
@@ -106,7 +109,8 @@ export function KeyboardSkinShopModal(): JSXElement {
                       >
                         <button
                           type="button"
-                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main"
+                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={pendingId() !== null}
                           onClick={() => setKeyboardStyle(item.id)}
                         >
                           select
@@ -117,10 +121,17 @@ export function KeyboardSkinShopModal(): JSXElement {
                     <button
                       type="button"
                       class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford()}
-                      onClick={() => void handleBuy(item)}
+                      disabled={!canAfford() || pendingId() !== null}
+                      onClick={() =>
+                        void guardedBuy(item.id, async () => handleBuy(item))
+                      }
                     >
-                      <Fa icon="fa-coins" size={0.7} />
+                      <Show
+                        when={pendingId() !== item.id}
+                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
+                      >
+                        <Fa icon="fa-coins" size={0.7} />
+                      </Show>
                       {item.price}
                     </button>
                   </Show>

@@ -4,13 +4,12 @@ import {
   doc,
   DocumentReference,
   getDoc,
-  increment,
-  runTransaction,
   setDoc,
 } from "firebase/firestore";
+import { callApi } from "../api-client";
 import { getDb } from "../firebase";
-import { localDateString } from "../utils/date-and-time";
-import { HouseItem } from "./house-items";
+import { invalidateCoinQueries } from "../queries/coins";
+import { DEFAULT_HOUSE_THEME_ID } from "./house-themes";
 
 function userRef(uid: string): DocumentReference {
   return doc(collection(getDb(), "users"), uid);
@@ -23,8 +22,14 @@ export type HouseState = {
   ownedItems: Record<string, true>;
   /** itemId -> custom position, if the student has dragged it - falls back to the catalog's default slot otherwise. */
   layout: Record<string, HouseItemPosition>;
+  /** itemId -> custom size multiplier (1 = catalog default), if the student has resized it. Furniture only, not pets. */
+  scale: Record<string, number>;
   /** Owned items the student has put away - still owned, just not rendered in the room. */
   storedItems: Record<string, true>;
+  /** Item ids the student has dragged/resized, oldest to most recent - drawn in this order, on top of untouched items, so the last-touched item stays in front across reloads. */
+  touchOrder: string[];
+  /** Selected wall/floor finish - see house-themes.ts. */
+  themeId: string;
 };
 
 export async function getHouseState(uid: string): Promise<HouseState> {
@@ -38,9 +43,21 @@ export async function getHouseState(uid: string): Promise<HouseState> {
       (data?.["houseLayout"] as
         | Record<string, HouseItemPosition>
         | undefined) ?? {},
+    scale: (data?.["houseScale"] as Record<string, number> | undefined) ?? {},
     storedItems:
       (data?.["storedHouseItems"] as Record<string, true> | undefined) ?? {},
+    touchOrder: (data?.["houseTouchOrder"] as string[] | undefined) ?? [],
+    themeId:
+      (data?.["houseTheme"] as string | undefined) ?? DEFAULT_HOUSE_THEME_ID,
   };
+}
+
+/** Switches the room's wall/floor finish. Ownership is enforced server-side at purchase time; this only records the choice. */
+export async function selectHouseTheme(
+  uid: string,
+  themeId: string,
+): Promise<void> {
+  await setDoc(userRef(uid), { houseTheme: themeId }, { merge: true });
 }
 
 /** Toggles whether an owned item is put away (hidden from the room) or placed back out. */
@@ -69,84 +86,63 @@ export async function saveItemPosition(
   );
 }
 
-class HouseShopError extends Error {}
-
-/**
- * Buys one house item. Runs as a transaction (rather than a plain
- * read-then-write), same reasoning as buyAvatarItem/buySideImageSet: a
- * double click / multiple tabs racing each other can't both pass an "enough
- * coins" check against the same stale balance.
- */
-export async function buyHouseItem(
+/** Saves how a student resized one item - merges into houseScale so other items' sizes are untouched. Furniture only, not pets. */
+export async function saveItemScale(
   uid: string,
-  item: HouseItem,
-): Promise<{ ok: boolean; reason?: string }> {
-  const ref = userRef(uid);
-  try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const coins = (data["coins"] as number | undefined) ?? 0;
-      const owned =
-        (data["ownedHouseItems"] as Record<string, true> | undefined) ?? {};
-      if (owned[item.id] === true) {
-        throw new HouseShopError("Already owned");
-      }
-      if (coins < item.price) {
-        throw new HouseShopError("Not enough coins");
-      }
+  itemId: string,
+  scale: number,
+): Promise<void> {
+  await setDoc(
+    userRef(uid),
+    { houseScale: { [itemId]: scale } },
+    { merge: true },
+  );
+}
 
-      tx.set(
-        ref,
-        {
-          coins: increment(-item.price),
-          ownedHouseItems: { [item.id]: true },
-        },
-        { merge: true },
-      );
-    });
-    return { ok: true };
+/** Saves the front-to-back stacking order of touched (dragged/resized) items, so it survives a reload instead of resetting to the default y-sort. */
+export async function saveTouchOrder(
+  uid: string,
+  order: string[],
+): Promise<void> {
+  await setDoc(userRef(uid), { houseTouchOrder: order }, { merge: true });
+}
+
+const DAILY_GREETING_BONUS = 2;
+
+/** Buys one house item (emoji, sprite furniture, or small decor - anything in the "house" shop) - price/ownership validated server-side, see api/buy-item.ts. */
+export async function buyHouseItem(
+  _uid: string,
+  item: { id: string },
+): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/buy-item",
+      { shop: "house", itemId: item.id },
+    );
+    if (result.ok) invalidateCoinQueries();
+    return result;
   } catch (e) {
-    if (e instanceof HouseShopError) {
-      return { ok: false, reason: e.message };
-    }
     console.error("Failed to buy house item:", e);
     return { ok: false, reason: "Something went wrong" };
   }
 }
 
-const DAILY_GREETING_BONUS = 2;
-
 /**
  * A tiny once-a-day coin reward for clicking/greeting the avatar in the
- * house - capped per day (same date-bucket idea as awardTryCoin in coins.ts)
- * so it can't become a second income stream competing with actually typing.
+ * house - capped per day server-side, see api/claim-reward.ts.
  */
 export async function claimDailyGreeting(
-  uid: string,
+  _uid: string,
 ): Promise<{ claimed: boolean; coins: number }> {
-  const ref = userRef(uid);
-  const today = localDateString();
-  let claimed = false;
   try {
-    await runTransaction(getDb(), async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists() ? snap.data() : {};
-      const lastClaim = data["houseGreetingDate"] as string | undefined;
-      if (lastClaim === today) return;
-
-      tx.set(
-        ref,
-        {
-          houseGreetingDate: today,
-          coins: increment(DAILY_GREETING_BONUS),
-        },
-        { merge: true },
-      );
-      claimed = true;
-    });
+    const result = await callApi<{ claimed: boolean; coins: number }>(
+      "/api/claim-reward",
+      { type: "dailyGreeting" },
+    );
+    if (result.claimed) invalidateCoinQueries();
+    return result;
   } catch (e) {
     console.error("Failed to claim daily greeting:", e);
+    return { claimed: false, coins: DAILY_GREETING_BONUS };
   }
-  return { claimed, coins: DAILY_GREETING_BONUS };
 }

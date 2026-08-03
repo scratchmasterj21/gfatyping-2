@@ -61,3 +61,10 @@
 .pet-wing-flip {
   transform-origin: 0% 0%;
 }
+
+// Idling between roams: the walk cycle freezes mid-pose rather than snapping
+// the legs back to a neutral stance, so settling down reads as natural.
+.pet-resting .pet-leg,
+.pet-resting .pet-tail {
+  animation-play-state: paused;
+}
