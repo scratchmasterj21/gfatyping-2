@@ -39,7 +39,12 @@ type Props = {
   open: boolean;
   onClose: () => void;
   lessonWords?: string[];
-  onResult?: (score: number, wave: number) => void;
+  onResult?: (
+    score: number,
+    wave: number,
+    difficultyLabel: string,
+    wordListGroup: string,
+  ) => void;
 };
 
 export function TypeTossModal(props: Props): JSXElement {
@@ -65,9 +70,11 @@ export function TypeTossModal(props: Props): JSXElement {
     setPhase("playing");
     await Promise.resolve();
     if (containerRef === undefined) return;
-    game = await createTypeTossGame(containerRef, words, difficulty());
+    const usedDifficulty = difficulty();
+    const usedGroup = selected().group;
+    game = await createTypeTossGame(containerRef, words, usedDifficulty);
     game.events.on("game-result", (data: { score: number; wave: number }) => {
-      onResult?.(data.score, data.wave);
+      onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
     });
     game.events.on("exit-game", () => {
       onClose();

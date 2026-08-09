@@ -40,6 +40,7 @@ import { gradeOf } from "../../../constants/classes";
 import { getAuthenticatedUser } from "../../../firebase";
 import { BalloonPopModal } from "../../../games/balloon-pop/BalloonPopModal";
 import { FruitNinjaModal } from "../../../games/fruit-ninja/FruitNinjaModal";
+import { scaleGameScore } from "../../../games/game-difficulty-multiplier";
 import { startGame } from "../../../games/game-launcher";
 import { games } from "../../../games/games-data";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
@@ -2027,8 +2028,11 @@ export function LessonsPage(): JSXElement {
           onClose={() => {
             setDefenderOpen(false);
           }}
-          onResult={(score) => {
-            void recordGameScore("word-defender", score);
+          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+            void recordGameScore(
+              "word-defender",
+              scaleGameScore(score, difficultyLabel, wordListGroup),
+            );
           }}
         />
         <BalloonPopModal
@@ -2036,8 +2040,11 @@ export function LessonsPage(): JSXElement {
           onClose={() => {
             setBalloonOpen(false);
           }}
-          onResult={(score) => {
-            void recordGameScore("balloon-pop", score);
+          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+            void recordGameScore(
+              "balloon-pop",
+              scaleGameScore(score, difficultyLabel, wordListGroup),
+            );
           }}
         />
         <TypeRacerModal
@@ -2054,8 +2061,11 @@ export function LessonsPage(): JSXElement {
           onClose={() => {
             setGhostOpen(false);
           }}
-          onResult={(score) => {
-            void recordGameScore("ghost-hunter", score);
+          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+            void recordGameScore(
+              "ghost-hunter",
+              scaleGameScore(score, difficultyLabel, wordListGroup),
+            );
           }}
         />
         <FruitNinjaModal
@@ -2063,8 +2073,11 @@ export function LessonsPage(): JSXElement {
           onClose={() => {
             setFruitNinjaOpen(false);
           }}
-          onResult={(score) => {
-            void recordGameScore("fruit-ninja", score);
+          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+            void recordGameScore(
+              "fruit-ninja",
+              scaleGameScore(score, difficultyLabel, wordListGroup),
+            );
           }}
         />
         <TypeTossModal
@@ -2072,8 +2085,11 @@ export function LessonsPage(): JSXElement {
           onClose={() => {
             setTypeTossOpen(false);
           }}
-          onResult={(score) => {
-            void recordGameScore("type-toss", score);
+          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+            void recordGameScore(
+              "type-toss",
+              scaleGameScore(score, difficultyLabel, wordListGroup),
+            );
           }}
         />
         {/* Lesson-mode games */}

@@ -37,7 +37,12 @@ type Props = {
   open: boolean;
   onClose: () => void;
   lessonWords?: string[];
-  onResult?: (score: number, wave: number) => void;
+  onResult?: (
+    score: number,
+    wave: number,
+    difficultyLabel: string,
+    wordListGroup: string,
+  ) => void;
 };
 
 export function WordDefenderModal(props: Props): JSXElement {
@@ -64,14 +69,17 @@ export function WordDefenderModal(props: Props): JSXElement {
     setPhase("playing");
     await Promise.resolve();
     if (containerRef === undefined) return;
+    const usedDifficulty =
+      wordsOverride !== undefined ? easyDiff : difficulty();
+    const usedGroup = selected().group;
     game = await createWordDefenderGame(
       containerRef,
       words,
-      wordsOverride !== undefined ? easyDiff : difficulty(),
+      usedDifficulty,
       wordsOverride !== undefined ? 5 : 0,
     );
     game.events.on("game-result", (data: { score: number; wave: number }) => {
-      onResult?.(data.score, data.wave);
+      onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
     });
     game.events.on("exit-game", () => {
       onClose();
