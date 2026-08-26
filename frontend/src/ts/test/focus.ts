@@ -83,9 +83,11 @@ document.addEventListener("mousemove", function (event) {
   if (PageTransition.get()) return;
   if (!getFocus()) return;
   if (
-    // To avoid mouse/desk vibration from creating a flashy effect, we'll unfocus @ >5px instead of >0px
-    event.movementX > unfocusPx ||
-    event.movementY > unfocusPx
+    // To avoid mouse/desk vibration from creating a flashy effect, we'll unfocus @ >5px instead of >0px.
+    // Compare magnitudes - movement left or up is negative, and without abs
+    // those directions never unfocus, leaving the cursor stuck at `none`.
+    Math.abs(event.movementX) > unfocusPx ||
+    Math.abs(event.movementY) > unfocusPx
   ) {
     set(false);
   }

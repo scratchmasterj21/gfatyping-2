@@ -3,6 +3,7 @@ import { autoTable, RowInput } from "jspdf-autotable";
 
 import { EMPTY_ACTIVITY, StudentActivity } from "./activity-report";
 import { Assignment, LessonDetailRow, StudentProgressRow } from "./assignments";
+import { formatWeakKeys } from "./progress-format";
 import { localDateString } from "../utils/date-and-time";
 
 export type DateRange = { start: number; end: number };
@@ -24,27 +25,6 @@ function formatMinutes(seconds: number): string {
 function getFinalY(doc: jsPDF, fallback: number): number {
   const withTable = doc as unknown as { lastAutoTable?: { finalY?: number } };
   return withTable.lastAutoTable?.finalY ?? fallback;
-}
-
-/** Uppercase letters for readability; leave punctuation as-is; name whitespace keys. */
-function displayChar(c: string): string {
-  if (c === " ") return "space";
-  if (c === "\t") return "tab";
-  if (c === "\n") return "enter";
-  return /[a-z]/i.test(c) ? c.toUpperCase() : c;
-}
-
-/** Top weak keys as a readable comma list, worst first, or "-" if none tracked yet. */
-export function formatWeakKeys(
-  weakKeys: Record<string, number>,
-  limit = 5,
-): string {
-  const sorted = Object.entries(weakKeys).sort((a, b) => b[1] - a[1]);
-  if (sorted.length === 0) return "-";
-  return sorted
-    .slice(0, limit)
-    .map(([c]) => displayChar(c))
-    .join(", ");
 }
 
 function sectionHeaderRow(label: string): RowInput {

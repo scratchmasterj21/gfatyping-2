@@ -1,10 +1,5 @@
 import type Phaser from "phaser";
 
-import { BootScene } from "./scenes/BootScene";
-import { GameOverScene } from "./scenes/GameOverScene";
-import { GameScene } from "./scenes/GameScene";
-import { UIScene } from "./scenes/UIScene";
-
 export type GameDifficulty = {
   label: string;
   cols: number;
@@ -23,6 +18,13 @@ export async function createTypeTossGame(
   difficulty: GameDifficulty = TYPE_TOSS_DIFFICULTIES[1] as GameDifficulty,
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
+  const [{ BootScene }, { GameOverScene }, { GameScene }, { UIScene }] =
+    await Promise.all([
+      import("./scenes/BootScene"),
+      import("./scenes/GameOverScene"),
+      import("./scenes/GameScene"),
+      import("./scenes/UIScene"),
+    ]);
   const P = PhaserLib.default;
 
   const game = new P.Game({

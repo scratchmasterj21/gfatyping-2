@@ -1,15 +1,16 @@
 import type Phaser from "phaser";
 
-import { BootScene } from "./scenes/BootScene";
-import { GameOverScene } from "./scenes/GameOverScene";
-import { GameScene } from "./scenes/GameScene";
-
 export async function createTypeRacerGame(
   parent: HTMLElement,
   words: string[],
   cpuWpm = 35,
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
+  const [{ BootScene }, { GameOverScene }, { GameScene }] = await Promise.all([
+    import("./scenes/BootScene"),
+    import("./scenes/GameOverScene"),
+    import("./scenes/GameScene"),
+  ]);
   const P = PhaserLib.default;
 
   const game = new P.Game({

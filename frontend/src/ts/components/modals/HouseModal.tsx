@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/solid-query";
 import {
   createEffect,
+  createMemo,
   createSignal,
   For,
   JSXElement,
@@ -191,18 +192,24 @@ function RoamingPet(props: {
     onCleanup(() => clearInterval(interval));
   });
 
+  // Snapshotted on pointerdown: closest() + getBoundingClientRect() inside the
+  // move handler meant a tree walk and a forced layout on every drag frame.
+  let dragRoomRect: DOMRect | null = null;
+
   const handlePointerDown = (e: PointerEvent): void => {
     e.preventDefault();
     e.stopPropagation();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    dragRoomRect =
+      el.closest("[data-house-room]")?.getBoundingClientRect() ?? null;
     setDragging(true);
   };
 
   const handlePointerMove = (e: PointerEvent): void => {
     if (!dragging()) return;
-    const room = (e.currentTarget as HTMLElement).closest("[data-house-room]");
-    if (room === null) return;
-    const rect = room.getBoundingClientRect();
+    const rect = dragRoomRect;
+    if (rect === null) return;
     const nextX = clampPct(((e.clientX - rect.left) / rect.width) * 100, 4, 96);
     const nextY = clampPct(((e.clientY - rect.top) / rect.height) * 100, 8, 96);
     setPos((prev) => {
@@ -212,6 +219,7 @@ function RoamingPet(props: {
   };
 
   const handlePointerUp = (): void => {
+    dragRoomRect = null;
     setDragging(false);
   };
 
@@ -222,13 +230,16 @@ function RoamingPet(props: {
   };
 
   return (
+    // Room-sized wrapper so a percentage translate resolves against the room,
+    // the same way RoomAnchor does it - gliding on transform keeps the pet off
+    // the layout path for the whole roam.
     <Anime
-      class="absolute -translate-x-1/2 -translate-y-1/2"
+      class="pointer-events-none absolute inset-0"
       style={{ "z-index": `${depthZ(pos().y)}` }}
-      initial={{ left: `${pos().x}%`, top: `${pos().y}%` }}
+      initial={{ translateX: `${pos().x}%`, translateY: `${pos().y}%` }}
       animate={{
-        left: `${pos().x}%`,
-        top: `${pos().y}%`,
+        translateX: `${pos().x}%`,
+        translateY: `${pos().y}%`,
         // Instant (no glide) while actively being dragged, so it tracks the
         // pointer directly instead of lagging behind on a multi-second ease.
         duration: dragging() ? 0 : PET_GLIDE_MS[props.item.movement],
@@ -236,7 +247,7 @@ function RoamingPet(props: {
       }}
     >
       <div
-        class="flex cursor-pointer touch-none flex-col items-center select-none"
+        class="pointer-events-auto absolute top-0 left-0 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer touch-none flex-col items-center select-none"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -272,6 +283,48 @@ function RoamingPet(props: {
 }
 
 /**
+ * Places a child at an (x%, y%) point in the room with a transform rather
+ * than `left`/`top`.
+ *
+ * The wrapper is stretched over the whole room, so a percentage translate on
+ * it resolves against the room's box - exactly the arithmetic `left`/`top`
+ * was doing, except a transform is composited. That matters while dragging:
+ * `left`/`top` dirty layout for the entire room on every pointer frame, so
+ * every other placed item gets re-laid-out too, dozens of times a second.
+ *
+ * The child sits at the wrapper's origin and is absolutely positioned, so it
+ * still measures against the full room width and isn't squeezed near a wall
+ * (the reason the old markup needed `w-max`).
+ */
+function RoomAnchor(props: {
+  xPct: number;
+  yPct: number;
+  zIndex: number;
+  class?: string;
+  title?: string;
+  onPointerDown?: (e: PointerEvent) => void;
+  children: JSXElement;
+}): JSXElement {
+  return (
+    <div
+      class="pointer-events-none absolute inset-0"
+      style={{
+        transform: `translate3d(${props.xPct}%, ${props.yPct}%, 0)`,
+        "z-index": `${props.zIndex}`,
+      }}
+    >
+      <div
+        class={cn("pointer-events-auto absolute top-0 left-0", props.class)}
+        title={props.title}
+        onPointerDown={(e) => props.onPointerDown?.(e)}
+      >
+        {props.children}
+      </div>
+    </div>
+  );
+}
+
+/**
  * A placed pixel-art sprite (furniture or small decor) - shared rendering
  * for both, since they're the same shape (HouseSpriteItem) and only differ
  * in which layer/list the caller puts them in.
@@ -288,23 +341,18 @@ function SpriteItem(props: {
   onImageReady: () => void;
 }): JSXElement {
   return (
-    <div
+    <RoomAnchor
+      xPct={props.pos.xPct}
+      yPct={props.pos.yPct}
+      zIndex={props.zIndex}
+      // w-max is load-bearing: this box would otherwise be shrink-to-fit, and
+      // Tailwind preflight's `img { max-width: 100% }` would scale the sprite
+      // down with it. max-content keeps it at its natural size (and keeps
+      // -translate-x-1/2 centering on the true width).
       class={cn(
-        // w-max is load-bearing: this box is positioned with `left` alone, so
-        // without it the box is shrink-to-fit and its available width is only
-        // (room width - left). Near the right wall that collapses to a few
-        // px, and Tailwind preflight's `img { max-width: 100% }` then scales
-        // the sprite down to fit it - the item visibly shrank as it
-        // approached the wall. max-content keeps the box at its natural size
-        // (and keeps -translate-x-1/2 centering on the true width).
-        "absolute w-max -translate-x-1/2 -translate-y-1/2 touch-none text-center select-none",
+        "w-max -translate-x-1/2 -translate-y-1/2 touch-none text-center select-none",
         props.editMode && "cursor-grab active:cursor-grabbing",
       )}
-      style={{
-        left: `${props.pos.xPct}%`,
-        top: `${props.pos.yPct}%`,
-        "z-index": `${props.zIndex}`,
-      }}
       title={props.item.name}
       onPointerDown={(e) => props.onPointerDown(e)}
     >
@@ -352,7 +400,7 @@ function SpriteItem(props: {
           </div>
         </Show>
       </div>
-    </div>
+    </RoomAnchor>
   );
 }
 
@@ -619,6 +667,10 @@ export function HouseModal(): JSXElement {
   // pointerdown stops propagation so it doesn't also start a move-drag.
   const [resizingId, setResizingId] = createSignal<string | null>(null);
   let resizeStart: { distance: number; scale: number } | null = null;
+  // Room geometry only changes on resize/scroll, but reading it inside the
+  // pointermove handler forced a synchronous layout on every frame of a
+  // drag. Snapshot it when the drag starts and reuse it for the gesture.
+  let dragRoomRect: DOMRect | null = null;
   let scaleWriteTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onCleanup(() => {
@@ -641,6 +693,7 @@ export function HouseModal(): JSXElement {
     }
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRoomRect = roomRef?.getBoundingClientRect() ?? null;
     setDraggingId(item.id);
   };
 
@@ -654,6 +707,7 @@ export function HouseModal(): JSXElement {
     if (roomRef === undefined) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     const rect = roomRef.getBoundingClientRect();
+    dragRoomRect = rect;
     const pos = effectivePos(item);
     const centerX = rect.left + (pos.xPct / 100) * rect.width;
     const centerY = rect.top + (pos.yPct / 100) * rect.height;
@@ -666,10 +720,10 @@ export function HouseModal(): JSXElement {
 
   const handleRoomPointerMove = (e: PointerEvent): void => {
     const resizeId = resizingId();
-    if (resizeId !== null && roomRef !== undefined && resizeStart !== null) {
+    if (resizeId !== null && dragRoomRect !== null && resizeStart !== null) {
       const item = findPlaceableItem(resizeId);
       if (item === undefined) return;
-      const rect = roomRef.getBoundingClientRect();
+      const rect = dragRoomRect;
       const pos = effectivePos(item);
       const centerX = rect.left + (pos.xPct / 100) * rect.width;
       const centerY = rect.top + (pos.yPct / 100) * rect.height;
@@ -686,8 +740,8 @@ export function HouseModal(): JSXElement {
     }
 
     const id = draggingId();
-    if (id === null || roomRef === undefined) return;
-    const rect = roomRef.getBoundingClientRect();
+    if (id === null || dragRoomRect === null) return;
+    const rect = dragRoomRect;
     // Raw pointer position, not yet clamped to the item's own footprint -
     // effectivePos re-clamps that precisely on every render (see above), so
     // the item visibly stays inside the room without needing that math here.
@@ -697,6 +751,7 @@ export function HouseModal(): JSXElement {
   };
 
   const handleRoomPointerUp = (): void => {
+    dragRoomRect = null;
     const resizeId = resizingId();
     if (resizeId !== null) {
       setResizingId(null);
@@ -899,13 +954,17 @@ export function HouseModal(): JSXElement {
 
           <For each={sortedFurniture()}>
             {(item) => {
+              // effectivePos re-clamps against the item's footprint, and this
+              // runs on every drag frame - compute it once per render instead
+              // of the three or four times the markup below reads it.
+              const pos = createMemo(() => effectivePos(item));
               if ("image" in item) {
                 return (
                   <SpriteItem
                     item={item}
-                    pos={effectivePos(item)}
+                    pos={pos()}
                     scale={effectiveScale(item)}
-                    zIndex={layerZ(item.id, effectivePos(item).yPct, 0)}
+                    zIndex={layerZ(item.id, pos().yPct, 0)}
                     editMode={editMode()}
                     onPointerDown={(e) => handleItemPointerDown(item, e)}
                     onResizePointerDown={(e) =>
@@ -917,20 +976,18 @@ export function HouseModal(): JSXElement {
                 );
               }
               return (
-                <div
+                <RoomAnchor
+                  xPct={pos().xPct}
+                  yPct={pos().yPct}
+                  zIndex={layerZ(item.id, pos().yPct, 0)}
+                  // w-max for the same reason as the sprite wrapper above -
+                  // an emoji glyph can't be scaled down by max-width, but a
+                  // squeezed box would still throw off -translate-x-1/2
+                  // centering near the walls.
                   class={cn(
-                    // w-max for the same reason as the sprite wrapper above -
-                    // an emoji glyph can't be scaled down by max-width, but a
-                    // squeezed box would still throw off -translate-x-1/2
-                    // centering near the walls.
-                    "absolute w-max -translate-x-1/2 -translate-y-1/2 touch-none text-center select-none",
+                    "w-max -translate-x-1/2 -translate-y-1/2 touch-none text-center select-none",
                     editMode() && "cursor-grab active:cursor-grabbing",
                   )}
-                  style={{
-                    left: `${effectivePos(item).xPct}%`,
-                    top: `${effectivePos(item).yPct}%`,
-                    "z-index": `${layerZ(item.id, effectivePos(item).yPct, 0)}`,
-                  }}
                   title={item.name}
                   onPointerDown={(e) => handleItemPointerDown(item, e)}
                 >
@@ -975,7 +1032,7 @@ export function HouseModal(): JSXElement {
                       </div>
                     </Show>
                   </div>
-                </div>
+                </RoomAnchor>
               );
             }}
           </For>
@@ -994,18 +1051,18 @@ export function HouseModal(): JSXElement {
           </For>
 
           <Anime
-            class="absolute -translate-x-1/2 -translate-y-1/2"
+            class="pointer-events-none absolute inset-0"
             style={{ "z-index": `${depthZ(pos().y)}` }}
-            initial={{ left: `${pos().x}%`, top: `${pos().y}%` }}
+            initial={{ translateX: `${pos().x}%`, translateY: `${pos().y}%` }}
             animate={{
-              left: `${pos().x}%`,
-              top: `${pos().y}%`,
+              translateX: `${pos().x}%`,
+              translateY: `${pos().y}%`,
               duration: 2200,
               easing: "easeInOutQuad",
             }}
           >
             <div
-              class="cursor-pointer"
+              class="pointer-events-auto absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
               onClick={() => void handleAvatarClick()}
             >
               <Avatar
@@ -1030,21 +1087,24 @@ export function HouseModal(): JSXElement {
 
           {/* Small decor always renders above furniture/avatar/pets - see sortedSmallItems. */}
           <For each={sortedSmallItems()}>
-            {(item) => (
-              <SpriteItem
-                item={item}
-                pos={effectivePos(item)}
-                scale={effectiveScale(item)}
-                zIndex={layerZ(item.id, effectivePos(item).yPct, SMALL_DECOR_Z)}
-                editMode={editMode()}
-                onPointerDown={(e) => handleItemPointerDown(item, e)}
-                onResizePointerDown={(e) =>
-                  handleResizeHandlePointerDown(item, e)
-                }
-                onBringToFront={() => bringToFront(item.id)}
-                onImageReady={onImageReady}
-              />
-            )}
+            {(item) => {
+              const smallPos = createMemo(() => effectivePos(item));
+              return (
+                <SpriteItem
+                  item={item}
+                  pos={smallPos()}
+                  scale={effectiveScale(item)}
+                  zIndex={layerZ(item.id, smallPos().yPct, SMALL_DECOR_Z)}
+                  editMode={editMode()}
+                  onPointerDown={(e) => handleItemPointerDown(item, e)}
+                  onResizePointerDown={(e) =>
+                    handleResizeHandlePointerDown(item, e)
+                  }
+                  onBringToFront={() => bringToFront(item.id)}
+                  onImageReady={onImageReady}
+                />
+              );
+            }}
           </For>
         </div>
 

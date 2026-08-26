@@ -113,7 +113,7 @@ export function GhostHunterModal(props: Props): JSXElement {
 
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/80 backdrop-blur-sm">
+      <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95">
         <div
           class={cn(
             "relative flex flex-col overflow-hidden rounded-xl border border-main/30 bg-bg shadow-2xl",

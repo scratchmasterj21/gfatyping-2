@@ -43,10 +43,6 @@ import {
   WordList,
 } from "../../../classroom/assignments";
 import { buildProgressCsv } from "../../../classroom/progress-csv";
-import {
-  buildClassReportPdf,
-  buildStudentReportPdf,
-} from "../../../classroom/progress-pdf";
 import { awardCoins } from "../../../coins";
 import { CLASS_IDS, GRADES } from "../../../constants/classes";
 import { lessonGroups } from "../../../lessons/lessons-data";
@@ -227,10 +223,12 @@ function ProgressTab(props: {
     setDownloadingUid(row.uid);
     try {
       const range = dateRange();
-      const [activity, lessonDetails] = await Promise.all([
-        getStudentActivity(row.uid, range.start, range.end),
-        getStudentLessonDetails(row.uid),
-      ]);
+      const [activity, lessonDetails, { buildStudentReportPdf }] =
+        await Promise.all([
+          getStudentActivity(row.uid, range.start, range.end),
+          getStudentLessonDetails(row.uid),
+          import("../../../classroom/progress-pdf"),
+        ]);
       const doc = buildStudentReportPdf({
         classId: props.classId,
         row,
@@ -254,14 +252,16 @@ function ProgressTab(props: {
     try {
       const range = dateRange();
       const uids = props.rows.map((r) => r.uid);
-      const [activity, lessonDetailsEntries] = await Promise.all([
-        getClassActivity(uids, range.start, range.end),
-        Promise.all(
-          uids.map(
-            async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
+      const [activity, lessonDetailsEntries, { buildClassReportPdf }] =
+        await Promise.all([
+          getClassActivity(uids, range.start, range.end),
+          Promise.all(
+            uids.map(
+              async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
+            ),
           ),
-        ),
-      ]);
+          import("../../../classroom/progress-pdf"),
+        ]);
       const doc = buildClassReportPdf({
         classId: props.classId,
         rows: props.rows,

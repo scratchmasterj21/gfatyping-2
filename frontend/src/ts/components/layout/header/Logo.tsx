@@ -19,8 +19,15 @@ export function Logo(): JSXElement {
       }}
     >
       <img
-        src="/images/logo-header.png"
+        src="/images/logo-header.webp"
         alt="GFA Typing"
+        // Intrinsic size is 2x the rendered height, so it stays sharp on
+        // retina without making the browser decode-and-downscale a much
+        // larger source on every raster. Declared here so the header
+        // reserves its space before the image lands.
+        width={450}
+        height={300}
+        decoding="async"
         class={cn(
           "h-[150px] w-auto object-contain transition-opacity duration-250",
           {

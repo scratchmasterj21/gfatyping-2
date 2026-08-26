@@ -87,13 +87,19 @@
 // Purely cosmetic shop effects, additive on top of whatever caret style/color
 // is already selected above - toggled by CaretEffectController.tsx, which
 // just adds/removes these classes and never touches the caret's own classes.
+// Animating box-shadow directly repaints the caret and re-blurs its halo on
+// every frame, which the compositor can't help with. The halo is now a
+// pseudo-element with a fixed shadow, and only its opacity/scale animate -
+// both composited, so the pulse costs nothing per frame. Same look.
 @keyframes caretFxGlowPulse {
   0%,
   100% {
-    box-shadow: 0 0 4px 1px var(--caret-color);
+    opacity: 0.55;
+    transform: scale(0.85);
   }
   50% {
-    box-shadow: 0 0 10px 3px var(--caret-color);
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -121,9 +127,17 @@
 
 #caret {
   &.fx-glow {
-    animation:
-      caretFlashSmooth 1s infinite,
-      caretFxGlowPulse 1.4s ease-in-out infinite;
+    animation: caretFlashSmooth 1s infinite;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      box-shadow: 0 0 10px 3px var(--caret-color);
+      animation: caretFxGlowPulse 1.4s ease-in-out infinite;
+    }
   }
 
   &.fx-comet {

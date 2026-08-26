@@ -5,7 +5,7 @@ import {
   StudentProgressRow,
   WordList,
 } from "./assignments";
-import { formatWeakKeys } from "./progress-pdf";
+import { formatWeakKeys } from "./progress-format";
 
 /** Quote a CSV field and escape embedded quotes. */
 function csvCell(value: string | number): string {
