@@ -181,32 +181,51 @@ function buildRgbOverrideCss(
   return `@keyframes mech-rgb-solid{from{filter:blur(3px) hue-rotate(0deg)}to{filter:blur(3px) hue-rotate(360deg)}}@keyframes mech-rgb-solid-under{from{filter:blur(9px) hue-rotate(0deg)}to{filter:blur(9px) hue-rotate(360deg)}}.mech-rgb{animation:none}.mech-rgb rect{fill:${solidBase}}.mech-rgb-key-glow{animation:mech-rgb-solid 3s linear infinite}.mech-rgb-under{animation:mech-rgb-solid-under 3s linear infinite}${opCss}`;
 }
 
+/**
+ * The @keyframes half of the keypress flourish.
+ *
+ * Kept apart from buildPressAnimationCss because it depends only on the
+ * keyboard style, so it belongs in the static <style> block. Re-declaring
+ * @keyframes on every keystroke is not free: the rule set is replaced
+ * wholesale, which drops and restarts every animation in the document that
+ * references those names.
+ */
+function buildPressKeyframesCss(style: KeyboardStyle): string {
+  if (style === "rgb") return "";
+  if (style === "flat") {
+    return `@keyframes press-classic{0%{transform:scale(1)}40%{transform:scale(0.92) translateY(1px)}100%{transform:scale(1)}}`;
+  }
+  if (style === "cartoon") {
+    return `@keyframes press-cartoon{0%{transform:scale(1,1)}30%{transform:scale(1.18,0.82)}60%{transform:scale(0.9,1.12)}100%{transform:scale(1,1)}}`;
+  }
+  if (style === "modern") {
+    return `@keyframes press-modern{0%{transform:scale(1);filter:none}50%{transform:scale(1.1);filter:drop-shadow(0 0 6px var(--main-color))}100%{transform:scale(1);filter:none}}`;
+  }
+  // marble - also the fallback for wood/glass, as before
+  return `@keyframes press-marble{0%{filter:brightness(1) scale(1)}45%{filter:brightness(1.4) scale(1.05)}100%{filter:brightness(1) scale(1)}}`;
+}
+
 // Per-style keypress flourish for the non-rgb styles (rgb has its own
 // lighting via buildRgbOverrideCss). Reuses each style's activeKeySelector,
 // the same hook activeHighlightCss() uses for the fill/stroke highlight.
+// Only the selector rule - the keyframes it names are declared once by
+// buildPressKeyframesCss above.
 function buildPressAnimationCss(
   style: KeyboardStyle,
   keyId: string | null,
 ): string {
   if (keyId === null || style === "rgb") return "";
   const sel = STYLE_CONFIG[style].activeKeySelector(keyId);
+  const animation =
+    style === "flat"
+      ? "press-classic 120ms ease-out"
+      : style === "cartoon"
+        ? "press-cartoon 300ms cubic-bezier(.34,1.56,.64,1)"
+        : style === "modern"
+          ? "press-modern 200ms ease-out"
+          : "press-marble 220ms ease-out";
   // fill-box + center origin so keys scale from their own middle, not the SVG's.
-  const base = `${sel}{transform-box:fill-box;transform-origin:center;}`;
-
-  if (style === "flat") {
-    return `${base}@keyframes press-classic{0%{transform:scale(1)}40%{transform:scale(0.92) translateY(1px)}100%{transform:scale(1)}}${sel}{animation:press-classic 120ms ease-out}`;
-  }
-
-  if (style === "cartoon") {
-    return `${base}@keyframes press-cartoon{0%{transform:scale(1,1)}30%{transform:scale(1.18,0.82)}60%{transform:scale(0.9,1.12)}100%{transform:scale(1,1)}}${sel}{animation:press-cartoon 300ms cubic-bezier(.34,1.56,.64,1)}`;
-  }
-
-  if (style === "modern") {
-    return `${base}@keyframes press-modern{0%{transform:scale(1);filter:none}50%{transform:scale(1.1);filter:drop-shadow(0 0 6px var(--main-color))}100%{transform:scale(1);filter:none}}${sel}{animation:press-modern 200ms ease-out}`;
-  }
-
-  // marble
-  return `${base}@keyframes press-marble{0%{filter:brightness(1) scale(1)}45%{filter:brightness(1.4) scale(1.05)}100%{filter:brightness(1) scale(1)}}${sel}{animation:press-marble 220ms ease-out}`;
+  return `${sel}{transform-box:fill-box;transform-origin:center;animation:${animation}}`;
 }
 
 const KEY_TO_SVG_ID: Record<string, string> = {
@@ -729,6 +748,12 @@ export function AnimatedHands(): JSXElement {
             overflow: "visible",
           }}
         >
+          {/* Two blocks on purpose. Solid rewrites a <style> element's text
+              whenever anything it interpolates changes, and the browser then
+              reparses that sheet and revalidates style for the whole
+              document. The active finger/key rules change on every single
+              keystroke, so everything that does NOT depend on them stays
+              here, where it is written once per config change. */}
           <style>
             {`
               #keymap {
@@ -762,26 +787,34 @@ export function AnimatedHands(): JSXElement {
               #hands-wrapper g.st0 {
                 display: none !important;
               }
-              #hands-wrapper g#${activeLeftId()} {
-                display: inline !important;
-              }
-              #hands-wrapper g#${activeRightId()} {
-                display: inline !important;
-              }
 
               ${showKeyColors() ? config().fingerCss : ""}
 
               ${config().edcSt1Css}
 
-              ${activeHighlightCss()}
-
-              ${pressAnimationCss()}
+              ${buildPressKeyframesCss(keyboardStyle())}
 
               ${rgbCss()}
 
               ${buildHandStyleCss(handStyle())}
 
               ${KEYPRESS_EFFECT_CSS}
+            `}
+          </style>
+
+          {/* Rewritten on every keystroke - keep it to the few rules that
+              actually track the active key, and keep it after the static
+              block so it still wins the ties it used to win. */}
+          <style>
+            {`
+              #hands-wrapper g#${activeLeftId()} {
+                display: inline !important;
+              }
+              #hands-wrapper g#${activeRightId()} {
+                display: inline !important;
+              }
+              ${activeHighlightCss()}
+              ${pressAnimationCss()}
             `}
           </style>
 

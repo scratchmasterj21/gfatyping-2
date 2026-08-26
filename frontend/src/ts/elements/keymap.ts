@@ -83,14 +83,18 @@ function findKeyElements(char: string): ElementsWithUtils | null {
   return keymap.qsa(`.keymapKey[data-key*="${char}"]`);
 }
 
+// The keys highlighted by the previous keystroke. Clearing these directly
+// avoids a document-wide querySelectorAll(".activeKey") on every keypress -
+// which ran even when the keymap is hidden behind guided hands.
+let highlightedKeys: ElementsWithUtils | null = null;
+
 function highlightKey(currentKey: string): void {
   if (Config.mode === "zen") return;
   requestDebouncedAnimationFrame("keymap.highlightKey", async () => {
     if (currentKey === "") currentKey = " ";
     try {
-      document
-        .querySelectorAll(".activeKey")
-        .forEach((el) => el.classList.remove("activeKey"));
+      highlightedKeys?.removeClass("activeKey");
+      highlightedKeys = null;
 
       if (Config.language.startsWith("korean")) {
         currentKey = Hangul.disassemble(currentKey)[0] ?? currentKey;
@@ -100,6 +104,7 @@ function highlightKey(currentKey: string): void {
       if ($target === null || $target.length === 0) return;
 
       $target.addClass("activeKey");
+      highlightedKeys = $target;
     } catch (e) {
       if (e instanceof Error) {
         console.log(`could not update highlighted keymap key: ${e.message}`);
