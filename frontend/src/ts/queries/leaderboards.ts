@@ -14,7 +14,7 @@ import {
 import { pageSize, Selection, setPage } from "../states/leaderboard-selection";
 
 const queryKeys = {
-  root: (options: Selection & { userSpecific?: true }) => [
+  root: (options: Selection & { userSpecific?: true; hideAdmin?: boolean }) => [
     //don't use baseKey, we require the key to have the options at the same position for user and non user specific
     options.userSpecific === true || options.friendsOnly
       ? "user"
@@ -27,19 +27,21 @@ const queryKeys = {
       language: options.language,
       friendsOnly: options.friendsOnly,
       previous: options.previous,
+      hideAdmin: options.hideAdmin,
     },
   ],
-  data: (options: Selection & { page: number }) => [
+  data: (options: Selection & { page: number; hideAdmin?: boolean }) => [
     ...queryKeys.root(options),
     { page: options.page },
   ],
-  rank: (options: Selection) =>
+  rank: (options: Selection & { hideAdmin?: boolean }) =>
     queryKeys.root({ ...options, userSpecific: true }), //rank is always user specific
 };
 
 export const getLeaderboardQueryOptions = (
   options: Selection & {
     page: number;
+    hideAdmin?: boolean;
   }, // oxlint-disable-next-line typescript/explicit-function-return-type
 ) =>
   queryOptions({
@@ -70,6 +72,7 @@ export const getLeaderboardQueryOptions = (
           mode: speed.mode,
           mode2: speed.mode2,
           language: speed.language,
+          hideAdmin: options.hideAdmin ? true : undefined,
         };
 
         if (options.type === "allTime") {
@@ -140,8 +143,9 @@ export const getClassroomLeaderboardQueryOptions = (options: {
     staleTime: 1000 * 60,
   });
 
-// oxlint-disable-next-line typescript/explicit-function-return-type
-export const getRankQueryOptions = (options: Selection) =>
+export const getRankQueryOptions = (
+  options: Selection & { hideAdmin?: boolean }, // oxlint-disable-next-line typescript/explicit-function-return-type
+) =>
   queryOptions({
     queryKey: queryKeys.rank(options),
     queryFn: async () => {
@@ -163,6 +167,7 @@ export const getRankQueryOptions = (options: Selection) =>
           mode2: speed.mode2,
           language: speed.language,
           friendsOnly: speed.friendsOnly ? true : undefined,
+          hideAdmin: options.hideAdmin ? true : undefined,
         };
         if (options.type === "allTime") {
           request = Ape.leaderboards.getRank({ query: baseQuery });

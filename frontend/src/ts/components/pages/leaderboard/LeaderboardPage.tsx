@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, JSXElement, Show } from "solid-js";
 
-import { ADMIN_UID } from "../../../auth";
 import { ClassroomScope } from "../../../classroom/classroom";
 import { getSnapshot, updateLbMemory } from "../../../db";
 import { createEffectOn } from "../../../hooks/effects";
@@ -38,26 +37,9 @@ import { GameScoresSection } from "./GameScoresSection";
 import { Navigation } from "./Navigation";
 import { NextUpdate } from "./NextUpdate";
 import { Sidebar } from "./Sidebar";
-import { Table, TableEntry } from "./Table";
+import { Table } from "./Table";
 import { Title } from "./Title";
 import { UserRank } from "./UserRank";
-
-/**
- * Removes the admin/teacher's own row from a ranked entries list and shifts
- * every entry that was ranked below them up by one, so e.g. #2 becomes #1.
- * Only correct within the entries actually passed in - on a paginated board,
- * a page that doesn't contain the admin's row can't know their rank and
- * skips the shift, which only matters once a board has more than one page.
- */
-function hideAdminFromEntries<T extends TableEntry>(entries: T[]): T[] {
-  const adminEntry = entries.find((e) => e.uid === ADMIN_UID);
-  if (adminEntry === undefined) {
-    return entries.filter((e) => e.uid !== ADMIN_UID);
-  }
-  return entries
-    .filter((e) => e.uid !== ADMIN_UID)
-    .map((e) => (e.rank > adminEntry.rank ? { ...e, rank: e.rank - 1 } : e));
-}
 
 const pageName: PageName = "leaderboards";
 
@@ -110,6 +92,7 @@ export function LeaderboardPage(): JSXElement {
         getLeaderboardQueryOptions({
           ...getSelection(),
           page: getPage() + 1,
+          hideAdmin: canHideAdmin() && getHideAdmin(),
         }),
       );
     }
@@ -145,6 +128,7 @@ export function LeaderboardPage(): JSXElement {
     ...getLeaderboardQueryOptions({
       ...getSelection(),
       page: getPage() ?? 0,
+      hideAdmin: canHideAdmin() && getHideAdmin(),
     }),
     enabled: isOpen() && !isClassroom(),
   }));
@@ -173,7 +157,10 @@ export function LeaderboardPage(): JSXElement {
     isClassroom() ? classroomEntriesQuery : standardEntriesQuery;
 
   const rankQuery = useQuery(() => ({
-    ...getRankQueryOptions(getSelection()),
+    ...getRankQueryOptions({
+      ...getSelection(),
+      hideAdmin: canHideAdmin() && getHideAdmin(),
+    }),
     enabled: isAuthenticated() && isOpen() && !isClassroom(),
   }));
 
@@ -242,7 +229,7 @@ export function LeaderboardPage(): JSXElement {
 
   return (
     <Page id="leaderboards">
-      <div class="content-grid flex flex-col gap-8 lg:flex-row">
+      <div class="content-grid flex flex-col gap-5 lg:flex-row lg:gap-8">
         <div class="w-full shrink-0 lg:w-60 2xl:w-75">
           <AsyncContent queries={{ serverConfigurationQuery }}>
             {({ serverConfigurationQueryData }) => (
@@ -253,15 +240,12 @@ export function LeaderboardPage(): JSXElement {
                   serverConfigurationQueryData().dailyLeaderboards
                     .validModeRules ?? []
                 }
-                connectionsEnabled={
-                  serverConfigurationQueryData().connections.enabled
-                }
               />
             )}
           </AsyncContent>
         </div>
 
-        <div class="flex w-full flex-1 flex-col gap-8">
+        <div class="flex w-full flex-1 flex-col gap-5 lg:gap-8">
           <Title
             selection={getSelection()}
             onPreviousSelect={() =>
@@ -380,13 +364,7 @@ export function LeaderboardPage(): JSXElement {
                     <Table
                       type={tableType()}
                       compactXp={isClassroom()}
-                      entries={
-                        canHideAdmin() && getHideAdmin()
-                          ? hideAdminFromEntries(
-                              entriesQueryData()?.entries ?? [],
-                            )
-                          : (entriesQueryData()?.entries ?? [])
-                      }
+                      entries={entriesQueryData()?.entries ?? []}
                       friendsOnly={getSelection().friendsOnly}
                       scrollToUser={scrollToUser}
                       onScrolledToUser={() => setScrollToUser(false)}

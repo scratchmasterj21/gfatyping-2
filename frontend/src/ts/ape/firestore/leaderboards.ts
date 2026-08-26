@@ -1,6 +1,4 @@
-import { UTCDateMini } from "@date-fns/utc";
 import { CompletedEvent } from "@monkeytype/schemas/results";
-import { startOfWeek } from "date-fns";
 import {
   collection,
   CollectionReference,
@@ -15,6 +13,8 @@ import { getAuthenticatedUser } from "../../firebase";
 import { db, Handler, ok, stripUndefined } from "./common";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const TOKYO_OFFSET_MS = 9 * 60 * 60 * 1000;
+const ADMIN_UID = "VCCAWzj9oGfj8JEpKYCCwifqMpk1";
 
 export function leaderboardKey(
   mode: string,
@@ -37,13 +37,38 @@ function weeklyEntriesCol(weekId: number): CollectionReference {
 }
 
 function currentDayId(daysBefore: number): number {
-  return Math.floor(Date.now() / DAY_MS) - daysBefore;
+  return Math.floor((Date.now() + TOKYO_OFFSET_MS) / DAY_MS) - daysBefore;
 }
 
-/** Monday-UTC-midnight timestamp for the current week (or `weeksBefore` weeks back) - the canonical "week" definition, also used for weekly quests (see coins.ts). */
+/** UTC timestamp of Monday 00:00 JST for the requested Japan week. */
 export function currentWeekId(weeksBefore: number): number {
-  const base = Date.now() - weeksBefore * 7 * DAY_MS;
-  return startOfWeek(new UTCDateMini(base), { weekStartsOn: 1 }).getTime();
+  const shifted = new Date(
+    Date.now() + TOKYO_OFFSET_MS - weeksBefore * 7 * DAY_MS,
+  );
+  const daysSinceMonday = (shifted.getUTCDay() + 6) % 7;
+  return (
+    Date.UTC(
+      shifted.getUTCFullYear(),
+      shifted.getUTCMonth(),
+      shifted.getUTCDate() - daysSinceMonday,
+    ) - TOKYO_OFFSET_MS
+  );
+}
+
+function competitionRanks<T>(
+  entries: T[],
+  score: (entry: T) => number,
+): Array<T & { rank: number }> {
+  let previousScore: number | undefined;
+  let rank = 0;
+  return entries.map((entry, index) => {
+    const currentScore = score(entry);
+    if (previousScore === undefined || currentScore !== previousScore) {
+      rank = index + 1;
+    }
+    previousScore = currentScore;
+    return { ...entry, rank };
+  });
 }
 
 function currentAvatarUrl(): string | undefined {
@@ -188,14 +213,28 @@ async function getSortedSpeedEntries(
   col: CollectionReference,
 ): Promise<StoredEntry[]> {
   const snap = await getDocs(query(col, orderBy("wpm", "desc")));
-  return snap.docs.map((d) => d.data() as StoredEntry);
+  return snap.docs
+    .map((d) => d.data() as StoredEntry)
+    .sort(
+      (a, b) =>
+        b.wpm - a.wpm ||
+        b.timestamp - a.timestamp ||
+        a.uid.localeCompare(b.uid),
+    );
 }
 
 async function getSortedWeeklyEntries(
   col: CollectionReference,
 ): Promise<WeeklyStoredEntry[]> {
   const snap = await getDocs(query(col, orderBy("totalXp", "desc")));
-  return snap.docs.map((d) => d.data() as WeeklyStoredEntry);
+  return snap.docs
+    .map((d) => d.data() as WeeklyStoredEntry)
+    .sort(
+      (a, b) =>
+        b.totalXp - a.totalXp ||
+        b.lastActivityTimestamp - a.lastActivityTimestamp ||
+        a.uid.localeCompare(b.uid),
+    );
 }
 
 // --- all-time ---
@@ -208,6 +247,7 @@ export const get: Handler = async (ctx) => {
     page?: number;
     pageSize?: number;
     friendsOnly?: boolean;
+    hideAdmin?: boolean;
   };
   const pageSize = Number(q.pageSize ?? 50);
   const page = Number(q.page ?? 0);
@@ -221,12 +261,15 @@ export const get: Handler = async (ctx) => {
     String(q.mode2),
     String(q.language),
   );
-  const all = await getSortedSpeedEntries(entriesCol(key));
+  const sorted = await getSortedSpeedEntries(entriesCol(key));
+  const all = q.hideAdmin
+    ? sorted.filter((entry) => entry.uid !== ADMIN_UID)
+    : sorted;
   const start = page * pageSize;
-  const entries = all.slice(start, start + pageSize).map((e, i) => ({
-    ...e,
-    rank: start + i + 1,
-  }));
+  const entries = competitionRanks(all, (e) => e.wpm).slice(
+    start,
+    start + pageSize,
+  );
 
   return ok({ count: all.length, pageSize, entries });
 };
@@ -237,6 +280,7 @@ export const getRank: Handler = async (ctx) => {
     mode2?: string;
     language?: string;
     friendsOnly?: boolean;
+    hideAdmin?: boolean;
   };
   const uid = getAuthenticatedUser()?.uid;
   if (uid === undefined || q.friendsOnly) return ok(null);
@@ -246,11 +290,14 @@ export const getRank: Handler = async (ctx) => {
     String(q.mode2),
     String(q.language),
   );
-  const all = await getSortedSpeedEntries(entriesCol(key));
+  const sorted = await getSortedSpeedEntries(entriesCol(key));
+  const all = q.hideAdmin
+    ? sorted.filter((entry) => entry.uid !== ADMIN_UID)
+    : sorted;
   const index = all.findIndex((e) => e.uid === uid);
   if (index === -1) return ok(null);
 
-  return ok({ ...all[index], rank: index + 1 });
+  return ok(competitionRanks(all, (e) => e.wpm)[index]);
 };
 
 // --- daily ---
@@ -280,10 +327,10 @@ export const getDaily: Handler = async (ctx) => {
   const dayId = currentDayId(q.daysBefore === 1 ? 1 : 0);
   const all = await getSortedSpeedEntries(dailyEntriesCol(dayId, key));
   const start = page * pageSize;
-  const entries = all.slice(start, start + pageSize).map((e, i) => ({
-    ...e,
-    rank: start + i + 1,
-  }));
+  const entries = competitionRanks(all, (e) => e.wpm).slice(
+    start,
+    start + pageSize,
+  );
 
   return ok({ count: all.length, pageSize, entries, minWpm: 0 });
 };
@@ -309,7 +356,7 @@ export const getDailyRank: Handler = async (ctx) => {
   const index = all.findIndex((e) => e.uid === uid);
   if (index === -1) return ok(null);
 
-  return ok({ ...all[index], rank: index + 1 });
+  return ok(competitionRanks(all, (e) => e.wpm)[index]);
 };
 
 // --- weekly xp ---
@@ -331,10 +378,10 @@ export const getWeeklyXp: Handler = async (ctx) => {
   const weekId = currentWeekId(q.weeksBefore === 1 ? 1 : 0);
   const all = await getSortedWeeklyEntries(weeklyEntriesCol(weekId));
   const start = page * pageSize;
-  const entries = all.slice(start, start + pageSize).map((e, i) => ({
-    ...e,
-    rank: start + i + 1,
-  }));
+  const entries = competitionRanks(all, (e) => e.totalXp).slice(
+    start,
+    start + pageSize,
+  );
 
   return ok({ count: all.length, pageSize, entries });
 };
@@ -349,5 +396,5 @@ export const getWeeklyXpRank: Handler = async (ctx) => {
   const index = all.findIndex((e) => e.uid === uid);
   if (index === -1) return ok(null);
 
-  return ok({ ...all[index], rank: index + 1 });
+  return ok(competitionRanks(all, (e) => e.totalXp)[index]);
 };

@@ -68,7 +68,13 @@ import {
   pickDailyChallengeLesson,
   recordGameResult,
   recordGameScore,
+  claimRecommendedGameReward,
+  PracticeRewardCategory,
 } from "../../../lessons/lesson-progress";
+import {
+  initialLessonGroupCollapseState,
+  lessonLockMessage,
+} from "../../../lessons/lesson-ux";
 import {
   findLesson,
   groupIdForLesson,
@@ -84,6 +90,7 @@ import { showModal } from "../../../states/modals";
 import {
   showErrorNotification,
   showNoticeNotification,
+  showSuccessNotification,
 } from "../../../states/notifications";
 import { getSnapshot } from "../../../states/snapshot";
 import { FaSolidIcon } from "../../../types/font-awesome";
@@ -134,6 +141,7 @@ function LessonButton(props: {
   lesson: Lesson;
   progress: LessonProgress | undefined;
   locked?: boolean;
+  lockedMessage?: string;
 }): JSXElement {
   const done = (): boolean => props.progress?.completed === true;
   const locked = (): boolean => props.locked === true;
@@ -141,7 +149,9 @@ function LessonButton(props: {
     done() && (props.progress?.stars ?? 3) < 3;
   const onClick = (): void => {
     if (locked()) {
-      showNoticeNotification("Finish the previous lesson first");
+      showNoticeNotification(
+        props.lockedMessage ?? "Complete the previous lesson first",
+      );
       return;
     }
     launchLessonWithIntro(props.lesson);
@@ -312,10 +322,6 @@ function ProgressSummary(props: {
   assignments: Assignment[];
   wordLists: WordList[];
   passages: ReadingPassage[];
-  weakKeys: Record<string, number>;
-  streakDays: number;
-  streakFreezesAvailable: number;
-  onReviewWeakKeys: () => void;
 }): JSXElement {
   const lessonsDone = createMemo(() => {
     const p = props.progress;
@@ -399,14 +405,6 @@ function ProgressSummary(props: {
     ).length;
   });
 
-  const topWeakKeys = createMemo(() =>
-    Object.entries(props.weakKeys)
-      .filter(([, score]) => score > 2)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([key]) => key),
-  );
-
   const hasAnything = (): boolean =>
     lessonsDone() > 0 ||
     assignmentsDone() > 0 ||
@@ -427,51 +425,6 @@ function ProgressSummary(props: {
   return (
     <Show when={hasAnything()}>
       <section class="grid gap-3">
-        <Show when={props.streakDays > 0}>
-          <div class="flex items-center gap-2 rounded bg-sub-alt px-4 py-2 text-main">
-            <Fa icon="fa-fire" />
-            <span class="font-bold">{props.streakDays}</span>
-            <span class="text-sub">
-              {props.streakDays === 1
-                ? "day streak"
-                : "day streak — keep going!"}
-            </span>
-            <Show when={props.streakFreezesAvailable > 0}>
-              <span
-                class="ml-1 rounded bg-bg px-1.5 py-0.5 text-em-xs text-sub"
-                title="Miss a day and this protects your streak once."
-              >
-                🧊 freeze ready
-              </span>
-            </Show>
-          </div>
-        </Show>
-        <Show when={topWeakKeys().length > 0}>
-          <div class="flex items-center justify-between gap-3 rounded bg-sub-alt p-3">
-            <div class="flex flex-col gap-1.5">
-              <div class="flex items-center gap-1.5 text-em-xs text-sub">
-                <Fa icon="fa-fire" size={0.8} />
-                weak keys
-              </div>
-              <div class="flex gap-1">
-                <For each={topWeakKeys()}>
-                  {(key) => (
-                    <span class="rounded bg-bg px-1.5 py-0.5 font-mono text-sm text-main">
-                      {key}
-                    </span>
-                  )}
-                </For>
-              </div>
-            </div>
-            <button
-              type="button"
-              class="cursor-pointer rounded bg-bg px-3 py-1.5 text-em-xs text-text hover:bg-text hover:text-bg"
-              onClick={() => props.onReviewWeakKeys()}
-            >
-              practice →
-            </button>
-          </div>
-        </Show>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           <StatCard
             icon="fa-graduation-cap"
@@ -620,7 +573,11 @@ function ClassLeaderboard(props: {
   return (
     <Show when={top5().length > 1}>
       <section>
-        <H2 fa={{ icon: "fa-medal" }} text="class leaderboard" />
+        <H2
+          class="text-[1.65em] sm:text-[1.85em]"
+          fa={{ icon: "fa-medal" }}
+          text="class leaderboard"
+        />
         <div class="grid gap-1">
           <For each={top5()}>
             {(entry, i) => {
@@ -675,7 +632,11 @@ function ClassCompare(props: {
   return (
     <Show when={props.entries.length > 1}>
       <section>
-        <H2 fa={{ icon: "fa-users" }} text="class vs class" />
+        <H2
+          class="text-[1.65em] sm:text-[1.85em]"
+          fa={{ icon: "fa-users" }}
+          text="class vs class"
+        />
         <div class="grid gap-1">
           <For each={props.entries}>
             {(entry) => (
@@ -711,7 +672,11 @@ function WeeklyQuests(props: {
 }): JSXElement {
   return (
     <section class="grid gap-3 rounded bg-sub-alt p-4">
-      <H2 fa={{ icon: "fa-flag-checkered" }} text="this week's quests" />
+      <H2
+        class="text-[1.65em] sm:text-[1.85em]"
+        fa={{ icon: "fa-flag-checkered" }}
+        text="this week's quests"
+      />
       <For each={WEEKLY_QUESTS}>
         {(quest) => {
           const current = (): number =>
@@ -775,6 +740,7 @@ export function LessonsPage(): JSXElement {
   >(null);
   const [lessonGameWords, setLessonGameWords] = createSignal<string[]>([]);
   const [lessonGameLoading, setLessonGameLoading] = createSignal(false);
+  const [recommendedGameId, setRecommendedGameId] = createSignal<string>();
   const [collapsed, setCollapsed] = createSignal<Set<string>>(
     (() => {
       const stored = localStorage.getItem("lessonSectionsCollapsed");
@@ -786,7 +752,21 @@ export function LessonsPage(): JSXElement {
       }
     })(),
   );
+  const manuallyToggledGroups = new Set<string>();
+  const persistCollapsed = (value: ReadonlySet<string>): void => {
+    try {
+      localStorage.setItem(
+        "lessonSectionsCollapsed",
+        JSON.stringify([...value]),
+      );
+    } catch {
+      // ignore
+    }
+  };
   const toggle = (id: string): void => {
+    if (lessonGroups.some((group) => group.id === id)) {
+      manuallyToggledGroups.add(id);
+    }
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -794,14 +774,7 @@ export function LessonsPage(): JSXElement {
       } else {
         next.add(id);
       }
-      try {
-        localStorage.setItem(
-          "lessonSectionsCollapsed",
-          JSON.stringify([...next]),
-        );
-      } catch {
-        // ignore
-      }
+      persistCollapsed(next);
       return next;
     });
   };
@@ -888,6 +861,19 @@ export function LessonsPage(): JSXElement {
     );
   };
 
+  const getLessonLockMessage = (id: string): string | undefined => {
+    if (!isLessonLocked(id)) return undefined;
+    const prevId = previousLessonId.get(id);
+    if (prevId === undefined) return undefined;
+    const previous = findLesson(prevId);
+    const previousProgress = progressFor(prevId);
+    return lessonLockMessage(
+      previous?.name ?? "the previous lesson",
+      previousProgress?.completed === true,
+      previousProgress?.stars ?? 0,
+    );
+  };
+
   // The first not-yet-completed lesson OR checkpoint game in curriculum
   // order - i.e. the true sequential frontier, matching what "next test"
   // already enforces (LESSON_IDS_WITH_GAME_CHECKPOINT sends students back to
@@ -937,15 +923,30 @@ export function LessonsPage(): JSXElement {
       : item.group.id;
   });
 
-  // The first time we learn where the student is, make sure that group is
-  // visible - but only once, so re-collapsing it afterward (their choice)
-  // is never fought.
-  let autoExpandedCurrentGroup = false;
+  // Once progress is available, tuck finished groups away and expose the
+  // current frontier. Manual choices made during this session always win.
+  let initializedLessonGroups = false;
   createEffect(() => {
+    const p = progress.data;
     const id = currentGroupId();
-    if (id === undefined || autoExpandedCurrentGroup) return;
-    autoExpandedCurrentGroup = true;
-    if (collapsed().has(id)) toggle(id);
+    if (p === undefined || initializedLessonGroups) return;
+    initializedLessonGroups = true;
+    const completeIds = new Set(
+      lessonGroups
+        .filter((group) =>
+          group.lessons.every((lesson) => p.get(lesson.id)?.completed === true),
+        )
+        .map((group) => group.id),
+    );
+    const next = initialLessonGroupCollapseState(
+      lessonGroups.map((group) => group.id),
+      completeIds,
+      id,
+      manuallyToggledGroups,
+      collapsed(),
+    );
+    setCollapsed(next);
+    persistCollapsed(next);
   });
 
   const continueIcon = (): FaSolidIcon => {
@@ -957,13 +958,13 @@ export function LessonsPage(): JSXElement {
     if (item === undefined) return "";
     return item.kind === "lesson" ? item.lesson.name : item.checkpoint.label;
   };
-  const onContinueClick = (): void => {
+  const onContinueClick = (reward = false): void => {
     const item = continueItem();
     if (item === undefined) return;
     if (item.kind === "lesson") {
-      launchLessonWithIntro(item.lesson);
+      launchLessonWithIntro(item.lesson, reward ? "recommendation" : undefined);
     } else {
-      void openCheckpointGame(item.group, item.checkpoint);
+      void openCheckpointGame(item.group, item.checkpoint, reward);
     }
   };
 
@@ -1038,6 +1039,7 @@ export function LessonsPage(): JSXElement {
           lastPracticedDate: "",
           lastSeenAssignmentsAt: 0,
           seenAchievementIds: [],
+          practiceRewardDates: {},
         };
       }
       return getUserLessonStats(uid);
@@ -1144,7 +1146,10 @@ export function LessonsPage(): JSXElement {
     return "text-sub";
   };
 
-  const launchAssignment = async (a: Assignment): Promise<void> => {
+  const launchAssignment = async (
+    a: Assignment,
+    rewardCategory?: PracticeRewardCategory,
+  ): Promise<void> => {
     const id = `${ASSIGNMENT_PREFIX}${a.id}`;
     if (a.contentType === "lesson") {
       const lesson =
@@ -1161,7 +1166,7 @@ export function LessonsPage(): JSXElement {
         showErrorNotification("Failed to generate lesson");
         return;
       }
-      startCustomDrill({ id, name: a.title, tokens });
+      startCustomDrill({ id, name: a.title, tokens, rewardCategory });
       return;
     }
     if (a.contentType === "passage") {
@@ -1176,6 +1181,7 @@ export function LessonsPage(): JSXElement {
         name: a.title,
         tokens: passageTokens(p.text),
         preserveOrder: true,
+        rewardCategory,
       });
       return;
     }
@@ -1185,7 +1191,12 @@ export function LessonsPage(): JSXElement {
       showErrorNotification("Word list not found");
       return;
     }
-    startCustomDrill({ id, name: a.title, tokens: wordListTokens(wl.text) });
+    startCustomDrill({
+      id,
+      name: a.title,
+      tokens: wordListTokens(wl.text),
+      rewardCategory,
+    });
   };
 
   const launchWordList = (wl: WordList): void => {
@@ -1233,6 +1244,7 @@ export function LessonsPage(): JSXElement {
   const openCheckpointGame = async (
     group: LessonGroup,
     checkpoint: HomeRowCheckpoint,
+    recommended = false,
   ): Promise<void> => {
     setLessonGameLoading(true);
     try {
@@ -1249,6 +1261,9 @@ export function LessonsPage(): JSXElement {
       }
       const words = [...new Set(all.filter((w) => w.length > 0))];
       setLessonGameWords(words);
+      setRecommendedGameId(
+        recommended ? HOME_ROW_GAME_IDS[checkpoint.gameType] : undefined,
+      );
       if (checkpoint.gameType === "defender") {
         setLessonDefGroupId(group.id);
       } else if (checkpoint.gameType === "balloon") {
@@ -1282,15 +1297,155 @@ export function LessonsPage(): JSXElement {
         name: "Weak Keys Review",
         tokens,
         preserveOrder: true,
+        rewardCategory: "adaptive",
       });
     } finally {
       setReviewLoading(false);
     }
   };
 
+  const openBuiltinGame = (gameId: string, recommended = false): void => {
+    setRecommendedGameId(recommended ? gameId : undefined);
+    if (gameId === "word-defender") setDefenderOpen(true);
+    else if (gameId === "balloon-pop") setBalloonOpen(true);
+    else if (gameId === "type-racer") setRacerOpen(true);
+    else if (gameId === "ghost-hunter") setGhostOpen(true);
+    else if (gameId === "fruit-ninja") setFruitNinjaOpen(true);
+    else if (gameId === "type-toss") setTypeTossOpen(true);
+  };
+
+  const launchDailyChallenge = async (): Promise<void> => {
+    const lesson = findLesson(dailyChallenge().lessonId);
+    if (lesson === undefined) return;
+    if (isLessonLocked(lesson.id)) {
+      showNoticeNotification(
+        getLessonLockMessage(lesson.id) ?? "Complete the previous lesson first",
+      );
+      return;
+    }
+    const uid = getAuthenticatedUser()?.uid;
+    if (uid !== undefined) {
+      await persistDailyChallengePick(uid, lesson.id);
+      await userStatsQuery.refetch();
+    }
+    launchLessonWithIntro(lesson, "dailyChallenge");
+  };
+
+  type PracticeRecommendation = {
+    icon: FaSolidIcon;
+    eyebrow: string;
+    title: string;
+    description: string;
+    action: string;
+    onStart: () => void;
+  };
+
+  const practiceRecommendation = createMemo(
+    (): PracticeRecommendation | undefined => {
+      if (!isAuthenticated()) return undefined;
+      if (
+        progress.data === undefined ||
+        weakKeysQuery.data === undefined ||
+        userStatsQuery.data === undefined ||
+        assignmentsQuery.isLoading
+      ) {
+        return undefined;
+      }
+
+      const unfinishedAssignments = (assignmentsQuery.data ?? [])
+        .filter(
+          (assignment) =>
+            progressFor(`${ASSIGNMENT_PREFIX}${assignment.id}`)?.completed !==
+            true,
+        )
+        .sort(
+          (a, b) =>
+            (a.dueAt ?? Number.POSITIVE_INFINITY) -
+            (b.dueAt ?? Number.POSITIVE_INFINITY),
+        );
+      const urgentAssignment = unfinishedAssignments.find(
+        (assignment) =>
+          assignment.dueAt !== undefined &&
+          assignment.dueAt < Date.now() + 2 * 24 * 60 * 60 * 1000,
+      );
+      if (urgentAssignment !== undefined) {
+        return {
+          icon: "fa-list",
+          eyebrow: "teacher priority",
+          title: urgentAssignment.title,
+          description: dueSubtitle(urgentAssignment) ?? "Assignment practice",
+          action: "start assignment",
+          onStart: () =>
+            void launchAssignment(urgentAssignment, "recommendation"),
+        };
+      }
+
+      const item = continueItem();
+      if (item !== undefined) {
+        return {
+          icon: continueIcon(),
+          eyebrow: item.kind === "checkpoint" ? "review checkpoint" : "up next",
+          title: continueLabel(),
+          description:
+            item.kind === "checkpoint"
+              ? "Use the keys you just learned in a quick game."
+              : "Keep moving along your personalized lesson path.",
+          action: item.kind === "checkpoint" ? "play now" : "continue",
+          onStart: () => onContinueClick(true),
+        };
+      }
+
+      const nextAssignment = unfinishedAssignments[0];
+      if (nextAssignment !== undefined) {
+        return {
+          icon: "fa-list",
+          eyebrow: "class practice",
+          title: nextAssignment.title,
+          description: dueSubtitle(nextAssignment) ?? "Assignment practice",
+          action: "start assignment",
+          onStart: () =>
+            void launchAssignment(nextAssignment, "recommendation"),
+        };
+      }
+
+      const builtinGames = games.filter((game) => game.type === "builtin");
+      const day = Number(localDateString().replaceAll("-", ""));
+      const game = builtinGames[day % builtinGames.length];
+      if (game === undefined) return undefined;
+      return {
+        icon: game.icon,
+        eyebrow: "game of the day",
+        title: game.name,
+        description: "Finish your practice with a quick typing challenge.",
+        action: "play now",
+        onStart: () => openBuiltinGame(game.id, true),
+      };
+    },
+  );
+
+  const practiceRewardLabel = (category: PracticeRewardCategory): string =>
+    userStatsQuery.data?.practiceRewardDates[category] === localDateString()
+      ? "✓ 10 claimed today"
+      : "🪙 10 daily";
+
+  const claimRecommendedGame = (
+    gameId: string,
+    score: number,
+    wave: number,
+  ): void => {
+    if (recommendedGameId() !== gameId) return;
+    setRecommendedGameId(undefined);
+    void claimRecommendedGameReward(gameId, score, wave).then((coins) => {
+      if (coins > 0) {
+        showSuccessNotification(`Recommended game complete · +${coins} coins`);
+        void userStatsQuery.refetch();
+      }
+    });
+  };
+
   return (
     <Page id="lessons">
-      <div class="content-grid grid gap-8">
+      <div class="content-grid grid gap-5">
         <section class="text-center text-sub">
           Build muscle memory from the ground up. Each drill warms up with a
           little rhythm, then turns into real words using the keys you know -
@@ -1303,6 +1458,125 @@ export function LessonsPage(): JSXElement {
             <Fa icon="fa-info-circle" class="mr-2" />
             Sign in to save your lesson progress across devices.
           </section>
+        </Show>
+
+        <Show when={(userStatsQuery.data?.streakDays ?? 0) > 0}>
+          <section class="flex items-center gap-2 rounded bg-sub-alt px-4 py-2 text-main">
+            <Fa icon="fa-fire" />
+            <span class="font-bold">
+              {userStatsQuery.data?.streakDays ?? 0}
+            </span>
+            <span class="text-sub">
+              {(userStatsQuery.data?.streakDays ?? 0) === 1
+                ? "day streak"
+                : "day streak — keep going!"}
+            </span>
+            <Show when={(userStatsQuery.data?.streakFreezesAvailable ?? 0) > 0}>
+              <span
+                class="ml-1 rounded bg-bg px-1.5 py-0.5 text-em-xs text-sub"
+                title="Miss a day and this protects your streak once."
+              >
+                🧊 freeze ready
+              </span>
+            </Show>
+          </section>
+        </Show>
+
+        <Show when={practiceRecommendation()} keyed>
+          {(recommendation) => (
+            <section class="grid gap-2">
+              <div class="grid gap-3 rounded bg-sub-alt p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div class="grid gap-2">
+                  <div class="flex items-center gap-2 text-em-xs font-medium text-main">
+                    <Fa icon={recommendation.icon} />
+                    recommended · {recommendation.eyebrow}
+                  </div>
+                  <div class="text-xl font-bold text-text">
+                    {recommendation.title}
+                  </div>
+                  <p class="max-w-2xl text-sm text-sub">
+                    {recommendation.description}
+                  </p>
+                  <div class="text-em-xs text-sub">
+                    <Fa icon="fa-clock" class="mr-1.5" /> about 3–5 minutes
+                    <span class="ml-3 text-main">
+                      {practiceRewardLabel("recommendation")}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="cursor-pointer rounded bg-main px-5 py-3 font-bold text-bg transition-opacity hover:opacity-80"
+                  onClick={recommendation.onStart}
+                  disabled={reviewLoading() || lessonGameLoading()}
+                >
+                  {recommendation.action}
+                  <Fa icon="fa-arrow-right" class="ml-2" />
+                </button>
+              </div>
+
+              <div class="grid gap-2 sm:grid-cols-2">
+                <div class="flex items-center justify-between gap-3 rounded bg-sub-alt p-3">
+                  <div class="grid gap-1">
+                    <div class="flex items-center gap-2 font-medium text-text">
+                      <Fa icon="fa-calendar-day" class="text-main" />
+                      Today&apos;s Challenge
+                    </div>
+                    <span class="text-em-xs text-sub">
+                      {dailyChallenge().lessonName}
+                    </span>
+                    <span class="text-em-xs text-main">
+                      {practiceRewardLabel("dailyChallenge")}
+                    </span>
+                  </div>
+                  <Show
+                    when={dailyChallenge().done}
+                    fallback={
+                      <button
+                        type="button"
+                        class="cursor-pointer rounded bg-bg px-3 py-2 text-em-xs text-text transition-colors hover:bg-text hover:text-bg"
+                        onClick={launchDailyChallenge}
+                      >
+                        start
+                      </button>
+                    }
+                  >
+                    <span class="flex items-center gap-1.5 text-em-xs text-main">
+                      <Fa icon="fa-check-circle" /> done
+                    </span>
+                  </Show>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 rounded bg-sub-alt p-3">
+                  <div class="grid gap-1">
+                    <div class="flex items-center gap-2 font-medium text-text">
+                      <Fa icon="fa-dumbbell" class="text-main" />
+                      Adaptive Review
+                    </div>
+                    <span class="text-em-xs text-sub">
+                      Practice the keys you miss most
+                    </span>
+                    <span class="text-em-xs text-main">
+                      {practiceRewardLabel("adaptive")}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    class="cursor-pointer rounded bg-bg px-3 py-2 text-em-xs text-text transition-colors hover:bg-text hover:text-bg"
+                    onClick={() => void reviewWeakKeys()}
+                    disabled={reviewLoading()}
+                  >
+                    <Fa
+                      icon={
+                        reviewLoading() ? "fa-circle-notch" : "fa-arrow-right"
+                      }
+                      class={reviewLoading() ? "fa-spin" : ""}
+                    />
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
         </Show>
 
         {/* Avatar + coins */}
@@ -1412,28 +1686,6 @@ export function LessonsPage(): JSXElement {
           </section>
         </Show>
 
-        {/* Continue where you left off */}
-        <Show when={isAuthenticated() && continueItem() !== undefined}>
-          <section class="rounded border-l-4 border-main bg-sub-alt p-4">
-            <div class="mb-3 flex items-center gap-2 text-em-xs text-sub">
-              <Fa icon={continueIcon()} size={0.9} />
-              {continueItem()?.kind === "checkpoint"
-                ? "checkpoint game up next"
-                : "continue where you left off"}
-            </div>
-            <div class="flex items-center justify-between gap-4">
-              <span class="font-medium text-text">{continueLabel()}</span>
-              <button
-                type="button"
-                class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                onClick={onContinueClick}
-              >
-                {continueItem()?.kind === "checkpoint" ? "play" : "continue"}
-              </button>
-            </div>
-          </section>
-        </Show>
-
         {/* 1. Progress summary + streak + leaderboard */}
         <Show when={isAuthenticated()}>
           <ProgressSummary
@@ -1441,12 +1693,6 @@ export function LessonsPage(): JSXElement {
             assignments={assignmentsQuery.data ?? []}
             wordLists={wordListsQuery.data ?? []}
             passages={passagesQuery.data ?? []}
-            weakKeys={weakKeysQuery.data ?? {}}
-            streakDays={userStatsQuery.data?.streakDays ?? 0}
-            streakFreezesAvailable={
-              userStatsQuery.data?.streakFreezesAvailable ?? 0
-            }
-            onReviewWeakKeys={reviewWeakKeys}
           />
           <ClassLeaderboard
             entries={classLeaderboardQuery.data ?? []}
@@ -1458,51 +1704,6 @@ export function LessonsPage(): JSXElement {
           />
         </Show>
 
-        {/* 2. Daily challenge */}
-        <Show when={isAuthenticated()}>
-          <section class="rounded border-l-4 border-caret bg-sub-alt p-4">
-            <div class="mb-3 flex items-center gap-2 text-em-xs text-sub">
-              <Fa icon="fa-calendar-day" size={0.9} />
-              today&apos;s challenge
-            </div>
-            <div class="flex items-center justify-between gap-4">
-              <span class="font-medium text-text">
-                {dailyChallenge().lessonName}
-              </span>
-              <Show
-                when={dailyChallenge().done}
-                fallback={
-                  <button
-                    type="button"
-                    class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                    onClick={() => {
-                      const lesson = findLesson(dailyChallenge().lessonId);
-                      if (lesson === undefined) return;
-                      // pickDailyChallengeLesson can fall back to "first
-                      // uncompleted lesson", which may now be star-gate
-                      // locked - never launch a locked lesson from here.
-                      if (isLessonLocked(lesson.id)) {
-                        showNoticeNotification(
-                          "Finish the previous lesson first",
-                        );
-                        return;
-                      }
-                      launchLessonWithIntro(lesson);
-                    }}
-                  >
-                    start
-                  </button>
-                }
-              >
-                <div class="flex items-center gap-1.5 text-main">
-                  <Fa icon="fa-check-circle" />
-                  <span class="text-sm">done</span>
-                </div>
-              </Show>
-            </div>
-          </section>
-        </Show>
-
         {/* Weekly quests */}
         <Show when={isAuthenticated()}>
           <WeeklyQuests
@@ -1511,50 +1712,15 @@ export function LessonsPage(): JSXElement {
           />
         </Show>
 
-        {/* 3. Adaptive Practice */}
-        <Show when={isAuthenticated()}>
-          <section>
-            <div class="flex items-center justify-between">
-              <H2 fa={{ icon: "fa-dumbbell" }} text="Adaptive Practice" />
-              <button
-                type="button"
-                class="rounded p-1.5 text-sub transition-colors hover:text-text"
-                onClick={() => toggle("adaptive-practice")}
-              >
-                <Fa
-                  icon="fa-chevron-down"
-                  class={cn(
-                    "transition-transform duration-200",
-                    collapsed().has("adaptive-practice") ? "-rotate-90" : "",
-                  )}
-                />
-              </button>
-            </div>
-            <Show when={!collapsed().has("adaptive-practice")}>
-              <p class="mb-4 text-sub">
-                Focus on the keys you struggle with the most.
-              </p>
-              <button
-                type="button"
-                class="button primary"
-                onClick={reviewWeakKeys}
-                disabled={reviewLoading()}
-              >
-                <Fa
-                  icon={reviewLoading() ? "fa-circle-notch" : "fa-fire"}
-                  class={reviewLoading() ? "fa-spin" : ""}
-                />
-                Review Weak Keys
-              </button>
-            </Show>
-          </section>
-        </Show>
-
         {/* 4. Assignments — urgent, graded */}
         <Show when={(assignmentsQuery.data?.length ?? 0) > 0}>
           <section>
-            <H2 fa={{ icon: "fa-list" }} text="assignments" />
-            <p class="mb-4 text-sub">Work set by your teacher.</p>
+            <H2
+              class="text-[1.65em] sm:text-[1.85em]"
+              fa={{ icon: "fa-list" }}
+              text="assignments"
+            />
+            <p class="mb-3 text-sub">Work set by your teacher.</p>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <For each={assignmentsQuery.data}>
                 {(a) => (
@@ -1577,7 +1743,11 @@ export function LessonsPage(): JSXElement {
         {/* 5. Typing Lessons — main section wrapping all lesson groups */}
         <section>
           <div class="flex items-center justify-between">
-            <H2 fa={{ icon: "fa-graduation-cap" }} text="Typing Lessons" />
+            <H2
+              class="text-[1.65em] sm:text-[1.85em]"
+              fa={{ icon: "fa-graduation-cap" }}
+              text="Typing Lessons"
+            />
             <button
               type="button"
               class="rounded p-1.5 text-sub transition-colors hover:text-text"
@@ -1646,10 +1816,10 @@ export function LessonsPage(): JSXElement {
                         </div>
                       </button>
                       <Show when={!collapsed().has(group.id)}>
-                        <p class="mt-1 mb-3 pl-2 text-em-xs text-sub">
+                        <p class="mt-1 mb-2 pl-2 text-em-xs text-sub">
                           {group.description}
                         </p>
-                        <div class="mb-3 grid grid-cols-1 gap-3 pl-2 sm:grid-cols-2 lg:grid-cols-3">
+                        <div class="mb-2 grid grid-cols-1 gap-2 pl-2 sm:grid-cols-2 lg:grid-cols-3">
                           <Show
                             when={LESSON_GROUP_INTRO_VIDEOS[group.id]}
                             keyed
@@ -1682,6 +1852,9 @@ export function LessonsPage(): JSXElement {
                                   lesson={item.lesson}
                                   progress={progressFor(item.lesson.id)}
                                   locked={isLessonLocked(item.lesson.id)}
+                                  lockedMessage={getLessonLockMessage(
+                                    item.lesson.id,
+                                  )}
                                 />
                               ) : (
                                 <GameCheckpointButton
@@ -1798,7 +1971,11 @@ export function LessonsPage(): JSXElement {
         >
           <section>
             <div class="flex items-center justify-between">
-              <H2 fa={{ icon: "fa-keyboard" }} text="Class Practice" />
+              <H2
+                class="text-[1.65em] sm:text-[1.85em]"
+                fa={{ icon: "fa-keyboard" }}
+                text="Class Practice"
+              />
               <button
                 type="button"
                 class="rounded p-1.5 text-sub transition-colors hover:text-text"
@@ -1869,7 +2046,11 @@ export function LessonsPage(): JSXElement {
         {/* 7. Japanese */}
         <section>
           <div class="flex items-center justify-between">
-            <H2 fa={{ icon: "fa-language" }} text="Japanese — Romaji" />
+            <H2
+              class="text-[1.65em] sm:text-[1.85em]"
+              fa={{ icon: "fa-language" }}
+              text="Japanese — Romaji"
+            />
             <button
               type="button"
               class="rounded p-1.5 text-sub transition-colors hover:text-text"
@@ -1915,7 +2096,11 @@ export function LessonsPage(): JSXElement {
         {/* 8. Games */}
         <section>
           <div class="flex items-center justify-between">
-            <H2 fa={{ icon: "fa-gamepad" }} text="Games" />
+            <H2
+              class="text-[1.65em] sm:text-[1.85em]"
+              fa={{ icon: "fa-gamepad" }}
+              text="Games"
+            />
             <button
               type="button"
               class="rounded p-1.5 text-sub transition-colors hover:text-text"
@@ -1942,39 +2127,7 @@ export function LessonsPage(): JSXElement {
                     name={game.name}
                     description={game.description}
                     icon={game.icon}
-                    onClick={() => {
-                      if (
-                        game.type === "builtin" &&
-                        game.id === "word-defender"
-                      ) {
-                        setDefenderOpen(true);
-                      } else if (
-                        game.type === "builtin" &&
-                        game.id === "balloon-pop"
-                      ) {
-                        setBalloonOpen(true);
-                      } else if (
-                        game.type === "builtin" &&
-                        game.id === "type-racer"
-                      ) {
-                        setRacerOpen(true);
-                      } else if (
-                        game.type === "builtin" &&
-                        game.id === "ghost-hunter"
-                      ) {
-                        setGhostOpen(true);
-                      } else if (
-                        game.type === "builtin" &&
-                        game.id === "fruit-ninja"
-                      ) {
-                        setFruitNinjaOpen(true);
-                      } else if (
-                        game.type === "builtin" &&
-                        game.id === "type-toss"
-                      ) {
-                        setTypeTossOpen(true);
-                      }
-                    }}
+                    onClick={() => openBuiltinGame(game.id)}
                   />
                 )}
               </For>
@@ -1986,7 +2139,11 @@ export function LessonsPage(): JSXElement {
         <Show when={FUNBOX_GAMES_ENABLED}>
           <section>
             <div class="flex items-center justify-between">
-              <H2 fa={{ icon: "fa-magic" }} text="fun box" />
+              <H2
+                class="text-[1.65em] sm:text-[1.85em]"
+                fa={{ icon: "fa-magic" }}
+                text="fun box"
+              />
               <button
                 type="button"
                 class="rounded p-1.5 text-sub transition-colors hover:text-text"
@@ -2027,69 +2184,81 @@ export function LessonsPage(): JSXElement {
           open={defenderOpen()}
           onClose={() => {
             setDefenderOpen(false);
+            setRecommendedGameId(undefined);
           }}
-          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+          onResult={(score, wave, difficultyLabel, wordListGroup) => {
             void recordGameScore(
               "word-defender",
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
+            claimRecommendedGame("word-defender", score, wave);
           }}
         />
         <BalloonPopModal
           open={balloonOpen()}
           onClose={() => {
             setBalloonOpen(false);
+            setRecommendedGameId(undefined);
           }}
-          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+          onResult={(score, wave, difficultyLabel, wordListGroup) => {
             void recordGameScore(
               "balloon-pop",
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
+            claimRecommendedGame("balloon-pop", score, wave);
           }}
         />
         <TypeRacerModal
           open={racerOpen()}
           onClose={() => {
             setRacerOpen(false);
+            setRecommendedGameId(undefined);
           }}
-          onResult={(score) => {
+          onResult={(score, wave) => {
             void recordGameScore("type-racer", score);
+            claimRecommendedGame("type-racer", score, wave);
           }}
         />
         <GhostHunterModal
           open={ghostOpen()}
           onClose={() => {
             setGhostOpen(false);
+            setRecommendedGameId(undefined);
           }}
-          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+          onResult={(score, wave, difficultyLabel, wordListGroup) => {
             void recordGameScore(
               "ghost-hunter",
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
+            claimRecommendedGame("ghost-hunter", score, wave);
           }}
         />
         <FruitNinjaModal
           open={fruitNinjaOpen()}
           onClose={() => {
             setFruitNinjaOpen(false);
+            setRecommendedGameId(undefined);
           }}
-          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+          onResult={(score, wave, difficultyLabel, wordListGroup) => {
             void recordGameScore(
               "fruit-ninja",
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
+            claimRecommendedGame("fruit-ninja", score, wave);
           }}
         />
         <TypeTossModal
           open={typeTossOpen()}
           onClose={() => {
             setTypeTossOpen(false);
+            setRecommendedGameId(undefined);
           }}
-          onResult={(score, _wave, difficultyLabel, wordListGroup) => {
+          onResult={(score, wave, difficultyLabel, wordListGroup) => {
             void recordGameScore(
               "type-toss",
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
+            claimRecommendedGame("type-toss", score, wave);
           }}
         />
         {/* Lesson-mode games */}
@@ -2097,6 +2266,7 @@ export function LessonsPage(): JSXElement {
           open={lessonDefGroupId() !== null}
           onClose={() => {
             setLessonDefGroupId(null);
+            setRecommendedGameId(undefined);
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
@@ -2108,6 +2278,7 @@ export function LessonsPage(): JSXElement {
                 score,
                 wave,
               );
+              claimRecommendedGame("word-defender", score, wave);
             }
           }}
         />
@@ -2115,6 +2286,7 @@ export function LessonsPage(): JSXElement {
           open={lessonBallGroupId() !== null}
           onClose={() => {
             setLessonBallGroupId(null);
+            setRecommendedGameId(undefined);
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
@@ -2126,6 +2298,7 @@ export function LessonsPage(): JSXElement {
                 score,
                 wave,
               );
+              claimRecommendedGame("balloon-pop", score, wave);
             }
           }}
         />
@@ -2133,6 +2306,7 @@ export function LessonsPage(): JSXElement {
           open={lessonTossGroupId() !== null}
           onClose={() => {
             setLessonTossGroupId(null);
+            setRecommendedGameId(undefined);
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
@@ -2144,6 +2318,7 @@ export function LessonsPage(): JSXElement {
                 score,
                 wave,
               );
+              claimRecommendedGame("type-toss", score, wave);
             }
           }}
         />
@@ -2151,6 +2326,7 @@ export function LessonsPage(): JSXElement {
           open={lessonGhostGroupId() !== null}
           onClose={() => {
             setLessonGhostGroupId(null);
+            setRecommendedGameId(undefined);
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
@@ -2162,6 +2338,7 @@ export function LessonsPage(): JSXElement {
                 score,
                 wave,
               );
+              claimRecommendedGame("ghost-hunter", score, wave);
             }
           }}
         />

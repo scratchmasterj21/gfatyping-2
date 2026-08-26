@@ -34,6 +34,9 @@ const FriendsOnlyQuerySchema = z.object({
     .optional()
     .describe("include only users from your friends list, defaults to false."),
 });
+const HideAdminQuerySchema = z.object({
+  hideAdmin: z.boolean().optional(),
+});
 export type FriendsOnlyQuery = z.infer<typeof FriendsOnlyQuerySchema>;
 
 const LeaderboardResponseSchema = z.object({
@@ -45,7 +48,9 @@ const LeaderboardResponseSchema = z.object({
 
 export const GetLeaderboardQuerySchema = LanguageAndModeQuerySchema.merge(
   PaginationQuerySchema,
-).merge(FriendsOnlyQuerySchema);
+)
+  .merge(FriendsOnlyQuerySchema)
+  .merge(HideAdminQuerySchema);
 export type GetLeaderboardQuery = z.infer<typeof GetLeaderboardQuerySchema>;
 
 export const GetLeaderboardResponseSchema = responseWithData(
@@ -61,7 +66,7 @@ export type GetLeaderboardResponse = z.infer<
 
 export const GetLeaderboardRankQuerySchema = LanguageAndModeQuerySchema.merge(
   FriendsOnlyQuerySchema,
-);
+).merge(HideAdminQuerySchema);
 export type GetLeaderboardRankQuery = z.infer<
   typeof GetLeaderboardRankQuerySchema
 >;

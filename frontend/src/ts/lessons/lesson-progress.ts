@@ -15,6 +15,7 @@ import { configEvent } from "../events/config";
 import { getAuthenticatedUser, getDb } from "../firebase";
 import { findLesson, lessonGroups, lessonOrder } from "./lessons-data";
 import { invalidateCoinQueries } from "../queries/coins";
+import { queryClient } from "../queries";
 import { isAuthenticated } from "../states/core";
 import { showNoticeNotification } from "../states/notifications";
 import { getSnapshot } from "../states/snapshot";
@@ -28,6 +29,10 @@ import { localDateString } from "../utils/date-and-time";
 import { checkNewAchievements } from "./achievements";
 
 export const GAME_PREFIX = "game:";
+export type PracticeRewardCategory =
+  | "dailyChallenge"
+  | "recommendation"
+  | "adaptive";
 
 function celebrateCompletedQuests(
   quests: { name: string; coinReward: number }[],
@@ -62,12 +67,30 @@ export type LessonProgress = {
   repeatCoinsCount?: number;
 };
 
+export type LessonCompletionResult = {
+  ok: boolean;
+  reason?: string;
+  passed?: boolean;
+  completed?: boolean;
+  coinsAwarded?: number;
+  practiceReward?: number;
+  stars?: number;
+  newlyCompletedQuests?: { name: string; coinReward: number }[];
+};
+
 // A signal (not a plain variable) so UI - e.g. the test page's config bar -
 // can reactively show/hide lesson-specific chrome as a lesson starts/ends.
 const [activeLessonId, setActiveLessonId] = createSignal<string | null>(null);
+const [activePracticeReward, setActivePracticeReward] = createSignal<
+  PracticeRewardCategory | undefined
+>();
 
-export function setActiveLesson(id: string | null): void {
+export function setActiveLesson(
+  id: string | null,
+  reward?: PracticeRewardCategory,
+): void {
   setActiveLessonId(id);
+  setActivePracticeReward(reward);
 }
 
 export function getActiveLesson(): string | null {
@@ -192,7 +215,9 @@ export async function ensureStarsGateGrandfather(
  * Record a finished lesson against the signed-in user's progress, keeping the
  * best WPM/accuracy. No-op when signed out or no lesson is active.
  */
-export async function recordCompletion(ce: CompletedEvent): Promise<void> {
+export async function recordCompletion(
+  ce: CompletedEvent,
+): Promise<LessonCompletionResult | undefined> {
   const lessonId = activeLessonId();
   if (!isAuthenticated() || lessonId === null) return;
   const uid = getAuthenticatedUser()?.uid;
@@ -207,24 +232,21 @@ export async function recordCompletion(ce: CompletedEvent): Promise<void> {
   // let any student self-report an arbitrary wpm/acc straight into their own
   // progress doc and mint coins for it.
   try {
-    const result = await callApi<{
-      ok: boolean;
-      reason?: string;
-      completed?: boolean;
-      coinsAwarded?: number;
-      stars?: number;
-      newlyCompletedQuests?: { name: string; coinReward: number }[];
-    }>("/api/complete-lesson", {
-      lessonId,
-      wpm: ce.wpm,
-      acc: ce.acc,
-      testDuration: ce.testDuration,
-      incompleteTestSeconds: ce.incompleteTestSeconds,
-      afkDuration: ce.afkDuration,
-    });
+    const result = await callApi<LessonCompletionResult>(
+      "/api/complete-lesson",
+      {
+        lessonId,
+        wpm: ce.wpm,
+        acc: ce.acc,
+        testDuration: ce.testDuration,
+        incompleteTestSeconds: ce.incompleteTestSeconds,
+        afkDuration: ce.afkDuration,
+        practiceRewardCategory: activePracticeReward(),
+      },
+    );
     if (!result.ok) {
       console.error("Failed to save lesson progress:", result.reason);
-      return;
+      return result;
     }
 
     const newStars = result.stars ?? 0;
@@ -241,12 +263,17 @@ export async function recordCompletion(ce: CompletedEvent): Promise<void> {
     void updateEngagement(uid, lessonId, ce.wpm, ce.acc, wasFirst3Star);
 
     if ((result.coinsAwarded ?? 0) > 0) invalidateCoinQueries();
+    void queryClient.invalidateQueries({ queryKey: ["lessonProgress"] });
+    void queryClient.invalidateQueries({ queryKey: ["userLessonStats"] });
+    void queryClient.invalidateQueries({ queryKey: ["weeklyQuests"] });
     celebrateCompletedQuests(result.newlyCompletedQuests ?? []);
+    return result;
   } catch (e) {
     console.error("Failed to save lesson progress:", e);
     showNoticeNotification(
       "You're offline — progress will save when reconnected",
     );
+    return { ok: false, reason: "offline" };
   }
 }
 
@@ -575,6 +602,28 @@ export async function recordGameScore(
   await setDoc(userRef, { gameScores: { [gameId]: score } }, { merge: true });
 }
 
+export async function claimRecommendedGameReward(
+  gameId: string,
+  score: number,
+  wave: number,
+): Promise<number> {
+  if (!isAuthenticated()) return 0;
+  try {
+    const result = await callApi<{ claimed: boolean; coins: number }>(
+      "/api/claim-reward",
+      { type: "recommendedGame", gameId, score, wave },
+    );
+    if (result.coins > 0) {
+      invalidateCoinQueries();
+      void queryClient.invalidateQueries({ queryKey: ["userLessonStats"] });
+    }
+    return result.coins;
+  } catch (e) {
+    console.error("Failed to claim recommended game reward:", e);
+    return 0;
+  }
+}
+
 export async function getUserLessonStats(uid: string): Promise<{
   streakDays: number;
   streakFreezesAvailable: number;
@@ -585,6 +634,7 @@ export async function getUserLessonStats(uid: string): Promise<{
   lastPracticedDate: string;
   lastSeenAssignmentsAt: number;
   seenAchievementIds: string[];
+  practiceRewardDates: Partial<Record<PracticeRewardCategory, string>>;
 }> {
   try {
     const userRef = doc(collection(getDb(), "users"), uid);
@@ -608,6 +658,10 @@ export async function getUserLessonStats(uid: string): Promise<{
           (data["lastSeenAssignmentsAt"] as number | undefined) ?? 0,
         seenAchievementIds:
           (data["seenAchievementIds"] as string[] | undefined) ?? [],
+        practiceRewardDates:
+          (data["practiceRewardDates"] as Partial<
+            Record<PracticeRewardCategory, string>
+          > | null) ?? {},
       };
     }
   } catch (e) {
@@ -623,6 +677,7 @@ export async function getUserLessonStats(uid: string): Promise<{
     lastPracticedDate: "",
     lastSeenAssignmentsAt: 0,
     seenAchievementIds: [],
+    practiceRewardDates: {},
   };
 }
 

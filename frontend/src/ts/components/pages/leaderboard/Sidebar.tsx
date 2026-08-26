@@ -3,6 +3,7 @@ import { Language } from "@monkeytype/schemas/languages";
 import { Mode } from "@monkeytype/schemas/shared";
 import { Accessor, For, JSXElement, Show } from "solid-js";
 
+import { isCurrentUserAdmin } from "../../../auth";
 import { CLASS_IDS, gradeOf, GRADES } from "../../../constants/classes";
 import { isAuthenticated } from "../../../states/core";
 import {
@@ -32,7 +33,6 @@ export function Sidebar(props: {
   selection: Accessor<Selection>;
   onSelect: (selection: Selection) => void;
   validModeRules: ValidModeRule[];
-  connectionsEnabled: boolean;
 }): JSXElement {
   const updateSelection = (patch: Partial<Selection>) => {
     props.onSelect(
@@ -53,9 +53,6 @@ export function Sidebar(props: {
 
   const selectLanguage = (language: Language) => {
     updateSelection({ language });
-  };
-  const selectFriendsOnly = (friendsOnly: boolean) => {
-    updateSelection({ friendsOnly });
   };
   const selectMetric = (metric: ClassroomMetric) => {
     updateSelection({ metric } as Partial<Selection>);
@@ -153,27 +150,17 @@ export function Sidebar(props: {
         />
       </Show>
       <Show when={isClassroom() && props.selection().type === "grade"}>
-        <Group
-          selected={classroom().grade}
-          onSelect={selectGrade}
-          items={GRADES.map((id) => ({
-            id: id as string,
-            text: id as string,
-            icon: "fa-user-friends" as FaSolidIcon,
-          }))}
-        />
-      </Show>
-      <Show
-        when={isAuthenticated() && props.connectionsEnabled && !isClassroom()}
-      >
-        <Group
-          selected={props.selection().friendsOnly}
-          onSelect={selectFriendsOnly}
-          items={[
-            { id: false, text: "everyone", icon: "fa-users" },
-            { id: true, text: "friends only", icon: "fa-user-friends" },
-          ]}
-        />
+        <Show when={isCurrentUserAdmin()}>
+          <Group
+            selected={classroom().grade}
+            onSelect={selectGrade}
+            items={GRADES.map((id) => ({
+              id: id as string,
+              text: id as string,
+              icon: "fa-user-friends" as FaSolidIcon,
+            }))}
+          />
+        </Show>
       </Show>
 
       <Show when={!isClassroom() && props.selection().type !== "weekly"}>
@@ -215,7 +202,7 @@ function Group<T>(props: {
     typeof a === "object" ? JSON.stringify(a) === JSON.stringify(b) : a === b;
 
   return (
-    <div class="mb-4 grid gap-4 rounded-xl bg-sub-alt p-4">
+    <div class="mb-3 grid gap-2 rounded-xl bg-sub-alt p-3 lg:mb-4 lg:gap-4 lg:p-4">
       <For each={props.items}>
         {(item) => (
           <Button
@@ -247,9 +234,12 @@ function normalizeSelection(
       friendsOnly: false,
       previous: false,
       classId: cs.classId ?? snapClassId,
-      grade:
-        cs.grade ??
-        (snapClassId !== undefined ? gradeOf(snapClassId) : undefined),
+      grade: isCurrentUserAdmin()
+        ? (cs.grade ??
+          (snapClassId !== undefined ? gradeOf(snapClassId) : undefined))
+        : snapClassId !== undefined
+          ? gradeOf(snapClassId)
+          : undefined,
       gameId: cs.gameId,
       mode: undefined,
       mode2: cs.metric === "wpm" ? (cs.mode2 ?? "30") : undefined,

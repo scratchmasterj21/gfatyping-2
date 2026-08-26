@@ -409,19 +409,39 @@ export function HouseModal(): JSXElement {
   const [positions, setPositions] = createSignal<
     Record<string, HouseItemPosition>
   >({});
+  let positionsUid: string | null | undefined;
   createEffect(() => {
+    if (!isOpen()) {
+      positionsUid = undefined;
+      setPositions({});
+      return;
+    }
     const layout = houseQuery.data?.layout;
     if (layout === undefined) return;
-    setPositions((prev) => (Object.keys(prev).length === 0 ? layout : prev));
+    const uid = getUserId();
+    if (positionsUid !== uid) {
+      positionsUid = uid;
+      setPositions(layout);
+    }
   });
 
   // Local copy of item scales, same seed-once-then-locally-own reasoning as
   // positions above.
   const [scales, setScales] = createSignal<Record<string, number>>({});
+  let scalesUid: string | null | undefined;
   createEffect(() => {
+    if (!isOpen()) {
+      scalesUid = undefined;
+      setScales({});
+      return;
+    }
     const scale = houseQuery.data?.scale;
     if (scale === undefined) return;
-    setScales((prev) => (Object.keys(prev).length === 0 ? scale : prev));
+    const uid = getUserId();
+    if (scalesUid !== uid) {
+      scalesUid = uid;
+      setScales(scale);
+    }
   });
 
   const effectiveScale = (item: { id: string }): number =>
@@ -489,10 +509,20 @@ export function HouseModal(): JSXElement {
   // bringing windows to front one at a time rather than only remembering
   // the single last one.
   const [touchOrder, setTouchOrder] = createSignal<string[]>([]);
+  let touchOrderUid: string | null | undefined;
   createEffect(() => {
+    if (!isOpen()) {
+      touchOrderUid = undefined;
+      setTouchOrder([]);
+      return;
+    }
     const order = houseQuery.data?.touchOrder;
     if (order === undefined) return;
-    setTouchOrder((prev) => (prev.length === 0 ? order : prev));
+    const uid = getUserId();
+    if (touchOrderUid !== uid) {
+      touchOrderUid = uid;
+      setTouchOrder(order);
+    }
   });
   let touchOrderWriteTimeout: ReturnType<typeof setTimeout> | null = null;
   const bringToFront = (id: string): void => {

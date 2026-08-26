@@ -4,6 +4,7 @@ import {
   createSignal,
   For,
   JSXElement,
+  onCleanup,
   onMount,
   Show,
 } from "solid-js";
@@ -59,9 +60,18 @@ const SHAPES: { id: AvatarShape; label: string }[] = [
   { id: "hexagon", label: "Hexagon" },
   { id: "cloud", label: "Cloud" },
 ];
-const CURRENT_MONTH = new Date().getMonth() + 1;
+const japanMonth = (): number =>
+  Number(
+    new Intl.DateTimeFormat("en-US", {
+      month: "numeric",
+      timeZone: "Asia/Tokyo",
+    }).format(new Date()),
+  );
 
 export function AvatarModal(): JSXElement {
+  const [currentMonth, setCurrentMonth] = createSignal(japanMonth());
+  const monthTimer = setInterval(() => setCurrentMonth(japanMonth()), 60000);
+  onCleanup(() => clearInterval(monthTimer));
   const [tab, setTab] = createSignal<Tab>("wear");
   const [category, setCategory] = createSignal<AvatarCategory>("color");
   const [animalShape, setAnimalShape] = createSignal<AnimalAvatarShape>(
@@ -241,7 +251,7 @@ export function AvatarModal(): JSXElement {
     if (tab() === "wear") return items.filter((i) => isOwned(i.id));
     return items.filter(
       (i) =>
-        i.seasonMonths === undefined || i.seasonMonths.includes(CURRENT_MONTH),
+        i.seasonMonths === undefined || i.seasonMonths.includes(currentMonth()),
     );
   };
 

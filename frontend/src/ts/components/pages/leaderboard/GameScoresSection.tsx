@@ -8,6 +8,8 @@ import {
   getGameScoresLeaderboard,
 } from "../../../classroom/classroom";
 import { cn } from "../../../utils/cn";
+import { Button } from "../../common/Button";
+import { LoadingCircle } from "../../common/LoadingCircle";
 
 export const GAME_LABELS: Record<string, string> = {
   "word-defender": "Word Defender",
@@ -38,6 +40,11 @@ function ScoreBoard(props: {
   const [expanded, setExpanded] = createSignal(false);
   const shown = (): GameScoreEntry[] =>
     expanded() ? props.entries : props.entries.slice(0, limit());
+  const rankAt = (index: number): number => {
+    const score = props.entries[index]?.score;
+    const first = props.entries.findIndex((entry) => entry.score === score);
+    return first + 1;
+  };
   return (
     <div class="rounded bg-sub-alt p-3">
       <Show when={props.showTitle !== false}>
@@ -54,7 +61,9 @@ function ScoreBoard(props: {
                 entry.uid === props.selfUid ? "bg-main/10 text-main" : "",
               )}
             >
-              <span class="w-5 text-center text-em-xs text-sub">{i() + 1}</span>
+              <span class="w-5 text-center text-em-xs text-sub">
+                {rankAt(i())}
+              </span>
               <span class="min-w-0 flex-1 truncate text-em-sm">
                 {entry.name}
                 {entry.uid === props.selfUid ? " (you)" : ""}
@@ -115,41 +124,54 @@ export function GameScoresSection(props: {
 
   // Single-game view: full ranked list
   return (
-    <Show when={query.data !== undefined}>
+    <Show
+      when={!query.isError}
+      fallback={
+        <div class="grid justify-items-center gap-3 rounded bg-sub-alt p-6 text-sub">
+          <p>Could not load game scores.</p>
+          <Button text="Try again" onClick={() => void query.refetch()} />
+        </div>
+      }
+    >
       <Show
-        when={props.selectedGameId !== undefined}
-        fallback={
-          <Show when={orderedGames().length > 0}>
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <For each={orderedGames()}>
-                {(gameId) => (
-                  <ScoreBoard
-                    gameId={gameId}
-                    entries={query.data?.[gameId] ?? []}
-                    selfUid={props.selfUid}
-                    limit={5}
-                  />
-                )}
-              </For>
-            </div>
-          </Show>
-        }
+        when={query.data !== undefined}
+        fallback={<LoadingCircle class="w-full py-8 text-center text-3xl" />}
       >
         <Show
-          when={(query.data?.[props.selectedGameId ?? ""] ?? []).length > 0}
+          when={props.selectedGameId !== undefined}
           fallback={
-            <p class="py-8 text-center text-sub">
-              No scores yet for this game.
-            </p>
+            <Show when={orderedGames().length > 0}>
+              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <For each={orderedGames()}>
+                  {(gameId) => (
+                    <ScoreBoard
+                      gameId={gameId}
+                      entries={query.data?.[gameId] ?? []}
+                      selfUid={props.selfUid}
+                      limit={5}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
           }
         >
-          <ScoreBoard
-            gameId={props.selectedGameId ?? ""}
-            entries={query.data?.[props.selectedGameId ?? ""] ?? []}
-            selfUid={props.selfUid}
-            showTitle={false}
-            limit={50}
-          />
+          <Show
+            when={(query.data?.[props.selectedGameId ?? ""] ?? []).length > 0}
+            fallback={
+              <p class="py-8 text-center text-sub">
+                No scores yet for this game.
+              </p>
+            }
+          >
+            <ScoreBoard
+              gameId={props.selectedGameId ?? ""}
+              entries={query.data?.[props.selectedGameId ?? ""] ?? []}
+              selfUid={props.selfUid}
+              showTitle={false}
+              limit={50}
+            />
+          </Show>
         </Show>
       </Show>
     </Show>

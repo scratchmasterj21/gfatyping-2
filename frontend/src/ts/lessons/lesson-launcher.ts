@@ -5,7 +5,7 @@ import { setCustomTextIndicator, getActivePage } from "../states/core";
 import { showErrorNotification } from "../states/notifications";
 import * as CustomText from "../test/custom-text";
 import { Lesson } from "./lessons-data";
-import { setActiveLesson } from "./lesson-progress";
+import { PracticeRewardCategory, setActiveLesson } from "./lesson-progress";
 
 /**
  * Configure a custom test from already-resolved tokens and start it on the test
@@ -18,6 +18,7 @@ export function startCustomDrill(drill: {
   tokens: string[];
   /** keep token order (staged muscle-memory drills); default shuffles */
   preserveOrder?: boolean;
+  rewardCategory?: PracticeRewardCategory;
 }): void {
   if (drill.tokens.length === 0) {
     showErrorNotification("Lesson produced no content");
@@ -49,7 +50,7 @@ export function startCustomDrill(drill: {
   CustomText.setText(drill.tokens);
 
   setCustomTextIndicator({ name: drill.name, isLong: false });
-  setActiveLesson(drill.id);
+  setActiveLesson(drill.id, drill.rewardCategory);
 
   if (getActivePage() === "test") {
     restartTestEvent.dispatch();
@@ -62,7 +63,10 @@ export function startCustomDrill(drill: {
  * Configure a custom test from a lesson's generated drill and start it on the
  * test page. Mirrors the launch flow used by practise-words.
  */
-export async function startLesson(lesson: Lesson): Promise<void> {
+export async function startLesson(
+  lesson: Lesson,
+  rewardCategory?: PracticeRewardCategory,
+): Promise<void> {
   let tokens: string[];
   try {
     tokens = await lesson.generate();
@@ -77,5 +81,6 @@ export async function startLesson(lesson: Lesson): Promise<void> {
     name: lesson.name,
     tokens,
     preserveOrder: lesson.preserveOrder,
+    rewardCategory,
   });
 }

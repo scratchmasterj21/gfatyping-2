@@ -38,6 +38,8 @@ service cloud.firestore {
         'ownedKeyboardSkins', 'ownedKeypressEffects', 'ownedSideImageSets',
         'ownedAnimalAvatars',
         'houseGreetingDate',
+        'practiceRewardDates',
+        'equipped', 'equippedAnimalAvatar', 'avatarShape', 'houseTheme',
         'questsWeekId', 'questProgress', 'questsClaimed', 'questDedupe',
         'raceBestWpm', 'raceBestWpmAcc', 'raceBestAcc', 'raceBestAccWpm',
         'raceTotalRaces', 'raceWins'
@@ -93,7 +95,9 @@ service cloud.firestore {
       match /results/{resultId} {
         allow read: if isOwner(uid) || isAdminUser();
         allow create: if false;
-        allow update: if isOwner(uid);
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['tags']);
         allow delete: if isOwner(uid);
       }
     }

@@ -3,21 +3,22 @@ import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
 import { verifyStudent } from "./_lib/auth.js";
+import { tokyoDateString } from "./_lib/time.js";
 
 const DAILY_GREETING_BONUS = 2;
-
-function localDateString(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+const DAILY_PRACTICE_REWARD = 10;
+const RECOMMENDED_GAME_IDS = new Set([
+  "word-defender",
+  "balloon-pop",
+  "type-racer",
+  "ghost-hunter",
+  "fruit-ninja",
+  "type-toss",
+]);
 
 /**
- * Standalone reward claims not tied to a completed-test event (those go
- * through complete-lesson.ts/submit-result.ts instead, alongside the actual
- * result). Currently just the house's once-a-day avatar-greeting bonus.
+ * Standalone rewards not tied to a completed typing test: the house greeting
+ * and a transaction-capped recommended-game completion bonus.
  */
 export default async function handler(
   req: VercelRequest,
@@ -34,36 +35,78 @@ export default async function handler(
     return;
   }
 
-  const body = req.body as { type?: unknown };
-  if (body.type !== "dailyGreeting") {
+  const body = req.body as {
+    type?: unknown;
+    gameId?: unknown;
+    score?: unknown;
+    wave?: unknown;
+  };
+  if (body.type !== "dailyGreeting" && body.type !== "recommendedGame") {
     res.status(400).json({ ok: false, reason: "Unknown reward type" });
+    return;
+  }
+  const isRecommendedGame = body.type === "recommendedGame";
+  const score = Number(body.score);
+  const wave = Number(body.wave);
+  if (
+    isRecommendedGame &&
+    (typeof body.gameId !== "string" ||
+      !RECOMMENDED_GAME_IDS.has(body.gameId) ||
+      !Number.isFinite(score) ||
+      score <= 0 ||
+      !Number.isFinite(wave) ||
+      wave < 1)
+  ) {
+    res.status(400).json({ ok: false, reason: "Invalid game result" });
     return;
   }
 
   const app = getAdminApp();
   const db = app.firestore();
   const userRef = db.collection("users").doc(auth.uid);
-  const today = localDateString();
+  const today = tokyoDateString();
 
   try {
     let claimed = false;
     await db.runTransaction(async (tx: admin.firestore.Transaction) => {
       const snap = await tx.get(userRef);
       const data = snap.exists ? snap.data() : {};
-      const lastClaim = data?.["houseGreetingDate"] as string | undefined;
+      const rewardDates =
+        (data?.["practiceRewardDates"] as Record<string, string> | undefined) ??
+        {};
+      const lastClaim = isRecommendedGame
+        ? rewardDates["recommendation"]
+        : (data?.["houseGreetingDate"] as string | undefined);
       if (lastClaim === today) return;
 
+      const coins = isRecommendedGame
+        ? DAILY_PRACTICE_REWARD
+        : DAILY_GREETING_BONUS;
       tx.set(
         userRef,
         {
-          houseGreetingDate: today,
-          coins: admin.firestore.FieldValue.increment(DAILY_GREETING_BONUS),
+          ...(isRecommendedGame
+            ? {
+                practiceRewardDates: {
+                  ...rewardDates,
+                  recommendation: today,
+                },
+              }
+            : { houseGreetingDate: today }),
+          coins: admin.firestore.FieldValue.increment(coins),
         },
         { merge: true },
       );
       claimed = true;
     });
-    res.status(200).json({ claimed, coins: DAILY_GREETING_BONUS });
+    res.status(200).json({
+      claimed,
+      coins: claimed
+        ? isRecommendedGame
+          ? DAILY_PRACTICE_REWARD
+          : DAILY_GREETING_BONUS
+        : 0,
+    });
   } catch (e) {
     console.error("claim-reward failed:", e);
     res.status(500).json({ claimed: false, coins: 0 });

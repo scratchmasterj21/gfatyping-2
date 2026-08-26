@@ -54,10 +54,13 @@ export async function getHouseState(uid: string): Promise<HouseState> {
 
 /** Switches the room's wall/floor finish. Ownership is enforced server-side at purchase time; this only records the choice. */
 export async function selectHouseTheme(
-  uid: string,
+  _uid: string,
   themeId: string,
 ): Promise<void> {
-  await setDoc(userRef(uid), { houseTheme: themeId }, { merge: true });
+  await callApi("/api/equip-item", {
+    target: "houseTheme",
+    itemId: themeId,
+  });
 }
 
 /** Toggles whether an owned item is put away (hidden from the room) or placed back out. */
@@ -107,8 +110,6 @@ export async function saveTouchOrder(
   await setDoc(userRef(uid), { houseTouchOrder: order }, { merge: true });
 }
 
-const DAILY_GREETING_BONUS = 2;
-
 /** Buys one house item (emoji, sprite furniture, or small decor - anything in the "house" shop) - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyHouseItem(
   _uid: string,
@@ -134,15 +135,10 @@ export async function buyHouseItem(
 export async function claimDailyGreeting(
   _uid: string,
 ): Promise<{ claimed: boolean; coins: number }> {
-  try {
-    const result = await callApi<{ claimed: boolean; coins: number }>(
-      "/api/claim-reward",
-      { type: "dailyGreeting" },
-    );
-    if (result.claimed) invalidateCoinQueries();
-    return result;
-  } catch (e) {
-    console.error("Failed to claim daily greeting:", e);
-    return { claimed: false, coins: DAILY_GREETING_BONUS };
-  }
+  const result = await callApi<{ claimed: boolean; coins: number }>(
+    "/api/claim-reward",
+    { type: "dailyGreeting" },
+  );
+  if (result.claimed) invalidateCoinQueries();
+  return result;
 }

@@ -1,11 +1,4 @@
-import {
-  collection,
-  deleteField,
-  doc,
-  DocumentReference,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
 
 import { findAnimalAvatarItem } from "../animal-avatars/animal-avatar-items";
 import { callApi } from "../api-client";
@@ -115,31 +108,10 @@ export async function getAvatarState(uid: string): Promise<AvatarState> {
  * ill-fitting item rendered.
  */
 export async function setAvatarShape(
-  uid: string,
+  _uid: string,
   shape: AvatarShape,
 ): Promise<void> {
-  const ref = userRef(uid);
-  const snap = await getDoc(ref);
-  const data = snap.exists() ? snap.data() : {};
-  const equipped =
-    (data["equipped"] as Partial<Record<AvatarCategory, string>> | undefined) ??
-    {};
-
-  const equippedUpdate: Partial<Record<AvatarCategory, unknown>> = {};
-  for (const category of ["hat", "hair"] as const) {
-    const itemId = equipped[category];
-    if (itemId === undefined) continue;
-    const itemShape = findAvatarItem(itemId)?.shape ?? "round";
-    if (itemShape !== shape) {
-      equippedUpdate[category] = deleteField();
-    }
-  }
-
-  const payload: Record<string, unknown> = { avatarShape: shape };
-  if (Object.keys(equippedUpdate).length > 0) {
-    payload["equipped"] = equippedUpdate;
-  }
-  await setDoc(ref, payload, { merge: true });
+  await callApi("/api/equip-item", { target: "avatarShape", shape });
 }
 
 /** Buys an item and equips it immediately - price/ownership validated server-side, see api/buy-item.ts. */
@@ -180,13 +152,9 @@ export async function claimAvatarItem(
 }
 
 export async function equipAvatarItem(
-  uid: string,
+  _uid: string,
   category: AvatarCategory,
   itemId: string | null,
 ): Promise<void> {
-  await setDoc(
-    userRef(uid),
-    { equipped: { [category]: itemId ?? deleteField() } },
-    { merge: true },
-  );
+  await callApi("/api/equip-item", { target: "avatar", category, itemId });
 }

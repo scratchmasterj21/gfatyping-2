@@ -11,6 +11,7 @@ const WPM_MODE2_OPTIONS = ["15", "30", "60"] as const;
 type WpmMode2 = (typeof WPM_MODE2_OPTIONS)[number];
 const DEFAULT_WPM_MODE2: WpmMode2 = "30";
 const DOMAIN = "@felice.ed.jp";
+const ADMIN_EMAIL = "john.limpiada@felice.ed.jp";
 
 type ClassroomMetric = "xp" | "xpAllTime" | "wpm" | "racewpm" | "raceacc";
 
@@ -61,6 +62,20 @@ type StoredUserDoc = {
 
 type Student = StoredUserDoc & { uid: string };
 
+function competitionRank<T>(
+  sorted: T[],
+  score: (entry: T) => number,
+): Array<T & { rank: number }> {
+  let previous: number | undefined;
+  let rank = 0;
+  return sorted.map((entry, index) => {
+    const current = score(entry);
+    if (previous === undefined || current !== previous) rank = index + 1;
+    previous = current;
+    return { ...entry, rank };
+  });
+}
+
 type CachedResult = {
   count: number;
   pageSize: number;
@@ -101,8 +116,12 @@ function rankStudents(
   if (metric === "racewpm") {
     const ranked = students
       .filter((d) => (d.raceTotalRaces ?? 0) > 0)
-      .sort((a, b) => (b.raceBestWpm ?? 0) - (a.raceBestWpm ?? 0))
-      .map((d, i) => ({
+      .sort(
+        (a, b) =>
+          (b.raceBestWpm ?? 0) - (a.raceBestWpm ?? 0) ||
+          a.uid.localeCompare(b.uid),
+      )
+      .map((d) => ({
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
@@ -110,16 +129,20 @@ function rankStudents(
         bestRaceAcc: d.raceBestWpmAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
-        rank: i + 1,
       }));
-    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+    const entries = competitionRank(ranked, (d) => d.bestRaceWpm);
+    return { count: entries.length, pageSize: entries.length, entries };
   }
 
   if (metric === "raceacc") {
     const ranked = students
       .filter((d) => (d.raceTotalRaces ?? 0) > 0)
-      .sort((a, b) => (b.raceBestAcc ?? 0) - (a.raceBestAcc ?? 0))
-      .map((d, i) => ({
+      .sort(
+        (a, b) =>
+          (b.raceBestAcc ?? 0) - (a.raceBestAcc ?? 0) ||
+          a.uid.localeCompare(b.uid),
+      )
+      .map((d) => ({
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
@@ -127,9 +150,9 @@ function rankStudents(
         bestRaceAcc: d.raceBestAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
-        rank: i + 1,
       }));
-    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+    const entries = competitionRank(ranked, (d) => d.bestRaceAcc);
+    return { count: entries.length, pageSize: entries.length, entries };
   }
 
   if (metric === "wpm") {
@@ -143,8 +166,13 @@ function rankStudents(
           best: NonNullable<ReturnType<typeof weeklyWpm>>;
         } => x.best !== null,
       )
-      .sort((a, b) => b.best.wpm - a.best.wpm)
-      .map((x, i) => ({
+      .sort(
+        (a, b) =>
+          b.best.wpm - a.best.wpm ||
+          b.best.timestamp - a.best.timestamp ||
+          a.d.uid.localeCompare(b.d.uid),
+      )
+      .map((x) => ({
         uid: x.d.uid,
         name: x.d.name ?? "",
         wpm: x.best.wpm,
@@ -152,41 +180,45 @@ function rankStudents(
         raw: x.best.raw,
         consistency: x.best.consistency,
         timestamp: x.best.timestamp,
-        rank: i + 1,
         avatarUrl: x.d.avatarUrl,
       }));
-    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+    const entries = competitionRank(ranked, (d) => d.wpm);
+    return { count: entries.length, pageSize: entries.length, entries };
   }
 
   if (metric === "xpAllTime") {
     const ranked = students
       .slice()
-      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
-      .map((d, i) => ({
+      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0) || a.uid.localeCompare(b.uid))
+      .map((d) => ({
         uid: d.uid,
         name: d.name ?? "",
         totalXp: d.xp ?? 0,
         timeTypedSeconds: 0,
         lastActivityTimestamp: d.streak?.lastResultTimestamp ?? 0,
-        rank: i + 1,
         avatarUrl: d.avatarUrl,
       }));
-    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+    const entries = competitionRank(ranked, (d) => d.totalXp);
+    return { count: entries.length, pageSize: entries.length, entries };
   }
 
   const ranked = students
     .slice()
-    .sort((a, b) => (b.weeklyPeriod?.xp ?? 0) - (a.weeklyPeriod?.xp ?? 0))
-    .map((d, i) => ({
+    .sort(
+      (a, b) =>
+        (b.weeklyPeriod?.xp ?? 0) - (a.weeklyPeriod?.xp ?? 0) ||
+        a.uid.localeCompare(b.uid),
+    )
+    .map((d) => ({
       uid: d.uid,
       name: d.name ?? "",
       totalXp: d.weeklyPeriod?.xp ?? 0,
       timeTypedSeconds: 0,
       lastActivityTimestamp: d.weeklyPeriod?.lastActivityTimestamp ?? 0,
-      rank: i + 1,
       avatarUrl: d.avatarUrl,
     }));
-  return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+  const entries = competitionRank(ranked, (d) => d.totalXp);
+  return { count: entries.length, pageSize: entries.length, entries };
 }
 
 type ClassPairEntry = {
@@ -228,10 +260,12 @@ function rankClassPairs(
         avgStars: members.length > 0 ? totalStars / members.length : 0,
       };
     })
-    .sort((a, b) => b.avgStars - a.avgStars)
-    .map((c, i) => ({ ...c, rank: i + 1 }));
+    .sort(
+      (a, b) => b.avgStars - a.avgStars || a.classId.localeCompare(b.classId),
+    );
+  const entries = competitionRank(ranked, (c) => c.avgStars);
 
-  return { count: ranked.length, pageSize: ranked.length, entries: ranked };
+  return { count: entries.length, pageSize: entries.length, entries };
 }
 
 export default async function handler(
@@ -286,8 +320,9 @@ export default async function handler(
     return;
   }
 
+  let decoded: admin.auth.DecodedIdToken;
   try {
-    const decoded = await app.auth().verifyIdToken(token);
+    decoded = await app.auth().verifyIdToken(token);
     if (decoded.email === undefined || !decoded.email.endsWith(DOMAIN)) {
       res.status(403).json({ message: "Forbidden" });
       return;
@@ -298,6 +333,18 @@ export default async function handler(
   }
 
   const db = app.firestore();
+  if (scope === "grade" && decoded.email !== ADMIN_EMAIL) {
+    const requester = await db.collection("users").doc(decoded.uid).get();
+    const requesterData = requester.data() as { classId?: unknown } | undefined;
+    const classId = requesterData?.classId;
+    const ownGrade = typeof classId === "string" ? gradeOf(classId) : undefined;
+    if (ownGrade === undefined || grade !== ownGrade) {
+      res
+        .status(403)
+        .json({ message: "Students may only view their own grade" });
+      return;
+    }
+  }
   const cacheKey = isClassCompare
     ? `classCompare_${grade}`
     : `${scope}_${scope === "grade" ? grade : "all"}_${metric}${

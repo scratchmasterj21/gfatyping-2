@@ -3,6 +3,7 @@ import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
 import { verifyStudent } from "./_lib/auth.js";
+import { tokyoDateString } from "./_lib/time.js";
 
 // Mirrors lessons-data.ts / lesson-progress.ts on the frontend - duplicated
 // here (not imported) for the same reason as _lib/catalogs.ts: this file
@@ -142,6 +143,8 @@ function bumpQuest(
 // backend already does for its own results collection.
 const MAX_PLAUSIBLE_WPM = 200;
 const MAX_TEST_DURATION_SECONDS = 600;
+const DAILY_PRACTICE_REWARD = 10;
+type PracticeRewardCategory = "dailyChallenge" | "recommendation" | "adaptive";
 
 function starsForGrade(wpm: number, grade: number | undefined): number {
   const [two, three] =
@@ -162,14 +165,6 @@ function gradeFromClassId(classId: string | undefined): number | undefined {
   if (m === null) return undefined;
   const grade = Number(m[1]);
   return grade >= 1 && grade <= 6 ? grade : undefined;
-}
-
-function localDateString(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 // Non-curriculum progress keys (assignments/word lists/passages/Japanese
@@ -207,6 +202,7 @@ export default async function handler(
     testDuration?: unknown;
     incompleteTestSeconds?: unknown;
     afkDuration?: unknown;
+    practiceRewardCategory?: unknown;
   };
 
   const lessonId = body.lessonId;
@@ -215,6 +211,12 @@ export default async function handler(
   const testDuration = Number(body.testDuration);
   const incompleteTestSeconds = Number(body.incompleteTestSeconds ?? 0);
   const afkDuration = Number(body.afkDuration ?? 0);
+  const practiceRewardCategory = body.practiceRewardCategory;
+  const validPracticeRewardCategory =
+    practiceRewardCategory === undefined ||
+    practiceRewardCategory === "dailyChallenge" ||
+    practiceRewardCategory === "recommendation" ||
+    practiceRewardCategory === "adaptive";
 
   if (
     typeof lessonId !== "string" ||
@@ -227,7 +229,15 @@ export default async function handler(
     acc > 100 ||
     !Number.isFinite(testDuration) ||
     testDuration < 0 ||
-    testDuration > MAX_TEST_DURATION_SECONDS
+    testDuration > MAX_TEST_DURATION_SECONDS ||
+    !Number.isFinite(incompleteTestSeconds) ||
+    incompleteTestSeconds < 0 ||
+    incompleteTestSeconds > MAX_TEST_DURATION_SECONDS ||
+    testDuration + incompleteTestSeconds > MAX_TEST_DURATION_SECONDS ||
+    !Number.isFinite(afkDuration) ||
+    afkDuration < 0 ||
+    afkDuration > testDuration + incompleteTestSeconds ||
+    !validPracticeRewardCategory
   ) {
     res.status(400).json({ ok: false, reason: "Invalid result" });
     return;
@@ -277,7 +287,32 @@ export default async function handler(
           (prev.bonusPaid !== true || newStars > (prev.stars ?? 0));
         const completionCoins = bonusDue ? 5 + newStars * 5 : 0;
 
-        const today = localDateString();
+        const today = tokyoDateString();
+        const rewardDates =
+          (userData?.["practiceRewardDates"] as
+            | Partial<Record<PracticeRewardCategory, string>>
+            | undefined) ?? {};
+        const rewardCategory = practiceRewardCategory as
+          | PracticeRewardCategory
+          | undefined;
+        const rewardCategoryAllowed =
+          rewardCategory === "recommendation" ||
+          (rewardCategory === "adaptive" && lessonId === "weak-keys-review") ||
+          (rewardCategory === "dailyChallenge" &&
+            userData?.["dailyChallengeDate"] === today &&
+            userData?.["dailyChallengeLessonId"] === lessonId);
+        const practiceReward =
+          passed &&
+          !bonusDue &&
+          rewardCategory !== undefined &&
+          rewardCategoryAllowed &&
+          rewardDates[rewardCategory] !== today
+            ? DAILY_PRACTICE_REWARD
+            : 0;
+        const nextRewardDates =
+          practiceReward > 0 && rewardCategory !== undefined
+            ? { ...rewardDates, [rewardCategory]: today }
+            : rewardDates;
         const repeatCountSoFar =
           prev.repeatCoinsDate === today ? (prev.repeatCoinsCount ?? 0) : 0;
         const repeatEligible =
@@ -310,7 +345,11 @@ export default async function handler(
         }
 
         const totalCoins =
-          timeCoins + completionCoins + repeatCoins + questCoins;
+          timeCoins +
+          completionCoins +
+          repeatCoins +
+          questCoins +
+          practiceReward;
 
         tx.set(
           progressRef,
@@ -334,6 +373,9 @@ export default async function handler(
           userRef,
           {
             ...questUpdate,
+            ...(practiceReward > 0
+              ? { practiceRewardDates: nextRewardDates }
+              : {}),
             ...(totalCoins > 0
               ? { coins: admin.firestore.FieldValue.increment(totalCoins) }
               : {}),
@@ -342,8 +384,10 @@ export default async function handler(
         );
 
         return {
+          passed,
           completed,
           coinsAwarded: totalCoins,
+          practiceReward,
           stars: newStars,
           newlyCompletedQuests,
         };

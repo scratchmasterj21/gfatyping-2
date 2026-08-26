@@ -5,7 +5,10 @@ import {
   FINGER_ORDER,
   fingerForChar,
 } from "../../lessons/finger-map";
-import { getIntroLesson } from "../../lessons/lesson-intro";
+import {
+  getIntroLesson,
+  getIntroRewardCategory,
+} from "../../lessons/lesson-intro";
 import { startLesson } from "../../lessons/lesson-launcher";
 import { hideModalAndClearChain } from "../../states/modals";
 import * as TTS from "../../test/tts";
@@ -50,7 +53,7 @@ export function LessonIntroModal(): JSXElement {
     const lesson = getIntroLesson();
     window.speechSynthesis.cancel();
     hideModalAndClearChain("LessonIntro");
-    if (lesson !== null) void startLesson(lesson);
+    if (lesson !== null) void startLesson(lesson, getIntroRewardCategory());
   };
 
   return (

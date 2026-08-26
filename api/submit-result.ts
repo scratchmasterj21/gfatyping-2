@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
-
 import { getAdminApp } from "./_lib/admin.js";
 import { verifyStudent } from "./_lib/auth.js";
+import { tokyoDateString, tokyoDayId, tokyoWeekId } from "./_lib/time.js";
 
 // Mirrors ape/firestore/scoring.ts + ape/firestore/results.ts + parts of
 // ape/firestore/leaderboards.ts on the frontend - duplicated (not imported)
@@ -11,6 +11,8 @@ import { verifyStudent } from "./_lib/auth.js";
 
 const MAX_PLAUSIBLE_WPM = 250;
 const MAX_TEST_DURATION_SECONDS = 3600;
+const MAX_RESULT_AGE_MS = 10 * 60 * 1000;
+const MAX_FUTURE_SKEW_MS = 60 * 1000;
 const WPM_MODE2_OPTIONS = ["15", "30", "60"] as const;
 type WpmMode2 = (typeof WPM_MODE2_OPTIONS)[number];
 const WPM_LANGUAGE = "english";
@@ -243,20 +245,8 @@ function computeWeeklyPeriod(
   };
 }
 
-/** Monday-UTC-midnight timestamp - mirrors currentWeekId() in leaderboards.ts without needing date-fns (not a root dependency, only frontend's). */
 function currentWeekId(weeksBefore: number): number {
-  const now = Date.now() - weeksBefore * 7 * DAY_MS;
-  const d = new Date(now);
-  const daysSinceMonday = (d.getUTCDay() + 6) % 7;
-  return Date.UTC(
-    d.getUTCFullYear(),
-    d.getUTCMonth(),
-    d.getUTCDate() - daysSinceMonday,
-    0,
-    0,
-    0,
-    0,
-  );
+  return tokyoWeekId(Date.now(), weeksBefore);
 }
 
 function leaderboardKey(mode: string, mode2: string, language: string): string {
@@ -349,14 +339,6 @@ function bumpQuest(
   };
 }
 
-function localDateString(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse,
@@ -385,6 +367,7 @@ export default async function handler(
   const testDuration = Number(result["testDuration"]);
   const incompleteTestSeconds = Number(result["incompleteTestSeconds"] ?? 0);
   const afkDuration = Number(result["afkDuration"] ?? 0);
+  const clientTimestamp = Number(result["timestamp"]);
 
   const mode = result["mode"];
   const language = result["language"];
@@ -403,7 +386,18 @@ export default async function handler(
     acc > 100 ||
     !Number.isFinite(testDuration) ||
     testDuration < 1 ||
-    testDuration > MAX_TEST_DURATION_SECONDS
+    testDuration > MAX_TEST_DURATION_SECONDS ||
+    !Number.isFinite(incompleteTestSeconds) ||
+    incompleteTestSeconds < 0 ||
+    incompleteTestSeconds > MAX_TEST_DURATION_SECONDS ||
+    testDuration + incompleteTestSeconds > MAX_TEST_DURATION_SECONDS ||
+    !Number.isFinite(afkDuration) ||
+    afkDuration < 0 ||
+    afkDuration > testDuration + incompleteTestSeconds ||
+    !Number.isFinite(clientTimestamp) ||
+    !Number.isInteger(clientTimestamp) ||
+    clientTimestamp < Date.now() - MAX_RESULT_AGE_MS ||
+    clientTimestamp > Date.now() + MAX_FUTURE_SKEW_MS
   ) {
     res.status(400).json({ ok: false, reason: "Invalid result" });
     return;
@@ -427,14 +421,25 @@ export default async function handler(
   const app = getAdminApp();
   const db = app.firestore();
   const userRef = db.collection("users").doc(auth.uid);
-  const resultRef = userRef.collection("results").doc();
+  // CompletedEvent.timestamp is stable across retries. Using it as the id
+  // makes the authoritative award transaction idempotent.
+  const resultRef = userRef.collection("results").doc(String(clientTimestamp));
   const timestamp = Date.now();
 
   try {
     const outcome = await db.runTransaction(
       async (tx: admin.firestore.Transaction) => {
-        const userSnap = await tx.get(userRef);
+        const [userSnap, existingResultSnap] = await Promise.all([
+          tx.get(userRef),
+          tx.get(resultRef),
+        ]);
         if (!userSnap.exists) throw new Error("User not found");
+        if (existingResultSnap.exists) {
+          return {
+            duplicate: true as const,
+            insertedId: resultRef.id,
+          };
+        }
         const user = userSnap.data() ?? {};
 
         const personalBests =
@@ -469,7 +474,7 @@ export default async function handler(
         // the old client-side awardTryCoin, now server-computed instead of
         // trusting a client-supplied bucket id.
         const bucketId = `${normalized.mode}:${normalized.mode2}`;
-        const today = localDateString();
+        const today = tokyoDateString(timestamp);
         const tryCoinSnap = await tx.get(
           userRef.collection("testTryCoins").doc(bucketId),
         );
@@ -528,6 +533,7 @@ export default async function handler(
         );
 
         return {
+          duplicate: false as const,
           isPb,
           xp,
           xpBreakdown,
@@ -539,6 +545,18 @@ export default async function handler(
       },
     );
 
+    if (outcome.duplicate) {
+      res.status(200).json({
+        ok: true,
+        insertedId: outcome.insertedId,
+        isPb: false,
+        xp: 0,
+        streak: 0,
+        newlyCompletedQuests: [],
+      });
+      return;
+    }
+
     // Leaderboard writes happen outside the transaction, same as the
     // client-side add() handler - best-effort, a failure here shouldn't
     // fail the whole result submission.
@@ -547,28 +565,31 @@ export default async function handler(
       String(normalized.mode2),
       normalized.language,
     );
-    const dayId = Math.floor(timestamp / DAY_MS);
+    const dayId = tokyoDayId(timestamp);
     const weekId = currentWeekId(0);
 
     const writeIfBetter = async (
       ref: admin.firestore.DocumentReference,
     ): Promise<void> => {
-      const snap = await ref.get();
-      const existingWpm = snap.exists
-        ? ((snap.data()?.["wpm"] as number | undefined) ?? 0)
-        : 0;
-      if (wpm <= existingWpm) return;
-      await ref.set(
-        stripUndefined({
-          uid: auth.uid,
-          name: outcome.name,
-          wpm,
-          acc,
-          raw: rawWpm,
-          consistency: normalized.consistency,
-          timestamp,
-        }),
-      );
+      await db.runTransaction(async (tx: admin.firestore.Transaction) => {
+        const snap = await tx.get(ref);
+        const existingWpm = snap.exists
+          ? ((snap.data()?.["wpm"] as number | undefined) ?? 0)
+          : 0;
+        if (wpm <= existingWpm) return;
+        tx.set(
+          ref,
+          stripUndefined({
+            uid: auth.uid,
+            name: outcome.name,
+            wpm,
+            acc,
+            raw: rawWpm,
+            consistency: normalized.consistency,
+            timestamp,
+          }),
+        );
+      });
     };
 
     await Promise.all([
@@ -592,21 +613,24 @@ export default async function handler(
           .doc(String(weekId))
           .collection("entries")
           .doc(auth.uid);
-        const snap = await ref.get();
-        const prev = snap.exists ? snap.data() : {};
-        await ref.set(
-          stripUndefined({
-            uid: auth.uid,
-            name: outcome.name,
-            totalXp:
-              ((prev?.["totalXp"] as number | undefined) ?? 0) + outcome.xp,
-            timeTypedSeconds:
-              ((prev?.["timeTypedSeconds"] as number | undefined) ?? 0) +
-              outcome.activeSeconds,
-            lastActivityTimestamp: timestamp,
-          }),
-          { merge: true },
-        );
+        await db.runTransaction(async (tx: admin.firestore.Transaction) => {
+          const snap = await tx.get(ref);
+          const prev = snap.exists ? snap.data() : {};
+          tx.set(
+            ref,
+            stripUndefined({
+              uid: auth.uid,
+              name: outcome.name,
+              totalXp:
+                ((prev?.["totalXp"] as number | undefined) ?? 0) + outcome.xp,
+              timeTypedSeconds:
+                ((prev?.["timeTypedSeconds"] as number | undefined) ?? 0) +
+                outcome.activeSeconds,
+              lastActivityTimestamp: timestamp,
+            }),
+            { merge: true },
+          );
+        });
       })(),
     ]);
 

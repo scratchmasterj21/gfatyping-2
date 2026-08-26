@@ -805,9 +805,21 @@ function updateTestType(randomQuote: Quote | null): void {
   qsa("#result .stats .testType .bottom")?.setHtml(testType);
 }
 
-// Shows a pass/redo message under the result for gated curriculum lessons.
-function updateLessonGate(res: CompletedEvent): void {
+// Shows server-confirmed lesson feedback and emphasizes one existing result
+// action. Retry remains Monkeytype's normal repeat-with-same-wordset control.
+async function updateLessonGate(
+  res: CompletedEvent,
+  completionPromise?: Promise<
+    LessonProgress.LessonCompletionResult | undefined
+  >,
+): Promise<void> {
   const el = qs("#lessonGateNotice");
+  const nextButton = qs("#nextTestButton");
+  const retryButton = qs("#restartTestButtonWithSameWordset");
+  nextButton?.removeClass("lessonPrimary");
+  retryButton?.removeClass("lessonPrimary");
+  nextButton?.setAttribute("aria-label", "Next test");
+  retryButton?.setAttribute("aria-label", "Repeat test");
   const lessonId = LessonProgress.getActiveLesson();
   if (
     el === null ||
@@ -818,11 +830,53 @@ function updateLessonGate(res: CompletedEvent): void {
     return;
   }
   const threshold = LessonProgress.lessonPassAccuracy(getStudentGrade());
-  if (res.acc >= threshold) {
+  if (completionPromise !== undefined) {
+    el.removeClass("pass")
+      .removeClass("fail")
+      .setHtml(`<i class="fas fa-spinner fa-spin"></i> Saving lesson…`)
+      .show();
+    const outcome = await completionPromise;
+    if (outcome?.ok !== true) {
+      el.addClass("fail")
+        .setHtml(
+          `<i class="fas fa-exclamation-circle"></i> Lesson progress could not be saved. Check your connection and retry.`,
+        )
+        .show();
+      retryButton?.addClass("lessonPrimary");
+      retryButton?.setAttribute("aria-label", "Retry lesson");
+      return;
+    }
+
+    if (outcome.passed === true) {
+      const stars = Math.max(1, Math.min(3, outcome.stars ?? 1));
+      const reward =
+        (outcome.coinsAwarded ?? 0) > 0
+          ? ` · +${outcome.coinsAwarded ?? 0} coins`
+          : "";
+      el.removeClass("fail")
+        .addClass("pass")
+        .setHtml(
+          `<i class="fas fa-check"></i> Lesson passed · ${"★".repeat(stars)}${"☆".repeat(3 - stars)}${reward}`,
+        )
+        .show();
+      if (stars >= 2) {
+        nextButton?.addClass("lessonPrimary");
+        nextButton?.setAttribute("aria-label", "Next lesson");
+      } else {
+        retryButton?.addClass("lessonPrimary");
+        retryButton?.setAttribute("aria-label", "Improve to 2 stars");
+      }
+      return;
+    }
+  }
+
+  if (res.acc >= threshold && completionPromise === undefined) {
     el.removeClass("fail")
       .addClass("pass")
       .setHtml(`<i class="fas fa-check"></i> Passed! Great typing.`)
       .show();
+    nextButton?.addClass("lessonPrimary");
+    nextButton?.setAttribute("aria-label", "Next lesson");
   } else {
     el.removeClass("pass")
       .addClass("fail")
@@ -830,6 +884,8 @@ function updateLessonGate(res: CompletedEvent): void {
         `<i class="fas fa-redo"></i> You need ${threshold}% accuracy to pass this lesson - try again!`,
       )
       .show();
+    retryButton?.addClass("lessonPrimary");
+    retryButton?.setAttribute("aria-label", "Retry lesson");
   }
 }
 
@@ -949,6 +1005,9 @@ export async function update(
   tooShort: boolean,
   randomQuote: Quote | null,
   dontSave: boolean,
+  lessonCompletionPromise?: Promise<
+    LessonProgress.LessonCompletionResult | undefined
+  >,
 ): Promise<void> {
   resultAnnotation = [];
   result = structuredClone(res);
@@ -991,7 +1050,7 @@ export async function update(
   applyMinMaxChartValues();
   await updateTags(dontSave);
   updateOther(difficultyFailed, failReason, afkDetected, isRepeated, tooShort);
-  updateLessonGate(res);
+  await updateLessonGate(res, lessonCompletionPromise);
 
   ((ChartController.result.options as PluginChartOptions<"line" | "scatter">)
     .plugins.annotation.annotations as AnnotationOptions<"line">[]) =

@@ -1,11 +1,4 @@
-import {
-  collection,
-  deleteField,
-  doc,
-  DocumentReference,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
 import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
@@ -69,12 +62,8 @@ export async function buyAnimalAvatar(
  * same as picking a hairstyle already owned.
  */
 export async function equipAnimalAvatar(
-  uid: string,
+  _uid: string,
   id: string | null,
 ): Promise<void> {
-  await setDoc(
-    userRef(uid),
-    { equippedAnimalAvatar: id ?? deleteField() },
-    { merge: true },
-  );
+  await callApi("/api/equip-item", { target: "animalAvatar", itemId: id });
 }

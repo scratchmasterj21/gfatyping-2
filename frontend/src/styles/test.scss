@@ -805,6 +805,12 @@
       }
     }
 
+    .buttons .lessonPrimary {
+      color: var(--bg-color);
+      background: var(--main-color);
+      border-radius: var(--roundness);
+    }
+
     #resultWordsHistory,
     #resultReplay {
       // grid-area: wordsHistory;

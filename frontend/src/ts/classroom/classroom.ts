@@ -191,6 +191,22 @@ export function weeklyWpm(
   return userDoc.weeklyPeriod?.wpm?.[mode2] ?? null;
 }
 
+function competitionRank<T>(
+  sorted: T[],
+  score: (entry: T) => number,
+): Array<T & { rank: number }> {
+  let previous: number | undefined;
+  let rank = 0;
+  return sorted.map((entry, index) => {
+    const current = score(entry);
+    if (previous === undefined || current !== previous) {
+      rank = index + 1;
+    }
+    previous = current;
+    return { ...entry, rank };
+  });
+}
+
 export async function getClassroomLeaderboard(options: {
   scope: ClassroomScope;
   classId?: string;
@@ -223,10 +239,14 @@ export async function getClassroomLeaderboard(options: {
   }
 
   if (options.metric === "racewpm") {
-    const ranked: RaceLeaderboardEntry[] = students
+    const sorted = students
       .filter((d) => (d.raceTotalRaces ?? 0) > 0)
-      .sort((a, b) => (b.raceBestWpm ?? 0) - (a.raceBestWpm ?? 0))
-      .map((d, i) => ({
+      .sort(
+        (a, b) =>
+          (b.raceBestWpm ?? 0) - (a.raceBestWpm ?? 0) ||
+          a.uid.localeCompare(b.uid),
+      )
+      .map((d) => ({
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
@@ -234,16 +254,23 @@ export async function getClassroomLeaderboard(options: {
         bestRaceAcc: d.raceBestWpmAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
-        rank: i + 1,
       }));
+    const ranked: RaceLeaderboardEntry[] = competitionRank(
+      sorted,
+      (entry) => entry.bestRaceWpm,
+    );
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
   if (options.metric === "raceacc") {
-    const ranked: RaceLeaderboardEntry[] = students
+    const sorted = students
       .filter((d) => (d.raceTotalRaces ?? 0) > 0)
-      .sort((a, b) => (b.raceBestAcc ?? 0) - (a.raceBestAcc ?? 0))
-      .map((d, i) => ({
+      .sort(
+        (a, b) =>
+          (b.raceBestAcc ?? 0) - (a.raceBestAcc ?? 0) ||
+          a.uid.localeCompare(b.uid),
+      )
+      .map((d) => ({
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
@@ -251,17 +278,25 @@ export async function getClassroomLeaderboard(options: {
         bestRaceAcc: d.raceBestAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
-        rank: i + 1,
       }));
+    const ranked: RaceLeaderboardEntry[] = competitionRank(
+      sorted,
+      (entry) => entry.bestRaceAcc,
+    );
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
   if (options.metric === "wpm") {
-    const ranked: (LeaderboardEntry & { avatarUrl?: string })[] = students
+    const sorted = students
       .map((d) => ({ d, best: weeklyWpm(d, options.wpmMode2) }))
       .filter((x): x is { d: StudentDoc; best: BestWpm } => x.best !== null)
-      .sort((a, b) => b.best.wpm - a.best.wpm)
-      .map((x, i) => ({
+      .sort(
+        (a, b) =>
+          b.best.wpm - a.best.wpm ||
+          b.best.timestamp - a.best.timestamp ||
+          a.d.uid.localeCompare(b.d.uid),
+      )
+      .map((x) => ({
         uid: x.d.uid,
         name: x.d.name ?? "",
         wpm: x.best.wpm,
@@ -269,40 +304,47 @@ export async function getClassroomLeaderboard(options: {
         raw: x.best.raw,
         consistency: x.best.consistency,
         timestamp: x.best.timestamp,
-        rank: i + 1,
         avatarUrl: x.d.avatarUrl,
       }));
+    const ranked: (LeaderboardEntry & { avatarUrl?: string })[] =
+      competitionRank(sorted, (entry) => entry.wpm);
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
   if (options.metric === "xpAllTime") {
-    const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] = students
+    const sorted = students
       .slice()
-      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0))
-      .map((d, i) => ({
+      .sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0) || a.uid.localeCompare(b.uid))
+      .map((d) => ({
         uid: d.uid,
         name: d.name ?? "",
         totalXp: d.xp ?? 0,
         timeTypedSeconds: 0,
         lastActivityTimestamp: d.streak?.lastResultTimestamp ?? 0,
-        rank: i + 1,
         avatarUrl: d.avatarUrl,
       }));
+    const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] =
+      competitionRank(sorted, (entry) => entry.totalXp);
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
-  const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] = students
+  const sorted = students
     .slice()
-    .sort((a, b) => (b.weeklyPeriod?.xp ?? 0) - (a.weeklyPeriod?.xp ?? 0))
-    .map((d, i) => ({
+    .sort(
+      (a, b) =>
+        (b.weeklyPeriod?.xp ?? 0) - (a.weeklyPeriod?.xp ?? 0) ||
+        a.uid.localeCompare(b.uid),
+    )
+    .map((d) => ({
       uid: d.uid,
       name: d.name ?? "",
       totalXp: d.weeklyPeriod?.xp ?? 0,
       timeTypedSeconds: 0,
       lastActivityTimestamp: d.weeklyPeriod?.lastActivityTimestamp ?? 0,
-      rank: i + 1,
       avatarUrl: d.avatarUrl,
     }));
+  const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] =
+    competitionRank(sorted, (entry) => entry.totalXp);
   return { count: ranked.length, pageSize: ranked.length, entries: ranked };
 }
 
@@ -456,7 +498,7 @@ export async function getGameScoresLeaderboard(options: {
   }
   for (const gameId of Object.keys(result)) {
     result[gameId] = (result[gameId] as GameScoreEntry[]).sort(
-      (a, b) => b.score - a.score,
+      (a, b) => b.score - a.score || a.uid.localeCompare(b.uid),
     );
   }
   return result;

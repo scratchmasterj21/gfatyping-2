@@ -57,7 +57,8 @@ export default async function handler(
     progress < 0 ||
     progress > 1 ||
     !Number.isFinite(wordIndex) ||
-    wordIndex < 0
+    wordIndex < 0 ||
+    !Number.isInteger(wordIndex)
   ) {
     res.status(400).json({ ok: false, reason: "Invalid result" });
     return;
@@ -79,14 +80,41 @@ export default async function handler(
         throw new SubmitError("You haven't joined this race");
       }
 
-      const race = raceSnap.data() as { status?: string; tokens?: string[] };
-      if (race.status !== "running" && race.status !== "finished") {
-        throw new SubmitError("Race hasn't started");
+      const race = raceSnap.data() as {
+        status?: string;
+        format?: string;
+        tokens?: string[];
+        durationSec?: number;
+        runningAt?: number;
+        finishedAt?: number;
+      };
+      const justFinished =
+        race.status === "finished" &&
+        Number.isFinite(race.finishedAt) &&
+        Date.now() - Number(race.finishedAt) <= 15_000;
+      if (race.status !== "running" && !justFinished) {
+        throw new SubmitError("Race is not running");
       }
 
       const tokenCount = Array.isArray(race.tokens) ? race.tokens.length : 0;
-      if (wordIndex > tokenCount) {
+      const runningAt = Number(race.runningAt);
+      const elapsedMs = Date.now() - runningAt;
+      const timedComplete =
+        race.format === "timed" &&
+        Number.isFinite(race.durationSec) &&
+        elapsedMs >= Number(race.durationSec) * 1000 - 1_000;
+      const textComplete = wordIndex >= tokenCount - 1;
+      if (
+        tokenCount === 0 ||
+        progress !== 1 ||
+        wordIndex > tokenCount ||
+        (!timedComplete && !textComplete)
+      ) {
         throw new SubmitError("Result doesn't match the race content");
+      }
+
+      if (!Number.isFinite(runningAt) || Date.now() < runningAt) {
+        throw new SubmitError("Race hasn't started");
       }
 
       tx.set(

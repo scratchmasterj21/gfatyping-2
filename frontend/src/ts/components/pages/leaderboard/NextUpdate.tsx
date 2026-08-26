@@ -1,5 +1,3 @@
-import { UTCDateMini } from "@date-fns/utc";
-import { differenceInSeconds, endOfDay, endOfWeek } from "date-fns";
 import {
   createEffect,
   createMemo,
@@ -25,20 +23,38 @@ export function NextUpdate(props: {
   });
 
   const nextUpdate = createMemo(() => {
-    const now = new Date(tick());
+    const now = tick();
     if (props.type === "daily") {
-      const diff = differenceInSeconds(endOfDay(new UTCDateMini()), now);
+      const japanNow = new Date(now + 9 * 60 * 60 * 1000);
+      const nextJapanMidnight =
+        Date.UTC(
+          japanNow.getUTCFullYear(),
+          japanNow.getUTCMonth(),
+          japanNow.getUTCDate() + 1,
+        ) -
+        9 * 60 * 60 * 1000;
+      const diff = Math.max(0, Math.floor((nextJapanMidnight - now) / 1000));
       return `Next reset in: ${secondsToString(diff, true)}`;
     } else if (props.type === "allTime") {
-      const minutesToNextUpdate = 14 - (now.getMinutes() % 15);
-      const secondsToNextUpdate = 60 - now.getSeconds();
+      const date = new Date(now);
+      const minutesToNextUpdate = 14 - (date.getMinutes() % 15);
+      const secondsToNextUpdate = 60 - date.getSeconds();
       const totalSeconds = minutesToNextUpdate * 60 + secondsToNextUpdate;
       return `Next update in: ${secondsToString(totalSeconds, true)}`;
     } else if (props.type === "weekly") {
-      const nextWeekTimestamp = endOfWeek(new UTCDateMini(), {
-        weekStartsOn: 1,
-      });
-      const totalSeconds = differenceInSeconds(nextWeekTimestamp, now);
+      const japanNow = new Date(now + 9 * 60 * 60 * 1000);
+      const daysUntilMonday = (8 - japanNow.getUTCDay()) % 7 || 7;
+      const nextWeekTimestamp =
+        Date.UTC(
+          japanNow.getUTCFullYear(),
+          japanNow.getUTCMonth(),
+          japanNow.getUTCDate() + daysUntilMonday,
+        ) -
+        9 * 60 * 60 * 1000;
+      const totalSeconds = Math.max(
+        0,
+        Math.floor((nextWeekTimestamp - now) / 1000),
+      );
       return `Next reset in: ${secondsToString(
         totalSeconds,
         true,

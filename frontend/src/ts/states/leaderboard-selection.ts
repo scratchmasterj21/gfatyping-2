@@ -1,11 +1,12 @@
 import { LanguageSchema } from "@monkeytype/schemas/languages";
 import { ModeSchema } from "@monkeytype/schemas/shared";
-import { Accessor, createEffect, createSignal, Setter } from "solid-js";
+import { Accessor, createSignal, Setter } from "solid-js";
 import { z } from "zod";
 import { serialize as serializeUrlSearchParams } from "zod-urlsearchparams";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 
-import { get as getServerConfiguration } from "../ape/server-configuration";
+import { isCurrentUserAdmin } from "../auth";
+import { gradeOf } from "../constants/classes";
 import { getSnapshot } from "./snapshot";
 
 export const pageSize = 50;
@@ -102,19 +103,19 @@ export const [getHideAdmin, setHideAdmin] = useLocalStorage<boolean>({
   fallback: false,
 });
 
-// Reset friendsOnly when connections are disabled
-createEffect(() => {
-  if (
-    getSelectionLs().friendsOnly &&
-    (getSnapshot() === undefined ||
-      getServerConfiguration()?.connections.enabled === false)
-  ) {
-    setSelection((old) => ({ ...old, friendsOnly: false }));
-  }
-});
-
 export const getSelection = (): Selection => {
-  return getSelectionLs();
+  const selection = getSelectionLs();
+  const withoutFriends = selection.friendsOnly
+    ? { ...selection, friendsOnly: false }
+    : selection;
+  if (withoutFriends.type !== "grade" || isCurrentUserAdmin()) {
+    return withoutFriends;
+  }
+  const classId = getSnapshot()?.classId;
+  return {
+    ...withoutFriends,
+    grade: typeof classId === "string" ? gradeOf(classId) : undefined,
+  };
 };
 
 export { setSelection };
@@ -146,7 +147,7 @@ export function readGetParameters(
 
   const newSelection: Partial<Selection> = {
     type: params.type,
-    friendsOnly: params.friendsOnly ?? false,
+    friendsOnly: false,
   };
 
   if (params.type === "weekly") {

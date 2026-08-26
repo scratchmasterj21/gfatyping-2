@@ -1069,9 +1069,10 @@ export async function finish(difficultyFailed = false): Promise<void> {
 
   // test is valid
 
-  if (!dontSaveLesson && LessonProgress.getActiveLesson() !== null) {
-    void LessonProgress.recordCompletion(completedEvent);
-  }
+  const lessonCompletionPromise =
+    !dontSaveLesson && LessonProgress.getActiveLesson() !== null
+      ? LessonProgress.recordCompletion(completedEvent)
+      : undefined;
 
   if (isRepeated() || difficultyFailed) {
     if (Config.resultSaving) {
@@ -1177,6 +1178,7 @@ export async function finish(difficultyFailed = false): Promise<void> {
     tooShort,
     getCurrentQuote(),
     dontSave,
+    lessonCompletionPromise,
   );
 
   await Promise.all([savingResultPromise, resultUpdatePromise]);
