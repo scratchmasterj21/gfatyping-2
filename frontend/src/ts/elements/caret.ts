@@ -4,7 +4,7 @@ import * as TestWords from "../test/test-words";
 import { getTotalInlineMargin } from "../utils/misc";
 import { isWordRightToLeft } from "../utils/strings";
 import { requestDebouncedAnimationFrame } from "../utils/debounced-animation-frame";
-import { EasingParam, JSAnimation } from "animejs";
+import { EasingParam, JSAnimation, utils as animeUtils } from "animejs";
 import { ElementWithUtils, qsr } from "../utils/dom";
 
 const wordsCache = qsr("#words");
@@ -109,9 +109,14 @@ export class Caret {
     width?: number;
   }): void {
     this.posAnimation?.cancel();
+    // Clear any glide offset animatePosition left behind - left/top alone are
+    // the position here. translate3d(0,0,0) rather than "none" so the caret
+    // keeps its own compositor layer instead of being promoted and demoted on
+    // every keystroke.
     let newStyle: Record<string, string> = {
       left: `${options.left}px`,
       top: `${options.top}px`,
+      transform: "translate3d(0px, 0px, 0)",
     };
     if (options.width !== undefined) {
       newStyle = { ...newStyle, width: `${options.width}px` };
@@ -255,11 +260,54 @@ export class Caret {
 
     const finalDuration = options.duration ?? smoothCaretSpeed;
 
-    const animation: Record<string, number> = {
-      left: options.left,
-      top: options.top,
+    if (finalDuration <= 0) {
+      this.setPosition(options);
+      return;
+    }
+
+    /**
+     * The glide used to animate left/top directly, which meant anime.js wrote
+     * two layout-affecting properties on the main thread for every frame of
+     * every keystroke. Instead: snap left/top to the destination immediately
+     * and offset the caret back by the same amount with a transform, so it
+     * hasn't visibly moved yet - then animate that transform to zero. Same
+     * motion, but it runs on the compositor and touches layout once per
+     * keystroke instead of once per frame.
+     *
+     * Inline styles are the source of truth for the resting position (goTo
+     * reads them the same way), so none of this forces a style flush.
+     */
+    const restLeft = parseFloat(this.element.getStyle().left || "0");
+    const restTop = parseFloat(this.element.getStyle().top || "0");
+
+    // A glide may still be in flight, in which case the caret is not actually
+    // at its resting position - fold that leftover offset into the new start
+    // so an interrupted glide continues from where it looks, not where it
+    // logically sits.
+    const inFlightX =
+      parseFloat(String(animeUtils.get(this.element.native, "translateX"))) ||
+      0;
+    const inFlightY =
+      parseFloat(String(animeUtils.get(this.element.native, "translateY"))) ||
+      0;
+
+    const startX = restLeft + inFlightX - options.left;
+    const startY = restTop + inFlightY - options.top;
+
+    this.posAnimation?.cancel();
+    this.element.setStyle({
+      left: `${options.left}px`,
+      top: `${options.top}px`,
+      transform: `translate3d(${startX}px, ${startY}px, 0)`,
+    });
+
+    const animation: Record<string, unknown> = {
+      translateX: [startX, 0],
+      translateY: [startY, 0],
     };
 
+    // Width still has to animate the slow way, but only the block/outline/
+    // underline caret styles ask for it - the default caret never does.
     if (options.width !== undefined) {
       animation["width"] = options.width;
     }
