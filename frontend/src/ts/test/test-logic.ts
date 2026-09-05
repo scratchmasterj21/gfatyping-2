@@ -1449,6 +1449,11 @@ qs(".pageTest")?.onChild("click", "#restartTestButtonWithSameWordset", () => {
   });
 });
 
+qs(".pageTest")?.onChild("click", "#backToLessonsButton", () => {
+  LessonProgress.setActiveLesson(null);
+  navigationEvent.dispatch({ url: "/lessons", options: {} });
+});
+
 // little roadblock for basic cheating
 window.addEventListener("focus", () => {
   if (

@@ -6,6 +6,14 @@
   border-radius: var(--roundness);
   // transition: 0.05s;
   transform-origin: top left;
+  /**
+   * .word is position: relative, and #words comes after #caret in the DOM
+   * (see pages/test.html), so at z-index auto the words paint on top of the
+   * caret - it only ever looked right because the blink animation happened to
+   * keep the caret on its own composited layer. Say it explicitly instead of
+   * depending on that. Scoped by #wordsWrapper's stacking context.
+   */
+  z-index: 2;
 }
 
 #paceCaret {
@@ -16,6 +24,8 @@
   border-radius: var(--roundness);
   // transition: 0.25s;
   transform-origin: top left;
+  // Above the words for the same reason as #caret, but below the real caret.
+  z-index: 1;
 }
 
 #caret,

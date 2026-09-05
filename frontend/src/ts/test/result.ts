@@ -816,8 +816,16 @@ async function updateLessonGate(
   const el = qs("#lessonGateNotice");
   const nextButton = qs("#nextTestButton");
   const retryButton = qs("#restartTestButtonWithSameWordset");
+  const backButton = qs("#backToLessonsButton");
   nextButton?.removeClass("lessonPrimary");
   retryButton?.removeClass("lessonPrimary");
+  nextButton?.removeClass("lessonAction").show();
+  retryButton?.removeClass("lessonAction");
+  backButton?.hide();
+  qsa("#nextTestButton .lessonActionText")?.addClass("hidden");
+  qsa("#restartTestButtonWithSameWordset .lessonActionText")?.addClass(
+    "hidden",
+  );
   nextButton?.setAttribute("aria-label", "Next test");
   retryButton?.setAttribute("aria-label", "Repeat test");
   const lessonId = LessonProgress.getActiveLesson();
@@ -829,6 +837,13 @@ async function updateLessonGate(
     el?.hide();
     return;
   }
+  nextButton?.addClass("lessonAction");
+  retryButton?.addClass("lessonAction");
+  backButton?.show();
+  qsa("#nextTestButton .lessonActionText")?.removeClass("hidden");
+  qsa("#restartTestButtonWithSameWordset .lessonActionText")?.removeClass(
+    "hidden",
+  );
   const threshold = LessonProgress.lessonPassAccuracy(getStudentGrade());
   if (completionPromise !== undefined) {
     el.removeClass("pass")
@@ -843,6 +858,7 @@ async function updateLessonGate(
         )
         .show();
       retryButton?.addClass("lessonPrimary");
+      nextButton?.hide();
       retryButton?.setAttribute("aria-label", "Retry lesson");
       return;
     }
@@ -864,6 +880,7 @@ async function updateLessonGate(
         nextButton?.setAttribute("aria-label", "Next lesson");
       } else {
         retryButton?.addClass("lessonPrimary");
+        nextButton?.hide();
         retryButton?.setAttribute("aria-label", "Improve to 2 stars");
       }
       return;
@@ -885,6 +902,7 @@ async function updateLessonGate(
       )
       .show();
     retryButton?.addClass("lessonPrimary");
+    nextButton?.hide();
     retryButton?.setAttribute("aria-label", "Retry lesson");
   }
 }

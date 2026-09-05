@@ -811,6 +811,13 @@
       border-radius: var(--roundness);
     }
 
+    .buttons .lessonAction {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35em;
+      padding-inline: 0.8em;
+    }
+
     #resultWordsHistory,
     #resultReplay {
       // grid-area: wordsHistory;
@@ -1368,6 +1375,9 @@
 .pageTest {
   #wordsWrapper {
     position: relative;
+    // Establish a stacking context so the caret z-indexes below are scoped to
+    // the words area and can't paint over unrelated page chrome.
+    z-index: 0;
     overflow: visible clip;
     &.tape {
       overflow: hidden;

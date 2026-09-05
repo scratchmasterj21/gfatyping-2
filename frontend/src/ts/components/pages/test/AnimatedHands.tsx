@@ -69,7 +69,7 @@ function loadKeyboardStyle(): KeyboardStyle {
   ) {
     return stored;
   }
-  return "flat";
+  return "marble";
 }
 
 export const [keyboardStyle, setKeyboardStyleSignal] =

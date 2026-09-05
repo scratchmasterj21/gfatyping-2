@@ -5,6 +5,14 @@ import { PartialConfig } from "@monkeytype/schemas/configs";
 
 const defaultConfig = getDefaultConfig();
 
+describe("school defaults", () => {
+  it("starts new profiles with the Viridescent theme", () => {
+    expect(defaultConfig.theme).toBe("viridescent");
+    expect(defaultConfig.themeLight).toBe("viridescent");
+    expect(defaultConfig.themeDark).toBe("viridescent");
+  });
+});
+
 describe("config.ts", () => {
   describe("migrateConfig", () => {
     it("should carry over properties from the default config", () => {

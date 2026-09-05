@@ -142,6 +142,7 @@ function LessonButton(props: {
   progress: LessonProgress | undefined;
   locked?: boolean;
   lockedMessage?: string;
+  next?: boolean;
 }): JSXElement {
   const done = (): boolean => props.progress?.completed === true;
   const locked = (): boolean => props.locked === true;
@@ -170,7 +171,14 @@ function LessonButton(props: {
       onClick={onClick}
     >
       <div class="flex items-center justify-between gap-2">
-        <span class="font-medium">{props.lesson.name}</span>
+        <span class="flex items-center gap-2 font-medium">
+          {props.lesson.name}
+          <Show when={props.next && !done()}>
+            <span class="rounded bg-main px-1.5 py-0.5 text-em-xs text-bg">
+              Next
+            </span>
+          </Show>
+        </span>
         <Show when={locked()} fallback={<LessonStatus done={done()} />}>
           <Fa icon="fa-lock" class="text-sub" size={0.9} />
         </Show>
@@ -897,9 +905,6 @@ export function LessonsPage(): JSXElement {
   const continueItem = createMemo((): ContinueItem | undefined => {
     const p = progress.data;
     if (p === undefined) return undefined;
-    const hasStarted = lessonOrder.some((id) => p.get(id) !== undefined);
-    if (!hasStarted) return undefined;
-
     const item = frontierItem();
     // frontierItem only checks "completed", not the 2-star gate - if the
     // naive next lesson is actually locked, redirect to its predecessor
@@ -921,6 +926,10 @@ export function LessonsPage(): JSXElement {
     return item.kind === "lesson"
       ? groupIdForLesson(item.lesson.id)
       : item.group.id;
+  });
+  const frontierLessonId = createMemo((): string | undefined => {
+    const item = frontierItem();
+    return item?.kind === "lesson" ? item.lesson.id : undefined;
   });
 
   // Once progress is available, tuck finished groups away and expose the
@@ -1382,15 +1391,28 @@ export function LessonsPage(): JSXElement {
 
       const item = continueItem();
       if (item !== undefined) {
+        const hasStarted = lessonOrder.some(
+          (id) => progress.data?.get(id) !== undefined,
+        );
         return {
           icon: continueIcon(),
-          eyebrow: item.kind === "checkpoint" ? "review checkpoint" : "up next",
+          eyebrow:
+            item.kind === "checkpoint"
+              ? "review checkpoint"
+              : hasStarted
+                ? "continue learning"
+                : "start here",
           title: continueLabel(),
           description:
             item.kind === "checkpoint"
               ? "Use the keys you just learned in a quick game."
               : "Keep moving along your personalized lesson path.",
-          action: item.kind === "checkpoint" ? "play now" : "continue",
+          action:
+            item.kind === "checkpoint"
+              ? "Play checkpoint"
+              : hasStarted
+                ? "Continue lesson"
+                : "Start first lesson",
           onStart: () => onContinueClick(true),
         };
       }
@@ -1489,7 +1511,7 @@ export function LessonsPage(): JSXElement {
                 <div class="grid gap-2">
                   <div class="flex items-center gap-2 text-em-xs font-medium text-main">
                     <Fa icon={recommendation.icon} />
-                    recommended · {recommendation.eyebrow}
+                    {recommendation.eyebrow}
                   </div>
                   <div class="text-xl font-bold text-text">
                     {recommendation.title}
@@ -1763,6 +1785,9 @@ export function LessonsPage(): JSXElement {
             </button>
           </div>
           <Show when={!collapsed().has("typing-lessons")}>
+            <p class="mb-2 text-sm font-medium text-main">
+              Start with the lesson marked Next and complete lessons in order.
+            </p>
             <div class="grid gap-1">
               <For each={lessonGroups}>
                 {(group) => {
@@ -1851,6 +1876,7 @@ export function LessonsPage(): JSXElement {
                                 <LessonButton
                                   lesson={item.lesson}
                                   progress={progressFor(item.lesson.id)}
+                                  next={frontierLessonId() === item.lesson.id}
                                   locked={isLessonLocked(item.lesson.id)}
                                   lockedMessage={getLessonLockMessage(
                                     item.lesson.id,

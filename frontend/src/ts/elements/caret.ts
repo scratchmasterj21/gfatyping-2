@@ -110,13 +110,12 @@ export class Caret {
   }): void {
     this.posAnimation?.cancel();
     // Clear any glide offset animatePosition left behind - left/top alone are
-    // the position here. translate3d(0,0,0) rather than "none" so the caret
-    // keeps its own compositor layer instead of being promoted and demoted on
-    // every keystroke.
+    // the position here. Written as separate translateX/translateY because
+    // that is the only form anime.js can parse back (see animatePosition).
     let newStyle: Record<string, string> = {
       left: `${options.left}px`,
       top: `${options.top}px`,
-      transform: "translate3d(0px, 0px, 0)",
+      transform: "translateX(0px) translateY(0px)",
     };
     if (options.width !== undefined) {
       newStyle = { ...newStyle, width: `${options.width}px` };
@@ -295,10 +294,18 @@ export class Caret {
     const startY = restTop + inFlightY - options.top;
 
     this.posAnimation?.cancel();
+    /**
+     * Must be translateX()/translateY(), NOT translate3d(). anime.js parses
+     * the existing inline transform into per-property values and rewrites the
+     * whole string; it does not understand translate3d, so it emits a mangled
+     * "undefined-20px, 0px, 0) translateX(0px)..." that the browser rejects as
+     * invalid - leaving the element stuck on the last transform it accepted,
+     * i.e. permanently offset by startX.
+     */
     this.element.setStyle({
       left: `${options.left}px`,
       top: `${options.top}px`,
-      transform: `translate3d(${startX}px, ${startY}px, 0)`,
+      transform: `translateX(${startX}px) translateY(${startY}px)`,
     });
 
     const animation: Record<string, unknown> = {
