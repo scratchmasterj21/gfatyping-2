@@ -56,12 +56,12 @@ export class GameOverScene extends Scene {
     });
 
     const btnY = cy + 118;
-    this.makeBtn(cx - 80, btnY, "Play Again", () => {
+    this.makeBtn(cx - 90, btnY, "Play Again", () => {
       this.scene.stop("UI");
       this.scene.start("Boot");
       this.scene.launch("UI");
     });
-    this.makeBtn(cx + 80, btnY, "Exit", () => {
+    this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
       this.game.events.emit("exit-game");
     });
   }
@@ -74,9 +74,9 @@ export class GameOverScene extends Scene {
   ): void {
     const bg = this.add.graphics();
     bg.fillStyle(0x8b4513, 1);
-    bg.fillRoundedRect(x - 65, y - 18, 130, 36, 8);
+    bg.fillRoundedRect(x - 80, y - 20, 160, 40, 8);
     bg.lineStyle(1.5, 0xf9a825, 0.7);
-    bg.strokeRoundedRect(x - 65, y - 18, 130, 36, 8);
+    bg.strokeRoundedRect(x - 80, y - 20, 160, 40, 8);
 
     const txt = this.add
       .text(x, y, label, {
@@ -87,7 +87,7 @@ export class GameOverScene extends Scene {
       .setOrigin(0.5);
 
     bg.setInteractive({
-      hitArea: new Geom.Rectangle(x - 65, y - 18, 130, 36),
+      hitArea: new Geom.Rectangle(x - 80, y - 20, 160, 40),
       hitAreaCallback: Geom.Rectangle.Contains,
       useHandCursor: true,
     })

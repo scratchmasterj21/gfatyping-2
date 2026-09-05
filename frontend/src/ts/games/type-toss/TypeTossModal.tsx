@@ -117,14 +117,17 @@ export function TypeTossModal(props: Props): JSXElement {
         >
           <button
             type="button"
-            class="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded text-sub hover:text-text"
+            class="absolute top-3 right-3 z-10 flex min-h-10 items-center justify-center rounded bg-sub-alt px-3 text-sm font-semibold text-sub hover:text-text"
             onClick={() => props.onClose()}
           >
-            ✕
+            ← Back to lessons
           </button>
 
           <Show when={phase() === "pick" && props.lessonWords === undefined}>
-            <h2 class="mb-1 text-lg font-bold text-text">Type Toss</h2>
+            <h2 class="mb-1 pr-40 text-lg font-bold text-text">Type Toss</h2>
+            <p class="mt-2 text-em-xs font-bold tracking-wider text-main uppercase">
+              How to play
+            </p>
             <p class="mb-4 text-em-sm text-sub">
               Type as many words as you can before time runs out! Watch for ⏱️
               bonus time and ✨ double points targets — and avoid the 💣 trap,
@@ -132,7 +135,7 @@ export function TypeTossModal(props: Props): JSXElement {
             </p>
 
             <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
-              Difficulty
+              Choose difficulty
             </p>
             <div class="mb-4 flex gap-2">
               <For each={TYPE_TOSS_DIFFICULTIES}>
@@ -192,7 +195,7 @@ export function TypeTossModal(props: Props): JSXElement {
               class="button primary mt-4"
               onClick={() => void startGame()}
             >
-              Play →
+              Start game →
             </button>
           </Show>
 

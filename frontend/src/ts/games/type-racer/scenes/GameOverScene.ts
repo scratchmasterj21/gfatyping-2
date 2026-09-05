@@ -58,10 +58,10 @@ export class GameOverScene extends Scene {
     });
 
     const btnY = cy + 118;
-    this.makeBtn(cx - 80, btnY, "Play Again", () => {
+    this.makeBtn(cx - 90, btnY, "Play Again", () => {
       this.scene.start("Boot");
     });
-    this.makeBtn(cx + 80, btnY, "Exit", () => {
+    this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
       this.game.events.emit("exit-game");
     });
   }
@@ -74,7 +74,7 @@ export class GameOverScene extends Scene {
   ): void {
     const bg = this.add.graphics();
     bg.fillStyle(0x224466, 1);
-    bg.fillRect(x - 60, y - 16, 120, 32);
+    bg.fillRect(x - 80, y - 20, 160, 40);
     const txt = this.add
       .text(x, y, label, {
         fontSize: "14px",
@@ -82,13 +82,16 @@ export class GameOverScene extends Scene {
         color: "#ffffff",
       })
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true })
-      .on("pointerdown", onClick)
       .on("pointerover", () => {
         txt.setColor("#ffcc44");
       })
       .on("pointerout", () => {
         txt.setColor("#ffffff");
       });
+
+    bg.setInteractive({ useHandCursor: true })
+      .on("pointerdown", onClick)
+      .on("pointerover", () => txt.setColor("#ffcc44"))
+      .on("pointerout", () => txt.setColor("#ffffff"));
   }
 }

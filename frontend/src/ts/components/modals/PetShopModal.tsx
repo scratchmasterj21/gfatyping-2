@@ -65,7 +65,7 @@ export function PetShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          Buy a pet to roam around your house.
+          Choose a pet. Buy it once, then place it in your house.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -130,7 +130,7 @@ export function PetShopModal(): JSXElement {
                       >
                         <Fa icon="fa-coins" size={0.7} />
                       </Show>
-                      {item.price}
+                      {canAfford() ? item.price : "Not enough coins"}
                     </button>
                   </Show>
                 </div>

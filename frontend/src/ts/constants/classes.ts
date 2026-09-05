@@ -18,6 +18,11 @@ export const GRADES = ["G1", "G2", "G3", "G4", "G5", "G6"] as const;
 export type Grade = (typeof GRADES)[number];
 
 /** Grade portion of a class id, e.g. "G3A" -> "G3". */
-export function gradeOf(classId: string): string {
-  return classId.slice(0, 2);
+export function gradeOf(classId: string): string;
+export function gradeOf(classId: null | undefined): undefined;
+export function gradeOf(classId: string | null | undefined): string | undefined;
+export function gradeOf(
+  classId: string | null | undefined,
+): string | undefined {
+  return classId?.slice(0, 2);
 }

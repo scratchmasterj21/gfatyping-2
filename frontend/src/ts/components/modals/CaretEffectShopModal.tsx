@@ -79,7 +79,7 @@ export function CaretEffectShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          A cosmetic effect layered on top of your caret while typing.
+          Choose an effect. Buy it once, then select it whenever you want.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -143,7 +143,7 @@ export function CaretEffectShopModal(): JSXElement {
                       >
                         <Fa icon="fa-coins" size={0.7} />
                       </Show>
-                      {item.price}
+                      {canAfford() ? item.price : "Not enough coins"}
                     </button>
                   </Show>
                 </div>

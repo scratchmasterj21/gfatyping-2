@@ -69,7 +69,7 @@ export function KeyboardSkinShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          New keyboard finishes for the guided keyboard display.
+          Choose a keyboard. Buy it once, then select it whenever you want.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -132,7 +132,7 @@ export function KeyboardSkinShopModal(): JSXElement {
                       >
                         <Fa icon="fa-coins" size={0.7} />
                       </Show>
-                      {item.price}
+                      {canAfford() ? item.price : "Not enough coins"}
                     </button>
                   </Show>
                 </div>

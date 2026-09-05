@@ -128,7 +128,7 @@ export function HouseShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          Buy furniture and decorations for your house.
+          Choose an item. Buy it once, then place or store it anytime.
         </p>
 
         <div class="flex gap-1 rounded bg-sub-alt p-1">
@@ -223,7 +223,7 @@ export function HouseShopModal(): JSXElement {
                         >
                           <Fa icon="fa-coins" size={0.7} />
                         </Show>
-                        {theme.price}
+                        {canAfford() ? theme.price : "Not enough coins"}
                       </button>
                     </Show>
                   </div>
@@ -311,7 +311,7 @@ export function HouseShopModal(): JSXElement {
                         >
                           <Fa icon="fa-coins" size={0.7} />
                         </Show>
-                        {item.price}
+                        {canAfford() ? item.price : "Not enough coins"}
                       </button>
                     </Show>
                   </div>

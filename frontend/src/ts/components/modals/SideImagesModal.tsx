@@ -61,8 +61,7 @@ export function SideImagesModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          Buy image sets to show beside your typing test. Cycle through anything
-          you own while you type.
+          Choose an image set. Buy it once, then use it while you type.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -132,7 +131,9 @@ export function SideImagesModal(): JSXElement {
                         >
                           <Fa icon="fa-coins" size={0.7} />
                         </Show>
-                        {item.price ?? DEFAULT_SIDE_IMAGES_PRICE}
+                        {canAfford()
+                          ? (item.price ?? DEFAULT_SIDE_IMAGES_PRICE)
+                          : "Not enough coins"}
                       </button>
                     </Show>
                   </div>

@@ -123,17 +123,22 @@ export function WordDefenderModal(props: Props): JSXElement {
           {/* Close button */}
           <button
             type="button"
-            class="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded text-sub hover:text-text"
+            class="absolute top-3 right-3 z-10 flex min-h-10 items-center justify-center rounded bg-sub-alt px-3 text-sm font-semibold text-sub hover:text-text"
             onClick={() => {
               props.onClose();
             }}
           >
-            ✕
+            ← Back to lessons
           </button>
 
           {/* Word list picker — hidden in lesson mode */}
           <Show when={phase() === "pick" && props.lessonWords === undefined}>
-            <h2 class="mb-1 text-lg font-bold text-text">Word Defender</h2>
+            <h2 class="mb-1 pr-40 text-lg font-bold text-text">
+              Word Defender
+            </h2>
+            <p class="mt-2 text-em-xs font-bold tracking-wider text-main uppercase">
+              How to play
+            </p>
             <p class="mb-4 text-em-sm text-sub">
               Type the words on each ship before it reaches your base. Watch for
               ⚡ EMP and ☢️ nuke power-ups — type their word to grab one, then
@@ -141,7 +146,7 @@ export function WordDefenderModal(props: Props): JSXElement {
             </p>
 
             <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
-              Difficulty
+              Choose difficulty
             </p>
             <div class="mb-4 flex gap-2">
               <For each={DEFENDER_DIFFICULTIES}>
@@ -205,7 +210,7 @@ export function WordDefenderModal(props: Props): JSXElement {
                 void startGame();
               }}
             >
-              Play →
+              Start game →
             </button>
           </Show>
 

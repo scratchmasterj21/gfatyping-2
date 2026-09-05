@@ -84,7 +84,7 @@ export function RgbPaletteShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          Change the color scheme of the RGB keyboard lighting.
+          Choose a palette. Buy it once, then select it whenever you want.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -151,7 +151,7 @@ export function RgbPaletteShopModal(): JSXElement {
                       >
                         <Fa icon="fa-coins" size={0.7} />
                       </Show>
-                      {item.price}
+                      {canAfford() ? item.price : "Not enough coins"}
                     </button>
                   </Show>
                 </div>

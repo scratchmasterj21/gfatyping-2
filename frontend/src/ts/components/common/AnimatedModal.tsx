@@ -10,6 +10,7 @@ import {
 } from "../../states/modals";
 import { cn } from "../../utils/cn";
 import { applyReducedMotion } from "../../utils/misc";
+import { Button } from "./Button";
 
 type AnimationParams = {
   opacity?: number | [number, number];
@@ -46,6 +47,7 @@ type AnimatedModalProps = ParentProps<{
   title?: string;
   modalClass?: string;
   wrapperClass?: string;
+  showCloseButton?: boolean;
 }>;
 
 const DEFAULT_ANIMATION_DURATION = 125;
@@ -352,8 +354,35 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
         ref={modalRef}
         onScroll={(e) => props.onScroll?.(e)}
       >
-        <Show when={props.title !== undefined && props.title !== ""}>
-          <div class="text-2xl text-sub">{props.title}</div>
+        <Show
+          when={
+            (props.title !== undefined && props.title !== "") ||
+            (props.showCloseButton !== false &&
+              (props.closeOnEscape !== false ||
+                props.closeOnWrapperClick !== false))
+          }
+        >
+          <div class="flex items-center justify-between gap-3">
+            <Show when={props.title !== undefined && props.title !== ""}>
+              <div class="text-2xl text-sub">{props.title}</div>
+            </Show>
+            <Show
+              when={
+                props.showCloseButton !== false &&
+                (props.closeOnEscape !== false ||
+                  props.closeOnWrapperClick !== false)
+              }
+            >
+              <Button
+                variant="text"
+                text="Close"
+                fa={{ icon: "fa-times" }}
+                class="ml-auto min-h-10"
+                onClick={() => storeHideModal(props.id)}
+                aria-label={`Close ${props.title ?? "dialog"}`}
+              />
+            </Show>
+          </div>
         </Show>
         {props.children}
       </div>

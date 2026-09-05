@@ -57,6 +57,14 @@ describe("AnimatedModal", () => {
     ).toHaveTextContent("Test Content");
   });
 
+  it("provides a visible close action", () => {
+    const { modalDiv } = renderModal({});
+
+    expect(
+      modalDiv.querySelector("button[aria-label='Close dialog']"),
+    ).toHaveTextContent("Close");
+  });
+
   it("has escape handler attached", () => {
     const { dialog } = renderModal({});
 

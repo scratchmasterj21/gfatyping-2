@@ -18,6 +18,8 @@ type BaseProps = {
   onMouseLeave?: (e: MouseEvent) => void;
   dataset?: Record<string, string>;
   active?: boolean;
+  "aria-label"?: string;
+  "aria-current"?: "page";
 };
 
 export type ButtonProps = BaseProps & {
@@ -37,8 +39,7 @@ type AnchorProps = BaseProps & {
 
 export function Button(props: ButtonProps | AnchorProps): JSXElement {
   const isAnchor = (): boolean => "href" in props;
-  const isActive = (): boolean =>
-    (!isAnchor() && !("href" in props) && props.active) ?? false;
+  const isActive = (): boolean => props.active ?? false;
 
   const variant = () => props.variant ?? "button";
 
@@ -98,6 +99,8 @@ export function Button(props: ButtonProps | AnchorProps): JSXElement {
           disabled={props.disabled ?? false}
           data-ui-variant={variant()}
           data-ui-element="button"
+          aria-label={props["aria-label"]}
+          aria-current={props["aria-current"]}
           {...props.dataset}
         >
           {content}
@@ -124,6 +127,8 @@ export function Button(props: ButtonProps | AnchorProps): JSXElement {
         onMouseLeave={(e) => props.onMouseLeave?.(e)}
         data-ui-variant={variant()}
         data-ui-element="button"
+        aria-label={props["aria-label"]}
+        aria-current={props["aria-current"]}
         {...props.dataset}
       >
         {content}

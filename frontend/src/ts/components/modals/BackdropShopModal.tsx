@@ -82,7 +82,7 @@ export function BackdropShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          A themed backdrop behind the guided keyboard.
+          Choose a backdrop. Buy it once, then select it whenever you want.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -149,7 +149,7 @@ export function BackdropShopModal(): JSXElement {
                       >
                         <Fa icon="fa-coins" size={0.7} />
                       </Show>
-                      {item.price}
+                      {canAfford() ? item.price : "Not enough coins"}
                     </button>
                   </Show>
                 </div>

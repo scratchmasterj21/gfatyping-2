@@ -9,6 +9,7 @@ import {
 
 import { isCurrentUserAdmin } from "../../../auth";
 import { usePendingConnectionsQuery } from "../../../collections/connections";
+import { gradeOf } from "../../../constants/classes";
 import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
@@ -29,6 +30,7 @@ import { getLevelFromTotalXp } from "../../../utils/levels";
 import { Anime } from "../../common/anime";
 import { AnimePresence } from "../../common/anime/AnimePresence";
 import { Button } from "../../common/Button";
+import { Fa } from "../../common/Fa";
 import { NotificationBubble } from "../../common/NotificationBubble";
 import { User } from "../../common/User";
 import { AccountMenu } from "./AccountMenu";
@@ -36,8 +38,10 @@ import { AccountXpBar } from "./AccountXpBar";
 
 export function Nav(): JSXElement {
   const [getAccountMenuOpen, setAccountMenuOpen] = createSignal(false);
+  const [getMobileMenuOpen, setMobileMenuOpen] = createSignal(false);
   const isCoarse = () => window.matchMedia("(pointer: coarse)").matches;
   const [accountMenuRef, accountMenuEl] = useRefWithUtils<HTMLDivElement>();
+  const [mobileMenuRef, mobileMenuEl] = useRefWithUtils<HTMLDivElement>();
 
   const pendingConnections = usePendingConnectionsQuery();
 
@@ -46,14 +50,49 @@ export function Nav(): JSXElement {
     if (getAccountMenuOpen() && el && !el.native.contains(e.target as Node)) {
       setAccountMenuOpen(false);
     }
+    const mobileEl = mobileMenuEl();
+    if (
+      getMobileMenuOpen() &&
+      mobileEl &&
+      !mobileEl.native.contains(e.target as Node)
+    ) {
+      setMobileMenuOpen(false);
+    }
   };
   document.addEventListener("click", handleClickOutside);
   onCleanup(() => document.removeEventListener("click", handleClickOutside));
 
   const buttonClass = () =>
-    cn("aspect-square", {
+    cn("aspect-square min-h-10 min-w-10 xl:aspect-auto", {
       "opacity-(--nav-focus-opacity)": getFocus(),
     });
+
+  const isYoungStudent = (): boolean => {
+    // Firestore stores null for admins and students who have not been placed
+    // in a class yet, despite the snapshot interface using undefined.
+    const grade = gradeOf(getSnapshot()?.classId ?? undefined);
+    return grade !== undefined && ["G1", "G2"].includes(grade);
+  };
+
+  const navLabel = (label: string): JSXElement => (
+    <span
+      class={cn("hidden text-sm font-semibold xl:inline", {
+        "lg:inline": isYoungStudent(),
+      })}
+    >
+      {label}
+    </span>
+  );
+
+  const pageProperties = (page: string, label: string) => ({
+    active: getActivePage() === page,
+    "aria-label": label,
+    "aria-current": getActivePage() === page ? ("page" as const) : undefined,
+  });
+
+  const destinationButtonClass = () => cn(buttonClass(), "hidden xl:flex");
+
+  createEffectOn(getActivePage, () => setMobileMenuOpen(false));
 
   createEffectOn(getSnapshot, (snapshot) => {
     if (snapshot === undefined) {
@@ -84,6 +123,100 @@ export function Nav(): JSXElement {
 
   return (
     <nav class={cn("z-5 flex w-full items-center gap-1 md:gap-2")}>
+      <div
+        ref={mobileMenuRef}
+        class="relative xl:hidden"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setMobileMenuOpen(false);
+        }}
+      >
+        <button
+          type="button"
+          class="flex min-h-10 items-center gap-2 rounded px-3 font-semibold text-sub transition-colors hover:text-text focus-visible:outline-2 focus-visible:outline-main"
+          aria-label={`${getMobileMenuOpen() ? "Close" : "Open"} navigation menu`}
+          aria-expanded={getMobileMenuOpen()}
+          aria-controls="student-navigation-menu"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        >
+          <Fa icon="fa-bars" fixedWidth /> Menu
+        </button>
+        <Show when={getMobileMenuOpen()}>
+          <div
+            id="student-navigation-menu"
+            role="group"
+            aria-label="Main navigation"
+            class="absolute top-full left-0 z-50 mt-2 grid min-w-52 gap-1 rounded bg-bg p-2 shadow-lg ring-2 ring-sub-alt"
+          >
+            <Button
+              variant="text"
+              fa={{ icon: "fa-keyboard", fixedWidth: true }}
+              text="Typing practice"
+              class="w-full justify-start"
+              href="/"
+              router-link
+              {...pageProperties("test", "Typing practice")}
+            />
+            <Button
+              variant="text"
+              fa={{ icon: "fa-graduation-cap", fixedWidth: true }}
+              text="Lessons"
+              class="w-full justify-start"
+              href="/lessons"
+              router-link
+              {...pageProperties("lessons", "Lessons")}
+            />
+            <Button
+              variant="text"
+              fa={{ icon: "fa-crown", fixedWidth: true }}
+              text="Scores"
+              class="w-full justify-start"
+              href="/leaderboards"
+              router-link
+              {...pageProperties("leaderboards", "Leaderboards")}
+            />
+            <Show when={getSnapshot() !== undefined}>
+              <Button
+                variant="text"
+                fa={{ icon: "fa-flag-checkered", fixedWidth: true }}
+                text="Class race"
+                class="w-full justify-start"
+                href="/race"
+                router-link
+                {...pageProperties("race", "Class race")}
+              />
+            </Show>
+            <Show when={isCurrentUserAdmin()}>
+              <Button
+                variant="text"
+                fa={{ icon: "fa-chalkboard-teacher", fixedWidth: true }}
+                text="Teacher classroom"
+                class="w-full justify-start"
+                href="/classroom"
+                router-link
+                {...pageProperties("classroom", "Teacher classroom")}
+              />
+              <Button
+                variant="text"
+                fa={{ icon: "fa-stopwatch", fixedWidth: true }}
+                text="Host race"
+                class="w-full justify-start"
+                href="/racehost"
+                router-link
+                {...pageProperties("racehost", "Host a class race")}
+              />
+            </Show>
+            <Button
+              variant="text"
+              fa={{ icon: "fa-cog", fixedWidth: true }}
+              text="Settings"
+              class="w-full justify-start"
+              href="/settings"
+              router-link
+              {...pageProperties("settings", "Settings")}
+            />
+          </div>
+        </Show>
+      </div>
       <Button
         variant="text"
         fa={{
@@ -92,14 +225,17 @@ export function Nav(): JSXElement {
         }}
         router-link
         href="/"
-        class={buttonClass()}
+        class={destinationButtonClass()}
+        {...pageProperties("test", "Typing practice")}
         dataset={{
           "data-nav-item": "test",
         }}
         onClick={() => {
           if (getActivePage() === "test") restartTestEvent.dispatch();
         }}
-      />
+      >
+        {navLabel("Type")}
+      </Button>
       <Button
         variant="text"
         fa={{
@@ -110,9 +246,12 @@ export function Nav(): JSXElement {
         dataset={{
           "data-nav-item": "lessons",
         }}
-        class={buttonClass()}
+        class={destinationButtonClass()}
         href="/lessons"
-      />
+        {...pageProperties("lessons", "Lessons")}
+      >
+        {navLabel("Lessons")}
+      </Button>
       <Button
         variant="text"
         fa={{
@@ -123,12 +262,15 @@ export function Nav(): JSXElement {
         dataset={{
           "data-nav-item": "leaderboards",
         }}
-        class={buttonClass()}
+        class={destinationButtonClass()}
         href="/leaderboards"
+        {...pageProperties("leaderboards", "Leaderboards")}
         onMouseEnter={() => {
           prefetchLeaderboardPage();
         }}
-      />
+      >
+        {navLabel("Scores")}
+      </Button>
       <Show when={getSnapshot() !== undefined}>
         <Button
           variant="text"
@@ -140,9 +282,12 @@ export function Nav(): JSXElement {
           dataset={{
             "data-nav-item": "race",
           }}
-          class={buttonClass()}
+          class={destinationButtonClass()}
           href="/race"
-        />
+          {...pageProperties("race", "Class race")}
+        >
+          {navLabel("Race")}
+        </Button>
       </Show>
       <Show when={isCurrentUserAdmin()}>
         <Button
@@ -155,9 +300,12 @@ export function Nav(): JSXElement {
           dataset={{
             "data-nav-item": "classroom",
           }}
-          class={buttonClass()}
+          class={destinationButtonClass()}
           href="/classroom"
-        />
+          {...pageProperties("classroom", "Teacher classroom")}
+        >
+          {navLabel("Classroom")}
+        </Button>
         <Button
           variant="text"
           fa={{
@@ -168,9 +316,12 @@ export function Nav(): JSXElement {
           dataset={{
             "data-nav-item": "racehost",
           }}
-          class={buttonClass()}
+          class={destinationButtonClass()}
           href="/racehost"
-        />
+          {...pageProperties("racehost", "Host a class race")}
+        >
+          {navLabel("Host race")}
+        </Button>
       </Show>
       <Button
         variant="text"
@@ -184,7 +335,10 @@ export function Nav(): JSXElement {
           "data-nav-item": "settings",
         }}
         router-link
-      />
+        {...pageProperties("settings", "Settings")}
+      >
+        {navLabel("Settings")}
+      </Button>
       <div class="grow"></div>
       <Button
         variant="text"
@@ -199,6 +353,7 @@ export function Nav(): JSXElement {
           showModal("Alerts");
         }}
         class={cn(buttonClass(), "relative")}
+        aria-label="Notifications"
       >
         <NotificationBubble
           variant="fromCorner"

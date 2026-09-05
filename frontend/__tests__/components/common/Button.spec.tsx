@@ -38,6 +38,27 @@ describe("Button component", () => {
     expect(anchor).not.toHaveAttribute("data-balloon-pos");
   });
 
+  it("supports current-page state on navigation links", () => {
+    const { container } = render(() => (
+      <Button
+        href="/lessons"
+        router-link
+        variant="text"
+        text="Lessons"
+        active
+        aria-label="Lessons"
+        aria-current="page"
+      />
+    ));
+
+    const anchor = container.querySelector("a");
+    expect(anchor).toHaveAttribute("aria-label", "Lessons");
+    expect(anchor).toHaveAttribute("aria-current", "page");
+    expect(anchor?.className).toContain(
+      "--themable-button-text:var(--themable-button-active)",
+    );
+  });
+
   it("calls onClick when button is clicked", async () => {
     const onClick = vi.fn();
 

@@ -79,7 +79,7 @@ export function HandsShopModal(): JSXElement {
         </div>
 
         <p class="text-center text-em-xs text-sub">
-          Change the look of the guided hands shown during typing tests.
+          Choose a style. Buy it once, then select it whenever you want.
         </p>
 
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -150,7 +150,7 @@ export function HandsShopModal(): JSXElement {
                       >
                         <Fa icon="fa-coins" size={0.7} />
                       </Show>
-                      {item.price}
+                      {canAfford() ? item.price : "Not enough coins"}
                     </button>
                   </Show>
                 </div>

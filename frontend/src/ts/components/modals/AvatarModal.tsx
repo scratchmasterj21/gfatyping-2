@@ -411,6 +411,14 @@ export function AvatarModal(): JSXElement {
           </For>
         </div>
 
+        <p class="text-center text-em-xs text-sub">
+          {tab() === "wear"
+            ? "Choose something you own to equip it."
+            : tab() === "shop"
+              ? "Choose an item to buy it, then equip it from Wear."
+              : "Choose an animal to buy or equip it."}
+        </p>
+
         <Show when={tab() !== "animals"}>
           <div class="flex flex-wrap gap-1">
             <For each={AVATAR_CATEGORIES}>
@@ -493,6 +501,7 @@ export function AvatarModal(): JSXElement {
                       <span class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-main ring-2 ring-main">
                         <Fa icon="fa-check" size={0.6} />
                       </span>
+                      <span class="text-em-xs font-bold">Equipped</span>
                     </Show>
                     <img
                       src={item.image}
@@ -510,7 +519,7 @@ export function AvatarModal(): JSXElement {
                           }
                         >
                           <Fa icon="fa-coins" size={0.7} />
-                          {item.price}
+                          {canAfford() ? item.price : "Not enough coins"}
                         </Show>
                       </span>
                     </Show>
@@ -605,6 +614,7 @@ export function AvatarModal(): JSXElement {
                         <span class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-main ring-2 ring-main">
                           <Fa icon="fa-check" size={0.6} />
                         </span>
+                        <span class="text-em-xs font-bold">Equipped</span>
                       </Show>
                       <Show
                         when={item.category === "color"}
@@ -675,7 +685,7 @@ export function AvatarModal(): JSXElement {
                           >
                             <span class="flex items-center gap-1 text-em-xs">
                               <Fa icon="fa-coins" size={0.7} />
-                              {item.price}
+                              {canAfford() ? item.price : "Not enough coins"}
                             </span>
                           </Show>
                         </Show>
