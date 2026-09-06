@@ -822,9 +822,9 @@ async function updateLessonGate(
   nextButton?.removeClass("lessonAction").show();
   retryButton?.removeClass("lessonAction");
   backButton?.hide();
-  qsa("#nextTestButton .lessonActionText")?.addClass("hidden");
-  qsa("#restartTestButtonWithSameWordset .lessonActionText")?.addClass(
-    "hidden",
+  qs("#nextTestButton .lessonActionText")?.setText("New test");
+  qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+    "Try again",
   );
   nextButton?.setAttribute("aria-label", "Next test");
   retryButton?.setAttribute("aria-label", "Repeat test");
@@ -840,9 +840,9 @@ async function updateLessonGate(
   nextButton?.addClass("lessonAction");
   retryButton?.addClass("lessonAction");
   backButton?.show();
-  qsa("#nextTestButton .lessonActionText")?.removeClass("hidden");
-  qsa("#restartTestButtonWithSameWordset .lessonActionText")?.removeClass(
-    "hidden",
+  qs("#nextTestButton .lessonActionText")?.setText("Next lesson");
+  qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+    "Try again",
   );
   const threshold = LessonProgress.lessonPassAccuracy(getStudentGrade());
   if (completionPromise !== undefined) {
@@ -860,6 +860,9 @@ async function updateLessonGate(
       retryButton?.addClass("lessonPrimary");
       nextButton?.hide();
       retryButton?.setAttribute("aria-label", "Retry lesson");
+      qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+        "Retry lesson",
+      );
       return;
     }
 
@@ -882,6 +885,9 @@ async function updateLessonGate(
         retryButton?.addClass("lessonPrimary");
         nextButton?.hide();
         retryButton?.setAttribute("aria-label", "Improve to 2 stars");
+        qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+          "Try again for 2 stars",
+        );
       }
       return;
     }
@@ -904,6 +910,9 @@ async function updateLessonGate(
     retryButton?.addClass("lessonPrimary");
     nextButton?.hide();
     retryButton?.setAttribute("aria-label", "Retry lesson");
+    qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+      "Retry lesson",
+    );
   }
 }
 

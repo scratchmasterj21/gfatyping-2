@@ -811,6 +811,10 @@
       border-radius: var(--roundness);
     }
 
+    .buttons button {
+      min-height: 3rem;
+    }
+
     .buttons .lessonAction {
       display: inline-flex;
       align-items: center;

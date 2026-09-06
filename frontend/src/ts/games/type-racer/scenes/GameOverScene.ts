@@ -1,4 +1,4 @@
-import { Scene } from "phaser";
+import { Geom, Scene } from "phaser";
 
 type GameOverData = {
   playerWon: boolean;
@@ -74,7 +74,7 @@ export class GameOverScene extends Scene {
   ): void {
     const bg = this.add.graphics();
     bg.fillStyle(0x224466, 1);
-    bg.fillRect(x - 80, y - 20, 160, 40);
+    bg.fillRect(x - 80, y - 24, 160, 48);
     const txt = this.add
       .text(x, y, label, {
         fontSize: "14px",
@@ -89,7 +89,11 @@ export class GameOverScene extends Scene {
         txt.setColor("#ffffff");
       });
 
-    bg.setInteractive({ useHandCursor: true })
+    bg.setInteractive({
+      hitArea: new Geom.Rectangle(x - 80, y - 24, 160, 48),
+      hitAreaCallback: Geom.Rectangle.Contains,
+      useHandCursor: true,
+    })
       .on("pointerdown", onClick)
       .on("pointerover", () => txt.setColor("#ffcc44"))
       .on("pointerout", () => txt.setColor("#ffffff"));

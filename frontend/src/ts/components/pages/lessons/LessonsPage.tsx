@@ -1461,6 +1461,25 @@ export function LessonsPage(): JSXElement {
           </section>
         </Show>
 
+        <Show
+          when={
+            isAuthenticated() &&
+            !isCurrentUserAdmin() &&
+            classId() === undefined
+          }
+        >
+          <section class="rounded bg-sub-alt p-4 text-center">
+            <div class="font-bold text-text">
+              <Fa icon="fa-user-clock" class="mr-2 text-main" />
+              Welcome! Your teacher is setting up your class.
+            </div>
+            <p class="mt-1 text-sm text-sub">
+              You can start Typing Practice and beginner lessons now. Class
+              assignments and scores will appear automatically when ready.
+            </p>
+          </section>
+        </Show>
+
         <Show when={(userStatsQuery.data?.streakDays ?? 0) > 0}>
           <section class="flex items-center gap-2 rounded bg-sub-alt px-4 py-2 text-main">
             <Fa icon="fa-fire" />

@@ -7,6 +7,7 @@ import {
   JSXElement,
   Show,
 } from "solid-js";
+import { z } from "zod";
 
 import { isCurrentUserAdmin } from "../../../auth";
 import {
@@ -45,6 +46,7 @@ import {
 import { buildProgressCsv } from "../../../classroom/progress-csv";
 import { awardCoins } from "../../../coins";
 import { CLASS_IDS, GRADES } from "../../../constants/classes";
+import { useLocalStorage } from "../../../hooks/useLocalStorage";
 import { lessonGroups } from "../../../lessons/lessons-data";
 import { queryClient } from "../../../queries";
 import { listHistoryForClass } from "../../../race/race-db";
@@ -57,7 +59,7 @@ import {
 import { cn } from "../../../utils/cn";
 import { download } from "../../../utils/misc";
 import { Button } from "../../common/Button";
-import { Fa } from "../../common/Fa";
+import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
 import { SideImageApprovals } from "./SideImageApprovals";
@@ -68,15 +70,24 @@ const inputClass =
 const selectClass =
   "rounded bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
 
-type Tab =
-  | "students"
-  | "progress"
-  | "assignments"
-  | "wordlists"
-  | "passages"
-  | "races"
-  | "images"
-  | "announcements";
+const TabSchema = z.enum([
+  "students",
+  "progress",
+  "assignments",
+  "wordlists",
+  "passages",
+  "races",
+  "images",
+  "announcements",
+]);
+type Tab = z.infer<typeof TabSchema>;
+
+const CLASS_TABS = new Set<Tab>([
+  "progress",
+  "assignments",
+  "races",
+  "announcements",
+]);
 
 function formatDate(ts: number): string {
   if (ts <= 0) return "never";
@@ -1688,7 +1699,19 @@ function RacesTab(props: {
 
 export function ClassroomDashboard(): JSXElement {
   const [selectedClass, setSelectedClass] = createSignal<string>(CLASS_IDS[0]);
-  const [tab, setTab] = createSignal<Tab>("students");
+  const [tab, setTab] = useLocalStorage<Tab>({
+    key: "classroomDashboardTab",
+    schema: TabSchema,
+    fallback: "students",
+  });
+  if (window.location.hash === "#students") {
+    setTab("students");
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${window.location.search}`,
+    );
+  }
 
   const [selfCoinAmount, setSelfCoinAmount] = createSignal(10);
   const [rewardingSelf, setRewardingSelf] = createSignal(false);
@@ -1781,13 +1804,23 @@ export function ClassroomDashboard(): JSXElement {
     () => announcementsQuery.data ?? [],
   );
 
-  const tabButton = (id: Tab, text: string): JSXElement => (
+  const tabButton = (id: Tab, text: string, fa: FaProps): JSXElement => (
     <Button
       variant="text"
       text={text}
+      fa={{ ...fa, fixedWidth: true }}
       active={tab() === id}
       onClick={() => setTab(id)}
     />
+  );
+
+  const tabGroup = (label: string, buttons: JSXElement): JSXElement => (
+    <div class="grid gap-1 rounded bg-sub-alt p-2">
+      <div class="px-2 text-xs font-semibold tracking-wide text-sub uppercase">
+        {label}
+      </div>
+      <div class="flex flex-wrap gap-1">{buttons}</div>
+    </div>
   );
 
   return (
@@ -1804,27 +1837,9 @@ export function ClassroomDashboard(): JSXElement {
         <div class="content-grid grid gap-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <H2 fa={{ icon: "fa-chalkboard-teacher" }} text="classroom" />
-            <Show when={tab() !== "students"}>
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-1.5 text-sm text-sub">
-                  <Fa icon="fa-coins" />
-                  <input
-                    type="number"
-                    min="1"
-                    class={cn(selectClass, "w-20")}
-                    value={selfCoinAmount()}
-                    onChange={(e) =>
-                      setSelfCoinAmount(
-                        Math.max(1, Number(e.currentTarget.value) || 1),
-                      )
-                    }
-                  />
-                  <Button
-                    text={rewardingSelf() ? "giving…" : "reward myself"}
-                    disabled={rewardingSelf()}
-                    onClick={() => void rewardSelf()}
-                  />
-                </div>
+            <Show when={CLASS_TABS.has(tab())}>
+              <label class="flex items-center gap-2 text-sm text-sub">
+                Class
                 <select
                   class={selectClass}
                   value={selectedClass()}
@@ -1834,19 +1849,44 @@ export function ClassroomDashboard(): JSXElement {
                     {(c) => <option value={c}>{c}</option>}
                   </For>
                 </select>
-              </div>
+              </label>
             </Show>
           </div>
 
-          <div class="flex flex-wrap gap-2 border-b border-sub-alt pb-2">
-            {tabButton("students", "students")}
-            {tabButton("progress", "progress")}
-            {tabButton("assignments", "assignments")}
-            {tabButton("wordlists", "word lists")}
-            {tabButton("passages", "passages")}
-            {tabButton("races", "races")}
-            {tabButton("images", "side images")}
-            {tabButton("announcements", "announcements")}
+          <div class="flex flex-wrap gap-2 border-b border-sub-alt pb-3">
+            {tabGroup(
+              "Students",
+              <>
+                {tabButton("students", "Students", { icon: "fa-users" })}
+                {tabButton("progress", "Student progress", {
+                  icon: "fa-chart-line",
+                })}
+              </>,
+            )}
+            {tabGroup(
+              "Teaching",
+              <>
+                {tabButton("assignments", "Assignments", {
+                  icon: "fa-tasks",
+                })}
+                {tabButton("wordlists", "Word lists", { icon: "fa-list" })}
+                {tabButton("passages", "Passages", {
+                  icon: "fa-book-open",
+                })}
+              </>,
+            )}
+            {tabGroup(
+              "Activities",
+              <>
+                {tabButton("races", "Races", {
+                  icon: "fa-flag-checkered",
+                })}
+                {tabButton("images", "Side images", { icon: "fa-images" })}
+                {tabButton("announcements", "Announcements", {
+                  icon: "fa-bullhorn",
+                })}
+              </>,
+            )}
           </div>
 
           <Show when={tab() === "students"}>
@@ -1893,6 +1933,36 @@ export function ClassroomDashboard(): JSXElement {
               onChanged={refetchAnnouncements}
             />
           </Show>
+
+          <details class="rounded bg-sub-alt p-3 text-sm">
+            <summary class="cursor-pointer text-sub">
+              <Fa icon="fa-tools" class="mr-2" />
+              Admin tools
+            </summary>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <Fa icon="fa-coins" class="text-sub" />
+              <label class="text-sub" for="admin-self-coin-amount">
+                Coins for my test account
+              </label>
+              <input
+                id="admin-self-coin-amount"
+                type="number"
+                min="1"
+                class={cn(selectClass, "w-20")}
+                value={selfCoinAmount()}
+                onChange={(e) =>
+                  setSelfCoinAmount(
+                    Math.max(1, Number(e.currentTarget.value) || 1),
+                  )
+                }
+              />
+              <Button
+                text={rewardingSelf() ? "giving…" : "reward myself"}
+                disabled={rewardingSelf()}
+                onClick={() => void rewardSelf()}
+              />
+            </div>
+          </details>
         </div>
       </Show>
     </Page>

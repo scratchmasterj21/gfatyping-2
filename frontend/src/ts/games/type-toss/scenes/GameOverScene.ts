@@ -74,7 +74,7 @@ export class GameOverScene extends Scene {
   ): void {
     const bg = this.add.graphics();
     bg.fillStyle(0x8b4513, 1);
-    bg.fillRoundedRect(x - 80, y - 20, 160, 40, 8);
+    bg.fillRoundedRect(x - 80, y - 24, 160, 48, 8);
     bg.lineStyle(1.5, 0xf9a825, 0.7);
     bg.strokeRoundedRect(x - 80, y - 20, 160, 40, 8);
 
@@ -87,7 +87,7 @@ export class GameOverScene extends Scene {
       .setOrigin(0.5);
 
     bg.setInteractive({
-      hitArea: new Geom.Rectangle(x - 80, y - 20, 160, 40),
+      hitArea: new Geom.Rectangle(x - 80, y - 24, 160, 48),
       hitAreaCallback: Geom.Rectangle.Contains,
       useHandCursor: true,
     })

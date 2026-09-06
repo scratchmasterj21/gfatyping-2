@@ -1,6 +1,7 @@
 import { For, JSXElement, Show } from "solid-js";
 
 import { ClassroomAlert } from "../../../lessons/classroom-alerts";
+import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 import { H3 } from "../../common/Headers";
 import { AlertsSection } from "./AlertsSection";
@@ -34,6 +35,18 @@ function Alert(props: { alert: ClassroomAlert }): JSXElement {
         <div class="text-xs wrap-break-word text-sub">
           {props.alert.message}
         </div>
+        <Show when={props.alert.action} keyed>
+          {(action) => (
+            <Button
+              class="mt-1 px-0"
+              variant="text"
+              text={action.label}
+              fa={{ icon: "fa-arrow-right" }}
+              href={action.href}
+              router-link
+            />
+          )}
+        </Show>
       </div>
     </div>
   );

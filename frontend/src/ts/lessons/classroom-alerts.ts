@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/solid-query";
 import { Accessor, createMemo } from "solid-js";
 
-import { isCurrentUserAdmin } from "../auth";
+import { ADMIN_UID, isCurrentUserAdmin } from "../auth";
 import {
   Announcement,
   getAnnouncementsForStudent,
@@ -16,6 +16,7 @@ import {
   ReadingPassage,
   WordList,
 } from "../classroom/assignments";
+import { listAllStudents } from "../classroom/classroom";
 import { getAuthenticatedUser } from "../firebase";
 import { queryClient } from "../queries";
 import { isAuthenticated } from "../states/core";
@@ -34,6 +35,7 @@ export type ClassroomAlert = {
   icon: FaSolidIcon;
   title: string;
   message: string;
+  action?: { href: string; label: string };
 };
 
 type DeriveAlertsInput = {
@@ -211,8 +213,15 @@ export function useClassroomAlerts(): {
     staleTime: 0,
   }));
 
-  const alerts = createMemo(() =>
-    deriveAlerts({
+  const unassignedStudentsQuery = useQuery(() => ({
+    queryKey: ["classroom", "students"],
+    queryFn: listAllStudents,
+    enabled: isAuthenticated() && isCurrentUserAdmin(),
+    staleTime: 1000 * 30,
+  }));
+
+  const alerts = createMemo(() => {
+    const derived = deriveAlerts({
       assignments: assignmentsQuery.data ?? [],
       wordLists: wordListsQuery.data ?? [],
       passages: passagesQuery.data ?? [],
@@ -222,8 +231,24 @@ export function useClassroomAlerts(): {
       seenAchievementIds: userStatsQuery.data?.seenAchievementIds ?? [],
       streakDays: userStatsQuery.data?.streakDays ?? 0,
       lastPracticedDate: userStatsQuery.data?.lastPracticedDate ?? "",
-    }),
-  );
+    });
+    if (isCurrentUserAdmin()) {
+      const count = (unassignedStudentsQuery.data ?? []).filter(
+        (student) => student.uid !== ADMIN_UID && student.classId === undefined,
+      ).length;
+      if (count > 0) {
+        derived.unshift({
+          id: "unassigned-students",
+          icon: "fa-user-plus",
+          title: `${count} unassigned student${count === 1 ? "" : "s"}`,
+          message:
+            "Assign new students to a class so they receive the right work.",
+          action: { href: "/classroom#students", label: "Assign now" },
+        });
+      }
+    }
+    return derived;
+  });
 
   const markAllSeen = (): void => {
     const uid = getAuthenticatedUser()?.uid;

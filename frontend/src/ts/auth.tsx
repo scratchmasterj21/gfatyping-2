@@ -9,6 +9,7 @@ import {
   User,
   User as UserType,
 } from "firebase/auth";
+import { doc, onSnapshot, Unsubscribe } from "firebase/firestore";
 import { z, ZodString } from "zod";
 
 import { provisionAccount } from "./account-provisioning";
@@ -22,6 +23,7 @@ import {
   signOut as authSignOut,
   createUserWithEmailAndPassword,
   getAuthenticatedUser,
+  getDb,
   isAuthAvailable,
   resetIgnoreAuthCallback,
   signInWithEmailAndPassword,
@@ -116,6 +118,31 @@ type ReauthSuccess = {
   message: string;
   user: User;
 };
+
+let stopClassAssignmentListener: Unsubscribe | undefined;
+
+function stopClassAssignmentSync(): void {
+  stopClassAssignmentListener?.();
+  stopClassAssignmentListener = undefined;
+}
+
+function startClassAssignmentSync(uid: string): void {
+  stopClassAssignmentSync();
+  stopClassAssignmentListener = onSnapshot(
+    doc(getDb(), "users", uid),
+    (userDoc) => {
+      const data = userDoc.data() as { classId?: unknown } | undefined;
+      const value = data?.classId;
+      const nextClassId =
+        typeof value === "string" && value !== "" ? value : undefined;
+      const snapshot = DB.getSnapshot();
+      if (snapshot === undefined || snapshot.classId === nextClassId) return;
+      snapshot.classId = nextClassId;
+      DB.setSnapshot(snapshot);
+    },
+    (error) => console.error("Class assignment sync failed", error),
+  );
+}
 
 type ReauthFailed = {
   status: "error" | "notice";
@@ -216,6 +243,7 @@ export async function loadUser(_user: UserType): Promise<void> {
     signOut();
     return;
   }
+  startClassAssignmentSync(_user.uid);
   authEvent.dispatch({ type: "snapshotUpdated", data: { isInitial: true } });
 }
 
@@ -228,6 +256,7 @@ export async function onAuthStateChanged(
   let userPromise: Promise<void> = Promise.resolve();
 
   if (authInitialisedAndConnected) {
+    stopClassAssignmentSync();
     console.debug(`auth state changed, user ${user ? "true" : "false"}`);
     if (user && !isAllowedAuthEmail(user.email)) {
       // Account is not from the allowed domain. Reject and sign out.
