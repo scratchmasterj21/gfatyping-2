@@ -117,7 +117,7 @@ export function Table(
               {...commonProps()}
               columns={xpColumns()}
               data={props.entries as XpLeaderboardEntry[]}
-              noDataRow={{ content: <NoEntriesFound /> }}
+              noDataRow={{ content: <NoEntriesFound type="xp" /> }}
             />
           }
         >
@@ -125,7 +125,7 @@ export function Table(
             {...commonProps()}
             columns={speedColumns()}
             data={props.entries as LeaderboardEntry[]}
-            noDataRow={{ content: <NoEntriesFound /> }}
+            noDataRow={{ content: <NoEntriesFound type="speed" /> }}
           />
         </Show>
       }
@@ -134,25 +134,52 @@ export function Table(
         {...commonProps()}
         columns={props.type === "raceacc" ? raceAccColumns() : raceColumns()}
         data={props.entries as RaceLeaderboardEntry[]}
-        noDataRow={{ content: <NoEntriesFound /> }}
+        noDataRow={{ content: <NoEntriesFound type={props.type} /> }}
       />
     </Show>
   );
 }
 
-function NoEntriesFound(): JSXElement {
+function NoEntriesFound(props: {
+  type: "speed" | "xp" | "racewpm" | "raceacc";
+}): JSXElement {
+  const message = () =>
+    props.type === "speed"
+      ? "No qualifying scores yet. Complete a saved typing test to join."
+      : props.type === "xp"
+        ? "No XP has been earned for this ranking period yet."
+        : "No race results yet. Finish a class race to join.";
   return (
     <div class="flex flex-row items-center justify-center rounded bg-sub-alt p-4 text-text">
-      <div>No entries found ¯\_(ツ)_/¯</div>
+      <div>{message()}</div>
     </div>
+  );
+}
+
+function Rank(props: { rank: number | undefined }): JSXElement {
+  const medal = () =>
+    props.rank === 1
+      ? "🥇"
+      : props.rank === 2
+        ? "🥈"
+        : props.rank === 3
+          ? "🥉"
+          : undefined;
+  return (
+    <span aria-label={`Rank ${props.rank}`}>
+      {props.rank === undefined
+        ? "—"
+        : medal() === undefined
+          ? props.rank
+          : medal()}
+    </span>
   );
 }
 
 const friendsRankColumn = () =>
   createColumnHelper<SpeedEntry | XpEntry>().accessor("friendsRank", {
     header: () => <Fa icon="fa-user-friends" />,
-    cell: (info) =>
-      info.getValue() === 1 ? <Fa icon="fa-crown" /> : info.getValue(),
+    cell: (info) => <Rank rank={info.getValue()} />,
     meta: {
       align: "center",
       headerMeta: {
@@ -165,8 +192,7 @@ const friendsRankColumn = () =>
 const rankColumn = (friendsOnly: boolean) =>
   createColumnHelper<SpeedEntry | XpEntry>().accessor("rank", {
     header: () => <Fa icon={friendsOnly ? "fa-users" : "fa-hashtag"} />,
-    cell: (info) =>
-      info.getValue() === 1 ? <Fa icon="fa-crown" /> : info.getValue(),
+    cell: (info) => <Rank rank={info.getValue()} />,
     meta: {
       align: "center",
       headerMeta: {

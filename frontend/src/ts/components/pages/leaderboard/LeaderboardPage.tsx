@@ -148,7 +148,11 @@ export function LeaderboardPage(): JSXElement {
         wpmMode2: cs.mode2,
       }),
       enabled:
-        isOpen() && isClassroom() && hasRequiredScope && !isGamesMetric(),
+        isAuthenticated() &&
+        isOpen() &&
+        isClassroom() &&
+        hasRequiredScope &&
+        !isGamesMetric(),
     };
   });
 
@@ -229,8 +233,8 @@ export function LeaderboardPage(): JSXElement {
 
   return (
     <Page id="leaderboards">
-      <div class="content-grid flex flex-col gap-5 lg:flex-row lg:gap-8">
-        <div class="w-full shrink-0 lg:w-60 2xl:w-75">
+      <div class="content-grid flex flex-col gap-5 lg:gap-6">
+        <div class="w-full">
           <AsyncContent queries={{ serverConfigurationQuery }}>
             {({ serverConfigurationQueryData }) => (
               <Sidebar
@@ -324,6 +328,26 @@ export function LeaderboardPage(): JSXElement {
             >
               {({ entriesQueryData }) => (
                 <div>
+                  <Show when={isClassroom()}>
+                    {(() => {
+                      const selfEntry = () =>
+                        entriesQueryData()?.entries.find(
+                          (entry) => entry.uid === getSnapshot()?.uid,
+                        );
+                      return (
+                        <Show when={selfEntry()}>
+                          {(entry) => (
+                            <div class="mb-3 flex min-h-12 items-center justify-between rounded bg-sub-alt px-4 py-3 text-text">
+                              <span class="font-semibold">Your position</span>
+                              <span class="text-lg font-semibold text-main">
+                                #{entry().rank}
+                              </span>
+                            </div>
+                          )}
+                        </Show>
+                      );
+                    })()}
+                  </Show>
                   <Show when={!isClassroom()}>
                     <div
                       class={cn(

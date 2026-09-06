@@ -108,10 +108,16 @@ export const getSelection = (): Selection => {
   const withoutFriends = selection.friendsOnly
     ? { ...selection, friendsOnly: false }
     : selection;
-  if (withoutFriends.type !== "grade" || isCurrentUserAdmin()) {
+  if (!isClassroomType(withoutFriends.type) || isCurrentUserAdmin()) {
     return withoutFriends;
   }
   const classId = getSnapshot()?.classId;
+  if (withoutFriends.type === "class") {
+    return typeof classId === "string"
+      ? { ...withoutFriends, classId }
+      : { ...withoutFriends, type: "school", classId: undefined };
+  }
+  if (withoutFriends.type !== "grade") return withoutFriends;
   return {
     ...withoutFriends,
     grade: typeof classId === "string" ? gradeOf(classId) : undefined,
@@ -212,10 +218,8 @@ function lsSelection(): [Accessor<Selection>, Setter<Selection>] {
     key: "leaderboardSelector",
     schema: SelectionSchema,
     fallback: {
-      type: "allTime",
-      mode: "time",
-      mode2: "15",
-      language: "english",
+      type: "class",
+      metric: "xp",
       friendsOnly: false,
       previous: false,
     },

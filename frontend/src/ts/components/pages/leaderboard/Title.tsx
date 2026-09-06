@@ -103,12 +103,42 @@ export function Title(props: {
       ),
   );
 
+  const description = createMemo(() => {
+    if (!isClassroomType(props.selection.type)) {
+      return props.selection.type === "weekly"
+        ? "XP earned by the Monkeytype community."
+        : "Typing scores from the global Monkeytype community.";
+    }
+
+    const selection = props.selection as ClassroomSelectionType;
+    const scope =
+      selection.type === "class"
+        ? `students in ${selection.classId ?? "your class"}`
+        : selection.type === "grade"
+          ? `students in ${selection.grade ?? "your grade"}`
+          : "all students in the school";
+    const metric =
+      selection.metric === "xpAllTime"
+        ? "total XP"
+        : selection.metric === "wpm"
+          ? "best typing speed"
+          : selection.metric === "racewpm"
+            ? "best race speed"
+            : selection.metric === "raceacc"
+              ? "best race accuracy"
+              : selection.metric === "games"
+                ? "game high scores"
+                : "XP earned this week";
+    return `Ranking ${scope} by ${metric}.`;
+  });
+
   return (
     <div>
       <H2
         text={title()}
         class="p-0 text-2xl text-text md:text-3xl xl:text-4xl"
       />
+      <div class="text-sub">{description()}</div>
       <Show when={isWpmMetric()}>
         <div class="text-sub">
           ranked by {(props.selection as ClassroomSelectionType).mode2 ?? "30"}s

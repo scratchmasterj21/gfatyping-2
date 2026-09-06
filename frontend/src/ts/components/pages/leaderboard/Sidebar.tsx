@@ -17,7 +17,12 @@ import { getSnapshot } from "../../../states/snapshot";
 import { FaSolidIcon } from "../../../types/font-awesome";
 import { Button } from "../../common/Button";
 
-type GroupItem<T> = { id: T; text: string; icon: FaSolidIcon };
+type GroupItem<T> = {
+  id: T;
+  text: string;
+  icon: FaSolidIcon;
+  description?: string;
+};
 
 type LanguagesByModeByMode2 = Partial<Record<Mode, Record<string, Language[]>>>;
 
@@ -72,60 +77,134 @@ export function Sidebar(props: {
 
   const classroom = () => props.selection() as ClassroomSelectionType;
   const isClassroom = () => isClassroomType(props.selection().type);
+  const hasClass = () => typeof getSnapshot()?.classId === "string";
+  const openSchoolRankings = (): void => {
+    selectType(!isCurrentUserAdmin() && hasClass() ? "class" : "school");
+  };
 
   return (
-    <>
-      <Group
-        selected={props.selection().type}
-        onSelect={selectType}
-        items={[
-          {
-            id: "allTime",
-            text: "all-time english",
-            icon: "fa-globe-americas",
-          },
-          { id: "weekly", text: "weekly xp", icon: "fa-calendar-day" },
-          { id: "daily", text: "daily", icon: "fa-sun" },
-        ]}
-      />
-      <Show when={isAuthenticated()}>
+    <div class="grid gap-3">
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <Button
+          class="min-h-14 justify-start px-4 text-base"
+          active={isClassroom()}
+          fa={{ icon: "fa-school", fixedWidth: true }}
+          text="School rankings"
+          onClick={openSchoolRankings}
+        />
+        <Button
+          class="min-h-14 justify-start px-4 text-base"
+          active={!isClassroom()}
+          fa={{ icon: "fa-globe-americas", fixedWidth: true }}
+          text="Global rankings"
+          onClick={() => selectType("allTime")}
+        />
+      </div>
+
+      <Show when={isClassroom() && isAuthenticated()}>
+        <Show when={!isCurrentUserAdmin() && !hasClass()}>
+          <div class="rounded bg-sub-alt p-4 text-sm text-sub">
+            <div class="font-semibold text-text">Class setup in progress</div>
+            Your class and grade rankings will appear after your teacher assigns
+            you. You can view the whole-school ranking now.
+          </div>
+        </Show>
         <Group
+          title="Who do you want to compare?"
           selected={props.selection().type}
           onSelect={selectType}
           items={[
-            { id: "class", text: "my class", icon: "fa-users" },
-            { id: "grade", text: "my grade", icon: "fa-user-friends" },
-            { id: "school", text: "school", icon: "fa-school" },
+            ...(isCurrentUserAdmin()
+              ? [
+                  {
+                    id: "class" as const,
+                    text: "Choose a class",
+                    icon: "fa-users" as const,
+                  },
+                  {
+                    id: "grade" as const,
+                    text: "Choose a grade",
+                    icon: "fa-user-friends" as const,
+                  },
+                ]
+              : hasClass()
+                ? [
+                    {
+                      id: "class" as const,
+                      text: "My class",
+                      icon: "fa-users" as const,
+                      description: getSnapshot()?.classId,
+                    },
+                    {
+                      id: "grade" as const,
+                      text: "My grade",
+                      icon: "fa-user-friends" as const,
+                      description: gradeOf(getSnapshot()?.classId),
+                    },
+                  ]
+                : []),
+            { id: "school", text: "Whole school", icon: "fa-school" },
           ]}
         />
-      </Show>
-      <Show when={isClassroom()}>
         <Group
+          title="What do you want to rank?"
           selected={classroom().metric ?? "xp"}
           onSelect={selectMetric}
           items={[
-            { id: "xp", text: "xp (weekly)", icon: "fa-star" },
-            { id: "xpAllTime", text: "xp (all-time)", icon: "fa-crown" },
-            { id: "wpm", text: "wpm", icon: "fa-bolt" },
-            { id: "racewpm", text: "race wpm", icon: "fa-flag-checkered" },
-            { id: "raceacc", text: "race acc", icon: "fa-bullseye" },
-            { id: "games", text: "games", icon: "fa-gamepad" },
+            {
+              id: "xp",
+              text: "Weekly XP",
+              icon: "fa-star",
+              description: "Practice earned this week",
+            },
+            {
+              id: "xpAllTime",
+              text: "All-time XP",
+              icon: "fa-crown",
+              description: "Total XP earned",
+            },
+            {
+              id: "wpm",
+              text: "Typing speed",
+              icon: "fa-bolt",
+              description: "Best English test WPM",
+            },
+            {
+              id: "racewpm",
+              text: "Race speed",
+              icon: "fa-flag-checkered",
+              description: "Best race WPM",
+            },
+            {
+              id: "raceacc",
+              text: "Race accuracy",
+              icon: "fa-bullseye",
+              description: "Best race accuracy",
+            },
+            {
+              id: "games",
+              text: "Games",
+              icon: "fa-gamepad",
+              description: "High scores by game",
+            },
           ]}
         />
       </Show>
       <Show when={isClassroom() && classroom().metric === "wpm"}>
         <Group
+          title="Test duration"
           selected={classroom().mode2 ?? "30"}
           onSelect={selectWpmMode2}
           items={[
-            { id: "15", text: "time 15", icon: "fa-clock" },
-            { id: "30", text: "time 30", icon: "fa-clock" },
-            { id: "60", text: "time 60", icon: "fa-clock" },
+            { id: "15", text: "15 seconds", icon: "fa-clock" },
+            { id: "30", text: "30 seconds", icon: "fa-clock" },
+            { id: "60", text: "60 seconds", icon: "fa-clock" },
           ]}
         />
       </Show>
       <Show when={isClassroom() && classroom().metric === "games"}>
         <Group
+          title="Choose a game"
           selected={classroom().gameId}
           onSelect={selectGameId}
           items={[
@@ -138,8 +217,15 @@ export function Sidebar(props: {
           ]}
         />
       </Show>
-      <Show when={isClassroom() && props.selection().type === "class"}>
+      <Show
+        when={
+          isClassroom() &&
+          props.selection().type === "class" &&
+          isCurrentUserAdmin()
+        }
+      >
         <Group
+          title="Choose a class"
           selected={classroom().classId}
           onSelect={selectClassId}
           items={CLASS_IDS.map((id) => ({
@@ -152,6 +238,7 @@ export function Sidebar(props: {
       <Show when={isClassroom() && props.selection().type === "grade"}>
         <Show when={isCurrentUserAdmin()}>
           <Group
+            title="Choose a grade"
             selected={classroom().grade}
             onSelect={selectGrade}
             items={GRADES.map((id) => ({
@@ -163,8 +250,36 @@ export function Sidebar(props: {
         </Show>
       </Show>
 
+      <Show when={!isClassroom()}>
+        <Group
+          title="Choose a global board"
+          selected={props.selection().type}
+          onSelect={selectType}
+          items={[
+            {
+              id: "allTime",
+              text: "All-time speed",
+              icon: "fa-trophy",
+              description: "Best scores ever",
+            },
+            {
+              id: "daily",
+              text: "Daily speed",
+              icon: "fa-sun",
+              description: "Today in Japan time",
+            },
+            {
+              id: "weekly",
+              text: "Weekly XP",
+              icon: "fa-calendar-day",
+              description: "XP earned this week",
+            },
+          ]}
+        />
+      </Show>
       <Show when={!isClassroom() && props.selection().type !== "weekly"}>
         <Group
+          title="Test type"
           selected={{
             mode: props.selection().mode,
             mode2: props.selection().mode2,
@@ -180,6 +295,7 @@ export function Sidebar(props: {
       </Show>
       <Show when={props.selection().type === "daily"}>
         <Group
+          title="Language"
           selected={props.selection().language}
           onSelect={selectLanguage}
           items={getLanguageButtons(
@@ -189,11 +305,12 @@ export function Sidebar(props: {
           )}
         />
       </Show>
-    </>
+    </div>
   );
 }
 
 function Group<T>(props: {
+  title: string;
   items: GroupItem<T>[];
   selected: T | undefined;
   onSelect: (selected: T) => void;
@@ -202,18 +319,29 @@ function Group<T>(props: {
     typeof a === "object" ? JSON.stringify(a) === JSON.stringify(b) : a === b;
 
   return (
-    <div class="mb-3 grid gap-2 rounded-xl bg-sub-alt p-3 lg:mb-4 lg:gap-4 lg:p-4">
-      <For each={props.items}>
-        {(item) => (
-          <Button
-            onClick={() => props.onSelect(item.id)}
-            fa={{ icon: item.icon }}
-            text={item.text}
-            class="justify-start px-[0.75em]"
-            active={isEqual(item.id, props.selected)}
-          />
-        )}
-      </For>
+    <div class="grid gap-2 rounded-xl bg-sub-alt p-3">
+      <div class="text-sm font-semibold text-sub">{props.title}</div>
+      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <For each={props.items}>
+          {(item) => (
+            <Button
+              onClick={() => props.onSelect(item.id)}
+              fa={{ icon: item.icon, fixedWidth: true }}
+              class="min-h-12 justify-start px-3"
+              active={isEqual(item.id, props.selected)}
+            >
+              <span class="grid text-left">
+                <span>{item.text}</span>
+                <Show when={item.description !== undefined}>
+                  <span class="text-xs font-normal opacity-70">
+                    {item.description}
+                  </span>
+                </Show>
+              </span>
+            </Button>
+          )}
+        </For>
+      </div>
     </div>
   );
 }
