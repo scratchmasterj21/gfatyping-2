@@ -61,6 +61,7 @@ import { Fa } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
 import { SideImageApprovals } from "./SideImageApprovals";
+import { StudentsTab } from "./StudentsTab";
 
 const inputClass =
   "w-full rounded bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
@@ -68,6 +69,7 @@ const selectClass =
   "rounded bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
 
 type Tab =
+  | "students"
   | "progress"
   | "assignments"
   | "wordlists"
@@ -1686,7 +1688,7 @@ function RacesTab(props: {
 
 export function ClassroomDashboard(): JSXElement {
   const [selectedClass, setSelectedClass] = createSignal<string>(CLASS_IDS[0]);
-  const [tab, setTab] = createSignal<Tab>("progress");
+  const [tab, setTab] = createSignal<Tab>("students");
 
   const [selfCoinAmount, setSelfCoinAmount] = createSignal(10);
   const [rewardingSelf, setRewardingSelf] = createSignal(false);
@@ -1802,39 +1804,42 @@ export function ClassroomDashboard(): JSXElement {
         <div class="content-grid grid gap-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <H2 fa={{ icon: "fa-chalkboard-teacher" }} text="classroom" />
-            <div class="flex flex-wrap items-center gap-3">
-              <div class="flex items-center gap-1.5 text-sm text-sub">
-                <Fa icon="fa-coins" />
-                <input
-                  type="number"
-                  min="1"
-                  class={cn(selectClass, "w-20")}
-                  value={selfCoinAmount()}
-                  onChange={(e) =>
-                    setSelfCoinAmount(
-                      Math.max(1, Number(e.currentTarget.value) || 1),
-                    )
-                  }
-                />
-                <Button
-                  text={rewardingSelf() ? "giving…" : "reward myself"}
-                  disabled={rewardingSelf()}
-                  onClick={() => void rewardSelf()}
-                />
+            <Show when={tab() !== "students"}>
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-1.5 text-sm text-sub">
+                  <Fa icon="fa-coins" />
+                  <input
+                    type="number"
+                    min="1"
+                    class={cn(selectClass, "w-20")}
+                    value={selfCoinAmount()}
+                    onChange={(e) =>
+                      setSelfCoinAmount(
+                        Math.max(1, Number(e.currentTarget.value) || 1),
+                      )
+                    }
+                  />
+                  <Button
+                    text={rewardingSelf() ? "giving…" : "reward myself"}
+                    disabled={rewardingSelf()}
+                    onClick={() => void rewardSelf()}
+                  />
+                </div>
+                <select
+                  class={selectClass}
+                  value={selectedClass()}
+                  onChange={(e) => setSelectedClass(e.currentTarget.value)}
+                >
+                  <For each={CLASS_IDS}>
+                    {(c) => <option value={c}>{c}</option>}
+                  </For>
+                </select>
               </div>
-              <select
-                class={selectClass}
-                value={selectedClass()}
-                onChange={(e) => setSelectedClass(e.currentTarget.value)}
-              >
-                <For each={CLASS_IDS}>
-                  {(c) => <option value={c}>{c}</option>}
-                </For>
-              </select>
-            </div>
+            </Show>
           </div>
 
           <div class="flex flex-wrap gap-2 border-b border-sub-alt pb-2">
+            {tabButton("students", "students")}
             {tabButton("progress", "progress")}
             {tabButton("assignments", "assignments")}
             {tabButton("wordlists", "word lists")}
@@ -1844,6 +1849,9 @@ export function ClassroomDashboard(): JSXElement {
             {tabButton("announcements", "announcements")}
           </div>
 
+          <Show when={tab() === "students"}>
+            <StudentsTab />
+          </Show>
           <Show when={tab() === "progress"}>
             <ProgressTab
               classId={selectedClass()}

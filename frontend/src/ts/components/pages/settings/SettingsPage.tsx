@@ -31,7 +31,6 @@ import { InputField } from "../../ui/form/InputField";
 import { fromSchema } from "../../ui/form/utils";
 import { AnimationFpsLimit } from "./custom-setting/AnimationFpsLimit";
 import { AutoSwitchTheme } from "./custom-setting/AutoSwitchTheme";
-import { Classroom } from "./custom-setting/Classroom";
 import { CustomBackground } from "./custom-setting/CustomBackground";
 import { CustomBackgroundFilters } from "./custom-setting/CustomBackgroundFilters";
 import { CustomLayoutfluid } from "./custom-setting/CustomLayoutfluid";
@@ -196,7 +195,21 @@ export function SettingsPage(): JSXElement {
           </Section>
           <Show when={isCurrentUserAdmin()}>
             <Section title="classroom">
-              <Classroom />
+              <Setting
+                key="classroom"
+                title="student management"
+                description="Student rosters and class assignments now live in the teacher classroom dashboard."
+                fa={{ icon: "fa-users" }}
+                inputs={
+                  <Button
+                    class="w-full"
+                    href="/classroom"
+                    router-link
+                    text="manage students"
+                    fa={{ icon: "fa-arrow-right" }}
+                  />
+                }
+              />
             </Section>
           </Show>
           <Section title="danger zone">

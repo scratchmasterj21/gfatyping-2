@@ -18,6 +18,7 @@ import { getDb, getIdToken } from "../firebase";
 export type Student = {
   uid: string;
   name: string;
+  email?: string;
   xp: number;
   avatarUrl?: string;
   classId?: string;
@@ -80,6 +81,7 @@ export type StoredWeeklyPeriod = {
 export type StoredUserDoc = {
   uid?: string;
   name?: string;
+  email?: string;
   avatarUrl?: string;
   xp?: number;
   classId?: string;
@@ -123,6 +125,7 @@ function toStudent(userDoc: StudentDoc): Student {
   return {
     uid: userDoc.uid,
     name: userDoc.name ?? "",
+    email: userDoc.email,
     xp: userDoc.xp ?? 0,
     avatarUrl: userDoc.avatarUrl,
     classId: userDoc.classId ?? undefined,

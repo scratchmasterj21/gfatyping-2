@@ -155,6 +155,10 @@ export function Nav(): JSXElement {
               href="/"
               router-link
               {...pageProperties("test", "Typing practice")}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (getActivePage() === "test") restartTestEvent.dispatch();
+              }}
             />
             <Button
               variant="text"
