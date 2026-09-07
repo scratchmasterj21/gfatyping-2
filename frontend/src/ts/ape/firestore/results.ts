@@ -11,6 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { callApi } from "../../api-client";
+import { queuePendingResult } from "../../results/pending-results";
 import { triggerCelebration } from "../../states/celebration";
 import { db, Handler, HandlerError, ok, requireUid } from "./common";
 import {
@@ -52,9 +53,18 @@ export const add: Handler = async (ctx) => {
   if (result === undefined) throw new HandlerError(463, "Result data invalid");
   if (result.testDuration < 1) throw new HandlerError(460, "Test too short");
 
-  const response = await callApi<SubmitResultResponse>("/api/submit-result", {
-    result,
-  });
+  let response: SubmitResultResponse;
+  try {
+    response = await callApi<SubmitResultResponse>("/api/submit-result", {
+      result,
+    });
+  } catch {
+    await queuePendingResult(uid, result);
+    throw new HandlerError(
+      503,
+      "Saved on this device. It will upload automatically when the service recovers.",
+    );
+  }
   if (!response.ok || response.insertedId === undefined) {
     throw new HandlerError(500, response.reason ?? "Failed to save result");
   }

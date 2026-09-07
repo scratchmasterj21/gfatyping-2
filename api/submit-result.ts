@@ -11,7 +11,9 @@ import { tokyoDateString, tokyoDayId, tokyoWeekId } from "./_lib/time.js";
 
 const MAX_PLAUSIBLE_WPM = 250;
 const MAX_TEST_DURATION_SECONDS = 3600;
-const MAX_RESULT_AGE_MS = 10 * 60 * 1000;
+// Results may be held in the student's IndexedDB queue during a daily
+// Firestore quota outage, then retried after the service recovers.
+const MAX_RESULT_AGE_MS = 48 * 60 * 60 * 1000;
 const MAX_FUTURE_SKEW_MS = 60 * 1000;
 const WPM_MODE2_OPTIONS = ["15", "30", "60"] as const;
 type WpmMode2 = (typeof WPM_MODE2_OPTIONS)[number];

@@ -72,7 +72,39 @@ export function SettingsPage(): JSXElement {
           </div>
         </Show>
         <AccountSettingsNotice />
+        <Show when={isCurrentUserAdmin()}>
+          <section class="grid gap-3 rounded-xl bg-sub-alt p-4">
+            <div>
+              <div class="text-xl font-semibold text-text">Teacher tools</div>
+              <div class="text-sm text-sub">
+                Manage students, class assignments, and live races.
+              </div>
+            </div>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <Button
+                class="min-h-12 justify-start"
+                href="/classroom"
+                router-link
+                text="Manage students"
+                fa={{ icon: "fa-users", fixedWidth: true }}
+              />
+              <Button
+                class="min-h-12 justify-start"
+                href="/racehost"
+                router-link
+                text="Host a class race"
+                fa={{ icon: "fa-stopwatch", fixedWidth: true }}
+              />
+            </div>
+          </section>
+        </Show>
         <div>
+          <div class="mb-6">
+            <div class="text-2xl font-semibold text-text">Student settings</div>
+            <div class="text-sub">
+              Typing, sound, appearance, and learning preferences.
+            </div>
+          </div>
           <Section title="behavior">
             <Show when={isAuthenticated()}>
               <Tags />
@@ -193,25 +225,6 @@ export function SettingsPage(): JSXElement {
             <AutoSetting key="capsLockWarning" />
             <AutoSetting key="showAverage" />
           </Section>
-          <Show when={isCurrentUserAdmin()}>
-            <Section title="classroom">
-              <Setting
-                key="classroom"
-                title="student management"
-                description="Student rosters and class assignments now live in the teacher classroom dashboard."
-                fa={{ icon: "fa-users" }}
-                inputs={
-                  <Button
-                    class="w-full"
-                    href="/classroom"
-                    router-link
-                    text="manage students"
-                    fa={{ icon: "fa-arrow-right" }}
-                  />
-                }
-              />
-            </Section>
-          </Show>
           <Section title="danger zone">
             <ImportExport />
             <Setting

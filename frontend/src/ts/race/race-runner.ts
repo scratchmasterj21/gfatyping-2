@@ -10,6 +10,7 @@ import * as CustomText from "../test/custom-text";
 import * as TestState from "../test/test-state";
 import {
   getRace,
+  getParticipants,
   joinRace,
   leaveRace,
   resetParticipant,
@@ -28,7 +29,9 @@ import {
 } from "./race-state";
 import { Race } from "./race-types";
 
-const PROGRESS_INTERVAL_MS = 500;
+const PROGRESS_POLL_INTERVAL_MS = 500;
+const MIN_PROGRESS_WRITE_INTERVAL_MS = 2000;
+const HEARTBEAT_INTERVAL_MS = 10000;
 const RACE_STORAGE_KEY = "gfa_active_race";
 
 let unsubRace: (() => void) | null = null;
@@ -45,6 +48,9 @@ let seenRound = 0;
 let finalWritten = false;
 /** Local timestamp when enterTest was called, for live WPM calculation. */
 let testStartedAt: number | null = null;
+let lastProgressWordIndex = -1;
+let lastProgressWriteAt = 0;
+let finalParticipantsLoaded = false;
 
 function stopPolling(): void {
   if (pollTimer !== null) {
@@ -57,6 +63,16 @@ function teardownSubscriptions(): void {
   unsubRace?.();
   unsubParticipants?.();
   unsubRace = null;
+  unsubParticipants = null;
+}
+
+function subscribeToParticipants(pin: string): void {
+  if (unsubParticipants !== null) return;
+  unsubParticipants = subscribeParticipants(pin, setRaceParticipants);
+}
+
+function stopParticipantSubscription(): void {
+  unsubParticipants?.();
   unsubParticipants = null;
 }
 
@@ -87,7 +103,7 @@ export async function joinAsParticipant(pin: string): Promise<void> {
     }
     handleRaceUpdate(race);
   });
-  unsubParticipants = subscribeParticipants(pin, setRaceParticipants);
+  subscribeToParticipants(pin);
 }
 
 /**
@@ -119,7 +135,7 @@ export async function tryReconnectRace(): Promise<void> {
       }
       handleRaceUpdate(r);
     });
-    unsubParticipants = subscribeParticipants(savedPin, setRaceParticipants);
+    if (race.status === "lobby") subscribeToParticipants(savedPin);
 
     if (race.status === "running" || race.status === "countdown") {
       enterTest(race);
@@ -135,9 +151,25 @@ function handleRaceUpdate(race: Race): void {
     seenRound = race.round;
     if (isReentry) {
       finalWritten = false;
+      finalParticipantsLoaded = false;
       void resetParticipant(race.pin);
       navigationEvent.dispatch({ url: "/race", options: {} });
     }
+  }
+
+  if (race.status === "lobby") {
+    subscribeToParticipants(race.pin);
+  } else if (race.status === "countdown" || race.status === "running") {
+    // Students only need the full roster in the lobby. Keeping this listener
+    // during live progress makes every student's write fan out to every other
+    // student as a billed document read. The host keeps its own live listener.
+    stopParticipantSubscription();
+  } else if (race.status === "finished" && !finalParticipantsLoaded) {
+    finalParticipantsLoaded = true;
+    stopParticipantSubscription();
+    void getParticipants(race.pin)
+      .then(setRaceParticipants)
+      .catch(() => undefined);
   }
 
   if (
@@ -158,6 +190,8 @@ function enterTest(race: Race): void {
   enteredRound = race.round;
   finalWritten = false;
   testStartedAt = Date.now();
+  lastProgressWordIndex = -1;
+  lastProgressWriteAt = 0;
 
   setActiveLesson(null);
   setLastResult(null);
@@ -223,9 +257,17 @@ function startPolling(race: Race): void {
       }
     }
 
-    // Always write so lastSeen stays fresh (used for disconnect detection).
-    void writeProgress(race.pin, { wordIndex, progress, liveWpm });
-  }, PROGRESS_INTERVAL_MS);
+    const timeSinceWrite = Date.now() - lastProgressWriteAt;
+    const progressChanged = wordIndex !== lastProgressWordIndex;
+    if (
+      (progressChanged && timeSinceWrite >= MIN_PROGRESS_WRITE_INTERVAL_MS) ||
+      timeSinceWrite >= HEARTBEAT_INTERVAL_MS
+    ) {
+      lastProgressWordIndex = wordIndex;
+      lastProgressWriteAt = Date.now();
+      void writeProgress(race.pin, { wordIndex, progress, liveWpm });
+    }
+  }, PROGRESS_POLL_INTERVAL_MS);
 }
 
 /**
@@ -243,7 +285,10 @@ export async function exitRace(): Promise<void> {
   enteredRound = null;
   seenRound = 0;
   finalWritten = false;
+  finalParticipantsLoaded = false;
   testStartedAt = null;
+  lastProgressWordIndex = -1;
+  lastProgressWriteAt = 0;
 
   localStorage.removeItem(RACE_STORAGE_KEY);
 

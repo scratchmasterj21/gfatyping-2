@@ -1,5 +1,15 @@
 import { getIdToken } from "./firebase";
 
+export class ApiError extends Error {
+  public readonly status: number;
+
+  constructor(status: number, path: string) {
+    super(`Request to ${path} failed (${status})`);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 /**
  * Calls one of the validated Vercel API endpoints under api/ (Firebase
  * Admin SDK, bypasses firestore.rules) instead of writing coins/xp/owned
@@ -20,7 +30,7 @@ export async function callApi<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`Request to ${path} failed (${response.status})`);
+    throw new ApiError(response.status, path);
   }
   return (await response.json()) as T;
 }

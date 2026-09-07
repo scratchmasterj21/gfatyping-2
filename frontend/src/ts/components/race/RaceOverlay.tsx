@@ -16,7 +16,7 @@ import {
   getRaceParticipants,
   getRaceRole,
 } from "../../race/race-state";
-import { rankParticipants, RaceParticipant } from "../../race/race-types";
+import { rankParticipants } from "../../race/race-types";
 import { cn } from "../../utils/cn";
 import { Fa } from "../common/Fa";
 
@@ -82,40 +82,6 @@ export function RaceOverlay(): JSXElement {
     );
   });
 
-  /** For timed races: bar is WPM relative to the fastest participant. */
-  const maxWpm = (): number =>
-    Math.max(
-      1,
-      ...getRaceParticipants().map((p) =>
-        p.finished ? (p.finalWpm ?? 0) : (p.liveWpm ?? 0),
-      ),
-    );
-
-  const barPct = (p: RaceParticipant): number => {
-    const race = getCurrentRace();
-    if (race?.format === "timed") {
-      const wpm = p.finished ? (p.finalWpm ?? 0) : (p.liveWpm ?? 0);
-      return Math.min(100, (wpm / maxWpm()) * 100);
-    }
-    return Math.min(100, p.progress * 100);
-  };
-
-  const wpmLabel = (p: RaceParticipant): string => {
-    if (p.finished) return `${Math.round(p.finalWpm ?? 0)} wpm`;
-    if (p.liveWpm !== undefined) return `${p.liveWpm} wpm`;
-    return "";
-  };
-
-  const liveSorted = createMemo((): RaceParticipant[] => {
-    const race = getCurrentRace();
-    const fmt = race?.format ?? "finish";
-    return [...getRaceParticipants()].sort((a, b) =>
-      fmt === "timed"
-        ? (b.liveWpm ?? 0) - (a.liveWpm ?? 0)
-        : b.progress - a.progress,
-    );
-  });
-
   const standings = createMemo(() =>
     rankParticipants(
       getRaceParticipants(),
@@ -144,49 +110,18 @@ export function RaceOverlay(): JSXElement {
         </div>
       </Show>
 
-      {/* Live progress bars: top of the screen, non-blocking. */}
+      {/* Compact status only: the full roster obscured the typing area and
+          required every student to listen to every live progress update. */}
       <Show when={showLive()}>
-        <div class="pointer-events-none fixed inset-x-0 top-2 z-60 flex justify-center">
-          <div class="pointer-events-auto grid w-full max-w-xl gap-1 rounded bg-sub-alt/95 p-3 shadow">
-            <div class="mb-1 flex items-center justify-between gap-2 text-em-xs text-sub">
-              <span class="flex items-center gap-2">
-                <Fa icon="fa-flag-checkered" />
-                live race
-              </span>
-              <Show
-                when={getCurrentRace()?.format === "timed" && timedLeft() > 0}
-              >
-                <span class="font-bold text-main">{timedLeft()}s</span>
-              </Show>
-            </div>
-            <For each={liveSorted()}>
-              {(p) => (
-                <div class="flex items-center gap-2">
-                  <Avatar url={p.avatarUrl} />
-                  <div class="min-w-0 flex-1">
-                    <div
-                      class={cn("mb-0.5 truncate text-em-xs", {
-                        "text-main": p.uid === selfUid(),
-                        "text-sub": p.uid !== selfUid(),
-                      })}
-                    >
-                      {p.name}
-                      {p.uid === selfUid() ? " (you)" : ""}
-                      {p.finished ? " ✓" : ""}
-                    </div>
-                    <div class="h-2 w-full overflow-hidden rounded bg-bg">
-                      <div
-                        class="h-full rounded bg-main transition-[width] duration-200"
-                        style={{ width: `${barPct(p)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  <span class="w-14 shrink-0 text-right text-em-xs text-sub">
-                    {wpmLabel(p)}
-                  </span>
-                </div>
-              )}
-            </For>
+        <div class="pointer-events-none fixed inset-x-0 top-2 z-60 flex justify-end px-2">
+          <div class="flex items-center gap-2 rounded bg-sub-alt/95 px-3 py-2 text-em-xs text-sub shadow">
+            <Fa icon="fa-flag-checkered" />
+            <span>live race</span>
+            <Show
+              when={getCurrentRace()?.format === "timed" && timedLeft() > 0}
+            >
+              <span class="font-bold text-main">{timedLeft()}s</span>
+            </Show>
           </div>
         </div>
       </Show>

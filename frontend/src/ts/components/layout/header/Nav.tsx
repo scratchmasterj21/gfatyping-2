@@ -9,7 +9,6 @@ import {
 
 import { isCurrentUserAdmin } from "../../../auth";
 import { usePendingConnectionsQuery } from "../../../collections/connections";
-import { gradeOf } from "../../../constants/classes";
 import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
@@ -67,21 +66,8 @@ export function Nav(): JSXElement {
       "opacity-(--nav-focus-opacity)": getFocus(),
     });
 
-  const isYoungStudent = (): boolean => {
-    // Firestore stores null for admins and students who have not been placed
-    // in a class yet, despite the snapshot interface using undefined.
-    const grade = gradeOf(getSnapshot()?.classId ?? undefined);
-    return grade !== undefined && ["G1", "G2"].includes(grade);
-  };
-
   const navLabel = (label: string): JSXElement => (
-    <span
-      class={cn("hidden text-sm font-semibold xl:inline", {
-        "lg:inline": isYoungStudent(),
-      })}
-    >
-      {label}
-    </span>
+    <span class="hidden text-sm font-semibold lg:inline">{label}</span>
   );
 
   const pageProperties = (page: string, label: string) => ({
@@ -90,7 +76,12 @@ export function Nav(): JSXElement {
     "aria-current": getActivePage() === page ? ("page" as const) : undefined,
   });
 
-  const destinationButtonClass = () => cn(buttonClass(), "hidden xl:flex");
+  const destinationButtonClass = () => cn(buttonClass(), "hidden lg:flex");
+  const mobileDestinationClass = (page: string) =>
+    cn(
+      "w-full justify-start border-l-4 border-transparent",
+      getActivePage() === page && "border-main bg-sub-alt text-text",
+    );
 
   createEffectOn(getActivePage, () => setMobileMenuOpen(false));
 
@@ -125,7 +116,7 @@ export function Nav(): JSXElement {
     <nav class={cn("z-5 flex w-full items-center gap-1 md:gap-2")}>
       <div
         ref={mobileMenuRef}
-        class="relative xl:hidden"
+        class="relative lg:hidden"
         onKeyDown={(event) => {
           if (event.key === "Escape") setMobileMenuOpen(false);
         }}
@@ -150,8 +141,8 @@ export function Nav(): JSXElement {
             <Button
               variant="text"
               fa={{ icon: "fa-keyboard", fixedWidth: true }}
-              text="Typing practice"
-              class="w-full justify-start"
+              text="Type"
+              class={mobileDestinationClass("test")}
               href="/"
               router-link
               {...pageProperties("test", "Typing practice")}
@@ -163,30 +154,33 @@ export function Nav(): JSXElement {
             <Button
               variant="text"
               fa={{ icon: "fa-graduation-cap", fixedWidth: true }}
-              text="Lessons"
-              class="w-full justify-start"
+              text="Continue lesson"
+              class={mobileDestinationClass("lessons")}
               href="/lessons"
               router-link
-              {...pageProperties("lessons", "Lessons")}
+              {...pageProperties("lessons", "Continue lesson")}
+              onClick={() => setMobileMenuOpen(false)}
             />
             <Button
               variant="text"
               fa={{ icon: "fa-crown", fixedWidth: true }}
-              text="Scores"
-              class="w-full justify-start"
+              text="Rankings"
+              class={mobileDestinationClass("leaderboards")}
               href="/leaderboards"
               router-link
               {...pageProperties("leaderboards", "Leaderboards")}
+              onClick={() => setMobileMenuOpen(false)}
             />
             <Show when={getSnapshot() !== undefined}>
               <Button
                 variant="text"
                 fa={{ icon: "fa-flag-checkered", fixedWidth: true }}
                 text="Class race"
-                class="w-full justify-start"
+                class={mobileDestinationClass("race")}
                 href="/race"
                 router-link
                 {...pageProperties("race", "Class race")}
+                onClick={() => setMobileMenuOpen(false)}
               />
             </Show>
             <Show when={isCurrentUserAdmin()}>
@@ -194,29 +188,32 @@ export function Nav(): JSXElement {
                 variant="text"
                 fa={{ icon: "fa-chalkboard-teacher", fixedWidth: true }}
                 text="Teacher classroom"
-                class="w-full justify-start"
+                class={mobileDestinationClass("classroom")}
                 href="/classroom"
                 router-link
                 {...pageProperties("classroom", "Teacher classroom")}
+                onClick={() => setMobileMenuOpen(false)}
               />
               <Button
                 variant="text"
                 fa={{ icon: "fa-stopwatch", fixedWidth: true }}
                 text="Host race"
-                class="w-full justify-start"
+                class={mobileDestinationClass("racehost")}
                 href="/racehost"
                 router-link
                 {...pageProperties("racehost", "Host a class race")}
+                onClick={() => setMobileMenuOpen(false)}
               />
             </Show>
             <Button
               variant="text"
               fa={{ icon: "fa-cog", fixedWidth: true }}
               text="Settings"
-              class="w-full justify-start"
+              class={mobileDestinationClass("settings")}
               href="/settings"
               router-link
               {...pageProperties("settings", "Settings")}
+              onClick={() => setMobileMenuOpen(false)}
             />
           </div>
         </Show>
@@ -252,9 +249,9 @@ export function Nav(): JSXElement {
         }}
         class={destinationButtonClass()}
         href="/lessons"
-        {...pageProperties("lessons", "Lessons")}
+        {...pageProperties("lessons", "Continue lesson")}
       >
-        {navLabel("Lessons")}
+        {navLabel("Continue lesson")}
       </Button>
       <Button
         variant="text"
@@ -273,7 +270,7 @@ export function Nav(): JSXElement {
           prefetchLeaderboardPage();
         }}
       >
-        {navLabel("Scores")}
+        {navLabel("Rankings")}
       </Button>
       <Show when={getSnapshot() !== undefined}>
         <Button
