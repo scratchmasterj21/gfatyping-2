@@ -101,14 +101,14 @@ export function GhostHunterModal(props: Props): JSXElement {
       (a, b) => a.joinedAt - b.joinedAt,
     ),
   );
-  const playerX = (uid: string): number => {
-    if (uid === getAuthenticatedUser()?.uid) return 50;
+  const playerXOffset = (uid: string): number => {
+    if (uid === getAuthenticatedUser()?.uid) return 0;
     const teammates = multiplayerPlayers().filter(
       (player) => player.uid !== getAuthenticatedUser()?.uid,
     );
     const index = teammates.findIndex((player) => player.uid === uid);
-    const offsets = [-10, 10, -18, 18, -26, 26, 30];
-    return 50 + (offsets[index] ?? 0);
+    const offsets = [-28, 28, -52, 52, -76, 76, 100];
+    return offsets[index] ?? 0;
   };
 
   const startGame = async (
@@ -590,9 +590,9 @@ export function GhostHunterModal(props: Props): JSXElement {
               <For each={multiplayerPlayers()}>
                 {(player) => (
                   <div
-                    class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                    class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-[top] duration-200 ease-linear"
                     style={{
-                      left: `${playerX(player.uid)}%`,
+                      left: `calc(50% + ${playerXOffset(player.uid)}px)`,
                       top: `calc(68% + ${
                         28 +
                         (player.uid === getAuthenticatedUser()?.uid

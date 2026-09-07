@@ -87,6 +87,7 @@ export class GameScene extends Scene {
   private multiplayerRole: "host" | "guest" | null = null;
   private lastWorldSnapshotAt = 0;
   private pendingRemoteWords = new Set<string>();
+  private guestGhostTargets = new Map<string, { x: number; y: number }>();
 
   private ghostsThisWave = 0;
   private ghostsSpawned = 0;
@@ -170,6 +171,7 @@ export class GameScene extends Scene {
       null;
     this.lastWorldSnapshotAt = 0;
     this.pendingRemoteWords.clear();
+    this.guestGhostTargets.clear();
   }
 
   create(): void {
@@ -322,6 +324,13 @@ export class GameScene extends Scene {
     }
 
     if (this.multiplayerRole === "guest") {
+      const smoothing = 1 - Math.exp(-12 * dt);
+      for (const ghost of this.ghosts) {
+        const target = this.guestGhostTargets.get(ghost.word);
+        if (target === undefined) continue;
+        ghost.x += (target.x - ghost.x) * smoothing;
+        ghost.y += (target.y - ghost.y) * smoothing;
+      }
       this.refreshTargeting();
       return;
     }
@@ -959,6 +968,7 @@ export class GameScene extends Scene {
       const ghost = this.ghosts[i];
       if (ghost === undefined || incoming.has(ghost.word)) continue;
       this.matcher.unregister(ghost.word);
+      this.guestGhostTargets.delete(ghost.word);
       ghost.destroy();
       this.ghosts.splice(i, 1);
     }
@@ -978,8 +988,10 @@ export class GameScene extends Scene {
         );
         this.ghosts.push(ghost);
       }
-      ghost.x = state.x * width;
-      ghost.y = this.lawnTop + state.y * lawnRange;
+      this.guestGhostTargets.set(state.word, {
+        x: state.x * width,
+        y: this.lawnTop + state.y * lawnRange,
+      });
       ghost.setFrozen(state.frozen);
     }
     for (const word of this.pendingRemoteWords) {
