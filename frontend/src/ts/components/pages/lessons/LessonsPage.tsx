@@ -1403,12 +1403,17 @@ export function LessonsPage(): JSXElement {
       const day = Number(localDateString().replaceAll("-", ""));
       const game = builtinGames[day % builtinGames.length];
       if (game === undefined) return undefined;
+      const completedToday =
+        userStatsQuery.data.practiceRewardDates.recommendation ===
+        localDateString();
       return {
         icon: game.icon,
         eyebrow: "game of the day",
         title: game.name,
-        description: "Finish your practice with a quick typing challenge.",
-        action: "play now",
+        description: completedToday
+          ? "Daily reward claimed. Play again anytime for extra practice."
+          : "Finish your practice with a quick typing challenge.",
+        action: completedToday ? "Play again" : "Play now",
         onStart: () => openBuiltinGame(game.id, true),
       };
     },
@@ -1606,6 +1611,12 @@ export function LessonsPage(): JSXElement {
                       }
                       class={reviewLoading() ? "fa-spin" : ""}
                     />
+                    <span class="ml-1.5">
+                      {userStatsQuery.data?.practiceRewardDates.adaptive ===
+                      localDateString()
+                        ? "Practice again"
+                        : "Start"}
+                    </span>
                   </button>
                 </div>
               </div>
