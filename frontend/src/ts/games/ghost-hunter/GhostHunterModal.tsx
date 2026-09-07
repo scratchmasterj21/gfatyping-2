@@ -45,6 +45,12 @@ import {
 } from "./ghost-multiplayer";
 
 const OPTIONS = getWordListOptions();
+const MULTIPLAYER_OPTIONS = OPTIONS.slice(
+  Math.max(
+    0,
+    OPTIONS.findIndex((option) => option.id === "all-keys"),
+  ),
+);
 
 function grouped(
   options: WordListOption[],
@@ -61,6 +67,7 @@ function grouped(
 type Props = {
   open: boolean;
   onClose: () => void;
+  multiplayerUnlocked?: boolean;
   lessonWords?: string[];
   onResult?: (
     score: number,
@@ -81,6 +88,7 @@ export function GhostHunterModal(props: Props): JSXElement {
     "pick" | "loading" | "lobby" | "playing" | "results"
   >("pick");
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
+  const [maxWave, setMaxWave] = createSignal<5 | 10>(5);
   const [roomCode, setRoomCode] = createSignal<string>();
   const [joinCode, setJoinCode] = createSignal("");
   const [room, setRoom] = createSignal<GhostRoom>();
@@ -95,7 +103,14 @@ export function GhostHunterModal(props: Props): JSXElement {
   let multiplayerGameStarted = false;
   let lastPositionWrite = 0;
 
-  const groups = createMemo(() => grouped(OPTIONS));
+  const groups = createMemo(() =>
+    grouped(mode() === "together" ? MULTIPLAYER_OPTIONS : OPTIONS),
+  );
+  const availableDifficulties = createMemo(() =>
+    mode() === "together"
+      ? GHOST_DIFFICULTIES.filter((item) => item.label !== "Easy")
+      : GHOST_DIFFICULTIES,
+  );
   const multiplayerPlayers = createMemo(() =>
     Object.values(room()?.players ?? {}).sort(
       (a, b) => a.joinedAt - b.joinedAt,
@@ -115,6 +130,7 @@ export function GhostHunterModal(props: Props): JSXElement {
     wordsOverride?: string[],
     multiplayerDifficulty?: GameDifficulty,
     multiplayerRole?: "host" | "guest",
+    multiplayerMaxWave?: 5 | 10,
   ): Promise<void> => {
     const easyDiff = GHOST_DIFFICULTIES[0] as GameDifficulty;
     const onClose = props.onClose;
@@ -133,7 +149,11 @@ export function GhostHunterModal(props: Props): JSXElement {
       containerRef,
       words,
       usedDifficulty,
-      wordsOverride !== undefined ? 5 : 0,
+      multiplayerRole !== undefined
+        ? (multiplayerMaxWave ?? 5)
+        : wordsOverride !== undefined
+          ? 5
+          : 0,
       multiplayerRole,
     );
     game.events.on("game-result", (data: { score: number; wave: number }) => {
@@ -142,7 +162,6 @@ export function GhostHunterModal(props: Props): JSXElement {
         return;
       }
       void markGhostPlayerFinished(multiplayerCode, data.wave);
-      if (multiplayerRole === "host") void finishGhostRoom(multiplayerCode);
     });
     game.events.on("ui-wave", (wave: number) => {
       game?.registry.set("multiplayerWave", wave);
@@ -263,7 +282,12 @@ export function GhostHunterModal(props: Props): JSXElement {
         const role =
           next.hostUid === getAuthenticatedUser()?.uid ? "host" : "guest";
         untrack(() => {
-          void startGame(next.words, selectedDifficulty, role);
+          void startGame(
+            next.words,
+            selectedDifficulty,
+            role,
+            next.maxWave ?? 5,
+          );
         });
       }
       if (next.status === "finished") {
@@ -277,11 +301,16 @@ export function GhostHunterModal(props: Props): JSXElement {
   };
 
   const createRoom = async (): Promise<void> => {
+    if (props.multiplayerUnlocked !== true) {
+      showErrorNotification("Unlock All keys to play together");
+      return;
+    }
     setRoomBusy(true);
     try {
       const words = await selected().getWords();
       const code = await createGhostRoom({
         difficultyLabel: difficulty().label,
+        maxWave: maxWave(),
         wordListLabel: selected().label,
         words,
       });
@@ -394,17 +423,33 @@ export function GhostHunterModal(props: Props): JSXElement {
                     ? "bg-main text-bg"
                     : "bg-sub-alt text-sub hover:text-text",
                 )}
-                onClick={() => setMode("together")}
+                disabled={props.multiplayerUnlocked !== true}
+                onClick={() => {
+                  if (props.multiplayerUnlocked !== true) return;
+                  setMode("together");
+                  setSelected(MULTIPLAYER_OPTIONS[0] as WordListOption);
+                  if (difficulty().label === "Easy") {
+                    setDifficulty(GHOST_DIFFICULTIES[1] as GameDifficulty);
+                  }
+                }}
               >
-                Play together
+                {props.multiplayerUnlocked === true
+                  ? "Play together"
+                  : "🔒 Play together"}
               </button>
             </div>
+
+            <Show when={props.multiplayerUnlocked !== true}>
+              <p class="mb-3 text-center text-em-xs text-sub">
+                Unlock the All keys lessons to play multiplayer.
+              </p>
+            </Show>
 
             <p class="mb-1 text-em-xs font-semibold tracking-wider text-sub uppercase">
               Choose difficulty
             </p>
             <div class="mb-3 flex gap-2">
-              <For each={GHOST_DIFFICULTIES}>
+              <For each={availableDifficulties()}>
                 {(d) => (
                   <button
                     type="button"
@@ -421,6 +466,30 @@ export function GhostHunterModal(props: Props): JSXElement {
                 )}
               </For>
             </div>
+
+            <Show when={mode() === "together"}>
+              <p class="mb-1 text-em-xs font-semibold tracking-wider text-sub uppercase">
+                Match length
+              </p>
+              <div class="mb-3 grid grid-cols-2 gap-2">
+                <For each={[5, 10] as const}>
+                  {(waves) => (
+                    <button
+                      type="button"
+                      class={cn(
+                        "rounded px-2 py-1 text-em-xs font-semibold transition-colors",
+                        maxWave() === waves
+                          ? "bg-main text-bg"
+                          : "bg-sub-alt text-sub hover:text-text",
+                      )}
+                      onClick={() => setMaxWave(waves)}
+                    >
+                      {waves} waves
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
 
             <p class="mb-1 text-em-xs font-semibold tracking-wider text-sub uppercase">
               Choose a word list
@@ -521,7 +590,8 @@ export function GhostHunterModal(props: Props): JSXElement {
                   {roomCode()}
                 </div>
                 <div class="mt-2 text-sm text-sub">
-                  {room()?.wordListLabel} · {room()?.difficultyLabel}
+                  {room()?.wordListLabel} · {room()?.difficultyLabel} ·{" "}
+                  {room()?.maxWave ?? 5} waves
                 </div>
               </div>
               <div class="grid gap-2">

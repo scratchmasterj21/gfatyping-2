@@ -855,8 +855,7 @@ export class GameScene extends Scene {
         });
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
-          this.wave++;
-          if (this.maxWave > 0 && this.wave > this.maxWave) {
+          if (this.maxWave > 0 && this.wave >= this.maxWave) {
             playGameOver();
             if (this.multiplayerRole === "host") {
               this.gameOver = true;
@@ -872,6 +871,7 @@ export class GameScene extends Scene {
             });
             return;
           }
+          this.wave++;
           this.startHordeWave();
         });
       } else {
@@ -892,8 +892,7 @@ export class GameScene extends Scene {
         });
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
-          this.wave++;
-          if (this.maxWave > 0 && this.wave > this.maxWave) {
+          if (this.maxWave > 0 && this.wave >= this.maxWave) {
             playGameOver();
             if (this.multiplayerRole === "host") {
               this.gameOver = true;
@@ -909,6 +908,7 @@ export class GameScene extends Scene {
             });
             return;
           }
+          this.wave++;
           this.startWave();
         });
       }

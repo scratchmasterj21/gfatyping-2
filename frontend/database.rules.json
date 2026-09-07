@@ -33,6 +33,12 @@
         "status": {
           ".validate": "newData.val() == 'lobby' || newData.val() == 'countdown' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
+        "maxWave": {
+          ".validate": "(newData.val() == 5 || newData.val() == 10) && (!data.exists() || newData.val() == data.val())"
+        },
+        "difficultyLabel": {
+          ".validate": "(newData.val() == 'Medium' || newData.val() == 'Hard') && (!data.exists() || newData.val() == data.val())"
+        },
         "hostUid": {
           ".validate": "newData.isString() && newData.val() == auth.uid"
         },

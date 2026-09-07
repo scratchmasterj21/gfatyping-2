@@ -2294,6 +2294,9 @@ export function LessonsPage(): JSXElement {
         />
         <GhostHunterModal
           open={ghostOpen()}
+          multiplayerUnlocked={
+            isCurrentUserAdmin() || !isLessonLocked("all-keys-1")
+          }
           onClose={() => {
             setGhostOpen(false);
             setRecommendedGameId(undefined);

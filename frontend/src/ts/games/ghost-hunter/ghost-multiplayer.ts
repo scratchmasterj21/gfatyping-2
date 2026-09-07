@@ -36,6 +36,7 @@ export type GhostRoom = {
   createdAt: number;
   startAt?: number;
   difficultyLabel: string;
+  maxWave: 5 | 10;
   wordListLabel: string;
   words: string[];
   players: Record<string, GhostRoomPlayer>;
@@ -100,10 +101,14 @@ function currentUser(): { uid: string; name: string } {
 
 export async function createGhostRoom(input: {
   difficultyLabel: string;
+  maxWave: 5 | 10;
   wordListLabel: string;
   words: string[];
 }): Promise<string> {
   const user = currentUser();
+  if (input.difficultyLabel !== "Medium" && input.difficultyLabel !== "Hard") {
+    throw new Error("Multiplayer supports Medium or Hard difficulty");
+  }
   const words = input.words
     .filter((word) => word.length > 0 && word.length <= 60)
     .slice(0, 200);
@@ -129,6 +134,7 @@ export async function createGhostRoom(input: {
         status: "lobby",
         createdAt: Date.now(),
         difficultyLabel: input.difficultyLabel,
+        maxWave: input.maxWave,
         wordListLabel: input.wordListLabel,
         words,
         players: { [user.uid]: player },
