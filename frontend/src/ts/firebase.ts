@@ -39,6 +39,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
 } from "firebase/firestore";
+import { Database, getDatabase } from "firebase/database";
 import { tryCatch } from "@monkeytype/util/trycatch";
 import { googleSignUpEvent } from "./events/google-sign-up";
 import { addBanner } from "./states/banners";
@@ -160,6 +161,7 @@ export function getAnalytics(): AnalyticsType {
  * `getFirestore` caches the instance per app, so calling this repeatedly is fine.
  */
 let dbInstance: Firestore | undefined;
+let realtimeDbInstance: Database | undefined;
 
 export function getDb(): Firestore {
   if (app === undefined) {
@@ -177,6 +179,15 @@ export function getDb(): Firestore {
     }
   }
   return dbInstance;
+}
+
+/** Realtime Database instance for short-lived multiplayer state. */
+export function getRealtimeDb(): Database {
+  if (app === undefined) {
+    throw new Error("Firebase is not initialized");
+  }
+  realtimeDbInstance ??= getDatabase(app);
+  return realtimeDbInstance;
 }
 
 export function isAuthAvailable(): boolean {

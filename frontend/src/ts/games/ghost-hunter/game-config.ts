@@ -47,6 +47,7 @@ export async function createGhostHunterGame(
   words: string[],
   difficulty: GameDifficulty = GHOST_DIFFICULTIES[0] as GameDifficulty,
   maxWave = 0,
+  multiplayerRole?: "host" | "guest",
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ BootScene }, { GameOverScene }, { GameScene }, { UIScene }] =
@@ -78,5 +79,6 @@ export async function createGhostHunterGame(
   game.registry.set("hordeEnabled", difficulty.hordeEnabled);
   game.registry.set("targetYRange", difficulty.targetYRange);
   game.registry.set("maxWave", maxWave);
+  game.registry.set("multiplayerRole", multiplayerRole);
   return game;
 }

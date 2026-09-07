@@ -33,6 +33,24 @@ const DEFAULT_TARGET_Y_RANGE = 70; // fallback if no difficulty config is regist
 // Logs absorb a few hits for free, so horde waves need noticeably more
 // ghosts than before to still feel like a real spike in danger.
 const HORDE_BONUS_MULTIPLIER = 2.5;
+const WORLD_SNAPSHOT_INTERVAL_MS = 250;
+
+type MultiplayerWorld = {
+  wave: number;
+  teamScore: number;
+  leftLogHp: number;
+  rightLogHp: number;
+  ghosts: Array<{
+    word: string;
+    side: "left" | "right";
+    x: number;
+    y: number;
+    frozen: boolean;
+  }>;
+  finished: boolean;
+  cleared: boolean;
+  updatedAt: number;
+};
 
 // Power-ups are fixed words (not drawn from the lesson word list) since
 // they're a special pickup, not vocabulary practice.
@@ -66,6 +84,9 @@ export class GameScene extends Scene {
   private maxWave = 0;
   private hordeEnabled = true;
   private targetYRange = DEFAULT_TARGET_Y_RANGE;
+  private multiplayerRole: "host" | "guest" | null = null;
+  private lastWorldSnapshotAt = 0;
+  private pendingRemoteWords = new Set<string>();
 
   private ghostsThisWave = 0;
   private ghostsSpawned = 0;
@@ -86,6 +107,7 @@ export class GameScene extends Scene {
   private facing: "left" | "right" = "right";
   private movingUp = false;
   private movingDown = false;
+  private lastPlayerPositionEmitAt = 0;
 
   private leftLogHp = LOG_MAX_HP;
   private rightLogHp = LOG_MAX_HP;
@@ -126,6 +148,7 @@ export class GameScene extends Scene {
     this.facing = "right";
     this.movingUp = false;
     this.movingDown = false;
+    this.lastPlayerPositionEmitAt = 0;
     this.leftLogHp = LOG_MAX_HP;
     this.rightLogHp = LOG_MAX_HP;
     this.powerUp = null;
@@ -142,6 +165,11 @@ export class GameScene extends Scene {
     this.targetYRange =
       (this.registry.get("targetYRange") as number | undefined) ??
       DEFAULT_TARGET_Y_RANGE;
+    this.multiplayerRole =
+      (this.registry.get("multiplayerRole") as "host" | "guest" | undefined) ??
+      null;
+    this.lastWorldSnapshotAt = 0;
+    this.pendingRemoteWords.clear();
   }
 
   create(): void {
@@ -221,7 +249,14 @@ export class GameScene extends Scene {
         if (this.powerUp !== null && result.word === this.powerUp.word) {
           this.onPowerUpCollected(this.powerUp);
         } else {
-          this.onGhostDestroyed(result.word);
+          if (this.multiplayerRole === "guest") {
+            this.hits++;
+            this.pendingRemoteWords.add(result.word);
+            this.matcher.unregister(result.word);
+            this.game.events.emit("multiplayer-word-action", result.word);
+          } else {
+            this.onGhostDestroyed(result.word);
+          }
         }
       } else if (result.status === "miss") {
         this.onMiss();
@@ -245,8 +280,24 @@ export class GameScene extends Scene {
 
     this.scene.launch("UI");
     this.emitUI();
-    this.startWave();
-    this.schedulePowerUpSpawn();
+    if (this.multiplayerRole !== "guest") {
+      this.startWave();
+      if (this.multiplayerRole === null) this.schedulePowerUpSpawn();
+    }
+    this.game.events.on(
+      "multiplayer-remote-action",
+      (action: { uid: string; word: string }) => {
+        if (this.multiplayerRole === "host") {
+          this.onGhostDestroyed(action.word, action.uid);
+        }
+      },
+    );
+    this.game.events.on(
+      "multiplayer-world-snapshot",
+      (world: MultiplayerWorld) => {
+        if (this.multiplayerRole === "guest") this.applyWorldSnapshot(world);
+      },
+    );
   }
 
   override update(time: number, delta: number): void {
@@ -260,6 +311,20 @@ export class GameScene extends Scene {
       Math.max(this.lawnTop, this.playerY),
     );
     this.redrawPlayer(this.playerGfx);
+
+    if (time - this.lastPlayerPositionEmitAt >= 100) {
+      this.lastPlayerPositionEmitAt = time;
+      const range = Math.max(1, this.lawnBottom - this.lawnTop);
+      this.game.events.emit("multiplayer-player-position", {
+        position: (this.playerY - this.lawnTop) / range,
+        facing: this.facing,
+      });
+    }
+
+    if (this.multiplayerRole === "guest") {
+      this.refreshTargeting();
+      return;
+    }
 
     this.refreshTargeting();
 
@@ -294,6 +359,14 @@ export class GameScene extends Scene {
         this.breachPlayer(ghost, i);
         return; // game over - stop processing this frame
       }
+    }
+
+    if (
+      this.multiplayerRole === "host" &&
+      time - this.lastWorldSnapshotAt >= WORLD_SNAPSHOT_INTERVAL_MS
+    ) {
+      this.lastWorldSnapshotAt = time;
+      this.emitWorldSnapshot(false, false);
     }
   }
 
@@ -576,6 +649,7 @@ export class GameScene extends Scene {
   private refreshTargeting(): void {
     for (const ghost of this.ghosts) {
       const shouldBeTargetable =
+        !this.pendingRemoteWords.has(ghost.word) &&
         ghost.side === this.facing &&
         Math.abs(ghost.y - this.playerY) <= this.targetYRange;
       if (shouldBeTargetable !== ghost.isTargetable()) {
@@ -647,14 +721,15 @@ export class GameScene extends Scene {
     this.spawnGhost();
   }
 
-  private onGhostDestroyed(word: string): void {
+  private onGhostDestroyed(word: string, playerUid?: string): void {
     const idx = this.ghosts.findIndex((g) => g.word === word);
     if (idx === -1) return;
     const ghost = this.ghosts[idx] as Ghost;
 
     this.hits++;
     this.streak++;
-    this.score += 10 + word.length * 2 + this.streak;
+    const points = 10 + word.length * 2 + this.streak;
+    this.score += points;
     this.game.events.emit("ui-score", this.score);
     this.game.events.emit("ui-streak", this.streak);
     playExplode();
@@ -662,6 +737,14 @@ export class GameScene extends Scene {
     this.poof(ghost.x, ghost.y - 30);
     ghost.destroy();
     this.ghosts.splice(idx, 1);
+    if (this.multiplayerRole === "host") {
+      this.game.events.emit("multiplayer-player-award", {
+        uid: playerUid,
+        points,
+        wave: this.wave,
+      });
+      this.emitWorldSnapshot(false, false);
+    }
     this.checkWaveComplete();
   }
 
@@ -706,6 +789,9 @@ export class GameScene extends Scene {
     this.cameras.main.shake(400, 0.02);
     this.cameras.main.flash(220, 150, 0, 100);
     playGameOver();
+    if (this.multiplayerRole === "host") {
+      this.emitWorldSnapshot(true, false);
+    }
     this.time.delayedCall(600, () => {
       this.scene.stop("UI");
       this.scene.start("GameOver", {
@@ -763,6 +849,10 @@ export class GameScene extends Scene {
           this.wave++;
           if (this.maxWave > 0 && this.wave > this.maxWave) {
             playGameOver();
+            if (this.multiplayerRole === "host") {
+              this.gameOver = true;
+              this.emitWorldSnapshot(true, true);
+            }
             this.scene.stop("UI");
             this.scene.start("GameOver", {
               score: this.score,
@@ -796,6 +886,10 @@ export class GameScene extends Scene {
           this.wave++;
           if (this.maxWave > 0 && this.wave > this.maxWave) {
             playGameOver();
+            if (this.multiplayerRole === "host") {
+              this.gameOver = true;
+              this.emitWorldSnapshot(true, true);
+            }
             this.scene.stop("UI");
             this.scene.start("GameOver", {
               score: this.score,
@@ -835,11 +929,95 @@ export class GameScene extends Scene {
     this.game.events.emit("ui-powerup", this.heldPowerUp);
   }
 
+  private emitWorldSnapshot(finished: boolean, cleared: boolean): void {
+    if (this.multiplayerRole !== "host") return;
+    const width = Math.max(1, this.scale.width);
+    const lawnRange = Math.max(1, this.lawnBottom - this.lawnTop);
+    const world: MultiplayerWorld = {
+      wave: this.wave,
+      teamScore: this.score,
+      leftLogHp: this.leftLogHp,
+      rightLogHp: this.rightLogHp,
+      ghosts: this.ghosts.map((ghost) => ({
+        word: ghost.word,
+        side: ghost.side,
+        x: ghost.x / width,
+        y: (ghost.y - this.lawnTop) / lawnRange,
+        frozen: ghost.isFrozen(),
+      })),
+      finished,
+      cleared,
+      updatedAt: Date.now(),
+    };
+    this.game.events.emit("multiplayer-world-out", world);
+  }
+
+  private applyWorldSnapshot(world: MultiplayerWorld): void {
+    if (this.gameOver) return;
+    const incoming = new Map(world.ghosts.map((ghost) => [ghost.word, ghost]));
+    for (let i = this.ghosts.length - 1; i >= 0; i--) {
+      const ghost = this.ghosts[i];
+      if (ghost === undefined || incoming.has(ghost.word)) continue;
+      this.matcher.unregister(ghost.word);
+      ghost.destroy();
+      this.ghosts.splice(i, 1);
+    }
+    const width = this.scale.width;
+    const lawnRange = Math.max(1, this.lawnBottom - this.lawnTop);
+    for (const state of world.ghosts) {
+      let ghost = this.ghosts.find(
+        (candidate) => candidate.word === state.word,
+      );
+      if (ghost === undefined) {
+        ghost = new Ghost(
+          this,
+          state.x * width,
+          this.lawnTop + state.y * lawnRange,
+          state.word,
+          state.side,
+        );
+        this.ghosts.push(ghost);
+      }
+      ghost.x = state.x * width;
+      ghost.y = this.lawnTop + state.y * lawnRange;
+      ghost.setFrozen(state.frozen);
+    }
+    for (const word of this.pendingRemoteWords) {
+      if (!incoming.has(word)) this.pendingRemoteWords.delete(word);
+    }
+    this.wave = world.wave;
+    this.score = world.teamScore;
+    this.leftLogHp = world.leftLogHp;
+    this.rightLogHp = world.rightLogHp;
+    this.redrawLogs();
+    this.game.events.emit("ui-wave", this.wave);
+    this.game.events.emit("ui-score", this.score);
+    this.game.events.emit("ui-log-left", this.leftLogHp);
+    this.game.events.emit("ui-log-right", this.rightLogHp);
+    this.refreshTargeting();
+
+    if (world.finished) {
+      this.gameOver = true;
+      this.time.delayedCall(250, () => {
+        this.scene.stop("UI");
+        this.scene.start("GameOver", {
+          score: this.score,
+          wave: this.wave,
+          hits: this.hits,
+          misses: this.misses,
+          cleared: world.cleared,
+        });
+      });
+    }
+  }
+
   shutdown(): void {
     this.spawnTimer?.remove();
     this.powerUpTimer?.remove();
     this.powerUpExpireTimer?.remove();
     this.matcher?.clear();
     this.input.keyboard?.removeAllListeners();
+    this.game.events.off("multiplayer-remote-action");
+    this.game.events.off("multiplayer-world-snapshot");
   }
 }
