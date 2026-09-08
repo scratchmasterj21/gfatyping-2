@@ -1,4 +1,4 @@
-import { Geom, Scene } from "phaser";
+import { Scene } from "phaser";
 
 type GameOverData = {
   playerWon: boolean;
@@ -6,6 +6,7 @@ type GameOverData = {
   accuracy: number;
   elapsed: number;
   wordsTyped: number;
+  marginChars: number;
 };
 
 export class GameOverScene extends Scene {
@@ -21,9 +22,9 @@ export class GameOverScene extends Scene {
 
     const panel = this.add.graphics();
     panel.fillStyle(0x0a0a1a, 0.94);
-    panel.fillRect(cx - 210, cy - 150, 420, 300);
+    panel.fillRoundedRect(cx - 210, cy - 165, 420, 330, 16);
     panel.lineStyle(2, data.playerWon ? 0x44aa44 : 0xcc3322, 0.7);
-    panel.strokeRect(cx - 210, cy - 150, 420, 300);
+    panel.strokeRoundedRect(cx - 210, cy - 165, 420, 330, 16);
 
     const title = data.playerWon ? "YOU WIN! 🏆" : "CPU WINS";
     const titleColor = data.playerWon ? "#44ee44" : "#ee4444";
@@ -34,6 +35,23 @@ export class GameOverScene extends Scene {
         fontFamily: "monospace",
         color: titleColor,
       })
+      .setOrigin(0.5);
+
+    this.add
+      .text(
+        cx,
+        cy - 82,
+        data.marginChars <= 5
+          ? "PHOTO FINISH!"
+          : data.playerWon
+            ? `Won by ${data.marginChars} characters`
+            : `${data.marginChars} characters behind`,
+        {
+          fontSize: "14px",
+          fontFamily: "monospace",
+          color: data.marginChars <= 5 ? "#ffdd44" : "#aaaacc",
+        },
+      )
       .setOrigin(0.5);
 
     const s = { fontSize: "14px", fontFamily: "monospace", color: "#888888" };
@@ -47,7 +65,7 @@ export class GameOverScene extends Scene {
     ];
 
     rows.forEach(([label, value], i) => {
-      const y = cy - 68 + i * 36;
+      const y = cy - 48 + i * 34;
       this.add.text(cx - 80, y, label, s).setOrigin(0, 0.5);
       this.add.text(cx + 80, y, value, v).setOrigin(1, 0.5);
     });
@@ -57,9 +75,9 @@ export class GameOverScene extends Scene {
       wave: data.wordsTyped,
     });
 
-    const btnY = cy + 118;
+    const btnY = cy + 132;
     this.makeBtn(cx - 90, btnY, "Play Again", () => {
-      this.scene.start("Boot");
+      this.scene.start("Game");
     });
     this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
       this.game.events.emit("exit-game");
@@ -89,11 +107,12 @@ export class GameOverScene extends Scene {
         txt.setColor("#ffffff");
       });
 
-    bg.setInteractive({
-      hitArea: new Geom.Rectangle(x - 80, y - 24, 160, 48),
-      hitAreaCallback: Geom.Rectangle.Contains,
-      useHandCursor: true,
-    })
+    // A centered zone gives the button a reliable local hit area. The old
+    // Graphics hit area used canvas coordinates and could miss clicks,
+    // especially after resizing the game modal.
+    this.add
+      .zone(x, y, 160, 48)
+      .setInteractive({ useHandCursor: true })
       .on("pointerdown", onClick)
       .on("pointerover", () => txt.setColor("#ffcc44"))
       .on("pointerout", () => txt.setColor("#ffffff"));

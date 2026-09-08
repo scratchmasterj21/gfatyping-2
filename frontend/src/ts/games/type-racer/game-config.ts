@@ -4,6 +4,7 @@ export async function createTypeRacerGame(
   parent: HTMLElement,
   words: string[],
   cpuWpm = 35,
+  durationSec = 60,
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ BootScene }, { GameOverScene }, { GameScene }] = await Promise.all([
@@ -28,5 +29,6 @@ export async function createTypeRacerGame(
 
   game.registry.set("words", words);
   game.registry.set("cpuWpm", cpuWpm);
+  game.registry.set("durationSec", durationSec);
   return game;
 }

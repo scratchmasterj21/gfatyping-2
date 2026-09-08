@@ -10,6 +10,8 @@ import {
   Show,
 } from "solid-js";
 
+import { UserAvatar } from "../../components/common/UserAvatar";
+import { getAuthenticatedUser } from "../../firebase";
 import { cn } from "../../utils/cn";
 import {
   getWordListOptions,
@@ -51,6 +53,9 @@ export function TypeRacerModal(props: Props): JSXElement {
   const [difficulty, setDifficulty] = createSignal<Difficulty>(
     DIFFICULTIES[0] as Difficulty,
   );
+  const [durationSec, setDurationSec] = createSignal<30 | 60>(60);
+  const [visualProgress, setVisualProgress] = createSignal(0);
+  const [raceActive, setRaceActive] = createSignal(false);
   const [phase, setPhase] = createSignal<"pick" | "loading" | "playing">(
     "pick",
   );
@@ -69,7 +74,17 @@ export function TypeRacerModal(props: Props): JSXElement {
     setPhase("playing");
     await Promise.resolve();
     if (containerRef === undefined) return;
-    game = await createTypeRacerGame(containerRef, words, cpuWpm);
+    game = await createTypeRacerGame(
+      containerRef,
+      words,
+      cpuWpm,
+      durationSec(),
+    );
+    setRaceActive(true);
+    game.events.on("type-racer-race-active", setRaceActive);
+    game.events.on("type-racer-player-progress", (progress: number) => {
+      setVisualProgress(Math.max(0, Math.min(1, progress)));
+    });
     game.events.on("game-result", (data: { score: number; wave: number }) => {
       onResult?.(data.score, data.wave);
     });
@@ -83,6 +98,8 @@ export function TypeRacerModal(props: Props): JSXElement {
       game.destroy(true);
       game = null;
     }
+    setVisualProgress(0);
+    setRaceActive(false);
     setPhase("pick");
   };
 
@@ -148,6 +165,28 @@ export function TypeRacerModal(props: Props): JSXElement {
             </div>
 
             <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
+              Race length
+            </p>
+            <div class="mb-4 grid grid-cols-2 gap-2">
+              <For each={[30, 60] as const}>
+                {(seconds) => (
+                  <button
+                    type="button"
+                    class={cn(
+                      "rounded px-3 py-1.5 text-em-sm font-semibold transition-colors",
+                      durationSec() === seconds
+                        ? "bg-main text-bg"
+                        : "bg-sub-alt text-sub hover:text-text",
+                    )}
+                    onClick={() => setDurationSec(seconds)}
+                  >
+                    {seconds === 30 ? "Quick · 30s" : "Standard · 60s"}
+                  </button>
+                )}
+              </For>
+            </div>
+
+            <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
               Choose a word list
             </p>
 
@@ -199,6 +238,19 @@ export function TypeRacerModal(props: Props): JSXElement {
           </Show>
 
           <Show when={phase() === "playing"}>
+            <Show when={raceActive()}>
+              <div
+                class="pointer-events-none absolute z-10 h-5 w-5 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full ring-1 ring-text/60 transition-[left] duration-75 ease-linear"
+                style={{
+                  left: `calc(60px + ${visualProgress() * 100}% - ${visualProgress() * 120}px)`,
+                  top: "calc(34.5% - 19px)",
+                }}
+              >
+                <Show when={getAuthenticatedUser()?.uid}>
+                  {(uid) => <UserAvatar uid={uid()} class="h-5 w-5" />}
+                </Show>
+              </div>
+            </Show>
             <div
               ref={(el) => {
                 containerRef = el;
