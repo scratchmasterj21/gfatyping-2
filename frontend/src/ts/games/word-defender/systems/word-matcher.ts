@@ -5,14 +5,6 @@ export type MatchResult =
   | { status: "complete"; word: string }
   | { status: "miss" };
 
-// Anti-spam: if the last SPAM_WINDOW_SIZE real keystrokes only used
-// SPAM_MAX_DISTINCT or fewer distinct characters, treat the current one as
-// a no-op miss instead of matching it. Real words (even short home-row ones)
-// pull in more distinct letters than this well before the window fills, so
-// this only catches mashing/holding a key or alternating 1-2 keys.
-const SPAM_WINDOW_SIZE = 8;
-const SPAM_MAX_DISTINCT = 2;
-
 // If the player keeps missing on the same locked target this many times in a
 // row, give up the lock for them - otherwise a hard word can trap them
 // (visually stuck on one highlighted target, e.g. a descending ship in Word
@@ -25,20 +17,10 @@ export class WordMatcher {
   private activeWords = new Set<string>();
   private lockedWord: string | null = null;
   private onBufferChange: (buf: string, locked: string | null) => void;
-  private recentKeys: string[] = [];
   private missStreak = 0;
 
   constructor(onBufferChange: (buf: string, locked: string | null) => void) {
     this.onBufferChange = onBufferChange;
-  }
-
-  private isSpamKey(char: string): boolean {
-    this.recentKeys.push(char);
-    if (this.recentKeys.length > SPAM_WINDOW_SIZE) {
-      this.recentKeys.shift();
-    }
-    if (this.recentKeys.length < SPAM_WINDOW_SIZE) return false;
-    return new Set(this.recentKeys).size <= SPAM_MAX_DISTINCT;
   }
 
   register(word: string): void {
@@ -64,11 +46,6 @@ export class WordMatcher {
       }
       this.onBufferChange(this.buffer, this.lockedWord);
       return { status: "none" };
-    }
-
-    if (this.isSpamKey(char)) {
-      this.onBufferChange(this.buffer, this.lockedWord);
-      return { status: "miss" };
     }
 
     const next = this.buffer + char;
@@ -155,7 +132,6 @@ export class WordMatcher {
     this.buffer = "";
     this.lockedWord = null;
     this.activeWords.clear();
-    this.recentKeys = [];
     this.missStreak = 0;
     this.onBufferChange("", null);
   }

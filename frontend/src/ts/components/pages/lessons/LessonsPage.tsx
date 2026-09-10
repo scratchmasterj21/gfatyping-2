@@ -140,6 +140,7 @@ function Stars(props: { count: number }): JSXElement {
 function LessonButton(props: {
   lesson: Lesson;
   progress: LessonProgress | undefined;
+  number?: number;
   locked?: boolean;
   lockedMessage?: string;
   next?: boolean;
@@ -160,34 +161,63 @@ function LessonButton(props: {
   return (
     <button
       type="button"
+      aria-label={`${props.number === undefined ? "Lesson" : `Lesson ${props.number}`}: ${props.lesson.name}${locked() ? ", locked" : ""}`}
       class={cn(
-        "flex flex-col gap-2 rounded p-3 text-left transition-colors",
+        "group relative grid min-h-48 grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-sub-alt bg-sub-alt text-left shadow-sm transition-all",
         locked()
-          ? "cursor-not-allowed bg-sub-alt text-sub opacity-50"
+          ? "cursor-not-allowed text-sub opacity-55"
           : needsImprovement()
-            ? "cursor-pointer bg-sub-alt text-text ring-1 ring-main/50 hover:bg-text hover:text-bg"
-            : "cursor-pointer bg-sub-alt text-text hover:bg-text hover:text-bg",
+            ? "cursor-pointer text-text ring-2 ring-main/50 hover:-translate-y-0.5 hover:shadow-lg"
+            : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
+        props.next && !done() && !locked() ? "ring-2 ring-main" : "",
       )}
       onClick={onClick}
     >
-      <div class="flex items-center justify-between gap-2">
-        <span class="flex items-center gap-2 font-medium">
-          {props.lesson.name}
-          <Show when={props.next && !done()}>
-            <span class="rounded bg-main px-1.5 py-0.5 text-em-xs text-bg">
-              Next
-            </span>
-          </Show>
+      <div class="flex items-start justify-between px-4 pt-3">
+        <span class="text-2xl font-bold text-sub tabular-nums">
+          {props.number === undefined
+            ? ""
+            : String(props.number).padStart(2, "0")}
         </span>
         <Show when={locked()} fallback={<LessonStatus done={done()} />}>
-          <Fa icon="fa-lock" class="text-sub" size={0.9} />
+          <Fa icon="fa-lock" class="mt-1 text-sub" />
         </Show>
       </div>
-      <div class="flex items-center justify-between gap-2 text-em-xs text-sub">
-        <Show when={props.progress !== undefined} fallback={<span>start</span>}>
-          <span>{Math.round(props.progress?.bestWpm ?? 0)} wpm</span>
+      <div class="flex flex-col items-center justify-center gap-3 px-3 py-2 text-center">
+        <Show
+          when={props.lesson.newKeys}
+          fallback={
+            <Fa
+              icon={locked() ? "fa-lock" : "fa-keyboard"}
+              class={locked() ? "text-sub" : "text-main"}
+              size={2.35}
+            />
+          }
+        >
+          {(keys) => (
+            <span class="text-4xl font-black tracking-wider text-main">
+              {keys().toUpperCase()}
+            </span>
+          )}
         </Show>
-        <Stars count={done() ? (props.progress?.stars ?? 1) : 0} />
+        <Show when={done()}>
+          <Stars count={props.progress?.stars ?? 1} />
+        </Show>
+        <Show when={props.next && !done() && !locked()}>
+          <span class="rounded-full bg-main px-3 py-1 text-em-xs font-bold text-bg">
+            Start here
+          </span>
+        </Show>
+      </div>
+      <div class="border-t border-bg px-3 py-2.5 text-center">
+        <div class="truncate font-medium" title={props.lesson.name}>
+          {props.lesson.name}
+        </div>
+        <Show when={props.progress !== undefined}>
+          <div class="mt-0.5 text-em-xs text-sub">
+            best {Math.round(props.progress?.bestWpm ?? 0)} wpm
+          </div>
+        </Show>
       </div>
     </button>
   );
@@ -206,6 +236,7 @@ function GameCheckpointButton(props: {
   group: LessonGroup;
   checkpoint: HomeRowCheckpoint;
   progressFor: (id: string) => LessonProgress | undefined;
+  number: number;
   loading: boolean;
   onPlay: (group: LessonGroup, checkpoint: HomeRowCheckpoint) => void;
 }): JSXElement {
@@ -231,16 +262,18 @@ function GameCheckpointButton(props: {
     <button
       type="button"
       class={cn(
-        "flex flex-col gap-2 rounded p-3 text-left transition-colors",
+        "relative grid min-h-48 grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-sub-alt bg-sub-alt text-left shadow-sm transition-all",
         locked()
-          ? "cursor-not-allowed bg-sub-alt text-sub opacity-50"
-          : "cursor-pointer bg-sub-alt text-text hover:bg-text hover:text-bg",
+          ? "cursor-not-allowed text-sub opacity-55"
+          : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
       )}
       onClick={onClick}
       disabled={props.loading}
     >
-      <div class="flex items-center justify-between gap-2">
-        <span class="font-medium">{props.checkpoint.label}</span>
+      <div class="flex items-start justify-between px-4 pt-3">
+        <span class="text-2xl font-bold text-sub tabular-nums">
+          {String(props.number).padStart(2, "0")}
+        </span>
         <Show
           when={locked()}
           fallback={
@@ -257,10 +290,25 @@ function GameCheckpointButton(props: {
           <Fa icon="fa-lock" class="text-sub" size={0.9} />
         </Show>
       </div>
-      <div class="text-em-xs text-sub">
-        <Show when={done()} fallback="review game">
-          best: {props.progressFor(key())?.bestScore ?? 0}
+      <div class="flex flex-col items-center justify-center gap-3 px-3 py-2">
+        <Fa
+          icon={locked() ? "fa-lock" : props.checkpoint.icon}
+          class={locked() ? "text-sub" : "text-main"}
+          size={2.35}
+        />
+        <Show when={done()}>
+          <Stars count={3} />
         </Show>
+      </div>
+      <div class="border-t border-bg px-3 py-2.5 text-center">
+        <div class="truncate font-medium" title={props.checkpoint.label}>
+          {props.checkpoint.label}
+        </div>
+        <div class="mt-0.5 text-em-xs text-sub">
+          <Show when={done()} fallback="checkpoint game">
+            best {props.progressFor(key())?.bestScore ?? 0}
+          </Show>
+        </div>
       </div>
     </button>
   );
@@ -541,6 +589,22 @@ const allCheckpoints = continueOrder.filter(
   (item): item is Extract<ContinueItem, { kind: "checkpoint" }> =>
     item.kind === "checkpoint",
 );
+
+const lessonCardNumber = (lessonId: string): number =>
+  continueOrder.findIndex(
+    (item) => item.kind === "lesson" && item.lesson.id === lessonId,
+  ) + 1;
+
+const checkpointCardNumber = (
+  group: LessonGroup,
+  checkpoint: HomeRowCheckpoint,
+): number =>
+  continueOrder.findIndex(
+    (item) =>
+      item.kind === "checkpoint" &&
+      item.group.id === group.id &&
+      item.checkpoint.gameType === checkpoint.gameType,
+  ) + 1;
 
 function ContentButton(props: {
   title: string;
@@ -1891,7 +1955,7 @@ export function LessonsPage(): JSXElement {
                         <p class="mt-1 mb-2 pl-2 text-em-xs text-sub">
                           {group.description}
                         </p>
-                        <div class="mb-2 grid grid-cols-1 gap-2 pl-2 sm:grid-cols-2 lg:grid-cols-3">
+                        <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
                           <Show
                             when={LESSON_GROUP_INTRO_VIDEOS[group.id]}
                             keyed
@@ -1899,19 +1963,24 @@ export function LessonsPage(): JSXElement {
                             {(videoId) => (
                               <button
                                 type="button"
-                                class="flex cursor-pointer flex-col gap-2 rounded bg-sub-alt p-3 text-left text-text transition-colors hover:bg-text hover:text-bg"
+                                class="grid min-h-48 cursor-pointer grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-sub-alt bg-sub-alt text-left text-text shadow-sm transition-all hover:-translate-y-0.5 hover:border-main hover:shadow-lg"
                                 onClick={() => showLessonIntroVideo(videoId)}
                               >
-                                <div class="flex items-center justify-between gap-2">
-                                  <span class="font-medium">Intro video</span>
+                                <div class="px-4 pt-3 text-2xl font-bold text-sub">
+                                  <Fa icon="fa-video" />
+                                </div>
+                                <div class="flex items-center justify-center">
                                   <Fa
                                     icon="fa-play-circle"
-                                    class="text-sub"
-                                    size={0.9}
+                                    class="text-main"
+                                    size={2.8}
                                   />
                                 </div>
-                                <div class="text-em-xs text-sub">
-                                  watch before you start
+                                <div class="border-t border-bg px-3 py-2.5 text-center">
+                                  <div class="font-medium">Intro video</div>
+                                  <div class="mt-0.5 text-em-xs text-sub">
+                                    watch before you start
+                                  </div>
                                 </div>
                               </button>
                             )}
@@ -1923,6 +1992,7 @@ export function LessonsPage(): JSXElement {
                                 <LessonButton
                                   lesson={item.lesson}
                                   progress={progressFor(item.lesson.id)}
+                                  number={lessonCardNumber(item.lesson.id)}
                                   next={frontierLessonId() === item.lesson.id}
                                   locked={isLessonLocked(item.lesson.id)}
                                   lockedMessage={getLessonLockMessage(
@@ -1933,6 +2003,10 @@ export function LessonsPage(): JSXElement {
                                 <GameCheckpointButton
                                   group={group}
                                   checkpoint={item.checkpoint}
+                                  number={checkpointCardNumber(
+                                    group,
+                                    item.checkpoint,
+                                  )}
                                   progressFor={progressFor}
                                   loading={lessonGameLoading()}
                                   onPlay={(g, c) =>
