@@ -10,6 +10,8 @@ import {
   Show,
 } from "solid-js";
 
+import { UserAvatar } from "../../components/common/UserAvatar";
+import { getAuthenticatedUser } from "../../firebase";
 import { cn } from "../../utils/cn";
 import {
   createWordDefenderGame,
@@ -55,6 +57,7 @@ export function WordDefenderModal(props: Props): JSXElement {
   const [phase, setPhase] = createSignal<"pick" | "loading" | "playing">(
     "pick",
   );
+  const [avatarVisible, setAvatarVisible] = createSignal(false);
   let containerRef: HTMLDivElement | undefined;
   let game: Phaser.Game | null = null;
 
@@ -78,7 +81,10 @@ export function WordDefenderModal(props: Props): JSXElement {
       usedDifficulty,
       wordsOverride !== undefined ? 5 : 0,
     );
+    setAvatarVisible(true);
+    game.events.on("game-avatar-visible", setAvatarVisible);
     game.events.on("game-result", (data: { score: number; wave: number }) => {
+      setAvatarVisible(false);
       onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
     });
     game.events.on("exit-game", () => {
@@ -92,6 +98,7 @@ export function WordDefenderModal(props: Props): JSXElement {
       game = null;
     }
     setPhase("pick");
+    setAvatarVisible(false);
   };
 
   createEffect(() => {
@@ -223,6 +230,16 @@ export function WordDefenderModal(props: Props): JSXElement {
 
           {/* Game canvas container */}
           <Show when={phase() === "playing"}>
+            <Show when={avatarVisible() && getAuthenticatedUser()?.uid}>
+              {(uid) => (
+                <div class="pointer-events-none absolute bottom-[46px] left-1/2 z-10 -translate-x-1/2">
+                  <UserAvatar
+                    uid={uid()}
+                    class="h-7 w-7 rounded-full bg-sub-alt ring-2 ring-main"
+                  />
+                </div>
+              )}
+            </Show>
             <div
               ref={(el) => {
                 containerRef = el;

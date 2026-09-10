@@ -122,6 +122,7 @@ export class GameScene extends Scene {
   }
 
   create(): void {
+    this.game.events.emit("game-avatar-visible", true);
     const W = this.scale.width;
     const H = this.scale.height;
     this.baseX = W / 2;

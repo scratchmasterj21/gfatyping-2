@@ -233,6 +233,7 @@ export function GhostHunterModal(props: Props): JSXElement {
       game.destroy(true);
       game = null;
     }
+    setLocalPlayerPosition(0.5);
     setPhase("pick");
   };
 
@@ -645,18 +646,37 @@ export function GhostHunterModal(props: Props): JSXElement {
           </Show>
 
           <Show when={phase() === "playing"}>
-            <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
-              <div class="font-bold text-main">Team room {roomCode()}</div>
-              <For each={Object.values(room()?.players ?? {})}>
-                {(player) => (
-                  <div class="flex min-w-44 justify-between gap-4 text-sub">
-                    <span class="max-w-28 truncate">{player.name}</span>
-                    <span>{player.score}</span>
+            <Show when={roomCode() !== undefined}>
+              <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
+                <div class="font-bold text-main">Team room {roomCode()}</div>
+                <For each={Object.values(room()?.players ?? {})}>
+                  {(player) => (
+                    <div class="flex min-w-44 justify-between gap-4 text-sub">
+                      <span class="max-w-28 truncate">{player.name}</span>
+                      <span>{player.score}</span>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </Show>
+            <div class="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+              <Show
+                when={roomCode() === undefined && getAuthenticatedUser()?.uid}
+              >
+                {(uid) => (
+                  <div
+                    class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-[top] duration-100 ease-linear"
+                    style={{
+                      left: "50%",
+                      top: `calc(68% + ${28 + localPlayerPosition() * 130}px)`,
+                    }}
+                  >
+                    <div class="relative z-10 h-8 w-8 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main">
+                      <UserAvatar uid={uid()} class="h-8 w-8" />
+                    </div>
                   </div>
                 )}
-              </For>
-            </div>
-            <div class="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+              </Show>
               <For each={multiplayerPlayers()}>
                 {(player) => (
                   <div

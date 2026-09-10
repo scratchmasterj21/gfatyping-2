@@ -10,6 +10,8 @@ import {
   Show,
 } from "solid-js";
 
+import { UserAvatar } from "../../components/common/UserAvatar";
+import { getAuthenticatedUser } from "../../firebase";
 import { cn } from "../../utils/cn";
 import {
   getWordListOptions,
@@ -57,6 +59,7 @@ export function BalloonPopModal(props: Props): JSXElement {
   const [phase, setPhase] = createSignal<"pick" | "loading" | "playing">(
     "pick",
   );
+  const [avatarVisible, setAvatarVisible] = createSignal(false);
   let containerRef: HTMLDivElement | undefined;
   let game: Phaser.Game | null = null;
 
@@ -80,7 +83,10 @@ export function BalloonPopModal(props: Props): JSXElement {
       usedDifficulty,
       wordsOverride !== undefined ? 5 : 0,
     );
+    setAvatarVisible(true);
+    game.events.on("game-avatar-visible", setAvatarVisible);
     game.events.on("game-result", (data: { score: number; wave: number }) => {
+      setAvatarVisible(false);
       onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
     });
     game.events.on("exit-game", () => {
@@ -94,6 +100,7 @@ export function BalloonPopModal(props: Props): JSXElement {
       game = null;
     }
     setPhase("pick");
+    setAvatarVisible(false);
   };
 
   createEffect(() => {
@@ -219,6 +226,17 @@ export function BalloonPopModal(props: Props): JSXElement {
           </Show>
 
           <Show when={phase() === "playing"}>
+            <Show when={avatarVisible() && getAuthenticatedUser()?.uid}>
+              {(uid) => (
+                <div class="pointer-events-none absolute bottom-8 left-8 z-10 flex flex-col items-center">
+                  <UserAvatar
+                    uid={uid()}
+                    class="h-11 w-11 rounded-full bg-sub-alt ring-2 ring-main"
+                  />
+                  <div class="-mt-1 h-10 w-7 rounded-t-xl bg-main/80"></div>
+                </div>
+              )}
+            </Show>
             <div
               ref={(el) => {
                 containerRef = el;
