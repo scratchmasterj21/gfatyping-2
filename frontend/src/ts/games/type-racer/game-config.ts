@@ -5,6 +5,8 @@ export async function createTypeRacerGame(
   words: string[],
   cpuWpm = 35,
   durationSec = 60,
+  multiplayer = false,
+  targetChars?: number,
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ BootScene }, { GameOverScene }, { GameScene }] = await Promise.all([
@@ -30,5 +32,7 @@ export async function createTypeRacerGame(
   game.registry.set("words", words);
   game.registry.set("cpuWpm", cpuWpm);
   game.registry.set("durationSec", durationSec);
+  game.registry.set("multiplayer", multiplayer);
+  if (targetChars !== undefined) game.registry.set("targetChars", targetChars);
   return game;
 }

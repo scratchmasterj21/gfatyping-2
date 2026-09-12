@@ -26,6 +26,8 @@ export class GameScene extends Scene {
   private playerWobbleMs = 0;
   private boostMs = 0;
   private lastProgressEmitAt = 0;
+  private multiplayer = false;
+  private opponentName = "CPU";
 
   private cpuFinishSec = 96;
   private playerProgress = 0;
@@ -69,12 +71,14 @@ export class GameScene extends Scene {
     const cpuWpm = (this.registry.get("cpuWpm") as number | undefined) ?? 35;
     this.durationSec =
       (this.registry.get("durationSec") as number | undefined) ?? 60;
-    this.raceChars = Math.max(
-      40,
-      Math.round((cpuWpm * 5 * this.durationSec) / 60),
-    );
+    this.multiplayer = this.registry.get("multiplayer") === true;
+    this.raceChars =
+      (this.registry.get("targetChars") as number | undefined) ??
+      Math.max(40, Math.round((cpuWpm * 5 * this.durationSec) / 60));
     this.cpuFinishSec = this.durationSec;
-    this.wordPool = shuffleCyclic(this.words);
+    this.wordPool = this.multiplayer
+      ? [...this.words]
+      : shuffleCyclic(this.words);
     this.poolIdx = 0;
     this.wordQueue = [];
     for (let i = 0; i < QUEUE_SIZE; i++) this.wordQueue.push(this.popWord());
@@ -106,6 +110,14 @@ export class GameScene extends Scene {
     const H = this.scale.height;
     this.events.once("shutdown", this.shutdown, this);
     this.game.events.emit("type-racer-race-active", true);
+    this.game.events.on(
+      "type-racer-opponent",
+      (opponent: { name: string; progress: number }) => {
+        this.opponentName = opponent.name;
+        this.cpuProgress = Math.max(0, Math.min(1, opponent.progress));
+        this.cpuLabel.setText(this.opponentName);
+      },
+    );
 
     this.trackG = this.add.graphics();
     this.playerCarG = this.add.graphics();
@@ -232,13 +244,15 @@ export class GameScene extends Scene {
     }
 
     const elapsed = (now - this.startTime) / 1000;
-    this.cpuProgress = Math.max(
-      this.cpuProgress,
-      Math.min(
-        1,
-        elapsed / this.cpuFinishSec + Math.sin(elapsed * 1.7) * 0.012,
-      ),
-    );
+    if (!this.multiplayer) {
+      this.cpuProgress = Math.max(
+        this.cpuProgress,
+        Math.min(
+          1,
+          elapsed / this.cpuFinishSec + Math.sin(elapsed * 1.7) * 0.012,
+        ),
+      );
+    }
 
     this.playerWobbleMs = Math.max(0, this.playerWobbleMs - delta);
     this.boostMs = Math.max(0, this.boostMs - delta);
@@ -296,12 +310,28 @@ export class GameScene extends Scene {
         "type-racer-player-progress",
         this.visualPlayerProgress,
       );
+      if (this.multiplayer) {
+        const total = this.completedChars + this.mistakes;
+        this.game.events.emit("type-racer-local-stats", {
+          progress: this.furthestTypingProgress,
+          wpm:
+            elapsed > 0
+              ? Math.round(this.completedChars / 5 / (elapsed / 60))
+              : 0,
+          accuracy:
+            total > 0 ? Math.round((this.completedChars / total) * 100) : 100,
+          finished: false,
+        });
+      }
     }
 
     if (this.playerProgress >= 1) {
       this.endRace(true, elapsed);
-    } else if (this.cpuProgress >= 1) {
-      this.endRace(false, elapsed);
+    } else if (
+      (!this.multiplayer && this.cpuProgress >= 1) ||
+      (this.multiplayer && elapsed >= this.durationSec)
+    ) {
+      this.endRace(this.playerProgress >= this.cpuProgress, elapsed);
     }
   }
 
@@ -566,6 +596,14 @@ export class GameScene extends Scene {
       total > 0 ? Math.round((this.completedChars / total) * 100) : 100;
     const wpm =
       elapsed > 0 ? Math.round(this.completedChars / 5 / (elapsed / 60)) : 0;
+    if (this.multiplayer) {
+      this.game.events.emit("type-racer-local-stats", {
+        progress: this.playerProgress,
+        wpm,
+        accuracy,
+        finished: true,
+      });
+    }
     this.time.delayedCall(700, () => {
       this.scene.start("GameOver", {
         playerWon,
@@ -589,5 +627,6 @@ export class GameScene extends Scene {
       this.scale.off("resize", this.resizeHandler);
       this.resizeHandler = null;
     }
+    this.game.events.off("type-racer-opponent");
   }
 }

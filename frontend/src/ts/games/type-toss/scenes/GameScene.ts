@@ -64,6 +64,8 @@ export class GameScene extends Scene {
 
   // unused but kept for shutdown typing
   private _spawnTimer: Time.TimerEvent | null = null;
+  private multiplayer = false;
+  private randomState = 1;
 
   constructor() {
     super({ key: "Game" });
@@ -75,7 +77,11 @@ export class GameScene extends Scene {
       stored !== undefined && stored.length > 0
         ? stored
         : ["type", "fast", "duck", "shelf", "score"];
-    this.wordPool = shuffleCyclic(this.words);
+    this.multiplayer = this.registry.get("multiplayer") === true;
+    this.randomState = (this.registry.get("seed") as number | undefined) ?? 1;
+    this.wordPool = this.multiplayer
+      ? this.seededShuffle(this.words)
+      : shuffleCyclic(this.words);
     this.poolIdx = 0;
     this.cells = [];
     this.lockedWord = null;
@@ -267,6 +273,10 @@ export class GameScene extends Scene {
   }
 
   private pickTargetKind(): TargetKind {
+    // Home-row learners can enter multiplayer before they know every letter.
+    // Keep competitive boards vocabulary-only so fixed power-up words such as
+    // "double" cannot create an impossible target.
+    if (this.multiplayer) return "normal";
     const r = Math.random();
     if (r < TRAP_CHANCE) return "trap";
     if (r < TRAP_CHANCE + BONUS_TIME_CHANCE) return "bonusTime";
@@ -351,7 +361,9 @@ export class GameScene extends Scene {
     const maxTries = this.wordPool.length * 2 + 1;
     for (let i = 0; i < maxTries; i++) {
       if (this.poolIdx >= this.wordPool.length) {
-        this.wordPool = shuffleCyclic(this.words);
+        this.wordPool = this.multiplayer
+          ? this.seededShuffle(this.words)
+          : shuffleCyclic(this.words);
         this.poolIdx = 0;
       }
       const w = this.wordPool[this.poolIdx++] as string;
@@ -385,6 +397,7 @@ export class GameScene extends Scene {
     this.score += word.length * scoreMult;
     this.game.events.emit("ui-score", this.score);
     this.game.events.emit("ui-streak", this.streak);
+    this.emitMultiplayerStats(false);
 
     if (target.kind === "bonusTime") {
       this.timeLeft += BONUS_TIME_SECONDS;
@@ -421,6 +434,7 @@ export class GameScene extends Scene {
     this.timeLeft = Math.max(0, this.timeLeft - TRAP_TIME_PENALTY);
     this.game.events.emit("ui-streak", 0);
     this.game.events.emit("ui-timer", Math.ceil(this.timeLeft), this.totalTime);
+    this.emitMultiplayerStats(false);
     this.spawnFloatingText(
       target.x,
       target.y - 30,
@@ -540,6 +554,7 @@ export class GameScene extends Scene {
     this.streak = 0;
     this.misses++;
     this.game.events.emit("ui-streak", 0);
+    this.emitMultiplayerStats(false);
     playMiss();
 
     if (this.lockedWord !== null) {
@@ -554,11 +569,40 @@ export class GameScene extends Scene {
     return 1;
   }
 
+  private random(): number {
+    this.randomState = (this.randomState * 16_807) % 2_147_483_647;
+    return (this.randomState - 1) / 2_147_483_646;
+  }
+
+  private seededShuffle(words: string[]): string[] {
+    const shuffled = [...words];
+    for (let index = shuffled.length - 1; index > 0; index--) {
+      const swapIndex = Math.floor(this.random() * (index + 1));
+      [shuffled[index], shuffled[swapIndex]] = [
+        shuffled[swapIndex] as string,
+        shuffled[index] as string,
+      ];
+    }
+    return shuffled;
+  }
+
+  private emitMultiplayerStats(finished: boolean): void {
+    if (!this.multiplayer) return;
+    const attempts = this.hits + this.misses;
+    this.game.events.emit("type-toss-local-stats", {
+      score: this.score,
+      words: this.wordsTyped,
+      accuracy: attempts > 0 ? Math.round((this.hits / attempts) * 100) : 100,
+      finished,
+    });
+  }
+
   private endGame(): void {
     if (this.gameOver) return;
     this.gameOver = true;
     this.shuffleTimer?.remove();
     this.matcher.clear();
+    this.emitMultiplayerStats(true);
     playGameOver();
     this.time.delayedCall(300, () => {
       this.scene.stop("UI");

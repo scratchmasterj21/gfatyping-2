@@ -16,6 +16,8 @@ export async function createTypeTossGame(
   parent: HTMLElement,
   words: string[],
   difficulty: GameDifficulty = TYPE_TOSS_DIFFICULTIES[1] as GameDifficulty,
+  multiplayer = false,
+  seed?: number,
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ BootScene }, { GameOverScene }, { GameScene }, { UIScene }] =
@@ -43,5 +45,7 @@ export async function createTypeTossGame(
   game.registry.set("words", words);
   game.registry.set("cols", difficulty.cols);
   game.registry.set("time", difficulty.time);
+  game.registry.set("multiplayer", multiplayer);
+  if (seed !== undefined) game.registry.set("seed", seed);
   return game;
 }

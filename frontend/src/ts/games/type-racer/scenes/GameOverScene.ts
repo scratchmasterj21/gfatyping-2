@@ -76,12 +76,25 @@ export class GameOverScene extends Scene {
     });
 
     const btnY = cy + 132;
-    this.makeBtn(cx - 90, btnY, "Play Again", () => {
-      this.scene.start("Game");
-    });
-    this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
-      this.game.events.emit("exit-game");
-    });
+    if (this.registry.get("multiplayer") === true) {
+      this.add
+        .text(cx, btnY - 28, "Waiting for the other racers…", {
+          fontSize: "13px",
+          fontFamily: "monospace",
+          color: "#aaaacc",
+        })
+        .setOrigin(0.5);
+      this.makeBtn(cx, btnY + 14, "Back to Lessons", () => {
+        this.game.events.emit("exit-game");
+      });
+    } else {
+      this.makeBtn(cx - 90, btnY, "Play Again", () => {
+        this.scene.start("Game");
+      });
+      this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
+        this.game.events.emit("exit-game");
+      });
+    }
   }
 
   private makeBtn(

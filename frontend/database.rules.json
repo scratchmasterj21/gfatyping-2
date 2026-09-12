@@ -20,6 +20,66 @@
       ".read": "auth != null && auth.token.email_verified == true && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
       ".write": "auth != null && auth.token.email_verified == true && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)"
     },
+    "tossRooms": {
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid && ((!data.exists() && root.child('tossRooms').child($code).child('status').val() == 'lobby') || (data.exists() && root.child('tossRooms').child($code).child('status').val() != 'finished'))",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('words').isNumber() && newData.child('words').val() >= 0 && newData.child('accuracy').isNumber() && newData.child('accuracy').val() >= 0 && newData.child('accuracy').val() <= 100 && newData.child('finished').isBoolean() && newData.child('online').isBoolean())"
+          }
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'countdown' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "durationSec": {
+          ".validate": "(newData.val() == 30 || newData.val() == 60) && (!data.exists() || newData.val() == data.val())"
+        },
+        "seed": {
+          ".validate": "newData.isNumber() && (!data.exists() || newData.val() == data.val())"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+          }
+        }
+      }
+    },
+    "racerRooms": {
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid && ((!data.exists() && root.child('racerRooms').child($code).child('status').val() == 'lobby') || (data.exists() && root.child('racerRooms').child($code).child('status').val() != 'finished'))",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 1 && newData.child('wpm').isNumber() && newData.child('wpm').val() >= 0 && newData.child('accuracy').isNumber() && newData.child('accuracy').val() >= 0 && newData.child('accuracy').val() <= 100 && newData.child('finished').isBoolean() && newData.child('online').isBoolean())"
+          }
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'countdown' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "durationSec": {
+          ".validate": "(newData.val() == 30 || newData.val() == 60) && (!data.exists() || newData.val() == data.val())"
+        },
+        "targetChars": {
+          ".validate": "(newData.val() == 100 || newData.val() == 200) && (!data.exists() || newData.val() == data.val())"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+          }
+        }
+      }
+    },
     "ghostRooms": {
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",

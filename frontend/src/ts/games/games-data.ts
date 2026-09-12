@@ -18,7 +18,8 @@ export type BuiltinGame = {
     | "type-racer"
     | "ghost-hunter"
     | "fruit-ninja"
-    | "type-toss";
+    | "type-toss"
+    | "typing-rpg";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -32,6 +33,14 @@ export type Game = FunboxGame | BuiltinGame;
  * with `nosave` so they never persist across reloads.
  */
 export const games: Game[] = [
+  {
+    type: "builtin",
+    id: "typing-rpg",
+    name: "Typing Quest",
+    description:
+      "Explore a forest, defeat monsters by typing, and find the treasure!",
+    icon: "fa-map",
+  },
   {
     type: "builtin",
     id: "type-toss",

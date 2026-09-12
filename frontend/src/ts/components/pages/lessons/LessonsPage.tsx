@@ -46,6 +46,7 @@ import { games } from "../../../games/games-data";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
 import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
+import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
 import {
   HOME_ROW_GAME_IDS,
@@ -318,22 +319,30 @@ function GameButton(props: {
   name: string;
   description: string;
   icon: FaSolidIcon;
+  locked?: boolean;
   onClick: () => void;
 }): JSXElement {
   return (
     <button
       type="button"
       class={cn(
-        "flex cursor-pointer flex-col gap-2 rounded p-3 text-left transition-colors",
-        "bg-sub-alt text-text hover:bg-text hover:text-bg",
+        "flex flex-col gap-2 rounded p-3 text-left transition-colors",
+        props.locked
+          ? "cursor-not-allowed bg-sub-alt text-sub opacity-60"
+          : "cursor-pointer bg-sub-alt text-text hover:bg-text hover:text-bg",
       )}
+      aria-disabled={props.locked === true}
       onClick={() => props.onClick()}
     >
       <div class="flex items-center gap-2">
         <Fa icon={props.icon} fixedWidth />
         <span class="font-medium">{props.name}</span>
       </div>
-      <div class="text-em-xs text-sub">{props.description}</div>
+      <div class="text-em-xs text-sub">
+        {props.locked
+          ? "🔒 Unlock the All Keys lessons to play"
+          : props.description}
+      </div>
     </button>
   );
 }
@@ -798,6 +807,7 @@ export function LessonsPage(): JSXElement {
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
   const [typeTossOpen, setTypeTossOpen] = createSignal(false);
+  const [rpgOpen, setRpgOpen] = createSignal(false);
   const [lessonDefGroupId, setLessonDefGroupId] = createSignal<string | null>(
     null,
   );
@@ -956,6 +966,9 @@ export function LessonsPage(): JSXElement {
       previousProgress?.stars ?? 0,
     );
   };
+  const rpgUnlocked = (): boolean =>
+    isCurrentUserAdmin() ||
+    (progress.data !== undefined && !isLessonLocked("all-keys-1"));
 
   // The first not-yet-completed lesson OR checkpoint game in curriculum
   // order - i.e. the true sequential frontier, matching what "next test"
@@ -1389,6 +1402,12 @@ export function LessonsPage(): JSXElement {
   };
 
   const openBuiltinGame = (gameId: string, recommended = false): void => {
+    if (gameId === "typing-rpg" && !rpgUnlocked()) {
+      showNoticeNotification(
+        "Unlock the All Keys lessons to play Typing Quest",
+      );
+      return;
+    }
     setRecommendedGameId(recommended ? gameId : undefined);
     if (gameId === "word-defender") setDefenderOpen(true);
     else if (gameId === "balloon-pop") setBalloonOpen(true);
@@ -1396,6 +1415,7 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "ghost-hunter") setGhostOpen(true);
     else if (gameId === "fruit-ninja") setFruitNinjaOpen(true);
     else if (gameId === "type-toss") setTypeTossOpen(true);
+    else if (gameId === "typing-rpg") setRpgOpen(true);
   };
 
   const launchDailyChallenge = async (): Promise<void> => {
@@ -1463,7 +1483,11 @@ export function LessonsPage(): JSXElement {
         };
       }
 
-      const builtinGames = games.filter((game) => game.type === "builtin");
+      const builtinGames = games.filter(
+        (game) =>
+          game.type === "builtin" &&
+          (game.id !== "typing-rpg" || rpgUnlocked()),
+      );
       const day = Number(localDateString().replaceAll("-", ""));
       const game = builtinGames[day % builtinGames.length];
       if (game === undefined) return undefined;
@@ -2274,6 +2298,7 @@ export function LessonsPage(): JSXElement {
                     name={game.name}
                     description={game.description}
                     icon={game.icon}
+                    locked={game.id === "typing-rpg" && !rpgUnlocked()}
                     onClick={() => openBuiltinGame(game.id)}
                   />
                 )}
@@ -2357,6 +2382,9 @@ export function LessonsPage(): JSXElement {
         />
         <TypeRacerModal
           open={racerOpen()}
+          multiplayerUnlocked={
+            isCurrentUserAdmin() || !isLessonLocked("home-middle")
+          }
           onClose={() => {
             setRacerOpen(false);
             setRecommendedGameId(undefined);
@@ -2399,6 +2427,9 @@ export function LessonsPage(): JSXElement {
         />
         <TypeTossModal
           open={typeTossOpen()}
+          multiplayerUnlocked={
+            isCurrentUserAdmin() || !isLessonLocked("home-words")
+          }
           onClose={() => {
             setTypeTossOpen(false);
             setRecommendedGameId(undefined);
@@ -2409,6 +2440,14 @@ export function LessonsPage(): JSXElement {
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
             claimRecommendedGame("type-toss", score, wave);
+          }}
+        />
+        <TypingRpgModal
+          open={rpgOpen() && rpgUnlocked()}
+          onClose={() => setRpgOpen(false)}
+          onResult={(score) => {
+            void recordGameScore("typing-rpg", score);
+            claimRecommendedGame("typing-rpg", score, 1);
           }}
         />
         {/* Lesson-mode games */}

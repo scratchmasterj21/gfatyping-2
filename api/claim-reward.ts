@@ -2,8 +2,12 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
-import { verifyStudent } from "./_lib/auth.js";
+import { isAdminEmail, verifyStudent } from "./_lib/auth.js";
 import { tokyoDateString } from "./_lib/time.js";
+import {
+  typingQuestPayout,
+  validTypingQuestClear,
+} from "./_lib/typing-quest-reward.js";
 
 const DAILY_GREETING_BONUS = 2;
 const DAILY_PRACTICE_REWARD = 10;
@@ -14,11 +18,12 @@ const RECOMMENDED_GAME_IDS = new Set([
   "ghost-hunter",
   "fruit-ninja",
   "type-toss",
+  "typing-rpg",
 ]);
 
 /**
  * Standalone rewards not tied to a completed typing test: the house greeting
- * and a transaction-capped recommended-game completion bonus.
+ * a transaction-capped recommended-game bonus, and Typing Quest clears.
  */
 export default async function handler(
   req: VercelRequest,
@@ -40,14 +45,25 @@ export default async function handler(
     gameId?: unknown;
     score?: unknown;
     wave?: unknown;
+    hits?: unknown;
+    elapsed?: unknown;
+    mistakes?: unknown;
   };
-  if (body.type !== "dailyGreeting" && body.type !== "recommendedGame") {
+  if (
+    body.type !== "dailyGreeting" &&
+    body.type !== "recommendedGame" &&
+    body.type !== "typingQuest"
+  ) {
     res.status(400).json({ ok: false, reason: "Unknown reward type" });
     return;
   }
   const isRecommendedGame = body.type === "recommendedGame";
+  const isTypingQuest = body.type === "typingQuest";
   const score = Number(body.score);
   const wave = Number(body.wave);
+  const hits = Number(body.hits);
+  const elapsed = Number(body.elapsed);
+  const mistakes = Number(body.mistakes);
   if (
     isRecommendedGame &&
     (typeof body.gameId !== "string" ||
@@ -60,6 +76,13 @@ export default async function handler(
     res.status(400).json({ ok: false, reason: "Invalid game result" });
     return;
   }
+  if (
+    isTypingQuest &&
+    !validTypingQuestClear({ hits, elapsed, mistakes, score })
+  ) {
+    res.status(400).json({ ok: false, reason: "Invalid quest clear" });
+    return;
+  }
 
   const app = getAdminApp();
   const db = app.firestore();
@@ -67,32 +90,64 @@ export default async function handler(
   const today = tokyoDateString();
 
   try {
+    if (isTypingQuest && !isAdminEmail(auth.email)) {
+      const prerequisite = await userRef
+        .collection("lessonProgress")
+        .doc("bottom-words")
+        .get();
+      if (prerequisite.data()?.["completed"] !== true) {
+        res.status(403).json({ ok: false, reason: "All Keys is locked" });
+        return;
+      }
+    }
     let claimed = false;
+    let firstClear = false;
+    let coinsAwarded = 0;
     await db.runTransaction(async (tx: admin.firestore.Transaction) => {
+      claimed = false;
+      firstClear = false;
+      coinsAwarded = 0;
       const snap = await tx.get(userRef);
       const data = snap.exists ? snap.data() : {};
       const rewardDates =
         (data?.["practiceRewardDates"] as Record<string, string> | undefined) ??
         {};
-      const lastClaim = isRecommendedGame
-        ? rewardDates["recommendation"]
-        : (data?.["houseGreetingDate"] as string | undefined);
+      const lastClaim = isTypingQuest
+        ? rewardDates["typingQuestLastReward"]
+        : isRecommendedGame
+          ? rewardDates["recommendation"]
+          : (data?.["houseGreetingDate"] as string | undefined);
       if (lastClaim === today) return;
 
-      const coins = isRecommendedGame
-        ? DAILY_PRACTICE_REWARD
-        : DAILY_GREETING_BONUS;
+      const questPayout = isTypingQuest
+        ? typingQuestPayout(rewardDates, today)
+        : { coins: 0, firstClear: false };
+      firstClear = questPayout.firstClear;
+      const coins = isTypingQuest
+        ? questPayout.coins
+        : isRecommendedGame
+          ? DAILY_PRACTICE_REWARD
+          : DAILY_GREETING_BONUS;
+      coinsAwarded = coins;
       tx.set(
         userRef,
         {
-          ...(isRecommendedGame
+          ...(isTypingQuest
             ? {
                 practiceRewardDates: {
                   ...rewardDates,
-                  recommendation: today,
+                  typingQuestLastReward: today,
+                  ...(firstClear ? { typingQuestFirstClear: today } : {}),
                 },
               }
-            : { houseGreetingDate: today }),
+            : isRecommendedGame
+              ? {
+                  practiceRewardDates: {
+                    ...rewardDates,
+                    recommendation: today,
+                  },
+                }
+              : { houseGreetingDate: today }),
           coins: admin.firestore.FieldValue.increment(coins),
         },
         { merge: true },
@@ -101,11 +156,8 @@ export default async function handler(
     });
     res.status(200).json({
       claimed,
-      coins: claimed
-        ? isRecommendedGame
-          ? DAILY_PRACTICE_REWARD
-          : DAILY_GREETING_BONUS
-        : 0,
+      firstClear: claimed && firstClear,
+      coins: claimed ? coinsAwarded : 0,
     });
   } catch (e) {
     console.error("claim-reward failed:", e);

@@ -18,6 +18,7 @@ export const GAME_LABELS: Record<string, string> = {
   "ghost-hunter": "Ghost Hunter",
   "fruit-ninja": "Fruit Ninja",
   "type-toss": "Type Toss",
+  "typing-rpg": "Typing Quest",
 };
 
 const GAME_ORDER = [
@@ -27,6 +28,7 @@ const GAME_ORDER = [
   "ghost-hunter",
   "fruit-ninja",
   "type-toss",
+  "typing-rpg",
 ];
 
 function ScoreBoard(props: {

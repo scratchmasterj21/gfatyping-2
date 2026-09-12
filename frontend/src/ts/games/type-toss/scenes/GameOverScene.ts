@@ -56,14 +56,27 @@ export class GameOverScene extends Scene {
     });
 
     const btnY = cy + 118;
-    this.makeBtn(cx - 90, btnY, "Play Again", () => {
-      this.scene.stop("UI");
-      this.scene.start("Boot");
-      this.scene.launch("UI");
-    });
-    this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
-      this.game.events.emit("exit-game");
-    });
+    if (this.registry.get("multiplayer") === true) {
+      this.add
+        .text(cx, btnY - 28, "Waiting for the other players…", {
+          fontSize: "13px",
+          fontFamily: "monospace",
+          color: "#c8a97a",
+        })
+        .setOrigin(0.5);
+      this.makeBtn(cx, btnY + 12, "Back to Lessons", () => {
+        this.game.events.emit("exit-game");
+      });
+    } else {
+      this.makeBtn(cx - 90, btnY, "Play Again", () => {
+        this.scene.stop("UI");
+        this.scene.start("Boot");
+        this.scene.launch("UI");
+      });
+      this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
+        this.game.events.emit("exit-game");
+      });
+    }
   }
 
   private makeBtn(
