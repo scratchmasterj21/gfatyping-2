@@ -13,12 +13,20 @@ import { getAuthenticatedUser } from "../../firebase";
 import { realWords } from "../../lessons/lessons-data";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
+import { playerMaxHp, type QuestMode } from "./endless-rules";
 import { createTypingRpgGame } from "./game-config";
 import { prepareRpgWords } from "./rpg-words";
-import { claimTypingQuestReward, TypingQuestReward } from "./typing-rpg-reward";
+import {
+  claimTypingQuestReward,
+  getTypingQuestStatus,
+  startTypingQuestRun,
+  TypingQuestReward,
+} from "./typing-rpg-reward";
 
 type Battle = {
+  wave: number;
   name: string;
+  kind: "slime" | "imp" | "guardian";
   word: string;
   hp: number;
   maxHp: number;
@@ -26,6 +34,7 @@ type Battle = {
   stage: "typing" | "enemy";
   ready: boolean;
   seconds: number;
+  turnSeconds: number;
   wordsTyped: number;
   mistakesThisTurn: number;
   turn: number;
@@ -36,6 +45,15 @@ type Result = {
   elapsed: number;
   hits: number;
   mistakes: number;
+  completedWaves: number;
+  outcome: "left" | "defeated";
+};
+type WaveClear = {
+  wave: number;
+  hp: number;
+  nextTurnSeconds: number;
+  nextMonsterCount: number;
+  nextFloorName: string;
 };
 type Position = { x: number; y: number; size: number };
 type Impact = { target: "player" | "monster" | "power"; label: string };
@@ -47,9 +65,12 @@ type Props = {
   onResult?: (score: number) => void;
 };
 
-function MonsterPortrait(props: { name: string }): JSXElement {
-  const guardian = () => props.name === "Gate Guardian";
-  const imp = () => props.name === "Forest Imp";
+function MonsterPortrait(props: {
+  name: string;
+  kind: Battle["kind"];
+}): JSXElement {
+  const guardian = () => props.kind === "guardian";
+  const imp = () => props.kind === "imp";
   return (
     <svg
       viewBox="0 0 80 80"
@@ -94,7 +115,7 @@ function MonsterPortrait(props: { name: string }): JSXElement {
 
 export function TypingRpgModal(props: Props): JSXElement {
   const [phase, setPhase] = createSignal<
-    "intro" | "loading" | "playing" | "results" | "defeated"
+    "intro" | "loading" | "playing" | "results"
   >("intro");
   const [battle, setBattle] = createSignal<Battle | null>(null);
   const [typed, setTyped] = createSignal("");
@@ -104,6 +125,10 @@ export function TypingRpgModal(props: Props): JSXElement {
   const [dialogue, setDialogue] = createSignal<string | null>(null);
   const [position, setPosition] = createSignal<Position>();
   const [result, setResult] = createSignal<Result>();
+  const [waveClear, setWaveClear] = createSignal<WaveClear | null>(null);
+  const [bestWave, setBestWave] = createSignal(0);
+  const [mode, setMode] = createSignal<QuestMode>("normal");
+  const [fastUnlocked, setFastUnlocked] = createSignal(false);
   const [reward, setReward] = createSignal<
     TypingQuestReward | "pending" | "error"
   >();
@@ -116,6 +141,7 @@ export function TypingRpgModal(props: Props): JSXElement {
   let impactTimeout: ReturnType<typeof setTimeout> | undefined;
   let wrongKeyTimeout: ReturnType<typeof setTimeout> | undefined;
   let runId = 0;
+  let activeRewardRunId: string | undefined;
   let pointerStartedAt = 0;
 
   const startMoving = (direction: Direction): void => {
@@ -141,6 +167,7 @@ export function TypingRpgModal(props: Props): JSXElement {
   };
   const rewardMessage = (): string => {
     const claim = reward();
+    if (result()?.completedWaves === 0) return "Clear wave 1 to earn coins.";
     if (claim === "pending" || claim === undefined) {
       return "Claiming quest coins…";
     }
@@ -154,8 +181,30 @@ export function TypingRpgModal(props: Props): JSXElement {
     return typeof claim === "object" ? claim : undefined;
   };
 
+  const requestRunReward = (
+    clear: Result,
+    ticket: string,
+    serial: number,
+  ): void => {
+    setReward("pending");
+    void claimTypingQuestReward(clear, ticket).then(
+      (claimed) => {
+        if (runId !== serial) return;
+        setReward(claimed);
+        if (claimed.bestWave !== undefined) {
+          setBestWave(claimed.bestWave);
+        }
+      },
+      (error: unknown) => {
+        console.error("Failed to claim Typing Quest coins:", error);
+        if (runId === serial) setReward("error");
+      },
+    );
+  };
+
   const cleanup = (): void => {
     runId++;
+    activeRewardRunId = undefined;
     if (impactTimeout !== undefined) clearTimeout(impactTimeout);
     if (wrongKeyTimeout !== undefined) clearTimeout(wrongKeyTimeout);
     wrongKeyTimeout = undefined;
@@ -171,15 +220,18 @@ export function TypingRpgModal(props: Props): JSXElement {
     setObjective("Defeat the monsters · 0/3");
     setPosition(undefined);
     setResult(undefined);
+    setWaveClear(null);
     setReward(undefined);
     setPhase("intro");
   };
 
-  const start = async (): Promise<void> => {
+  const start = async (selectedMode: QuestMode): Promise<void> => {
     if (phase() === "loading") return;
+    if (selectedMode === "fast" && !fastUnlocked()) return;
+    setMode(selectedMode);
     runId++;
     const thisRun = runId;
-    const rewardRunId = crypto.randomUUID();
+    activeRewardRunId = undefined;
     const onResult = props.onResult;
     game?.destroy(true);
     if (impactTimeout !== undefined) clearTimeout(impactTimeout);
@@ -195,6 +247,7 @@ export function TypingRpgModal(props: Props): JSXElement {
     setTyped("");
     setObjective("Defeat the monsters · 0/3");
     setResult(undefined);
+    setWaveClear(null);
     setReward(undefined);
     setPhase("loading");
     try {
@@ -209,10 +262,16 @@ export function TypingRpgModal(props: Props): JSXElement {
         );
       cachedWords = words;
       if (!props.open) return;
+      const run = await startTypingQuestRun(selectedMode);
+      if (!props.open || runId !== thisRun) return;
+      setMode(run.mode);
+      const rewardRunId = run.runId;
+      activeRewardRunId = rewardRunId;
+      setBestWave(run.bestWave);
       setPhase("playing");
       await Promise.resolve();
       if (containerRef === undefined) return;
-      const nextGame = await createTypingRpgGame(containerRef, words);
+      const nextGame = await createTypingRpgGame(containerRef, words, run.mode);
       if (!props.open) {
         nextGame.destroy(true);
         return;
@@ -224,6 +283,7 @@ export function TypingRpgModal(props: Props): JSXElement {
       });
       game.events.on("rpg-prompt", setPrompt);
       game.events.on("rpg-objective", setObjective);
+      game.events.on("rpg-wave-clear", setWaveClear);
       game.events.on("rpg-battle", (next: Battle | null) => {
         const current = latestBattle;
         latestBattle = next;
@@ -252,25 +312,16 @@ export function TypingRpgModal(props: Props): JSXElement {
       game.events.on("rpg-enemy-hit", (damage: number) =>
         showImpact({ target: "player", label: `−${damage} HP` }),
       );
-      game.events.on("rpg-defeat", () => {
-        setBattle(null);
-        setPhase("defeated");
-      });
       game.events.on("rpg-result", (next: Result) => {
         setResult(next);
         setBattle(null);
-        setReward("pending");
+        setWaveClear(null);
+        setReward(undefined);
         setPhase("results");
-        void claimTypingQuestReward(next, rewardRunId).then(
-          (claimed) => {
-            if (runId === thisRun) setReward(claimed);
-          },
-          (error: unknown) => {
-            console.error("Failed to claim Typing Quest coins:", error);
-            if (runId === thisRun) setReward("error");
-          },
-        );
-        onResult?.(next.score);
+        if (next.completedWaves > 0) {
+          requestRunReward(next, rewardRunId, thisRun);
+          onResult?.(next.score);
+        }
       });
     } catch (error) {
       setPhase("intro");
@@ -309,6 +360,11 @@ export function TypingRpgModal(props: Props): JSXElement {
     if (!props.open) {
       cleanup();
       cachedWords = undefined;
+    } else {
+      void getTypingQuestStatus().then(
+        (status) => setFastUnlocked(status.fastUnlocked),
+        () => setFastUnlocked(false),
+      );
     }
   });
   onCleanup(cleanup);
@@ -335,8 +391,8 @@ export function TypingRpgModal(props: Props): JSXElement {
           <Show when={phase() === "intro"}>
             <h2 class="mb-3 pr-40 text-xl font-bold text-text">Typing Quest</h2>
             <p class="mb-3 text-sub">
-              Explore the forest, type to defeat three monsters, then open the
-              treasure chest.
+              Survive endless waves in the forest. Defeat every monster, then
+              choose to continue or leave with your coins.
             </p>
             <p class="mb-2 text-em-sm text-sub">
               Hold arrows or WASD to move. Talk to the Guide with Enter.
@@ -347,16 +403,36 @@ export function TypingRpgModal(props: Props): JSXElement {
               Battles use common English words.
             </p>
             <p class="mb-5 text-em-sm text-main">
-              First clear: 100 coins. Next 10 clears: 10 coins each. After that:
-              1 coin per clear.
+              Start with 100 HP and no healing. Typing turns shrink from 20 to 8
+              seconds. First completed run: 100 coins. Next 10: 10 coins each;
+              later runs: 1 coin. These 10 bonus clears reset daily. Deeper
+              waves add up to 10 coins per run, capped at 20 depth coins per
+              day.
             </p>
-            <button
-              type="button"
-              class="button primary"
-              onClick={() => void start()}
-            >
-              Start quest →
-            </button>
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="button primary"
+                onClick={() => void start("normal")}
+              >
+                Start quest →
+              </button>
+              <button
+                type="button"
+                class="button"
+                disabled={!fastUnlocked()}
+                onClick={() => void start("fast")}
+              >
+                Fast Mode →
+              </button>
+            </div>
+            <p class="mt-3 text-em-sm text-sub">
+              Fast Mode: 50 HP, 8-second turns, double coins with shared daily
+              limits.{" "}
+              {fastUnlocked()
+                ? "Unlocked"
+                : "Unlock with two 30-second English tests at 40+ WPM and 95%+ accuracy."}
+            </p>
           </Show>
 
           <Show when={phase() === "loading"}>
@@ -389,7 +465,7 @@ export function TypingRpgModal(props: Props): JSXElement {
               class="pointer-events-none absolute top-12 left-3 z-10 rounded border border-main/40 bg-bg/90 px-3 py-2 text-em-sm font-bold text-text"
               aria-live="polite"
             >
-              {objective()}
+              {objective()} · Best {bestWave()}
             </div>
             <div class="pointer-events-none absolute right-2 bottom-2 left-2 z-20 rounded bg-bg/90 px-3 py-2 text-center text-em-xs text-text">
               {prompt()}
@@ -451,7 +527,7 @@ export function TypingRpgModal(props: Props): JSXElement {
                   class="button col-span-3"
                   onClick={() => game?.events.emit("rpg-interact")}
                 >
-                  Talk / Open
+                  Talk
                 </button>
               </div>
             </Show>
@@ -474,12 +550,47 @@ export function TypingRpgModal(props: Props): JSXElement {
                 </div>
               )}
             </Show>
+            <Show when={waveClear()}>
+              {(clear) => (
+                <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/80 p-4">
+                  <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-6 text-center text-text shadow-xl">
+                    <h3 class="mb-3 text-2xl font-bold text-main">
+                      Wave {clear().wave} cleared!
+                    </h3>
+                    <p class="mb-2">
+                      HP: {clear().hp}/{playerMaxHp(mode())} · No recovery
+                    </p>
+                    <p class="mb-5 text-em-sm text-sub">
+                      Next floor: {clear().nextFloorName} ·{" "}
+                      {clear().nextMonsterCount} monsters ·{" "}
+                      {clear().nextTurnSeconds}s per turn
+                    </p>
+                    <div class="flex justify-center gap-3">
+                      <button
+                        type="button"
+                        class="button primary"
+                        onClick={() => game?.events.emit("rpg-continue")}
+                      >
+                        Continue →
+                      </button>
+                      <button
+                        type="button"
+                        class="button"
+                        onClick={() => game?.events.emit("rpg-leave")}
+                      >
+                        Leave with coins
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Show>
             <Show when={battle()}>
               {(enemy) => (
                 <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
                   <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 shadow-xl">
                     <div class="mb-1 text-em-xs font-bold tracking-widest text-sub uppercase">
-                      Typing battle · turn {enemy().turn}
+                      Wave {enemy().wave} · typing turn {enemy().turn}
                     </div>
                     <div
                       class={cn(
@@ -532,13 +643,13 @@ export function TypingRpgModal(props: Props): JSXElement {
                         </div>
                         <div class="text-em-sm font-bold text-text">You</div>
                         <div class="text-em-xs text-sub">
-                          {enemy().playerHp}/12 HP
+                          {enemy().playerHp}/{playerMaxHp(mode())} HP
                         </div>
                         <div class="mt-1 h-2 rounded bg-bg">
                           <div
                             class="h-2 rounded bg-main motion-safe:transition-[width] motion-safe:duration-300"
                             style={{
-                              width: `${(100 * enemy().playerHp) / 12}%`,
+                              width: `${(enemy().playerHp / playerMaxHp(mode())) * 100}%`,
                             }}
                           ></div>
                         </div>
@@ -555,7 +666,10 @@ export function TypingRpgModal(props: Props): JSXElement {
                               "animate-pulse",
                           )}
                         >
-                          <MonsterPortrait name={enemy().name} />
+                          <MonsterPortrait
+                            name={enemy().name}
+                            kind={enemy().kind}
+                          />
                           <Show when={impact()?.target === "monster"}>
                             <span
                               class="absolute inset-x-0 bottom-0 bg-bg/85 text-em-xs font-bold text-main"
@@ -602,7 +716,7 @@ export function TypingRpgModal(props: Props): JSXElement {
                         role="progressbar"
                         aria-label="Time left in your turn"
                         aria-valuemin={0}
-                        aria-valuemax={8}
+                        aria-valuemax={enemy().turnSeconds}
                         aria-valuenow={enemy().seconds}
                       >
                         <div
@@ -610,7 +724,9 @@ export function TypingRpgModal(props: Props): JSXElement {
                             "h-full rounded",
                             enemy().seconds <= 3 ? "bg-error" : "bg-main",
                           )}
-                          style={{ width: `${(enemy().seconds / 8) * 100}%` }}
+                          style={{
+                            width: `${(enemy().seconds / enemy().turnSeconds) * 100}%`,
+                          }}
                         ></div>
                       </div>
                       <p class="mb-3 text-em-xs text-sub">
@@ -672,10 +788,15 @@ export function TypingRpgModal(props: Props): JSXElement {
           <Show when={phase() === "results"}>
             <div class="pt-12 text-center">
               <div class="mb-3 text-3xl font-bold text-main">
-                Quest complete! ✨
+                {result()?.outcome === "defeated"
+                  ? "Run ended"
+                  : "Well played! ✨"}
               </div>
               <p class="mb-4 text-sub">
-                You cleared the forest and found the treasure.
+                {result()?.completedWaves} waves cleared ·{" "}
+                {result()?.outcome === "defeated"
+                  ? "You were defeated"
+                  : "You left safely"}
               </p>
               <p class="mb-1 text-text">
                 {result()?.hits} successful attacks · {result()?.mistakes}{" "}
@@ -688,7 +809,7 @@ export function TypingRpgModal(props: Props): JSXElement {
                 class="mb-5 rounded-xl border border-main/50 bg-sub-alt p-4"
                 aria-live="polite"
               >
-                <p class="mb-1 text-em-sm font-bold text-sub">Treasure chest</p>
+                <p class="mb-1 text-em-sm font-bold text-sub">Run reward</p>
                 <Show
                   when={rewardClaim()}
                   fallback={
@@ -705,51 +826,48 @@ export function TypingRpgModal(props: Props): JSXElement {
                       <p class="text-4xl font-bold text-main">
                         +{claim().coins} coins
                       </p>
+                      <p class="mt-1 text-em-xs text-sub">
+                        Run {claim().baseCoins} · Depth {claim().depthCoins}
+                        <Show when={claim().bestWave}>
+                          {" "}
+                          · Best wave {claim().bestWave}
+                        </Show>
+                      </p>
                       <p class="mt-1 text-em-sm text-text">
                         {claim().firstClear
                           ? "First-clear bonus!"
-                          : claim().coins === 10
-                            ? `${10 - (claim().bonusRepeatClears ?? 10)} bonus clears left`
-                            : "Keep farming!"}
+                          : claim().baseCoins === (mode() === "fast" ? 20 : 10)
+                            ? `${10 - (claim().bonusRepeatClears ?? 10)} bonus clears left today`
+                            : "Daily bonus clears used · Keep farming!"}
                       </p>
                     </Show>
                   )}
                 </Show>
               </div>
+              <Show when={reward() === "error"}>
+                <button
+                  type="button"
+                  class="button mb-4"
+                  onClick={() => {
+                    const clear = result();
+                    if (
+                      clear !== undefined &&
+                      activeRewardRunId !== undefined
+                    ) {
+                      requestRunReward(clear, activeRewardRunId, runId);
+                    }
+                  }}
+                >
+                  Retry coin claim
+                </button>
+              </Show>
               <div class="flex justify-center gap-3">
                 <button
                   type="button"
                   class="button primary"
-                  onClick={() => void start()}
+                  onClick={() => void start(mode())}
                 >
                   Play again
-                </button>
-                <button
-                  type="button"
-                  class="button"
-                  onClick={() => props.onClose()}
-                >
-                  Back to lessons
-                </button>
-              </div>
-            </div>
-          </Show>
-          <Show when={phase() === "defeated"}>
-            <div class="pt-12 text-center">
-              <h2 class="mb-3 text-2xl font-bold text-text">
-                The forest won this round
-              </h2>
-              <p class="mb-5 text-sub">
-                Try typing more words each turn, and use Backspace to fix
-                mistakes.
-              </p>
-              <div class="flex justify-center gap-3">
-                <button
-                  type="button"
-                  class="button primary"
-                  onClick={() => void start()}
-                >
-                  Try again
                 </button>
                 <button
                   type="button"

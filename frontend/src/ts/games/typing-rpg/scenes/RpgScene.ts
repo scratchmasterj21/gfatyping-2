@@ -1,6 +1,13 @@
 import { GameObjects, Scene, Structs } from "phaser";
 
 import { turnDamage } from "../battle-rules";
+import { appearanceForWave, type MonsterKind } from "../wave-appearance";
+import {
+  monsterCountForWave,
+  playerMaxHp,
+  type QuestMode,
+  turnSecondsForWave,
+} from "../endless-rules";
 import {
   activeElapsedSeconds,
   canMoveNearPlayerDuringSafety,
@@ -18,13 +25,13 @@ type Monster = {
   destinationY: number;
   nextDecisionAt: number;
   name: string;
+  kind: MonsterKind;
   hp: number;
   maxHp: number;
   attack: number;
 };
 
 type BattleStage = "typing" | "enemy";
-const TURN_MS = 8000;
 const PLAYER_SPEED = 3.2;
 const PLAYER_ACCELERATION = 14;
 const PLAYER_DRAG = 12;
@@ -37,7 +44,24 @@ const POST_BATTLE_SAFETY_MS = 2500;
 
 const COLS = 13;
 const ROWS = 9;
-const CHEST = { x: 11, y: 7 };
+const SPAWNS = [
+  { x: 5, y: 3 },
+  { x: 8, y: 5 },
+  { x: 11, y: 4 },
+  { x: 4, y: 6 },
+  { x: 9, y: 2 },
+  { x: 11, y: 6 },
+];
+const MONSTER_STATS = [
+  { hp: 8, attack: 2 },
+  { hp: 12, attack: 3 },
+  { hp: 18, attack: 4 },
+] as const;
+const MONSTER_COLORS: Record<MonsterKind, number> = {
+  slime: 0x79b874,
+  imp: 0xf3cfa0,
+  guardian: 0xa85d7a,
+};
 
 export class RpgScene extends Scene {
   private words: string[] = [];
@@ -48,13 +72,17 @@ export class RpgScene extends Scene {
   private playerVisual?: GameObjects.Container;
   private monsterVisuals = new Map<Monster, GameObjects.Container>();
   private targetIndex: number | null = null;
+  private wave = 1;
+  private completedWaves = 0;
+  private betweenWaves = false;
   private finished = false;
   private hits = 0;
   private mistakes = 0;
-  private playerHp = 12;
+  private mode: QuestMode = "normal";
+  private playerHp = playerMaxHp("normal");
   private battleStage: BattleStage = "typing";
   private turnEndsAt = 0;
-  private turnRemainingMs = TURN_MS;
+  private turnRemainingMs = 20_000;
   private turnWords = 0;
   private turnNumber = 0;
   private turnMistakes = 0;
@@ -88,6 +116,7 @@ export class RpgScene extends Scene {
   }
 
   create(): void {
+    this.mode = this.registry.get("rpgMode") === "fast" ? "fast" : "normal";
     this.words = (this.registry.get("rpgWords") as string[] | undefined) ?? [
       "forest",
       "river",
@@ -96,56 +125,19 @@ export class RpgScene extends Scene {
     this.playerVelocity = { x: 0, y: 0 };
     this.heldDirections.clear();
     this.player = { x: 1, y: 4 };
-    this.monsters = [
-      {
-        x: 5,
-        y: 3,
-        vx: 0,
-        vy: 0,
-        destinationX: 5,
-        destinationY: 3,
-        nextDecisionAt: 0,
-        name: "Moss Slime",
-        hp: 8,
-        maxHp: 8,
-        attack: 2,
-      },
-      {
-        x: 8,
-        y: 5,
-        vx: 0,
-        vy: 0,
-        destinationX: 8,
-        destinationY: 5,
-        nextDecisionAt: 0,
-        name: "Forest Imp",
-        hp: 12,
-        maxHp: 12,
-        attack: 3,
-      },
-      {
-        x: 11,
-        y: 4,
-        vx: 0,
-        vy: 0,
-        destinationX: 11,
-        destinationY: 4,
-        nextDecisionAt: 0,
-        name: "Gate Guardian",
-        hp: 18,
-        maxHp: 18,
-        attack: 4,
-      },
-    ];
+    this.wave = 1;
+    this.completedWaves = 0;
+    this.betweenWaves = false;
+    this.spawnWave();
     this.targetIndex = null;
     this.finished = false;
     this.hits = 0;
     this.mistakes = 0;
-    this.playerHp = 12;
+    this.playerHp = playerMaxHp(this.mode);
     this.wordCursor = 0;
     this.turnNumber = 0;
     this.turnEndsAt = 0;
-    this.turnRemainingMs = TURN_MS;
+    this.turnRemainingMs = this.turnMs();
     this.lastPrompt = "";
     this.dialogueOpen = false;
     this.startedAt = performance.now();
@@ -158,7 +150,12 @@ export class RpgScene extends Scene {
     this.draw();
 
     this.keydownHandler = (event) => {
-      if (this.finished || this.targetIndex !== null || this.dialogueOpen) {
+      if (
+        this.finished ||
+        this.betweenWaves ||
+        this.targetIndex !== null ||
+        this.dialogueOpen
+      ) {
         return;
       }
       if ((event.target as HTMLElement | null)?.tagName === "INPUT") return;
@@ -207,6 +204,8 @@ export class RpgScene extends Scene {
     this.game.events.on("rpg-interact", this.interact, this);
     this.game.events.on("rpg-attack", this.attackHandler);
     this.game.events.on("rpg-miss", this.missHandler);
+    this.game.events.on("rpg-continue", this.continueWave, this);
+    this.game.events.on("rpg-leave", this.endRun, this);
     this.focusHandler = () => {
       if (
         this.targetIndex === null ||
@@ -248,9 +247,83 @@ export class RpgScene extends Scene {
     if (document.hidden || !document.hasFocus()) this.pauseRun();
   }
 
+  private turnMs(): number {
+    return turnSecondsForWave(this.wave, this.mode) * 1000;
+  }
+
+  private spawnWave(): void {
+    const appearance = appearanceForWave(this.wave);
+    this.monsters = Array.from(
+      { length: monsterCountForWave(this.wave) },
+      (_, index) => {
+        const spawn = SPAWNS[index] ?? { x: 5, y: 3 };
+        const typeIndex = (index + this.wave - 1) % MONSTER_STATS.length;
+        const type = MONSTER_STATS[typeIndex] ?? MONSTER_STATS[0];
+        const creature = appearance.monsters[typeIndex] ?? {
+          name: "Moss Slime",
+          kind: "slime",
+        };
+        const hp = type.hp + Math.floor((this.wave - 1) / 3) * 2;
+        return {
+          ...spawn,
+          vx: 0,
+          vy: 0,
+          destinationX: spawn.x,
+          destinationY: spawn.y,
+          nextDecisionAt: 0,
+          name: creature.name,
+          kind: creature.kind,
+          hp,
+          maxHp: hp,
+          attack: type.attack,
+        };
+      },
+    );
+  }
+
+  private continueWave(): void {
+    if (!this.betweenWaves || this.finished) return;
+    this.wave++;
+    this.betweenWaves = false;
+    this.player = { x: 1, y: 4 };
+    this.playerVelocity = { x: 0, y: 0 };
+    this.heldDirections.clear();
+    this.safeUntilAt = performance.now() + POST_BATTLE_SAFETY_MS;
+    this.spawnWave();
+    this.game.events.emit("rpg-wave-clear", null);
+    this.draw();
+  }
+
+  private endRun(outcome: "left" | "defeated" = "left"): void {
+    if (this.finished || (outcome === "left" && !this.betweenWaves)) return;
+    this.finished = true;
+    this.betweenWaves = false;
+    const elapsed = activeElapsedSeconds(
+      this.startedAt,
+      performance.now(),
+      this.pausedDurationMs,
+    );
+    this.game.events.emit("rpg-result", {
+      score: Math.max(
+        100,
+        500 + 100 * (this.completedWaves - 1) - elapsed - this.mistakes * 5,
+      ),
+      elapsed,
+      hits: this.hits,
+      mistakes: this.mistakes,
+      completedWaves: this.completedWaves,
+      outcome,
+    });
+  }
+
   override update(_time: number, delta: number): void {
     if (this.interrupted) return;
-    if (!this.finished && this.targetIndex === null && !this.dialogueOpen) {
+    if (
+      !this.finished &&
+      !this.betweenWaves &&
+      this.targetIndex === null &&
+      !this.dialogueOpen
+    ) {
       const seconds = Math.min(delta / 1000, 0.05);
       this.movePlayer(seconds);
       if (this.targetIndex === null) this.moveMonsters(seconds);
@@ -341,6 +414,16 @@ export class RpgScene extends Scene {
     this.monsterVisuals.clear();
     const { size, left, top } = this.layout();
     const graphics = this.add.graphics();
+    const appearance = appearanceForWave(this.wave);
+    const theme = getComputedStyle(document.documentElement);
+    const themeColor = (key: string, fallback: number): number => {
+      const value = theme.getPropertyValue(key).trim();
+      const hex = /^#([\da-f]{6})$/i.exec(value)?.[1];
+      return hex === undefined ? fallback : Number.parseInt(hex, 16);
+    };
+    const accent = themeColor("--main-color", 0x79b874);
+    const secondary = themeColor("--sub-color", 0x36744b);
+    const highlight = themeColor("--text-color", 0xf3cfa0);
     graphics.fillStyle(0x172c2b);
     graphics.fillRect(0, 0, this.scale.width, this.scale.height);
 
@@ -348,15 +431,79 @@ export class RpgScene extends Scene {
       for (let x = 0; x < COLS; x++) {
         graphics.fillStyle((x + y) % 2 ? 0x4a7844 : 0x52804c);
         graphics.fillRect(left + x * size, top + y * size, size, size);
-        if (
-          (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) &&
-          !(x === CHEST.x && y === CHEST.y)
-        ) {
+        const tileX = left + x * size;
+        const tileY = top + y * size;
+        const marker = (x * 7 + y * 11 + appearance.tier) % 5;
+        if (appearance.floorIndex === 1) {
+          graphics.fillStyle(accent, marker === 0 ? 0.36 : 0.12);
+          graphics.fillTriangle(
+            tileX + size * 0.25,
+            tileY + size * 0.7,
+            tileX + size * 0.5,
+            tileY + size * 0.18,
+            tileX + size * 0.75,
+            tileY + size * 0.7,
+          );
+        } else if (appearance.floorIndex === 2) {
+          graphics.fillStyle(secondary, marker < 2 ? 0.52 : 0.2);
+          graphics.fillRect(
+            tileX + size * 0.14,
+            tileY + size * 0.42,
+            size * 0.72,
+            size * 0.12,
+          );
+          if (marker === 0) {
+            graphics.fillStyle(accent, 0.6);
+            graphics.fillCircle(
+              tileX + size * 0.72,
+              tileY + size * 0.28,
+              size * 0.09,
+            );
+          }
+        } else if (appearance.floorIndex === 3) {
+          graphics.lineStyle(
+            Math.max(1, size * 0.035),
+            highlight,
+            marker === 0 ? 0.62 : 0.22,
+          );
+          graphics.strokeCircle(
+            tileX + size * 0.5,
+            tileY + size * 0.5,
+            size * 0.2,
+          );
+          graphics.fillStyle(secondary, 0.2);
+          graphics.fillCircle(
+            tileX + size * 0.5,
+            tileY + size * 0.5,
+            size * 0.06,
+          );
+        } else if (marker === 0 || appearance.tier > 0) {
+          graphics.fillStyle(accent, appearance.tier > 0 ? 0.3 : 0.16);
+          graphics.fillCircle(
+            tileX + size * 0.48,
+            tileY + size * 0.55,
+            size * 0.09,
+          );
+        }
+        if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) {
           const p = this.center(x, y);
-          graphics.fillStyle(0x245338);
-          graphics.fillCircle(p.x, p.y + size * 0.06, size * 0.28);
-          graphics.fillStyle(0x36744b);
-          graphics.fillCircle(p.x, p.y - size * 0.12, size * 0.24);
+          if (appearance.floorIndex % 2 === 0) {
+            graphics.fillStyle(0x245338);
+            graphics.fillCircle(p.x, p.y + size * 0.06, size * 0.28);
+            graphics.fillStyle(secondary, 0.8);
+            graphics.fillCircle(p.x, p.y - size * 0.12, size * 0.24);
+          } else {
+            graphics.fillStyle(secondary, 0.7);
+            graphics.fillRoundedRect(
+              p.x - size * 0.3,
+              p.y - size * 0.28,
+              size * 0.6,
+              size * 0.56,
+              size * 0.1,
+            );
+            graphics.fillStyle(accent, 0.35);
+            graphics.fillCircle(p.x, p.y, size * 0.12);
+          }
         }
       }
     }
@@ -374,32 +521,13 @@ export class RpgScene extends Scene {
     graphics.fillCircle(npc.x, npc.y - size * 0.18, size * 0.14);
     this.label(npc.x, npc.y - size * 0.42, "Guide", Math.max(10, size * 0.16));
 
-    const chest = this.center(CHEST.x, CHEST.y);
-    graphics.fillStyle(
-      this.monsters.every((monster) => monster.hp === 0) ? 0xf5c047 : 0x8f7452,
-    );
-    graphics.fillRoundedRect(
-      chest.x - size * 0.25,
-      chest.y - size * 0.16,
-      size * 0.5,
-      size * 0.38,
-      3,
-    );
-    graphics.fillStyle(0x643e27);
-    graphics.fillRect(chest.x - size * 0.25, chest.y, size * 0.5, size * 0.07);
-    this.label(
-      chest.x,
-      chest.y - size * 0.39,
-      "Chest",
-      Math.max(10, size * 0.16),
-    );
-
     for (const monster of this.monsters) {
       if (monster.hp === 0) continue;
       const p = this.center(monster.x, monster.y);
       const visual = this.add.container(p.x, p.y);
       const body = this.add.graphics();
-      body.fillStyle(monster.name === "Gate Guardian" ? 0xa85d7a : 0x79b874);
+      const bodyColor = MONSTER_COLORS[monster.kind];
+      body.fillStyle(bodyColor);
       body.fillRoundedRect(
         -size * 0.28,
         -size * 0.2,
@@ -407,9 +535,31 @@ export class RpgScene extends Scene {
         size * 0.48,
         size * 0.16,
       );
+      if (monster.kind !== "slime") {
+        body.fillStyle(bodyColor);
+        body.fillTriangle(
+          -size * 0.23,
+          -size * 0.11,
+          -size * 0.25,
+          -size * 0.42,
+          -size * 0.04,
+          -size * 0.18,
+        );
+        body.fillTriangle(
+          size * 0.23,
+          -size * 0.11,
+          size * 0.25,
+          -size * 0.42,
+          size * 0.04,
+          -size * 0.18,
+        );
+      }
+      body.fillStyle(0xffffff);
+      body.fillCircle(-size * 0.09, 0, size * 0.055);
+      body.fillCircle(size * 0.09, 0, size * 0.055);
       body.fillStyle(0x172c2b);
-      body.fillCircle(-size * 0.09, 0, size * 0.035);
-      body.fillCircle(size * 0.09, 0, size * 0.035);
+      body.fillCircle(-size * 0.09, 0, size * 0.025);
+      body.fillCircle(size * 0.09, 0, size * 0.025);
       visual.add(body);
       visual.add(
         this.label(
@@ -438,7 +588,7 @@ export class RpgScene extends Scene {
     this.label(
       this.scale.width / 2,
       14,
-      `Typing Quest · HP ${this.playerHp}/12 · ${this.monsters.filter((monster) => monster.hp === 0).length}/3 monsters`,
+      `${this.mode === "fast" ? "FAST · " : ""}${appearance.name} · Wave ${this.wave} · HP ${this.playerHp}/${playerMaxHp(this.mode)} · ${this.monsters.filter((monster) => monster.hp === 0).length}/${this.monsters.length} monsters`,
       15,
     );
     this.lastPrompt = this.prompt();
@@ -446,9 +596,9 @@ export class RpgScene extends Scene {
     const defeated = this.monsters.filter((monster) => monster.hp === 0).length;
     this.game.events.emit(
       "rpg-objective",
-      defeated === this.monsters.length
-        ? "Open the chest · lower right"
-        : `Defeat the monsters · ${defeated}/${this.monsters.length}`,
+      this.betweenWaves
+        ? `Wave ${this.wave} cleared · Choose your next move`
+        : `${appearance.name} · Wave ${this.wave} · Defeat monsters · ${defeated}/${this.monsters.length}`,
     );
   }
 
@@ -483,7 +633,14 @@ export class RpgScene extends Scene {
   }
 
   private nudge(direction: Direction): void {
-    if (this.finished || this.targetIndex !== null || this.dialogueOpen) return;
+    if (
+      this.finished ||
+      this.betweenWaves ||
+      this.targetIndex !== null ||
+      this.dialogueOpen
+    ) {
+      return;
+    }
     const impulse = PLAYER_SPEED;
     if (direction === "left") this.playerVelocity.x = -impulse;
     if (direction === "right") this.playerVelocity.x = impulse;
@@ -513,16 +670,8 @@ export class RpgScene extends Scene {
   }
 
   private prompt(): string {
-    if (this.monsters.every((monster) => monster.hp === 0)) {
-      return Math.hypot(this.player.x - CHEST.x, this.player.y - CHEST.y) <= 1
-        ? "Walk onto the chest or press Enter to open it."
-        : "Chest unlocked! Head to the lower-right corner.";
-    }
-    if (Math.hypot(this.player.x - CHEST.x, this.player.y - CHEST.y) <= 1) {
-      const remaining = this.monsters.filter(
-        (monster) => monster.hp > 0,
-      ).length;
-      return `Chest locked. Defeat ${remaining} more monster${remaining === 1 ? "" : "s"}.`;
+    if (this.betweenWaves) {
+      return `Wave ${this.wave} cleared. Continue or leave with your reward.`;
     }
     if (Math.hypot(this.player.x - 1, this.player.y - 2) <= 1.2) {
       return "Press Enter to talk to the Guide.";
@@ -530,7 +679,7 @@ export class RpgScene extends Scene {
     if (this.hasMoved && this.encounterSafe()) {
       return "Safe for a moment—move away from nearby monsters.";
     }
-    return "Hold arrows or WASD to move. Monsters roam the forest.";
+    return "Hold arrows or WASD to move. Monsters roam this floor.";
   }
 
   private movePlayer(seconds: number): void {
@@ -597,11 +746,6 @@ export class RpgScene extends Scene {
         );
     if (target >= 0) {
       this.beginBattle(target);
-    } else if (
-      this.monsters.every((monster) => monster.hp === 0) &&
-      Math.hypot(this.player.x - CHEST.x, this.player.y - CHEST.y) < 0.48
-    ) {
-      this.interact();
     }
   }
 
@@ -622,7 +766,12 @@ export class RpgScene extends Scene {
   }
 
   private beginBattle(index: number): void {
-    if (this.targetIndex !== null || this.finished || this.encounterSafe()) {
+    if (
+      this.targetIndex !== null ||
+      this.finished ||
+      this.betweenWaves ||
+      this.encounterSafe()
+    ) {
       return;
     }
     this.targetIndex = index;
@@ -637,7 +786,7 @@ export class RpgScene extends Scene {
     this.turnNumber++;
     this.turnMistakes = 0;
     this.turnEndsAt = 0;
-    this.turnRemainingMs = TURN_MS;
+    this.turnRemainingMs = this.turnMs();
     this.game.events.emit("rpg-dialogue", null);
     this.emitBattle();
   }
@@ -647,7 +796,9 @@ export class RpgScene extends Scene {
       this.targetIndex === null ? undefined : this.monsters[this.targetIndex];
     if (monster === undefined) return;
     this.game.events.emit("rpg-battle", {
+      wave: this.wave,
       name: monster.name,
+      kind: monster.kind,
       word: this.words[this.wordCursor % this.words.length],
       hp: monster.hp,
       maxHp: monster.maxHp,
@@ -662,6 +813,7 @@ export class RpgScene extends Scene {
             : this.turnEndsAt - performance.now(),
         ) / 1000,
       ),
+      turnSeconds: turnSecondsForWave(this.wave, this.mode),
       wordsTyped: this.turnWords,
       mistakesThisTurn: this.turnMistakes,
       turn: this.turnNumber,
@@ -688,6 +840,19 @@ export class RpgScene extends Scene {
         this.targetIndex = null;
         this.safeUntilAt = performance.now() + POST_BATTLE_SAFETY_MS;
         this.game.events.emit("rpg-battle", null);
+        if (this.monsters.every((next) => next.hp === 0)) {
+          this.completedWaves = this.wave;
+          this.betweenWaves = true;
+          this.heldDirections.clear();
+          this.playerVelocity = { x: 0, y: 0 };
+          this.game.events.emit("rpg-wave-clear", {
+            wave: this.wave,
+            hp: this.playerHp,
+            nextTurnSeconds: turnSecondsForWave(this.wave + 1, this.mode),
+            nextMonsterCount: monsterCountForWave(this.wave + 1),
+            nextFloorName: appearanceForWave(this.wave + 1).name,
+          });
+        }
         this.draw();
       });
       return;
@@ -699,8 +864,7 @@ export class RpgScene extends Scene {
       this.emitBattle(`${monster.name} hit you for ${monster.attack}!`);
       this.draw();
       if (this.playerHp === 0) {
-        this.finished = true;
-        this.time.delayedCall(900, () => this.game.events.emit("rpg-defeat"));
+        this.time.delayedCall(900, () => this.endRun("defeated"));
       } else {
         this.time.delayedCall(900, () => {
           if (this.finished) return;
@@ -709,7 +873,7 @@ export class RpgScene extends Scene {
           this.turnNumber++;
           this.turnMistakes = 0;
           this.turnEndsAt = 0;
-          this.turnRemainingMs = TURN_MS;
+          this.turnRemainingMs = this.turnMs();
           this.emitBattle();
         });
       }
@@ -720,10 +884,7 @@ export class RpgScene extends Scene {
     for (let attempt = 0; attempt < 12; attempt++) {
       const x = 1 + Math.random() * (COLS - 3);
       const y = 1 + Math.random() * (ROWS - 3);
-      if (
-        Math.hypot(x - 1, y - 2) < 0.8 ||
-        Math.hypot(x - CHEST.x, y - CHEST.y) < 0.65
-      ) {
+      if (Math.hypot(x - 1, y - 2) < 0.8) {
         continue;
       }
       monster.destinationX = x;
@@ -753,7 +914,10 @@ export class RpgScene extends Scene {
         this.chooseMonsterDestination(monster);
       }
       const fleeing = safe && playerDistance < SAFE_DISTANCE + 0.5;
-      const chasing = !safe && playerDistance < 2.4;
+      const isImp = monster.kind === "imp";
+      const isGuardian = monster.kind === "guardian";
+      const aggroRange = isImp ? 3.2 : isGuardian ? 1.7 : 2.4;
+      const chasing = !safe && playerDistance < aggroRange;
       const awayX =
         playerDistance > 0
           ? (monster.x - this.player.x) / playerDistance
@@ -776,7 +940,8 @@ export class RpgScene extends Scene {
         destinationX - monster.x,
         destinationY - monster.y,
       );
-      const speed = chasing ? MONSTER_SPEED * 1.2 : MONSTER_SPEED;
+      const typeSpeed = isImp ? 1.25 : isGuardian ? 0.85 : 1;
+      const speed = MONSTER_SPEED * typeSpeed * (chasing ? 1.2 : 1);
       const targetVx =
         distance < 0.15 ? 0 : ((destinationX - monster.x) / distance) * speed;
       const targetVy =
@@ -801,7 +966,6 @@ export class RpgScene extends Scene {
       );
       const blocked =
         Math.hypot(x - 1, y - 2) < 0.55 ||
-        Math.hypot(x - CHEST.x, y - CHEST.y) < 0.5 ||
         (safe &&
           !canMoveNearPlayerDuringSafety(
             playerDistance,
@@ -838,34 +1002,24 @@ export class RpgScene extends Scene {
   }
 
   private interact(): void {
-    if (this.finished || this.targetIndex !== null || this.dialogueOpen) return;
+    if (
+      this.finished ||
+      this.betweenWaves ||
+      this.targetIndex !== null ||
+      this.dialogueOpen
+    ) {
+      return;
+    }
     if (Math.hypot(this.player.x - 1, this.player.y - 2) <= 1.2) {
       this.dialogueOpen = true;
       this.heldDirections.clear();
       this.playerVelocity = { x: 0, y: 0 };
       this.game.events.emit(
         "rpg-dialogue",
-        "Defeat all 3 monsters, then open the chest in the lower-right corner. In battle, type as many words as you can before your 8-second turn ends!",
+        `Defeat every monster to clear a wave. You have ${playerMaxHp(this.mode)} HP with no recovery. ${this.mode === "fast" ? "Every typing turn is 8 seconds." : "Typing turns start at 20 seconds and shrink to 8 seconds by wave 7."} Continue or leave after each wave.`,
       );
       return;
     }
-    const nearChest =
-      Math.hypot(this.player.x - CHEST.x, this.player.y - CHEST.y) <= 1;
-    if (!nearChest || !this.monsters.every((monster) => monster.hp === 0)) {
-      return;
-    }
-    this.finished = true;
-    const elapsed = activeElapsedSeconds(
-      this.startedAt,
-      performance.now(),
-      this.pausedDurationMs,
-    );
-    this.game.events.emit("rpg-result", {
-      score: Math.max(100, 500 - elapsed - this.mistakes * 5),
-      elapsed,
-      hits: this.hits,
-      mistakes: this.mistakes,
-    });
   }
 
   private shutdown(): void {
@@ -897,6 +1051,8 @@ export class RpgScene extends Scene {
       this.game.events.off("rpg-nudge", this.nudgeHandler);
     }
     this.game.events.off("rpg-interact", this.interact, this);
+    this.game.events.off("rpg-continue", this.continueWave, this);
+    this.game.events.off("rpg-leave", this.endRun, this);
     if (this.attackHandler !== undefined) {
       this.game.events.off("rpg-attack", this.attackHandler);
     }

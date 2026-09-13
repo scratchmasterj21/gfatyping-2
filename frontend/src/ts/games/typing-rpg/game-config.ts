@@ -1,8 +1,10 @@
 import type Phaser from "phaser";
+import type { QuestMode } from "./endless-rules";
 
 export async function createTypingRpgGame(
   parent: HTMLElement,
   words: string[],
+  mode: QuestMode = "normal",
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ RpgScene }] = await Promise.all([import("./scenes/RpgScene")]);
@@ -20,5 +22,6 @@ export async function createTypingRpgGame(
     scene: [RpgScene],
   });
   game.registry.set("rpgWords", words);
+  game.registry.set("rpgMode", mode);
   return game;
 }

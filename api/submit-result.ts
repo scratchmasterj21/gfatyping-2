@@ -3,6 +3,7 @@ import admin from "firebase-admin";
 import { getAdminApp } from "./_lib/admin.js";
 import { verifyStudent } from "./_lib/auth.js";
 import { tokyoDateString, tokyoDayId, tokyoWeekId } from "./_lib/time.js";
+import { qualifiesForFastMode } from "./_lib/typing-quest-reward.js";
 
 // Mirrors ape/firestore/scoring.ts + ape/firestore/results.ts + parts of
 // ape/firestore/leaderboards.ts on the frontend - duplicated (not imported)
@@ -471,6 +472,11 @@ export default async function handler(
           ((user["timeTyping"] as number | undefined) ?? 0) + activeSeconds;
         const completedTests =
           ((user["completedTests"] as number | undefined) ?? 0) + 1;
+        const typingQuestFastQualifiers = Math.min(
+          2,
+          Math.max(0, Number(user["typingQuestFastQualifiers"]) || 0) +
+            Number(qualifiesForFastMode(normalized)),
+        );
 
         // Daily-capped "repeat practice" try-coin - same bucket/cap idea as
         // the old client-side awardTryCoin, now server-computed instead of
@@ -525,6 +531,7 @@ export default async function handler(
             streak,
             timeTyping,
             completedTests,
+            typingQuestFastQualifiers,
             weeklyPeriod,
             ...quest.update,
             ...(totalCoins > 0
