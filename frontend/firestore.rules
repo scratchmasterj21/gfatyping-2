@@ -38,7 +38,7 @@ service cloud.firestore {
         'ownedKeyboardSkins', 'ownedKeypressEffects', 'ownedSideImageSets',
         'ownedAnimalAvatars',
         'houseGreetingDate',
-        'practiceRewardDates',
+        'practiceRewardDates', 'typingQuestBonusRepeatClears',
         'equipped', 'equippedAnimalAvatar', 'avatarShape', 'houseTheme',
         'questsWeekId', 'questProgress', 'questsClaimed', 'questDedupe',
         'raceBestWpm', 'raceBestWpmAcc', 'raceBestAcc', 'raceBestAccWpm',
@@ -69,6 +69,11 @@ service cloud.firestore {
       // typing lesson progress: written only by api/complete-lesson.ts
       // (Admin SDK); admin may read for the teacher dashboard.
       match /lessonProgress/{lessonId} {
+        allow read: if isOwner(uid) || isAdminUser();
+        allow write: if isAdminUser();
+      }
+
+      match /typingQuestClaims/{runId} {
         allow read: if isOwner(uid) || isAdminUser();
         allow write: if isAdminUser();
       }

@@ -48,6 +48,7 @@ export default async function handler(
     hits?: unknown;
     elapsed?: unknown;
     mistakes?: unknown;
+    runId?: unknown;
   };
   if (
     body.type !== "dailyGreeting" &&
@@ -83,6 +84,16 @@ export default async function handler(
     res.status(400).json({ ok: false, reason: "Invalid quest clear" });
     return;
   }
+  if (
+    isTypingQuest &&
+    (typeof body.runId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        body.runId,
+      ))
+  ) {
+    res.status(400).json({ ok: false, reason: "Invalid quest run" });
+    return;
+  }
 
   const app = getAdminApp();
   const db = app.firestore();
@@ -103,26 +114,35 @@ export default async function handler(
     let claimed = false;
     let firstClear = false;
     let coinsAwarded = 0;
+    let bonusRepeatClears = 0;
     await db.runTransaction(async (tx: admin.firestore.Transaction) => {
       claimed = false;
       firstClear = false;
       coinsAwarded = 0;
+      bonusRepeatClears = 0;
       const snap = await tx.get(userRef);
+      const runRef = isTypingQuest
+        ? userRef.collection("typingQuestClaims").doc(body.runId as string)
+        : null;
+      const runSnap = runRef ? await tx.get(runRef) : null;
+      if (runSnap?.exists) return;
       const data = snap.exists ? snap.data() : {};
       const rewardDates =
         (data?.["practiceRewardDates"] as Record<string, string> | undefined) ??
         {};
-      const lastClaim = isTypingQuest
-        ? rewardDates["typingQuestLastReward"]
-        : isRecommendedGame
-          ? rewardDates["recommendation"]
-          : (data?.["houseGreetingDate"] as string | undefined);
-      if (lastClaim === today) return;
+      const lastClaim = isRecommendedGame
+        ? rewardDates["recommendation"]
+        : (data?.["houseGreetingDate"] as string | undefined);
+      if (!isTypingQuest && lastClaim === today) return;
 
       const questPayout = isTypingQuest
-        ? typingQuestPayout(rewardDates, today)
-        : { coins: 0, firstClear: false };
+        ? typingQuestPayout(
+            rewardDates,
+            data?.["typingQuestBonusRepeatClears"] as number,
+          )
+        : { coins: 0, firstClear: false, bonusRepeatClears: 0 };
       firstClear = questPayout.firstClear;
+      bonusRepeatClears = questPayout.bonusRepeatClears;
       const coins = isTypingQuest
         ? questPayout.coins
         : isRecommendedGame
@@ -139,6 +159,7 @@ export default async function handler(
                   typingQuestLastReward: today,
                   ...(firstClear ? { typingQuestFirstClear: today } : {}),
                 },
+                typingQuestBonusRepeatClears: bonusRepeatClears,
               }
             : isRecommendedGame
               ? {
@@ -152,12 +173,18 @@ export default async function handler(
         },
         { merge: true },
       );
+      if (runRef) {
+        tx.create(runRef, {
+          claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
       claimed = true;
     });
     res.status(200).json({
       claimed,
       firstClear: claimed && firstClear,
       coins: claimed ? coinsAwarded : 0,
+      bonusRepeatClears: claimed ? bonusRepeatClears : undefined,
     });
   } catch (e) {
     console.error("claim-reward failed:", e);

@@ -147,7 +147,7 @@ export function TypingRpgModal(props: Props): JSXElement {
     if (claim === "error") {
       return "Could not confirm the coin reward. Check your balance.";
     }
-    return "Today's quest coin reward has already been claimed.";
+    return "This run's coin reward has already been claimed.";
   };
   const rewardClaim = (): TypingQuestReward | undefined => {
     const claim = reward();
@@ -179,6 +179,7 @@ export function TypingRpgModal(props: Props): JSXElement {
     if (phase() === "loading") return;
     runId++;
     const thisRun = runId;
+    const rewardRunId = crypto.randomUUID();
     const onResult = props.onResult;
     game?.destroy(true);
     if (impactTimeout !== undefined) clearTimeout(impactTimeout);
@@ -218,6 +219,9 @@ export function TypingRpgModal(props: Props): JSXElement {
       }
       game = nextGame;
       game.events.on("rpg-player-position", setPosition);
+      game.events.on("rpg-resume-input", () => {
+        setTimeout(() => inputRef?.focus(), 0);
+      });
       game.events.on("rpg-prompt", setPrompt);
       game.events.on("rpg-objective", setObjective);
       game.events.on("rpg-battle", (next: Battle | null) => {
@@ -257,7 +261,7 @@ export function TypingRpgModal(props: Props): JSXElement {
         setBattle(null);
         setReward("pending");
         setPhase("results");
-        void claimTypingQuestReward(next).then(
+        void claimTypingQuestReward(next, rewardRunId).then(
           (claimed) => {
             if (runId === thisRun) setReward(claimed);
           },
@@ -343,7 +347,8 @@ export function TypingRpgModal(props: Props): JSXElement {
               Battles use common English words.
             </p>
             <p class="mb-5 text-em-sm text-main">
-              First clear: 25 coins. Later clears: 5 coins, once per day.
+              First clear: 100 coins. Next 10 clears: 10 coins each. After that:
+              1 coin per clear.
             </p>
             <button
               type="button"
@@ -703,7 +708,9 @@ export function TypingRpgModal(props: Props): JSXElement {
                       <p class="mt-1 text-em-sm text-text">
                         {claim().firstClear
                           ? "First-clear bonus!"
-                          : "Daily quest reward!"}
+                          : claim().coins === 10
+                            ? `${10 - (claim().bonusRepeatClears ?? 10)} bonus clears left`
+                            : "Keep farming!"}
                       </p>
                     </Show>
                   )}

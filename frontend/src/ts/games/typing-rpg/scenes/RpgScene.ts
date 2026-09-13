@@ -1,6 +1,12 @@
 import { GameObjects, Scene, Structs } from "phaser";
 
 import { turnDamage } from "../battle-rules";
+import {
+  activeElapsedSeconds,
+  canMoveNearPlayerDuringSafety,
+  encounterIsSafe,
+  remainingTurnMs,
+} from "../quest-flow";
 
 type Direction = "up" | "down" | "left" | "right";
 type Monster = {
@@ -24,6 +30,10 @@ const PLAYER_ACCELERATION = 14;
 const PLAYER_DRAG = 12;
 const MONSTER_SPEED = 1.2;
 const MONSTER_ACCELERATION = 4;
+const ENCOUNTER_DISTANCE = 0.55;
+const SAFE_DISTANCE = 1.15;
+const START_SAFETY_MS = 1500;
+const POST_BATTLE_SAFETY_MS = 2500;
 
 const COLS = 13;
 const ROWS = 9;
@@ -53,9 +63,16 @@ export class RpgScene extends Scene {
   private lastPrompt = "";
   private dialogueOpen = false;
   private startedAt = 0;
+  private pausedDurationMs = 0;
+  private interruptedAt = 0;
+  private interrupted = false;
+  private hasMoved = false;
+  private safeUntilAt = 0;
   private keydownHandler?: (event: KeyboardEvent) => void;
   private keyupHandler?: (event: KeyboardEvent) => void;
   private windowBlurHandler?: () => void;
+  private windowFocusHandler?: () => void;
+  private visibilityHandler?: () => void;
   private resizeHandler?: (size: Structs.Size) => void;
   private moveStartHandler?: (direction: Direction) => void;
   private moveStopHandler?: (direction: Direction) => void;
@@ -132,6 +149,12 @@ export class RpgScene extends Scene {
     this.lastPrompt = "";
     this.dialogueOpen = false;
     this.startedAt = performance.now();
+    this.pausedDurationMs = 0;
+    this.interruptedAt = 0;
+    this.interrupted = false;
+    this.hasMoved = false;
+    this.safeUntilAt = 0;
+    this.time.paused = false;
     this.draw();
 
     this.keydownHandler = (event) => {
@@ -153,10 +176,17 @@ export class RpgScene extends Scene {
       const direction = this.directionForKey(event.key);
       if (direction !== undefined) this.heldDirections.delete(direction);
     };
-    this.windowBlurHandler = () => this.heldDirections.clear();
+    this.windowBlurHandler = () => this.pauseRun();
+    this.windowFocusHandler = () => this.resumeRun();
+    this.visibilityHandler = () => {
+      if (document.hidden) this.pauseRun();
+      else this.resumeRun();
+    };
     document.addEventListener("keydown", this.keydownHandler);
     document.addEventListener("keyup", this.keyupHandler);
+    document.addEventListener("visibilitychange", this.visibilityHandler);
     window.addEventListener("blur", this.windowBlurHandler);
+    window.addEventListener("focus", this.windowFocusHandler);
     this.moveStartHandler = (direction) => this.heldDirections.add(direction);
     this.moveStopHandler = (direction) => this.heldDirections.delete(direction);
     this.nudgeHandler = (direction) => this.nudge(direction);
@@ -181,7 +211,10 @@ export class RpgScene extends Scene {
       if (
         this.targetIndex === null ||
         this.battleStage !== "typing" ||
-        this.turnEndsAt !== 0
+        this.turnEndsAt !== 0 ||
+        this.interrupted ||
+        document.hidden ||
+        !document.hasFocus()
       ) {
         return;
       }
@@ -196,7 +229,10 @@ export class RpgScene extends Scene {
       ) {
         return;
       }
-      this.turnRemainingMs = Math.max(0, this.turnEndsAt - performance.now());
+      this.turnRemainingMs = remainingTurnMs(
+        this.turnEndsAt,
+        performance.now(),
+      );
       this.turnEndsAt = 0;
       this.emitBattle();
     };
@@ -209,9 +245,11 @@ export class RpgScene extends Scene {
     this.resizeHandler = () => this.draw();
     this.scale.on("resize", this.resizeHandler);
     this.events.once("shutdown", this.shutdown, this);
+    if (document.hidden || !document.hasFocus()) this.pauseRun();
   }
 
   override update(_time: number, delta: number): void {
+    if (this.interrupted) return;
     if (!this.finished && this.targetIndex === null && !this.dialogueOpen) {
       const seconds = Math.min(delta / 1000, 0.05);
       this.movePlayer(seconds);
@@ -229,11 +267,49 @@ export class RpgScene extends Scene {
     ) {
       return;
     }
-    const remaining = Math.max(0, this.turnEndsAt - performance.now());
+    const remaining = remainingTurnMs(this.turnEndsAt, performance.now());
     if (remaining === 0) {
       this.endPlayerTurn();
     } else if (performance.now() - this.lastClock >= 100) {
       this.lastClock = performance.now();
+      this.emitBattle();
+    }
+  }
+
+  private pauseRun(): void {
+    if (this.interrupted) return;
+    this.interruptedAt = performance.now();
+    if (this.turnEndsAt !== 0 && this.battleStage === "typing") {
+      this.turnRemainingMs = remainingTurnMs(
+        this.turnEndsAt,
+        this.interruptedAt,
+      );
+      this.turnEndsAt = 0;
+      this.emitBattle();
+    }
+    this.interrupted = true;
+    this.time.paused = true;
+    this.heldDirections.clear();
+    this.playerVelocity = { x: 0, y: 0 };
+    for (const monster of this.monsters) {
+      monster.vx = 0;
+      monster.vy = 0;
+    }
+  }
+
+  private resumeRun(): void {
+    if (!this.interrupted || document.hidden || !document.hasFocus()) return;
+    const pauseMs = performance.now() - this.interruptedAt;
+    this.pausedDurationMs += pauseMs;
+    if (this.safeUntilAt > 0) this.safeUntilAt += pauseMs;
+    for (const monster of this.monsters) {
+      if (monster.nextDecisionAt > 0) monster.nextDecisionAt += pauseMs;
+    }
+    this.interrupted = false;
+    this.interruptedAt = 0;
+    this.time.paused = false;
+    if (this.targetIndex !== null && this.battleStage === "typing") {
+      this.game.events.emit("rpg-resume-input");
       this.emitBattle();
     }
   }
@@ -415,6 +491,10 @@ export class RpgScene extends Scene {
     if (direction === "down") this.playerVelocity.y = impulse;
   }
 
+  private encounterSafe(now = performance.now()): boolean {
+    return encounterIsSafe(this.hasMoved, this.safeUntilAt, now);
+  }
+
   private label(
     x: number,
     y: number,
@@ -446,6 +526,9 @@ export class RpgScene extends Scene {
     }
     if (Math.hypot(this.player.x - 1, this.player.y - 2) <= 1.2) {
       return "Press Enter to talk to the Guide.";
+    }
+    if (this.hasMoved && this.encounterSafe()) {
+      return "Safe for a moment—move away from nearby monsters.";
     }
     return "Hold arrows or WASD to move. Monsters roam the forest.";
   }
@@ -494,17 +577,24 @@ export class RpgScene extends Scene {
       this.playerVelocity = { x: 0, y: 0 };
     }
     if (this.player.x === oldX && this.player.y === oldY) return;
+    if (!this.hasMoved) {
+      this.hasMoved = true;
+      this.safeUntilAt = performance.now() + START_SAFETY_MS;
+    }
     const visual = this.playerVisual;
     if (visual !== undefined) {
       const position = this.center(this.player.x, this.player.y);
       visual.setPosition(position.x, position.y);
       this.emitPlayerPosition();
     }
-    const target = this.monsters.findIndex(
-      (monster) =>
-        monster.hp > 0 &&
-        Math.hypot(monster.x - this.player.x, monster.y - this.player.y) < 0.55,
-    );
+    const target = this.encounterSafe()
+      ? -1
+      : this.monsters.findIndex(
+          (monster) =>
+            monster.hp > 0 &&
+            Math.hypot(monster.x - this.player.x, monster.y - this.player.y) <
+              ENCOUNTER_DISTANCE,
+        );
     if (target >= 0) {
       this.beginBattle(target);
     } else if (
@@ -532,7 +622,9 @@ export class RpgScene extends Scene {
   }
 
   private beginBattle(index: number): void {
-    if (this.targetIndex !== null || this.finished) return;
+    if (this.targetIndex !== null || this.finished || this.encounterSafe()) {
+      return;
+    }
     this.targetIndex = index;
     this.heldDirections.clear();
     this.playerVelocity = { x: 0, y: 0 };
@@ -594,6 +686,7 @@ export class RpgScene extends Scene {
     if (monster.hp === 0) {
       this.time.delayedCall(1100, () => {
         this.targetIndex = null;
+        this.safeUntilAt = performance.now() + POST_BATTLE_SAFETY_MS;
         this.game.events.emit("rpg-battle", null);
         this.draw();
       });
@@ -642,6 +735,7 @@ export class RpgScene extends Scene {
 
   private moveMonsters(seconds: number): void {
     const now = performance.now();
+    const safe = this.encounterSafe(now);
     for (let index = 0; index < this.monsters.length; index++) {
       const monster = this.monsters[index];
       if (monster === undefined || monster.hp === 0) continue;
@@ -658,9 +752,26 @@ export class RpgScene extends Scene {
       ) {
         this.chooseMonsterDestination(monster);
       }
-      const chasing = playerDistance < 2.4;
-      const destinationX = chasing ? this.player.x : monster.destinationX;
-      const destinationY = chasing ? this.player.y : monster.destinationY;
+      const fleeing = safe && playerDistance < SAFE_DISTANCE + 0.5;
+      const chasing = !safe && playerDistance < 2.4;
+      const awayX =
+        playerDistance > 0
+          ? (monster.x - this.player.x) / playerDistance
+          : index % 2 === 0
+            ? 1
+            : -1;
+      const awayY =
+        playerDistance > 0 ? (monster.y - this.player.y) / playerDistance : 0;
+      const destinationX = fleeing
+        ? monster.x + awayX * 2
+        : chasing
+          ? this.player.x
+          : monster.destinationX;
+      const destinationY = fleeing
+        ? monster.y + awayY * 2
+        : chasing
+          ? this.player.y
+          : monster.destinationY;
       const distance = Math.hypot(
         destinationX - monster.x,
         destinationY - monster.y,
@@ -691,6 +802,12 @@ export class RpgScene extends Scene {
       const blocked =
         Math.hypot(x - 1, y - 2) < 0.55 ||
         Math.hypot(x - CHEST.x, y - CHEST.y) < 0.5 ||
+        (safe &&
+          !canMoveNearPlayerDuringSafety(
+            playerDistance,
+            Math.hypot(x - this.player.x, y - this.player.y),
+            SAFE_DISTANCE,
+          )) ||
         this.monsters.some(
           (other) =>
             other !== monster &&
@@ -710,7 +827,10 @@ export class RpgScene extends Scene {
         const position = this.center(x, y);
         visual.setPosition(position.x, position.y);
       }
-      if (Math.hypot(x - this.player.x, y - this.player.y) < 0.55) {
+      if (
+        !safe &&
+        Math.hypot(x - this.player.x, y - this.player.y) < ENCOUNTER_DISTANCE
+      ) {
         this.beginBattle(index);
         return;
       }
@@ -735,7 +855,11 @@ export class RpgScene extends Scene {
       return;
     }
     this.finished = true;
-    const elapsed = Math.round((performance.now() - this.startedAt) / 1000);
+    const elapsed = activeElapsedSeconds(
+      this.startedAt,
+      performance.now(),
+      this.pausedDurationMs,
+    );
     this.game.events.emit("rpg-result", {
       score: Math.max(100, 500 - elapsed - this.mistakes * 5),
       elapsed,
@@ -753,6 +877,12 @@ export class RpgScene extends Scene {
     }
     if (this.windowBlurHandler !== undefined) {
       window.removeEventListener("blur", this.windowBlurHandler);
+    }
+    if (this.windowFocusHandler !== undefined) {
+      window.removeEventListener("focus", this.windowFocusHandler);
+    }
+    if (this.visibilityHandler !== undefined) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
     }
     if (this.resizeHandler !== undefined) {
       this.scale.off("resize", this.resizeHandler);

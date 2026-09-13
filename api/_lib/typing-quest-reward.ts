@@ -1,5 +1,7 @@
-export const TYPING_QUEST_FIRST_CLEAR_REWARD = 25;
-export const TYPING_QUEST_REPEAT_REWARD = 5;
+export const TYPING_QUEST_FIRST_CLEAR_REWARD = 100;
+export const TYPING_QUEST_BONUS_REPEAT_REWARD = 10;
+export const TYPING_QUEST_FARM_REWARD = 1;
+export const TYPING_QUEST_BONUS_REPEAT_LIMIT = 10;
 
 type Clear = { score: number; elapsed: number; hits: number; mistakes: number };
 
@@ -19,16 +21,21 @@ export function validTypingQuestClear(clear: Clear): boolean {
 
 export function typingQuestPayout(
   rewardDates: Record<string, string>,
-  today: string,
-): { coins: number; firstClear: boolean } {
-  if (rewardDates["typingQuestLastReward"] === today) {
-    return { coins: 0, firstClear: false };
-  }
+  bonusRepeatClears: number,
+): { coins: number; firstClear: boolean; bonusRepeatClears: number } {
   const firstClear = rewardDates["typingQuestFirstClear"] === undefined;
+  const used = Number.isInteger(bonusRepeatClears)
+    ? Math.max(0, Math.min(TYPING_QUEST_BONUS_REPEAT_LIMIT, bonusRepeatClears))
+    : 0;
   return {
     coins: firstClear
       ? TYPING_QUEST_FIRST_CLEAR_REWARD
-      : TYPING_QUEST_REPEAT_REWARD,
+      : used < TYPING_QUEST_BONUS_REPEAT_LIMIT
+        ? TYPING_QUEST_BONUS_REPEAT_REWARD
+        : TYPING_QUEST_FARM_REWARD,
     firstClear,
+    bonusRepeatClears: firstClear
+      ? used
+      : Math.min(TYPING_QUEST_BONUS_REPEAT_LIMIT, used + 1),
   };
 }

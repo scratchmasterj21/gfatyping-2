@@ -7,9 +7,10 @@ import {
 
 describe("Typing Quest rewards", () => {
   it("pays the first clear once", () => {
-    expect(typingQuestPayout({}, "2026-09-12")).toEqual({
-      coins: 25,
+    expect(typingQuestPayout({}, 0)).toEqual({
+      coins: 100,
       firstClear: true,
+      bonusRepeatClears: 0,
     });
     expect(
       typingQuestPayout(
@@ -17,21 +18,28 @@ describe("Typing Quest rewards", () => {
           typingQuestFirstClear: "2026-09-12",
           typingQuestLastReward: "2026-09-12",
         },
-        "2026-09-12",
+        0,
       ),
-    ).toEqual({ coins: 0, firstClear: false });
+    ).toEqual({ coins: 10, firstClear: false, bonusRepeatClears: 1 });
   });
 
-  it("pays a smaller repeat reward on a later day", () => {
-    expect(
-      typingQuestPayout(
-        {
-          typingQuestFirstClear: "2026-09-12",
-          typingQuestLastReward: "2026-09-12",
-        },
-        "2026-09-13",
-      ),
-    ).toEqual({ coins: 5, firstClear: false });
+  it("pays 10 coins for 10 repeats, then 1 per clear", () => {
+    const dates = { typingQuestFirstClear: "2026-09-12" };
+    expect(typingQuestPayout(dates, 9)).toEqual({
+      coins: 10,
+      firstClear: false,
+      bonusRepeatClears: 10,
+    });
+    expect(typingQuestPayout(dates, 10)).toEqual({
+      coins: 1,
+      firstClear: false,
+      bonusRepeatClears: 10,
+    });
+    expect(typingQuestPayout(dates, undefined as unknown as number)).toEqual({
+      coins: 10,
+      firstClear: false,
+      bonusRepeatClears: 1,
+    });
   });
 
   it("rejects incomplete or inconsistent clear reports", () => {
