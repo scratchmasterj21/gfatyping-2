@@ -406,8 +406,7 @@ export function TypingRpgModal(props: Props): JSXElement {
               Start with 100 HP and no healing. Typing turns shrink from 20 to 8
               seconds. First completed run: 100 coins. Next 10: 10 coins each;
               later runs: 1 coin. These 10 bonus clears reset daily. Deeper
-              waves add up to 10 coins per run, capped at 20 depth coins per
-              day.
+              waves add up to 10 depth coins per normal run.
             </p>
             <div class="flex flex-wrap gap-2">
               <button
@@ -427,8 +426,10 @@ export function TypingRpgModal(props: Props): JSXElement {
               </button>
             </div>
             <p class="mt-3 text-em-sm text-sub">
-              Fast Mode: 50 HP, 8-second turns, double coins with shared daily
-              limits.{" "}
+              Fast Mode: 50 HP, 8-second turns, double run coins, plus 8 depth
+              coins per extra wave (up to 80 per run). Modes share 10 daily
+              bonus clears and an 80-unit daily depth pool (worth up to 160 Fast
+              coins).{" "}
               {fastUnlocked()
                 ? "Unlocked"
                 : "Unlock with two 30-second English tests at 40+ WPM and 95%+ accuracy."}

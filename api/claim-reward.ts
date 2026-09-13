@@ -243,7 +243,7 @@ export default async function handler(
           ? Math.max(0, Number(data?.["typingQuestDepthBonusCoins"]) || 0)
           : 0;
       const depthUnits = isTypingQuest
-        ? typingQuestDepthPayout(completedWaves, paidDepthToday)
+        ? typingQuestDepthPayout(completedWaves, paidDepthToday, questMode)
         : 0;
       const multiplier = questRewardMultiplier(questMode);
       depthCoins = depthUnits * multiplier;

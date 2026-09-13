@@ -63,6 +63,36 @@ const MONSTER_COLORS: Record<MonsterKind, number> = {
   guardian: 0xa85d7a,
 };
 
+function mixCanvasColor(from: number, to: number, amount: number): number {
+  const channel = (shift: number): number =>
+    Math.round(
+      ((from >> shift) & 255) * (1 - amount) + ((to >> shift) & 255) * amount,
+    );
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}
+
+const FLOOR_PALETTES = [
+  { dark: 0x4a7844, light: 0x52804c, detail: 0x79b874, edge: 0x245338 },
+  {
+    dark: mixCanvasColor(0x172c2b, 0x395fbd, 0.42),
+    light: mixCanvasColor(0x172c2b, 0x395fbd, 0.54),
+    detail: 0xf3cfa0,
+    edge: 0x395fbd,
+  },
+  {
+    dark: mixCanvasColor(0x172c2b, 0xa85d7a, 0.42),
+    light: mixCanvasColor(0x172c2b, 0xf3cfa0, 0.34),
+    detail: 0xf3cfa0,
+    edge: 0xa85d7a,
+  },
+  {
+    dark: mixCanvasColor(0x172c2b, 0x7f68ac, 0.42),
+    light: mixCanvasColor(0x172c2b, 0x7f68ac, 0.53),
+    detail: 0xf3cfa0,
+    edge: 0x7f68ac,
+  },
+] as const;
+
 export class RpgScene extends Scene {
   private words: string[] = [];
   private player = { x: 1, y: 4 };
@@ -415,97 +445,193 @@ export class RpgScene extends Scene {
     const { size, left, top } = this.layout();
     const graphics = this.add.graphics();
     const appearance = appearanceForWave(this.wave);
-    const theme = getComputedStyle(document.documentElement);
-    const themeColor = (key: string, fallback: number): number => {
-      const value = theme.getPropertyValue(key).trim();
-      const hex = /^#([\da-f]{6})$/i.exec(value)?.[1];
-      return hex === undefined ? fallback : Number.parseInt(hex, 16);
-    };
-    const accent = themeColor("--main-color", 0x79b874);
-    const secondary = themeColor("--sub-color", 0x36744b);
-    const highlight = themeColor("--text-color", 0xf3cfa0);
+    const palette = FLOOR_PALETTES[appearance.floorIndex] ?? FLOOR_PALETTES[0];
     graphics.fillStyle(0x172c2b);
     graphics.fillRect(0, 0, this.scale.width, this.scale.height);
 
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
-        graphics.fillStyle((x + y) % 2 ? 0x4a7844 : 0x52804c);
-        graphics.fillRect(left + x * size, top + y * size, size, size);
         const tileX = left + x * size;
         const tileY = top + y * size;
-        const marker = (x * 7 + y * 11 + appearance.tier) % 5;
-        if (appearance.floorIndex === 1) {
-          graphics.fillStyle(accent, marker === 0 ? 0.36 : 0.12);
-          graphics.fillTriangle(
-            tileX + size * 0.25,
-            tileY + size * 0.7,
-            tileX + size * 0.5,
-            tileY + size * 0.18,
-            tileX + size * 0.75,
-            tileY + size * 0.7,
-          );
-        } else if (appearance.floorIndex === 2) {
-          graphics.fillStyle(secondary, marker < 2 ? 0.52 : 0.2);
-          graphics.fillRect(
-            tileX + size * 0.14,
-            tileY + size * 0.42,
-            size * 0.72,
-            size * 0.12,
-          );
-          if (marker === 0) {
-            graphics.fillStyle(accent, 0.6);
-            graphics.fillCircle(
-              tileX + size * 0.72,
-              tileY + size * 0.28,
-              size * 0.09,
+        const edge = x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1;
+        const marker = (x * 7 + y * 11 + appearance.tier * 3) % 9;
+        graphics.fillStyle(
+          (x + y + appearance.tier) % 2 ? palette.dark : palette.light,
+        );
+        graphics.fillRect(tileX, tileY, size, size);
+        if (!edge && appearance.floorIndex === 0) {
+          const pathCenter = 6 + Math.sin(y * 0.85 + appearance.tier) * 1.45;
+          if (Math.abs(x - pathCenter) < 1.5) {
+            graphics.fillStyle(0xf3cfa0, 0.14);
+            graphics.fillRoundedRect(
+              tileX + size * 0.03,
+              tileY + size * 0.03,
+              size * 0.94,
+              size * 0.94,
+              size * 0.18,
+            );
+          } else if (marker < 3) {
+            graphics.lineStyle(Math.max(1, size * 0.025), palette.detail, 0.55);
+            graphics.lineBetween(
+              tileX + size * 0.4,
+              tileY + size * 0.75,
+              tileX + size * 0.35,
+              tileY + size * 0.58,
+            );
+            graphics.lineBetween(
+              tileX + size * 0.4,
+              tileY + size * 0.75,
+              tileX + size * 0.48,
+              tileY + size * 0.54,
             );
           }
-        } else if (appearance.floorIndex === 3) {
+        } else if (!edge && appearance.floorIndex === 1) {
+          graphics.lineStyle(Math.max(1, size * 0.025), palette.detail, 0.22);
+          graphics.strokeRect(
+            tileX + size * 0.08,
+            tileY + size * 0.08,
+            size * 0.84,
+            size * 0.84,
+          );
+          if (marker < 3) {
+            graphics.fillStyle(palette.edge, 0.82);
+            graphics.fillTriangle(
+              tileX + size * 0.34,
+              tileY + size * 0.72,
+              tileX + size * 0.51,
+              tileY + size * 0.2,
+              tileX + size * 0.65,
+              tileY + size * 0.72,
+            );
+            graphics.lineStyle(Math.max(1, size * 0.025), palette.detail, 0.7);
+            graphics.lineBetween(
+              tileX + size * 0.51,
+              tileY + size * 0.2,
+              tileX + size * 0.51,
+              tileY + size * 0.72,
+            );
+          }
+        } else if (!edge && appearance.floorIndex === 2) {
+          graphics.lineStyle(Math.max(1, size * 0.035), palette.dark, 0.7);
+          graphics.lineBetween(
+            tileX,
+            tileY + size * 0.5,
+            tileX + size,
+            tileY + size * 0.5,
+          );
+          graphics.lineBetween(
+            tileX + size * (y % 2 ? 0.25 : 0.75),
+            tileY,
+            tileX + size * (y % 2 ? 0.25 : 0.75),
+            tileY + size * 0.5,
+          );
+          if (marker < 2) {
+            graphics.lineStyle(Math.max(1, size * 0.04), palette.detail, 0.68);
+            graphics.lineBetween(
+              tileX + size * 0.3,
+              tileY + size * 0.62,
+              tileX + size * 0.48,
+              tileY + size * 0.4,
+            );
+            graphics.lineBetween(
+              tileX + size * 0.48,
+              tileY + size * 0.4,
+              tileX + size * 0.7,
+              tileY + size * 0.54,
+            );
+          }
+        } else if (!edge) {
           graphics.lineStyle(
-            Math.max(1, size * 0.035),
-            highlight,
-            marker === 0 ? 0.62 : 0.22,
+            Math.max(1, size * 0.025),
+            palette.detail,
+            marker < 2 ? 0.62 : 0.15,
           );
           graphics.strokeCircle(
             tileX + size * 0.5,
             tileY + size * 0.5,
-            size * 0.2,
+            size * 0.18,
           );
-          graphics.fillStyle(secondary, 0.2);
-          graphics.fillCircle(
-            tileX + size * 0.5,
-            tileY + size * 0.5,
-            size * 0.06,
+          if (marker < 2) {
+            graphics.lineBetween(
+              tileX + size * 0.5,
+              tileY + size * 0.18,
+              tileX + size * 0.5,
+              tileY + size * 0.82,
+            );
+            graphics.lineBetween(
+              tileX + size * 0.18,
+              tileY + size * 0.5,
+              tileX + size * 0.82,
+              tileY + size * 0.5,
+            );
+          }
+        }
+        if (!edge && appearance.tier > 0 && marker === 4) {
+          graphics.fillStyle(
+            palette.detail,
+            Math.min(0.65, 0.25 + appearance.tier * 0.1),
           );
-        } else if (marker === 0 || appearance.tier > 0) {
-          graphics.fillStyle(accent, appearance.tier > 0 ? 0.3 : 0.16);
           graphics.fillCircle(
-            tileX + size * 0.48,
-            tileY + size * 0.55,
-            size * 0.09,
+            tileX + size * 0.78,
+            tileY + size * 0.22,
+            size * 0.045,
           );
         }
-        if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) {
+        if (edge) {
           const p = this.center(x, y);
-          if (appearance.floorIndex % 2 === 0) {
-            graphics.fillStyle(0x245338);
-            graphics.fillCircle(p.x, p.y + size * 0.06, size * 0.28);
-            graphics.fillStyle(secondary, 0.8);
-            graphics.fillCircle(p.x, p.y - size * 0.12, size * 0.24);
-          } else {
-            graphics.fillStyle(secondary, 0.7);
-            graphics.fillRoundedRect(
+          graphics.fillStyle(palette.edge);
+          if (appearance.floorIndex === 0) {
+            graphics.fillCircle(p.x, p.y + size * 0.06, size * 0.29);
+            graphics.fillStyle(palette.detail, 0.56);
+            graphics.fillCircle(p.x, p.y - size * 0.12, size * 0.22);
+          } else if (appearance.floorIndex === 1) {
+            graphics.fillTriangle(
               p.x - size * 0.3,
-              p.y - size * 0.28,
-              size * 0.6,
-              size * 0.56,
-              size * 0.1,
+              p.y + size * 0.3,
+              p.x,
+              p.y - size * 0.37,
+              p.x + size * 0.3,
+              p.y + size * 0.3,
             );
-            graphics.fillStyle(accent, 0.35);
-            graphics.fillCircle(p.x, p.y, size * 0.12);
+            graphics.lineStyle(Math.max(1, size * 0.03), palette.detail, 0.62);
+            graphics.lineBetween(p.x, p.y - size * 0.32, p.x, p.y + size * 0.2);
+          } else if (appearance.floorIndex === 2) {
+            graphics.fillRoundedRect(
+              p.x - size * 0.27,
+              p.y - size * 0.3,
+              size * 0.54,
+              size * 0.6,
+              size * 0.07,
+            );
+            graphics.fillStyle(palette.detail, 0.58);
+            graphics.fillTriangle(
+              p.x - size * 0.1,
+              p.y + size * 0.12,
+              p.x,
+              p.y - size * 0.23,
+              p.x + size * 0.1,
+              p.y + size * 0.12,
+            );
+          } else {
+            graphics.fillRoundedRect(
+              p.x - size * 0.28,
+              p.y - size * 0.28,
+              size * 0.56,
+              size * 0.56,
+              size * 0.08,
+            );
+            graphics.lineStyle(Math.max(1, size * 0.03), palette.detail, 0.58);
+            graphics.strokeCircle(p.x, p.y, size * 0.15);
           }
         }
       }
+    }
+
+    if (appearance.floorIndex === 3) {
+      const center = this.center(6, 4);
+      graphics.lineStyle(Math.max(2, size * 0.04), palette.detail, 0.28);
+      graphics.strokeCircle(center.x, center.y, size * 2.7);
+      graphics.strokeCircle(center.x, center.y, size * 1.9);
     }
 
     const npc = this.center(1, 2);

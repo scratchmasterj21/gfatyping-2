@@ -2,7 +2,8 @@ export const TYPING_QUEST_FIRST_CLEAR_REWARD = 100;
 export const TYPING_QUEST_BONUS_REPEAT_REWARD = 10;
 export const TYPING_QUEST_FARM_REWARD = 1;
 export const TYPING_QUEST_BONUS_REPEAT_LIMIT = 10;
-export const TYPING_QUEST_DEPTH_DAILY_LIMIT = 20;
+// Stored as unmultiplied depth units, so normal/fast runs share one daily pool.
+export const TYPING_QUEST_DEPTH_DAILY_LIMIT = 80;
 export type TypingQuestMode = "normal" | "fast";
 
 export function questRewardMultiplier(mode: TypingQuestMode): number {
@@ -56,8 +57,12 @@ export function minimumQuestSecondsForWaves(
 export function typingQuestDepthPayout(
   completedWaves: number,
   paidToday: number,
+  mode: TypingQuestMode = "normal",
 ): number {
-  const earned = Math.min(10, Math.max(0, completedWaves - 1));
+  const earned = Math.min(
+    mode === "fast" ? 40 : 10,
+    Math.max(0, completedWaves - 1) * (mode === "fast" ? 4 : 1),
+  );
   const used = Number.isInteger(paidToday) ? Math.max(0, paidToday) : 0;
   const remaining = Math.max(0, TYPING_QUEST_DEPTH_DAILY_LIMIT - used);
   return Math.min(earned, remaining);

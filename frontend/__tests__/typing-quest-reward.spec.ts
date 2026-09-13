@@ -87,9 +87,9 @@ describe("Typing Quest rewards", () => {
     );
     expect(tenth.coins * questRewardMultiplier("fast")).toBe(20);
     expect(eleventh.coins * questRewardMultiplier("fast")).toBe(2);
-    expect(typingQuestDepthPayout(20, 19) * questRewardMultiplier("fast")).toBe(
-      2,
-    );
+    expect(
+      typingQuestDepthPayout(20, 79, "fast") * questRewardMultiplier("fast"),
+    ).toBe(2);
   });
 
   it("rejects incomplete or inconsistent clear reports", () => {
@@ -186,11 +186,15 @@ describe("Typing Quest rewards", () => {
     ).toBe(false);
   });
 
-  it("caps depth coins at ten per run and twenty per day", () => {
+  it("rewards deeper fast runs while sharing a capped daily depth pool", () => {
     expect(typingQuestDepthPayout(1, 0)).toBe(0);
     expect(typingQuestDepthPayout(5, 0)).toBe(4);
-    expect(typingQuestDepthPayout(20, 17)).toBe(3);
-    expect(typingQuestDepthPayout(20, 20)).toBe(0);
+    expect(typingQuestDepthPayout(20, 17)).toBe(10);
+    expect(typingQuestDepthPayout(20, 80)).toBe(0);
+    expect(typingQuestDepthPayout(6, 0, "fast")).toBe(20);
+    expect(typingQuestDepthPayout(20, 0, "fast")).toBe(40);
+    expect(typingQuestDepthPayout(20, 70, "fast")).toBe(10);
+    expect(20 + typingQuestDepthPayout(6, 0, "fast") * 2).toBe(60);
     expect(questRewardMultiplier("normal")).toBe(1);
     expect(questRewardMultiplier("fast")).toBe(2);
   });
