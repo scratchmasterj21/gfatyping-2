@@ -51,6 +51,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   multiplayerUnlocked?: boolean;
+  initialMode?: "solo" | "together";
   onResult?: (score: number, wave: number) => void;
 };
 
@@ -242,7 +243,13 @@ export function TypeRacerModal(props: Props): JSXElement {
   };
 
   createEffect(() => {
-    if (!props.open) {
+    if (props.open) {
+      setMode(
+        props.initialMode === "together" && props.multiplayerUnlocked === true
+          ? "together"
+          : "solo",
+      );
+    } else {
       cleanup();
       void disconnectRoom();
     }

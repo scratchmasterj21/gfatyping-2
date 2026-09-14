@@ -55,6 +55,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   multiplayerUnlocked?: boolean;
+  initialMode?: "solo" | "together";
   lessonWords?: string[];
   onResult?: (
     score: number,
@@ -244,6 +245,11 @@ export function TypeTossModal(props: Props): JSXElement {
       void disconnectRoom();
       return;
     }
+    setMode(
+      props.initialMode === "together" && props.multiplayerUnlocked === true
+        ? "together"
+        : "solo",
+    );
     const words = props.lessonWords;
     if (words !== undefined) {
       void startGame(words);

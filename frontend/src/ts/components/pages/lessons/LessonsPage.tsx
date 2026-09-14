@@ -320,6 +320,7 @@ function GameButton(props: {
   description: string;
   icon: FaSolidIcon;
   locked?: boolean;
+  lockedMessage?: string;
   onClick: () => void;
 }): JSXElement {
   return (
@@ -340,7 +341,7 @@ function GameButton(props: {
       </div>
       <div class="text-em-xs text-sub">
         {props.locked
-          ? "🔒 Unlock the All Keys lessons to play"
+          ? (props.lockedMessage ?? "🔒 Unlock the All Keys lessons to play")
           : props.description}
       </div>
     </button>
@@ -824,6 +825,12 @@ export function LessonsPage(): JSXElement {
   const [lessonGameLoading, setLessonGameLoading] = createSignal(false);
   const [recommendedGameId, setRecommendedGameId] = createSignal<string>();
   const [showExtras, setShowExtras] = createSignal(false);
+  const [gamesTab, setGamesTab] = createSignal<
+    "solo" | "multiplayer" | "rewards"
+  >("solo");
+  const [gameLaunchMode, setGameLaunchMode] = createSignal<"solo" | "together">(
+    "solo",
+  );
   const [collapsed, setCollapsed] = createSignal<Set<string>>(
     (() => {
       const stored = localStorage.getItem("lessonSectionsCollapsed");
@@ -1416,6 +1423,14 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "fruit-ninja") setFruitNinjaOpen(true);
     else if (gameId === "type-toss") setTypeTossOpen(true);
     else if (gameId === "typing-rpg") setRpgOpen(true);
+  };
+
+  const launchGame = (
+    gameId: string,
+    mode: "solo" | "together" = "solo",
+  ): void => {
+    setGameLaunchMode(mode);
+    openBuiltinGame(gameId);
   };
 
   const launchDailyChallenge = async (): Promise<void> => {
@@ -2288,21 +2303,151 @@ export function LessonsPage(): JSXElement {
           </div>
           <Show when={!collapsed().has("games")}>
             <p class="mb-4 text-sub">
-              Take a break with a fun typing challenge. Games don&apos;t affect
-              your stats.
+              Play solo, challenge classmates, or check your game rewards.
             </p>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <For each={games.filter((g) => g.type === "builtin")}>
-                {(game) => (
-                  <GameButton
-                    name={game.name}
-                    description={game.description}
-                    icon={game.icon}
-                    locked={game.id === "typing-rpg" && !rpgUnlocked()}
-                    onClick={() => openBuiltinGame(game.id)}
-                  />
+            <div
+              role="tablist"
+              aria-label="Game categories"
+              class="mb-4 flex gap-2 border-b border-sub pb-2"
+            >
+              <For each={["solo", "multiplayer", "rewards"] as const}>
+                {(tab) => (
+                  <button
+                    id={`games-tab-${tab}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={gamesTab() === tab}
+                    aria-controls="games-tab-panel"
+                    tabIndex={gamesTab() === tab ? 0 : -1}
+                    class={cn(
+                      "rounded px-3 py-2 transition-colors",
+                      gamesTab() === tab
+                        ? "bg-text text-bg"
+                        : "bg-sub-alt text-sub hover:text-text",
+                    )}
+                    onClick={() => setGamesTab(tab)}
+                    onKeyDown={(event) => {
+                      const tabs = ["solo", "multiplayer", "rewards"] as const;
+                      const index = tabs.indexOf(tab);
+                      const next =
+                        event.key === "ArrowRight"
+                          ? tabs[(index + 1) % tabs.length]
+                          : event.key === "ArrowLeft"
+                            ? tabs[(index + tabs.length - 1) % tabs.length]
+                            : event.key === "Home"
+                              ? tabs[0]
+                              : event.key === "End"
+                                ? tabs[tabs.length - 1]
+                                : undefined;
+                      if (next === undefined) return;
+                      event.preventDefault();
+                      setGamesTab(next);
+                      document.getElementById(`games-tab-${next}`)?.focus();
+                    }}
+                  >
+                    {tab === "solo"
+                      ? "Solo play"
+                      : tab === "multiplayer"
+                        ? "Multiplayer"
+                        : "Rewards"}
+                  </button>
                 )}
               </For>
+            </div>
+            <div
+              id="games-tab-panel"
+              role="tabpanel"
+              aria-labelledby={`games-tab-${gamesTab()}`}
+            >
+              <Show when={gamesTab() === "solo"}>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <For each={games.filter((g) => g.type === "builtin")}>
+                    {(game) => (
+                      <GameButton
+                        name={game.name}
+                        description={game.description}
+                        icon={game.icon}
+                        locked={game.id === "typing-rpg" && !rpgUnlocked()}
+                        onClick={() => launchGame(game.id)}
+                      />
+                    )}
+                  </For>
+                </div>
+              </Show>
+              <Show when={gamesTab() === "multiplayer"}>
+                <p class="mb-3 text-sub">
+                  Create a room or join friends with a code.
+                </p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <For
+                    each={games.filter(
+                      (g) =>
+                        g.type === "builtin" &&
+                        ["type-toss", "type-racer", "ghost-hunter"].includes(
+                          g.id,
+                        ),
+                    )}
+                  >
+                    {(game) => {
+                      const requiredLesson =
+                        game.id === "type-racer"
+                          ? "home-middle"
+                          : game.id === "type-toss"
+                            ? "home-words"
+                            : "all-keys-1";
+                      const locked = () =>
+                        !isCurrentUserAdmin() && isLessonLocked(requiredLesson);
+                      return (
+                        <GameButton
+                          name={game.name}
+                          description={game.description}
+                          icon={game.icon}
+                          locked={locked()}
+                          lockedMessage="🔒 Complete the required typing lessons to play together"
+                          onClick={() => {
+                            if (!locked()) launchGame(game.id, "together");
+                          }}
+                        />
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
+              <Show when={gamesTab() === "rewards"}>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div class="rounded bg-sub-alt p-4">
+                    <h3 class="font-medium text-text">Typing Quest</h3>
+                    <p class="my-2 text-sub">
+                      Earn coins for clearing waves. Fast mode earns more; both
+                      modes share the daily bonus limit.
+                    </p>
+                    <button
+                      type="button"
+                      class="rounded bg-text px-3 py-2 text-bg"
+                      onClick={() => launchGame("typing-rpg")}
+                    >
+                      Play Typing Quest
+                    </button>
+                  </div>
+                  <div class="rounded bg-sub-alt p-4">
+                    <h3 class="font-medium text-text">
+                      Today&apos;s practice reward
+                    </h3>
+                    <p class="my-2 text-sub">
+                      Finish today&apos;s recommended activity for its daily
+                      practice reward.
+                    </p>
+                    <button
+                      type="button"
+                      class="rounded bg-text px-3 py-2 text-bg"
+                      onClick={() => practiceRecommendation()?.onStart()}
+                    >
+                      {practiceRecommendation()?.title ??
+                        "See today's practice"}
+                    </button>
+                  </div>
+                </div>
+              </Show>
             </div>
           </Show>
         </section>
@@ -2382,6 +2527,7 @@ export function LessonsPage(): JSXElement {
         />
         <TypeRacerModal
           open={racerOpen()}
+          initialMode={gameLaunchMode()}
           multiplayerUnlocked={
             isCurrentUserAdmin() || !isLessonLocked("home-middle")
           }
@@ -2396,6 +2542,7 @@ export function LessonsPage(): JSXElement {
         />
         <GhostHunterModal
           open={ghostOpen()}
+          initialMode={gameLaunchMode()}
           multiplayerUnlocked={
             isCurrentUserAdmin() || !isLessonLocked("all-keys-1")
           }
@@ -2427,6 +2574,7 @@ export function LessonsPage(): JSXElement {
         />
         <TypeTossModal
           open={typeTossOpen()}
+          initialMode={gameLaunchMode()}
           multiplayerUnlocked={
             isCurrentUserAdmin() || !isLessonLocked("home-words")
           }
