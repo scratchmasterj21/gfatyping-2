@@ -2,7 +2,7 @@ import { XpLeaderboardEntry } from "@monkeytype/schemas/leaderboards";
 import { formatDuration, intervalToDuration } from "date-fns";
 import { JSXElement, Match, Show, Switch } from "solid-js";
 
-import type { TableEntry } from "./Table";
+import type { TableEntry } from "./table-entry";
 
 import { getFormatting } from "../../../states/core";
 import { cn } from "../../../utils/cn";

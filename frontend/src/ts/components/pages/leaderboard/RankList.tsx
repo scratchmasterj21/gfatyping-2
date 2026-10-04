@@ -1,6 +1,6 @@
 import { For, JSXElement } from "solid-js";
 
-import type { TableEntry } from "./Table";
+import type { TableEntry } from "./table-entry";
 
 import { cn } from "../../../utils/cn";
 import { RankRow, RankRowVariant } from "./RankRow";

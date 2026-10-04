@@ -4,7 +4,7 @@ import {
 } from "@monkeytype/schemas/leaderboards";
 import { JSXElement, Show } from "solid-js";
 
-import type { TableEntry } from "./Table";
+import type { TableEntry } from "./table-entry";
 
 import { RaceLeaderboardEntry } from "../../../classroom/classroom";
 import { hasConnection } from "../../../collections/connections";

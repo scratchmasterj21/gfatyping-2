@@ -7,6 +7,8 @@ import { format as dateFormat } from "date-fns/format";
 import { formatDistanceToNow } from "date-fns/formatDistanceToNow";
 import { Accessor, createMemo, JSXElement, Show } from "solid-js";
 
+import type { TableEntry } from "./table-entry";
+
 import { RaceLeaderboardEntry } from "../../../classroom/classroom";
 import { hasConnection } from "../../../collections/connections";
 import { createEffectOn } from "../../../hooks/effects";
@@ -22,9 +24,10 @@ import { User } from "../../common/User";
 import { DataTable, DataTableColumnDef } from "../../ui/table/DataTable";
 import { RankList } from "./RankList";
 
+export type { TableEntry } from "./table-entry";
+
 type SpeedEntry = LeaderboardEntry;
 type XpEntry = XpLeaderboardEntry;
-export type TableEntry = SpeedEntry | XpEntry | RaceLeaderboardEntry;
 
 export function Table(
   props: {
