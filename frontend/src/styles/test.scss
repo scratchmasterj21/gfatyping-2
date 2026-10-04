@@ -73,6 +73,12 @@
   }
 }
 
+.pageTest.typing-student-ui {
+  .outOfFocusWarning .text {
+    font-size: 1rem;
+  }
+}
+
 .pageTest {
   position: relative;
 
@@ -788,6 +794,53 @@
     #retrySavingResultButton {
       margin: 0 auto 1rem auto;
       display: flex;
+    }
+
+    &.lesson-result-student {
+      .stats.morestats .group.testType .tags,
+      .stats.morestats .group.info,
+      .stats.morestats .group.dailyLeaderboard,
+      .stats.morestats .group.source,
+      .loginTip {
+        display: none;
+      }
+
+      .lesson-result-actions {
+        grid-column: 1 / -1;
+      }
+
+      #lessonGateNotice {
+        font-size: 1.25rem;
+        font-weight: 600;
+        max-width: 36rem;
+        padding: 0.75rem 1rem;
+        border-radius: var(--roundness);
+        background: var(--sub-alt-color);
+      }
+
+      .buttons {
+        grid-auto-flow: row;
+        grid-template-columns: 1fr;
+        max-width: 22rem;
+        margin-inline: auto;
+        width: 100%;
+
+        @media (min-width: 640px) {
+          grid-auto-flow: column;
+          grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+          max-width: none;
+        }
+      }
+
+      .buttons .lessonPrimary {
+        order: -1;
+        font-size: 1.05rem;
+        min-height: 3.25rem;
+      }
+
+      #backToLessonsButton {
+        order: 2;
+      }
     }
 
     #lessonGateNotice {

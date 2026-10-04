@@ -15,8 +15,10 @@ import {
 } from "../../../controllers/sound-controller";
 import { useLocalStorage } from "../../../hooks/useLocalStorage";
 import { useSavedIndicator } from "../../../hooks/useSavedIndicator";
+import { resetToLessonRecommendedSettings } from "../../../lessons/lesson-launcher";
 import { isAuthenticated } from "../../../states/core";
 import { showModal } from "../../../states/modals";
+import { showSuccessNotification } from "../../../states/notifications";
 import { showSimpleModal } from "../../../states/simple-modal";
 import { cn } from "../../../utils/cn";
 import fileStorage from "../../../utils/file-storage";
@@ -26,6 +28,7 @@ import { Anime, AnimeShow } from "../../common/anime";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 import { Page } from "../../common/Page";
+import { StudentPageHeader } from "../../common/StudentPageHeader";
 import { CommandlineHotkey } from "../../hotkeys/CommandlineHotkey";
 import { InputField } from "../../ui/form/InputField";
 import { fromSchema } from "../../ui/form/utils";
@@ -62,9 +65,12 @@ export function SettingsPage(): JSXElement {
 
   return (
     <Page id="settings">
-      <div class="grid gap-8">
-        <QuickNav />
-        <Show when={getConfig.showKeyTips}>
+      <div class="student-ui grid gap-8">
+        <StudentPageHeader
+          title="Settings"
+          subtitle="Change how typing looks and sounds. Advanced options stay tucked away."
+        />
+        <Show when={isCurrentUserAdmin() && getConfig.showKeyTips}>
           <div class="text-center text-sub">
             tip: You can also change all these settings quickly using the
             command line
@@ -99,190 +105,209 @@ export function SettingsPage(): JSXElement {
           </section>
         </Show>
         <div>
-          <div class="mb-6">
-            <div class="text-2xl font-semibold text-text">Student settings</div>
-            <div class="text-sub">
-              Typing, sound, appearance, and learning preferences.
-            </div>
-          </div>
-          <Section title="behavior">
-            <Show when={isAuthenticated()}>
-              <Tags />
-              <Presets />
-              <AutoSetting key="resultSaving" />
-            </Show>
-            <AutoSetting key="difficulty" />
-            <AutoSetting key="quickRestart" />
-            <AutoSetting key="repeatQuotes" />
-            <AutoSetting key="blindMode" />
-            <AutoSetting key="alwaysShowWordsHistory" />
-            <AutoSetting key="singleListCommandLine" />
-            <MinSpeed />
-            <MinAcc />
-            <MinBurst />
-            <AutoSetting key="britishEnglish" />
-            <Language />
-            <Funbox />
-            <CustomLayoutfluid />
-            <CustomPolyglot />
-          </Section>
-          <Section title="input">
-            <AutoSetting key="freedomMode" />
-            <AutoSetting key="strictSpace" />
-            <AutoSetting key="oppositeShiftMode" />
-            <AutoSetting key="stopOnError" />
-            <AutoSetting key="confidenceMode" />
-            <AutoSetting key="quickEnd" />
-            <AutoSetting key="indicateTypos" />
-            <AutoSetting key="hideExtraLetters" />
-            <AutoSetting key="compositionDisplay" />
-            <AutoSetting key="lazyMode" />
-            <Layout />
-            <AutoSetting key="codeUnindentOnBackspace" />
-          </Section>
-          <Section title="sound">
+          <Section title="For you">
+            <Theme />
             <SoundVolume />
-            <AutoSetting
-              key="playSoundOnClick"
-              wide
-              onOptionClick={(option) => {
-                if (option === "off") return;
-                void previewClick(option);
-              }}
-            />
-            <AutoSetting
-              key="playSoundOnError"
-              wide
-              onOptionClick={(option) => {
-                if (option === "off") return;
-                void previewError(option);
-              }}
-            />
-            <AutoSetting
-              key="playTimeWarning"
-              wide
-              onOptionClick={(option) => {
-                if (option === "off") return;
-                void playTimeWarning();
-              }}
-            />
-          </Section>
-          <Section title="caret">
-            <AutoSetting key="smoothCaret" />
-            <AutoSetting key="caretStyle" wide />
-            <PaceCaret />
-            <AutoSetting key="repeatedPace" />
-            <AutoSetting key="paceCaretStyle" wide />
-          </Section>
-          <Section title="appearance">
-            <AutoSetting key="timerStyle" wide />
-            <AutoSetting key="liveSpeedStyle" />
-            <AutoSetting key="liveAccStyle" />
-            <AutoSetting key="liveBurstStyle" />
-            <AutoSetting key="timerColor" />
-            <AutoSetting key="timerOpacity" />
-            <AutoSetting key="highlightMode" wide />
-            <AutoSetting key="typedEffect" />
-            <AutoSetting key="tapeMode" />
-            <AutoSetting key="tapeMargin" />
-            <AutoSetting key="smoothLineScroll" />
-            <AutoSetting key="showAllLines" />
-            <AutoSetting key="alwaysShowDecimalPlaces" />
-            <AutoSetting key="typingSpeedUnit" />
-            <AutoSetting key="startGraphsAtZero" />
-            <MaxLineWidth />
-            <AutoSetting key="fontSize" />
-            <FontFamily />
-            <AutoSetting key="keymapMode" />
-            <Show when={getConfig.keymapMode !== "off"}>
-              <KeymapLayout />
-              <AutoSetting key="keymapStyle" wide />
-              <AutoSetting key="keymapLegendStyle" wide />
-              <AutoSetting key="keymapShowTopRow" wide />
-              <KeymapSize />
-              <AutoSetting key="keymapShowFingers" />
-              <AutoSetting key="showGuidedHands" />
-            </Show>
-          </Section>
-          <Section title="learning">
+            <Language />
+            <AutoSetting key="showGuidedHands" />
+            <AutoSetting key="keymapShowFingers" />
             <AutoSetting key="lessonIntros" />
             <AutoSetting key="lessonIntroSpeech" />
-          </Section>
-          <Section title="theme">
-            <AutoSetting key="flipTestColors" />
-            <AutoSetting key="colorfulMode" />
-            <CustomBackground />
-            <Show when={getConfig.customBackground !== "" || hasLocalBg()}>
-              <CustomBackgroundFilters />
-            </Show>
-            <AutoSwitchTheme />
-            <AutoSetting key="randomTheme" wide />
-            <Theme />
-          </Section>
-          <Section title="hide elements">
-            <AutoSetting key="showKeyTips" />
-            <AutoSetting key="showOutOfFocusWarning" />
-            <AutoSetting key="capsLockWarning" />
-            <AutoSetting key="showAverage" />
-          </Section>
-          <Section title="danger zone">
-            <ImportExport />
             <Setting
-              key="cookies"
-              title="update cookie preferences"
-              description="If you changed your mind about which cookies you consent to, you can change your preferences here."
-              fa={{
-                icon: "fa-cookie-bite",
-              }}
+              key="lessonRecommended"
+              title="Reset to recommended for lessons"
+              description="Turns off options that can make lesson typing feel broken (strict space, stop on error, funbox)."
+              fa={{ icon: "fa-graduation-cap" }}
               inputs={
                 <Button
                   class="w-full"
+                  text="Apply recommended settings"
                   onClick={() => {
-                    showModal("Cookies");
-                  }}
-                >
-                  open
-                </Button>
-              }
-            />
-            <AnimationFpsLimit />
-            <Setting
-              key="resetSettings"
-              title="reset settings"
-              description={
-                <div>
-                  Resets settings to the default (but doesn&apos;t touch your
-                  tags and presets).
-                  <br />
-                  <div class="text-error">You can&apos;t undo this!</div>
-                </div>
-              }
-              fa={{
-                icon: "fa-undo",
-              }}
-              inputs={
-                <Button
-                  class="w-full"
-                  danger
-                  onClick={() => {
-                    showSimpleModal({
-                      title: "Are you sure?",
-                      buttonText: "reset",
-                      execFn: async () => {
-                        await resetConfig();
-                        await fileStorage.deleteFile("LocalBackgroundFile");
-                        return {
-                          status: "success",
-                          message: "Settings reset",
-                        };
-                      },
+                    void resetToLessonRecommendedSettings().then(() => {
+                      showSuccessNotification(
+                        "Lesson-friendly settings applied",
+                      );
                     });
                   }}
-                >
-                  reset settings
-                </Button>
+                />
               }
             />
+          </Section>
+          <Section title="Advanced typing" defaultOpen={false}>
+            <QuickNav />
+            <Section title="behavior">
+              <Show when={isAuthenticated()}>
+                <Tags />
+                <Presets />
+                <AutoSetting key="resultSaving" />
+              </Show>
+              <AutoSetting key="difficulty" />
+              <AutoSetting key="quickRestart" />
+              <AutoSetting key="repeatQuotes" />
+              <AutoSetting key="blindMode" />
+              <AutoSetting key="alwaysShowWordsHistory" />
+              <AutoSetting key="singleListCommandLine" />
+              <MinSpeed />
+              <MinAcc />
+              <MinBurst />
+              <AutoSetting key="britishEnglish" />
+              <Language />
+              <Funbox />
+              <CustomLayoutfluid />
+              <CustomPolyglot />
+            </Section>
+            <Section title="input">
+              <AutoSetting key="freedomMode" />
+              <AutoSetting key="strictSpace" />
+              <AutoSetting key="oppositeShiftMode" />
+              <AutoSetting key="stopOnError" />
+              <AutoSetting key="confidenceMode" />
+              <AutoSetting key="quickEnd" />
+              <AutoSetting key="indicateTypos" />
+              <AutoSetting key="hideExtraLetters" />
+              <AutoSetting key="compositionDisplay" />
+              <AutoSetting key="lazyMode" />
+              <Layout />
+              <AutoSetting key="codeUnindentOnBackspace" />
+            </Section>
+            <Section title="sound">
+              <AutoSetting
+                key="playSoundOnClick"
+                wide
+                onOptionClick={(option) => {
+                  if (option === "off") return;
+                  void previewClick(option);
+                }}
+              />
+              <AutoSetting
+                key="playSoundOnError"
+                wide
+                onOptionClick={(option) => {
+                  if (option === "off") return;
+                  void previewError(option);
+                }}
+              />
+              <AutoSetting
+                key="playTimeWarning"
+                wide
+                onOptionClick={(option) => {
+                  if (option === "off") return;
+                  void playTimeWarning();
+                }}
+              />
+            </Section>
+            <Section title="caret">
+              <AutoSetting key="smoothCaret" />
+              <AutoSetting key="caretStyle" wide />
+              <PaceCaret />
+              <AutoSetting key="repeatedPace" />
+              <AutoSetting key="paceCaretStyle" wide />
+            </Section>
+            <Section title="appearance">
+              <AutoSetting key="timerStyle" wide />
+              <AutoSetting key="liveSpeedStyle" />
+              <AutoSetting key="liveAccStyle" />
+              <AutoSetting key="liveBurstStyle" />
+              <AutoSetting key="timerColor" />
+              <AutoSetting key="timerOpacity" />
+              <AutoSetting key="highlightMode" wide />
+              <AutoSetting key="typedEffect" />
+              <AutoSetting key="tapeMode" />
+              <AutoSetting key="tapeMargin" />
+              <AutoSetting key="smoothLineScroll" />
+              <AutoSetting key="showAllLines" />
+              <AutoSetting key="alwaysShowDecimalPlaces" />
+              <AutoSetting key="typingSpeedUnit" />
+              <AutoSetting key="startGraphsAtZero" />
+              <MaxLineWidth />
+              <AutoSetting key="fontSize" />
+              <FontFamily />
+              <AutoSetting key="keymapMode" />
+              <Show when={getConfig.keymapMode !== "off"}>
+                <KeymapLayout />
+                <AutoSetting key="keymapStyle" wide />
+                <AutoSetting key="keymapLegendStyle" wide />
+                <AutoSetting key="keymapShowTopRow" wide />
+                <KeymapSize />
+                <AutoSetting key="keymapShowFingers" />
+                <AutoSetting key="showGuidedHands" />
+              </Show>
+            </Section>
+            <Section title="theme">
+              <AutoSetting key="flipTestColors" />
+              <AutoSetting key="colorfulMode" />
+              <CustomBackground />
+              <Show when={getConfig.customBackground !== "" || hasLocalBg()}>
+                <CustomBackgroundFilters />
+              </Show>
+              <AutoSwitchTheme />
+              <AutoSetting key="randomTheme" wide />
+            </Section>
+            <Section title="hide elements">
+              <AutoSetting key="showKeyTips" />
+              <AutoSetting key="showOutOfFocusWarning" />
+              <AutoSetting key="capsLockWarning" />
+              <AutoSetting key="showAverage" />
+            </Section>
+            <Section title="danger zone">
+              <ImportExport />
+              <Setting
+                key="cookies"
+                title="update cookie preferences"
+                description="If you changed your mind about which cookies you consent to, you can change your preferences here."
+                fa={{
+                  icon: "fa-cookie-bite",
+                }}
+                inputs={
+                  <Button
+                    class="w-full"
+                    onClick={() => {
+                      showModal("Cookies");
+                    }}
+                  >
+                    open
+                  </Button>
+                }
+              />
+              <AnimationFpsLimit />
+              <Setting
+                key="resetSettings"
+                title="reset settings"
+                description={
+                  <div>
+                    Resets settings to the default (but doesn&apos;t touch your
+                    tags and presets).
+                    <br />
+                    <div class="text-error">You can&apos;t undo this!</div>
+                  </div>
+                }
+                fa={{
+                  icon: "fa-undo",
+                }}
+                inputs={
+                  <Button
+                    class="w-full"
+                    danger
+                    onClick={() => {
+                      showSimpleModal({
+                        title: "Are you sure?",
+                        buttonText: "reset",
+                        execFn: async () => {
+                          await resetConfig();
+                          await fileStorage.deleteFile("LocalBackgroundFile");
+                          return {
+                            status: "success",
+                            message: "Settings reset",
+                          };
+                        },
+                      });
+                    }}
+                  >
+                    reset settings
+                  </Button>
+                }
+              />
+            </Section>
           </Section>
         </div>
 
@@ -321,8 +346,12 @@ function AccountSettingsNotice(): JSXElement {
   );
 }
 
-function Section(props: { title: string; children: JSXElement }): JSXElement {
-  const [isOpen, setIsOpen] = createSignal(true);
+function Section(props: {
+  title: string;
+  children: JSXElement;
+  defaultOpen?: boolean;
+}): JSXElement {
+  const [isOpen, setIsOpen] = createSignal(props.defaultOpen ?? true);
 
   return (
     <div id={`group_${wordsToCamelCase(props.title)}`}>

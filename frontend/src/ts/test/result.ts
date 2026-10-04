@@ -864,8 +864,10 @@ async function updateLessonGate(
     !LessonProgress.isCurriculumLesson(lessonId)
   ) {
     el?.hide();
+    qs("#result")?.removeClass("lesson-result-student");
     return;
   }
+  qs("#result")?.addClass("lesson-result-student");
   nextButton?.addClass("lessonAction");
   retryButton?.addClass("lessonAction");
   backButton?.show();

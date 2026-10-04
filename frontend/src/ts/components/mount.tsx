@@ -32,6 +32,7 @@ import { SettingsPage } from "./pages/settings/SettingsPage";
 import { AnimatedHands } from "./pages/test/AnimatedHands";
 import { FingerLegend } from "./pages/test/FingerLegend";
 import { TestModesNotice } from "./pages/test/modes-notice/TestModesNotice";
+import { ResultsLessonActions } from "./pages/test/ResultsLessonActions";
 import { SideImagePanels } from "./pages/test/SideImagePanels";
 import { TestConfig } from "./pages/test/TestConfig";
 import { Popups } from "./popups/Popups";
@@ -62,6 +63,7 @@ const components: Record<string, () => JSXElement> = {
   header: () => <Header />,
   devtools: () => <DevTools />,
   testconfig: () => <TestConfig />,
+  resultslessonactions: () => <ResultsLessonActions />,
   commandlinehotkey: () => <CommandlineHotkey />,
   testmodesnotice: () => <TestModesNotice />,
   fingerlegend: () => <FingerLegend />,

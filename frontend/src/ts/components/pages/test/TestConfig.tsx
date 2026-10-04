@@ -1,4 +1,4 @@
-import { ComponentProps, For, JSXElement, Show } from "solid-js";
+import { ComponentProps, For, JSXElement, onCleanup, Show } from "solid-js";
 
 import { configMetadata } from "../../../config/metadata";
 import { setConfig, setQuoteLengthAll } from "../../../config/setters";
@@ -35,6 +35,18 @@ const cardClass =
 const durationMs = 250;
 
 export function TestConfig(): JSXElement {
+  createEffectOn(
+    () => getActiveLesson() !== null,
+    (active) => {
+      document
+        .querySelector(".pageTest")
+        ?.toggleAttribute("data-lesson-active", active);
+    },
+  );
+  onCleanup(() => {
+    document.querySelector(".pageTest")?.removeAttribute("data-lesson-active");
+  });
+
   return (
     <>
       <LessonTestNav />
@@ -131,6 +143,12 @@ function PuncAndNum(): JSXElement {
 
 function Mode(): JSXElement {
   const modeOptions = ["time", "words", "quote", "zen", "custom"] as const;
+  const visibleModes = (): (typeof modeOptions)[number][] =>
+    getActiveLesson() !== null
+      ? (["time", "words"] as const)
+      : getCustomTextIndicator() !== undefined
+        ? (["time", "words", "custom"] as const)
+        : [...modeOptions];
 
   return (
     <div class={cn("z-2", cardClass)}>
@@ -156,7 +174,7 @@ function Mode(): JSXElement {
           onClick={() => void nextTest()}
         />
       </Show>
-      <For each={modeOptions}>
+      <For each={visibleModes()}>
         {(modeOption) => (
           <TCButton
             fa={

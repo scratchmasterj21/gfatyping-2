@@ -1,9 +1,13 @@
-import { createMemo } from "solid-js";
+import { createMemo, Show } from "solid-js";
 
 import { useActiveTagsLiveQuery } from "../../../../collections/tags";
 import * as Commandline from "../../../../commandline/commandline";
 import { getConfig } from "../../../../config/store";
 import { exitGame, isGameActive } from "../../../../games/game-launcher";
+import {
+  getActiveLesson,
+  isCurriculumLesson,
+} from "../../../../lessons/lesson-progress";
 import {
   getCustomTextIndicator,
   getFormatting,
@@ -31,6 +35,11 @@ import { Notice } from "./Notice";
 import { PbNotice } from "./PbNotice";
 
 export function TestModesNotice() {
+  const curriculumLesson = () => {
+    const id = getActiveLesson();
+    return id !== null && isCurriculumLesson(id);
+  };
+
   return (
     <div
       class={cn(
@@ -52,17 +61,19 @@ export function TestModesNotice() {
       <LazyMode />
       <PaceCaretNotice />
       <AverageNotice />
-      <PbNotice />
-      <MinSpeed />
-      <MinAcc />
-      <MinBurst />
+      <Show when={!curriculumLesson()}>
+        <PbNotice />
+        <MinSpeed />
+        <MinAcc />
+        <MinBurst />
+        <Tags />
+      </Show>
       <Funbox />
       <GameExit />
       <ConfidenceMode />
       <StopOnError />
       <Layout />
       <OppositeShift />
-      <Tags />
     </div>
   );
 }

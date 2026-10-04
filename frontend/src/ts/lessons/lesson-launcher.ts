@@ -31,6 +31,15 @@ export function leaveLessonDrillThen(run: () => void): void {
   void exitLessonDrillForFreeTyping().then(run);
 }
 
+/** Restore lesson-safe typing options (matches startCustomDrill overrides). */
+export async function resetToLessonRecommendedSettings(): Promise<void> {
+  await loadFromLocalStorage();
+  setConfig("stopOnError", "off", { nosave: true });
+  setConfig("difficulty", "normal", { nosave: true });
+  setConfig("strictSpace", false, { nosave: true });
+  setConfig("funbox", [], { nosave: true });
+}
+
 /**
  * Configure a custom test from already-resolved tokens and start it on the test
  * page, recording completion against `id`. Shared by lessons, assignments and

@@ -8,17 +8,24 @@ import { For, JSXElement, Show } from "solid-js";
 
 import { setConfig, setQuoteLengthAll } from "../../config/setters";
 import { getConfig } from "../../config/store";
+import { navigationEvent } from "../../events/navigation";
 import { restartTestEvent } from "../../events/test";
 import { leaveLessonDrillThen } from "../../lessons/lesson-launcher";
-import { getActiveLesson } from "../../lessons/lesson-progress";
+import {
+  getActiveLesson,
+  isCurriculumLesson,
+} from "../../lessons/lesson-progress";
 import { getCustomTextIndicator, isAuthenticated } from "../../states/core";
 import { showModal } from "../../states/modals";
+import { getFocus, getResultVisible } from "../../states/test";
+import { nextTest } from "../../test/test-logic";
 import { areUnsortedArraysEqual } from "../../utils/arrays";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Button } from "../common/Button";
 import { Separator } from "../common/Separator";
 
-const modes: Mode[] = ["time", "words", "quote", "zen", "custom"];
+const allModes: Mode[] = ["time", "words", "quote", "zen", "custom"];
+const lessonFreeModes: Mode[] = ["time", "words"];
 const times = [15, 30, 60, 120];
 const wordCounts = [10, 25, 50, 100];
 
@@ -59,6 +66,12 @@ const isPunctuationDisabled = () =>
   getActiveLesson() !== null;
 
 export function MobileTestConfigModal(): JSXElement {
+  const inLesson = () => getActiveLesson() !== null;
+  const inDrill = () =>
+    getActiveLesson() !== null || getCustomTextIndicator() !== undefined;
+  const idle = () => !getFocus() && !getResultVisible();
+  const modes = () => (inLesson() ? lessonFreeModes : allModes);
+
   const handleModeClick = (mode: Mode) => {
     if (mode === getConfig.mode && getActiveLesson() === null) return;
     leaveLessonDrillThen(() => {
@@ -123,41 +136,74 @@ export function MobileTestConfigModal(): JSXElement {
 
   return (
     <AnimatedModal id="MobileTestConfig" modalClass="grid gap-4">
-      <div class="grid gap-2">
-        <MCButton
-          text="punctuation"
-          active={getConfig.punctuation && !isPunctuationDisabled()}
-          disabled={isPunctuationDisabled()}
-          onClick={() => {
-            setConfig("punctuation", !getConfig.punctuation);
-            restartTestEvent.dispatch();
-          }}
-        />
-        <MCButton
-          text="numbers"
-          active={getConfig.numbers && !isPunctuationDisabled()}
-          disabled={isPunctuationDisabled()}
-          onClick={() => {
-            setConfig("numbers", !getConfig.numbers);
-            restartTestEvent.dispatch();
-          }}
-        />
-      </div>
-
-      <Separator />
-
-      <div class="grid gap-2">
-        <Show when={getActiveLesson() !== null}>
-          <MCButton
-            text={getCustomTextIndicator()?.name ?? "lesson"}
-            active={true}
+      <Show when={inDrill()}>
+        <div class="grid gap-2">
+          <Button
+            variant="text"
+            href="/"
+            router-link
+            class="min-h-11 justify-start bg-sub-alt px-3"
+            fa={{ icon: "fa-graduation-cap", fixedWidth: true }}
+            text="Back to lessons"
             onClick={() => {
-              // Informational only - a lesson isn't a mode you can switch
-              // into ad hoc, so this row doesn't do anything when clicked.
+              navigationEvent.dispatch({ url: "/", options: {} });
             }}
           />
-        </Show>
-        <For each={modes}>
+          <Show
+            when={
+              getActiveLesson() !== null &&
+              isCurriculumLesson(getActiveLesson() as string)
+            }
+          >
+            <Button
+              variant="button"
+              class="min-h-11 justify-start"
+              fa={{ icon: "fa-arrow-right", fixedWidth: true }}
+              text="Next lesson"
+              disabled={!idle()}
+              onClick={() => void nextTest()}
+            />
+          </Show>
+          <Show when={getActiveLesson() !== null}>
+            <MCButton
+              text={getCustomTextIndicator()?.name ?? "lesson"}
+              active={true}
+              onClick={() => {
+                navigationEvent.dispatch({ url: "/", options: {} });
+              }}
+            />
+          </Show>
+        </div>
+        <Separator />
+      </Show>
+
+      <Show when={!inLesson()}>
+        <div class="grid gap-2">
+          <MCButton
+            text="punctuation"
+            active={getConfig.punctuation && !isPunctuationDisabled()}
+            disabled={isPunctuationDisabled()}
+            onClick={() => {
+              setConfig("punctuation", !getConfig.punctuation);
+              restartTestEvent.dispatch();
+            }}
+          />
+          <MCButton
+            text="numbers"
+            active={getConfig.numbers && !isPunctuationDisabled()}
+            disabled={isPunctuationDisabled()}
+            onClick={() => {
+              setConfig("numbers", !getConfig.numbers);
+              restartTestEvent.dispatch();
+            }}
+          />
+        </div>
+
+        <Separator />
+      </Show>
+
+      <div class="grid gap-2">
+        <For each={modes()}>
           {(mode) => (
             <MCButton
               text={mode}
