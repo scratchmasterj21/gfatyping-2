@@ -37,6 +37,7 @@ import { mountComponents } from "./components/mount";
 import "./ready";
 import { setVersion } from "./states/core";
 import { loadFromLocalStorage } from "./config/lifecycle";
+import { initClassPresenceClient } from "./classroom/class-presence-client";
 
 import "./input/hotkeys";
 import { showModal } from "./states/modals";
@@ -99,4 +100,5 @@ addToGlobal({
   },
 });
 
+initClassPresenceClient();
 mountComponents();

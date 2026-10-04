@@ -134,6 +134,19 @@ service cloud.firestore {
       allow write: if isAdminUser();
     }
 
+    function studentClassId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId;
+    }
+
+    // --- in-class practice presence (teacher live monitor) ---
+    match /classPresence/{classId}/members/{uid} {
+      allow read: if isAdminUser();
+      allow create, update: if isOwner(uid)
+        && studentClassId() == classId
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isOwner(uid) || isAdminUser();
+    }
+
     // --- live class races ---
     // The teacher (admin) owns the race control doc; each student writes their
     // own participant doc with live progress. Admin may also write/delete any

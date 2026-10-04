@@ -54,6 +54,7 @@ import { RaceHistory } from "../../../race/race-types";
 import { getUserId } from "../../../states/core";
 import {
   showErrorNotification,
+  showNoticeNotification,
   showSuccessNotification,
 } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
@@ -62,6 +63,7 @@ import { Button } from "../../common/Button";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
+import { LiveMonitorTab } from "./LiveMonitorTab";
 import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
 
@@ -72,6 +74,7 @@ const selectClass =
 
 const TabSchema = z.enum([
   "students",
+  "live",
   "progress",
   "assignments",
   "wordlists",
@@ -83,6 +86,7 @@ const TabSchema = z.enum([
 type Tab = z.infer<typeof TabSchema>;
 
 const CLASS_TABS = new Set<Tab>([
+  "live",
   "progress",
   "assignments",
   "races",
@@ -178,6 +182,61 @@ function ProgressTab(props: {
   const isGoneQuiet = (row: StudentProgressRow): boolean =>
     Date.now() - row.lastActive > GONE_QUIET_MS;
 
+  const startOfToday = (): number => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  };
+  const isActiveToday = (row: StudentProgressRow): boolean =>
+    row.lastActive >= startOfToday();
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const noPracticeThisWeek = (row: StudentProgressRow): boolean =>
+    Date.now() - row.lastActive > WEEK_MS;
+
+  type ProgressFilter = "all" | "quiet" | "incomplete" | "noWeek";
+  const [progressFilter, setProgressFilter] =
+    createSignal<ProgressFilter>("all");
+  const [selectedForCert, setSelectedForCert] = createSignal<Set<string>>(
+    new Set(),
+  );
+
+  const toggleCertSelect = (uid: string): void => {
+    setSelectedForCert((prev) => {
+      const next = new Set(prev);
+      if (next.has(uid)) next.delete(uid);
+      else next.add(uid);
+      return next;
+    });
+  };
+
+  const filteredRows = createMemo(() => {
+    let list = props.rows.slice();
+    list.sort((a, b) => b.lastActive - a.lastActive);
+    const f = progressFilter();
+    if (f === "quiet") {
+      list = list.filter(isGoneQuiet);
+    } else if (f === "incomplete") {
+      list = list.filter((r) => assignmentsDone(r) < assignmentTotal(r));
+    } else if (f === "noWeek") {
+      list = list.filter(noPracticeThisWeek);
+    }
+    return list;
+  });
+
+  const summary = createMemo(() => {
+    const rows = props.rows;
+    const pastDueAssignments = props.assignments.filter(
+      (a) => a.dueAt !== undefined && a.dueAt < Date.now(),
+    ).length;
+    return {
+      activeToday: rows.filter(isActiveToday).length,
+      quiet: rows.filter(isGoneQuiet).length,
+      incomplete: rows.filter((r) => assignmentsDone(r) < assignmentTotal(r))
+        .length,
+      pastDueAssignments,
+    };
+  });
+
   const [openUid, setOpenUid] = createSignal<string | null>(null);
   const toggleOpen = (uid: string): void => {
     setOpenUid((cur) => (cur === uid ? null : uid));
@@ -207,6 +266,15 @@ function ProgressTab(props: {
   const [rangeEnd, setRangeEnd] = createSignal(formatDateInput(new Date()));
   const [downloadingAll, setDownloadingAll] = createSignal(false);
   const [downloadingUid, setDownloadingUid] = createSignal<string | null>(null);
+  const [previewingAll, setPreviewingAll] = createSignal(false);
+  const [previewingUid, setPreviewingUid] = createSignal<string | null>(null);
+
+  const applyRangePreset = (days: number): void => {
+    const end = new Date();
+    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    setRangeStart(formatDateInput(start));
+    setRangeEnd(formatDateInput(end));
+  };
 
   const [coinAmount, setCoinAmount] = createSignal(10);
   const [rewardingUid, setRewardingUid] = createSignal<string | null>(null);
@@ -231,31 +299,69 @@ function ProgressTab(props: {
     end: new Date(rangeEnd()).getTime() + 24 * 60 * 60 * 1000 - 1,
   });
 
+  const buildStudentPdfDoc = async (
+    row: StudentProgressRow,
+  ): Promise<import("jspdf").jsPDF> => {
+    const range = dateRange();
+    const [activity, lessonDetails, { buildStudentReportPdf }] =
+      await Promise.all([
+        getStudentActivity(row.uid, range.start, range.end),
+        getStudentLessonDetails(row.uid),
+        import("../../../classroom/progress-pdf"),
+      ]);
+    return buildStudentReportPdf({
+      classId: props.classId,
+      row,
+      activity,
+      lessonDetails,
+      assignments: props.assignments,
+      range,
+    });
+  };
+
   const downloadStudentPdf = async (row: StudentProgressRow): Promise<void> => {
     if (downloadingUid() !== null) return;
     setDownloadingUid(row.uid);
     try {
-      const range = dateRange();
-      const [activity, lessonDetails, { buildStudentReportPdf }] =
-        await Promise.all([
-          getStudentActivity(row.uid, range.start, range.end),
-          getStudentLessonDetails(row.uid),
-          import("../../../classroom/progress-pdf"),
-        ]);
-      const doc = buildStudentReportPdf({
-        classId: props.classId,
-        row,
-        activity,
-        lessonDetails,
-        assignments: props.assignments,
-        range,
-      });
+      const doc = await buildStudentPdfDoc(row);
       doc.save(`progress-${props.classId}-${row.name}.pdf`);
     } catch (e) {
       showErrorNotification("Failed to build PDF report");
       console.error(e);
     } finally {
       setDownloadingUid(null);
+    }
+  };
+
+  const previewStudentPdf = async (row: StudentProgressRow): Promise<void> => {
+    if (previewingUid() !== null) return;
+    setPreviewingUid(row.uid);
+    try {
+      const doc = await buildStudentPdfDoc(row);
+      window.open(doc.output("bloburl"), "_blank");
+    } catch (e) {
+      showErrorNotification("Failed to preview PDF report");
+      console.error(e);
+    } finally {
+      setPreviewingUid(null);
+    }
+  };
+
+  const openCertificatesForSelected = (): void => {
+    const uids = [...selectedForCert()];
+    if (uids.length === 0) {
+      showNoticeNotification("Select students using the checkboxes first");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Open ${uids.length} certificate tab(s)? Your browser may block pop-ups — allow them if needed. Print each with Save as PDF.`,
+      )
+    ) {
+      return;
+    }
+    for (const uid of uids) {
+      window.open(`/certificate?uid=${encodeURIComponent(uid)}`, "_blank");
     }
   };
 
@@ -292,11 +398,92 @@ function ProgressTab(props: {
     }
   };
 
+  const previewAllPdf = async (): Promise<void> => {
+    if (previewingAll() || props.rows.length === 0) return;
+    setPreviewingAll(true);
+    try {
+      const range = dateRange();
+      const uids = props.rows.map((r) => r.uid);
+      const [activity, lessonDetailsEntries, { buildClassReportPdf }] =
+        await Promise.all([
+          getClassActivity(uids, range.start, range.end),
+          Promise.all(
+            uids.map(
+              async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
+            ),
+          ),
+          import("../../../classroom/progress-pdf"),
+        ]);
+      const doc = buildClassReportPdf({
+        classId: props.classId,
+        rows: props.rows,
+        activityByUid: activity,
+        lessonDetailsByUid: Object.fromEntries(lessonDetailsEntries),
+        assignments: props.assignments,
+        range,
+      });
+      window.open(doc.output("bloburl"), "_blank");
+    } catch (e) {
+      showErrorNotification("Failed to preview PDF reports");
+      console.error(e);
+    } finally {
+      setPreviewingAll(false);
+    }
+  };
+
   return (
     <Show
       when={!props.loading}
       fallback={<div class="text-sub">loading progress...</div>}
     >
+      <div class="mb-3 flex flex-wrap gap-2 text-sm text-sub">
+        <span>
+          <strong class="text-text">{summary().activeToday}</strong> active
+          today
+        </span>
+        <span>·</span>
+        <span>
+          <strong class="text-error">{summary().quiet}</strong> gone quiet (2d+)
+        </span>
+        <span>·</span>
+        <span>
+          <strong class="text-text">{summary().incomplete}</strong> incomplete
+          assignments
+        </span>
+        <Show when={summary().pastDueAssignments > 0}>
+          <span>·</span>
+          <span>
+            <strong class="text-text">{summary().pastDueAssignments}</strong>{" "}
+            assignments past due (class-wide)
+          </span>
+        </Show>
+      </div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <Button
+          variant="text"
+          text="All"
+          active={progressFilter() === "all"}
+          onClick={() => setProgressFilter("all")}
+        />
+        <Button
+          variant="text"
+          text="Gone quiet"
+          active={progressFilter() === "quiet"}
+          onClick={() => setProgressFilter("quiet")}
+        />
+        <Button
+          variant="text"
+          text="Incomplete assignments"
+          active={progressFilter() === "incomplete"}
+          onClick={() => setProgressFilter("incomplete")}
+        />
+        <Button
+          variant="text"
+          text="No practice (7d)"
+          active={progressFilter() === "noWeek"}
+          onClick={() => setProgressFilter("noWeek")}
+        />
+      </div>
       <div class="mb-3 flex flex-wrap items-center justify-end gap-3">
         <div class="flex items-center gap-1.5 text-sm text-sub">
           <Fa icon="fa-coins" />
@@ -328,12 +515,41 @@ function ProgressTab(props: {
             min={rangeStart()}
             onChange={(e) => setRangeEnd(e.currentTarget.value)}
           />
+          <Button
+            variant="text"
+            text="7d"
+            onClick={() => applyRangePreset(7)}
+          />
+          <Button
+            variant="text"
+            text="30d"
+            onClick={() => applyRangePreset(30)}
+          />
+          <Button
+            variant="text"
+            text="90d"
+            onClick={() => applyRangePreset(90)}
+          />
         </div>
+        <Button
+          text={previewingAll() ? "opening…" : "preview all (pdf)"}
+          fa={{ icon: "fa-eye" }}
+          onClick={() => void previewAllPdf()}
+          disabled={
+            props.rows.length === 0 || previewingAll() || downloadingAll()
+          }
+        />
         <Button
           text={downloadingAll() ? "building…" : "download all (pdf)"}
           fa={{ icon: "fa-file-pdf" }}
           onClick={() => void downloadAllPdf()}
           disabled={props.rows.length === 0 || downloadingAll()}
+        />
+        <Button
+          text="print certificates"
+          fa={{ icon: "fa-certificate" }}
+          onClick={openCertificatesForSelected}
+          disabled={selectedForCert().size === 0}
         />
         <Button
           text="export csv"
@@ -342,10 +558,15 @@ function ProgressTab(props: {
           disabled={props.rows.length === 0}
         />
       </div>
+      <p class="mb-2 text-xs text-sub">
+        PDF date range affects practice stats only; use preview then Print →
+        Save as PDF for conferences.
+      </p>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead class="text-sub">
             <tr>
+              <th class="w-8 p-2" aria-label="Select for certificates"></th>
               <th class="p-2">name</th>
               <th class="p-2 text-right">best wpm</th>
               <th class="p-2 text-right">acc</th>
@@ -360,15 +581,23 @@ function ProgressTab(props: {
             </tr>
           </thead>
           <tbody>
-            <For each={props.rows}>
+            <For each={filteredRows()}>
               {(row) => (
                 <>
                   <tr
                     class="cursor-pointer border-t border-sub-alt hover:bg-sub-alt"
                     onClick={() => toggleOpen(row.uid)}
                   >
-                    <td class="p-2 text-text">
-                      <span class="flex items-center gap-2">
+                    <td class="p-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedForCert().has(row.uid)}
+                        aria-label={`Select ${row.name} for certificates`}
+                        onChange={() => toggleCertSelect(row.uid)}
+                      />
+                    </td>
+                    <td class="max-w-[12rem] p-2 text-text">
+                      <span class="flex min-w-0 items-center gap-2">
                         <Fa
                           icon={
                             openUid() === row.uid
@@ -376,8 +605,11 @@ function ProgressTab(props: {
                               : "fa-chevron-right"
                           }
                           size={0.75}
+                          class="shrink-0"
                         />
-                        {row.name}
+                        <span class="truncate" title={row.name}>
+                          {row.name}
+                        </span>
                       </span>
                     </td>
                     <td class="p-2 text-right">{Math.round(row.bestWpm)}</td>
@@ -423,6 +655,21 @@ function ProgressTab(props: {
                       />
                       <Button
                         variant="text"
+                        fa={{ icon: "fa-eye" }}
+                        balloon={{
+                          text: "preview progress report (pdf)",
+                          position: "left",
+                        }}
+                        disabled={
+                          previewingUid() !== null || downloadingUid() !== null
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void previewStudentPdf(row);
+                        }}
+                      />
+                      <Button
+                        variant="text"
                         fa={{ icon: "fa-file-pdf" }}
                         balloon={{
                           text: "download progress report (pdf)",
@@ -449,7 +696,7 @@ function ProgressTab(props: {
                   </tr>
                   <Show when={openUid() === row.uid}>
                     <tr>
-                      <td colSpan="11" class="bg-bg p-3">
+                      <td colSpan="12" class="bg-bg p-3">
                         <StudentDrilldown
                           uid={row.uid}
                           name={row.name}
@@ -1858,6 +2105,7 @@ export function ClassroomDashboard(): JSXElement {
               "Students",
               <>
                 {tabButton("students", "Students", { icon: "fa-users" })}
+                {tabButton("live", "Live", { icon: "fa-signal" })}
                 {tabButton("progress", "Student progress", {
                   icon: "fa-chart-line",
                 })}
@@ -1891,6 +2139,9 @@ export function ClassroomDashboard(): JSXElement {
 
           <Show when={tab() === "students"}>
             <StudentsTab />
+          </Show>
+          <Show when={tab() === "live"}>
+            <LiveMonitorTab classId={selectedClass()} rows={rows()} />
           </Show>
           <Show when={tab() === "progress"}>
             <ProgressTab
