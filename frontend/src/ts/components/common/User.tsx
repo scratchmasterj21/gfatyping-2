@@ -36,6 +36,8 @@ type Props = {
   showNotificationBubble?: boolean;
   fontClass?: "text-em-xs" | "text-em-sm" | "text-em-md" | "text-em-lg";
   hideBadgeTextOnWidth?: BreakpointKey;
+  /** Ellipsis long names (e.g. leaderboard rows). */
+  truncateName?: boolean;
 } & UserFlagOptions;
 
 export function User(props: Props): JSXElement {
@@ -76,12 +78,17 @@ export function User(props: Props): JSXElement {
   return (
     <div
       class={cn(
-        "grid grid-flow-col place-items-center gap-[0.5em]",
+        props.truncateName === true
+          ? "flex max-w-full min-w-0 items-center gap-[0.5em]"
+          : "grid grid-flow-col place-items-center gap-[0.5em]",
         props.class,
       )}
     >
       <Show when={props.showAvatar ?? true}>
-        <div class="relative w-[1.25em]" data-ui-element="navAvatar">
+        <div
+          class={cn("relative w-[1.25em]", props.truncateName && "shrink-0")}
+          data-ui-element="navAvatar"
+        >
           <NotificationBubble
             variant="atCorner"
             show={props.showNotificationBubble ?? false}
@@ -123,7 +130,9 @@ export function User(props: Props): JSXElement {
       <div
         class={cn(props.fontClass, {
           "hidden sm:block": props.hideNameOnSmallScreens,
+          "min-w-0 flex-1 truncate": props.truncateName === true,
         })}
+        title={props.truncateName === true ? props.user.name : undefined}
       >
         <Show when={props.linkToProfile ?? false} fallback={props.user.name}>
           <Button
@@ -131,7 +140,11 @@ export function User(props: Props): JSXElement {
             href={`/profile/${props.user.name}`}
             text={props.user.name}
             router-link
-            class="px-0"
+            class={cn(
+              "px-0",
+              props.truncateName === true &&
+                "block max-w-full min-w-0 truncate text-left",
+            )}
           />
         </Show>
       </div>
@@ -145,6 +158,7 @@ export function User(props: Props): JSXElement {
         <div
           class={cn(
             "flex items-center justify-center gap-[0.5em]",
+            props.truncateName && "shrink-0",
             cn(
               props.flagsColor === "text" && "text-text",
               props.flagsColor === "sub" && "text-sub",
@@ -159,10 +173,12 @@ export function User(props: Props): JSXElement {
         </div>
       </Show>
       <Show when={props.user.badgeId !== undefined}>
-        <UserBadge
-          id={props.user.badgeId}
-          hideTextOnWidth={props.hideBadgeTextOnWidth}
-        />
+        <div class={cn(props.truncateName && "shrink-0")}>
+          <UserBadge
+            id={props.user.badgeId}
+            hideTextOnWidth={props.hideBadgeTextOnWidth}
+          />
+        </div>
       </Show>
       <Show when={props.level !== undefined}>
         <Anime

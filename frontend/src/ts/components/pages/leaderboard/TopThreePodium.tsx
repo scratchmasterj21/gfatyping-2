@@ -37,7 +37,7 @@ export function TopThreePodium(props: {
       <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3 sm:items-end">
         <For each={ordered()}>
           {(entry) => (
-            <div class="rankings-podium-slot flex flex-col justify-end">
+            <div class="rankings-podium-slot flex min-w-0 flex-col justify-end">
               <RankRow
                 rank={entry.rank ?? 0}
                 variant={variantFor(entry)}

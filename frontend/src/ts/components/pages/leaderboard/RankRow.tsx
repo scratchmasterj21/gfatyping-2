@@ -98,7 +98,7 @@ export function RankRow(props: {
   return (
     <div
       class={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2.5",
+        "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5",
         isSelf() ? "rank-row-self bg-main/10" : "bg-sub-alt/60",
         props.class,
       )}
@@ -134,6 +134,7 @@ export function RankRow(props: {
             flagsColor="sub"
             user={variant().entry}
             isFriend={hasConnection(variant().entry.uid, "accepted")}
+            truncateName={true}
             class="min-w-0 flex-1 text-[1em] **:data-[ui-element='button']:[--themable-button-text:var(--text-color)]"
             linkToProfile={true}
           />
