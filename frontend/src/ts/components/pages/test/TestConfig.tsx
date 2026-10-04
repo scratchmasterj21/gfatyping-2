@@ -3,18 +3,25 @@ import { ComponentProps, For, JSXElement, Show } from "solid-js";
 import { configMetadata } from "../../../config/metadata";
 import { setConfig, setQuoteLengthAll } from "../../../config/setters";
 import { getConfig } from "../../../config/store";
+import { navigationEvent } from "../../../events/navigation";
 import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
-import { getActiveLesson } from "../../../lessons/lesson-progress";
+import { leaveLessonDrillThen } from "../../../lessons/lesson-launcher";
+import {
+  getActiveLesson,
+  isCurriculumLesson,
+} from "../../../lessons/lesson-progress";
 import { getCustomTextIndicator, isAuthenticated } from "../../../states/core";
 import { showModal } from "../../../states/modals";
 import { getResultVisible, getFocus } from "../../../states/test";
+import { nextTest } from "../../../test/test-logic";
 import { FaObject } from "../../../types/font-awesome";
 import { areUnsortedArraysEqual } from "../../../utils/arrays";
 import { cn } from "../../../utils/cn";
 import { Anime, AnimeShow } from "../../common/anime";
 import { Button } from "../../common/Button";
+import { LessonTestNav } from "./LessonTestNav";
 
 const variables = cn(
   "[--card-gap:0.25em] [--font-size:0.5em] [--horizontal-padding:0.4em] [--vertical-padding:0.5rem]",
@@ -30,6 +37,7 @@ const durationMs = 250;
 export function TestConfig(): JSXElement {
   return (
     <>
+      <LessonTestNav />
       <div
         class={cn(
           variables,
@@ -132,9 +140,20 @@ function Mode(): JSXElement {
           text={getCustomTextIndicator()?.name ?? "lesson"}
           active={true}
           onClick={() => {
-            // Informational only - a lesson isn't a mode you can switch into
-            // ad hoc, so this pill doesn't do anything when clicked.
+            navigationEvent.dispatch({ url: "/", options: {} });
           }}
+        />
+      </Show>
+      <Show
+        when={
+          getActiveLesson() !== null &&
+          isCurriculumLesson(getActiveLesson() as string)
+        }
+      >
+        <TCButton
+          fa={{ icon: "fa-arrow-right" }}
+          text="Next lesson"
+          onClick={() => void nextTest()}
         />
       </Show>
       <For each={modeOptions}>
@@ -150,8 +169,10 @@ function Mode(): JSXElement {
             }
             active={getConfig.mode === modeOption && getActiveLesson() === null}
             onClick={() => {
-              setConfig("mode", modeOption);
-              restartTestEvent.dispatch();
+              leaveLessonDrillThen(() => {
+                setConfig("mode", modeOption);
+                restartTestEvent.dispatch();
+              });
             }}
           />
         )}

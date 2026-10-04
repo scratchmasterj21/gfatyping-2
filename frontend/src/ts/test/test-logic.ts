@@ -24,8 +24,8 @@ import * as Replay from "./replay-ui";
 import { __nonReactive } from "../collections/tags";
 import * as TodayTracker from "./today-tracker";
 import * as ChallengeContoller from "../controllers/challenge-controller";
-import { navigationEvent } from "../events/navigation";
 import { isLessonBlockedByCheckpoint } from "../lessons/lesson-checkpoint-order";
+import { navigateToLessonsHub } from "../lessons/lesson-navigation";
 import { LESSON_IDS_WITH_GAME_CHECKPOINT } from "../lessons/lesson-checkpoints";
 import { launchLessonWithIntro } from "../lessons/lesson-intro";
 import * as LessonProgress from "../lessons/lesson-progress";
@@ -1398,7 +1398,9 @@ export async function nextTest(): Promise<void> {
   if (activeLesson !== null) {
     if (LESSON_IDS_WITH_GAME_CHECKPOINT.has(activeLesson)) {
       LessonProgress.setActiveLesson(null);
-      navigationEvent.dispatch({ url: "/lessons", options: {} });
+      navigateToLessonsHub(
+        "Play the checkpoint on the lessons page to continue.",
+      );
       return;
     }
     const next = findNextLesson(activeLesson);
@@ -1421,7 +1423,9 @@ export async function nextTest(): Promise<void> {
 
       if (isLessonBlockedByCheckpoint(next.id, progressMap)) {
         LessonProgress.setActiveLesson(null);
-        navigationEvent.dispatch({ url: "/lessons", options: {} });
+        navigateToLessonsHub(
+          "Play the checkpoint on the lessons page to continue.",
+        );
         return;
       }
       if (
@@ -1457,7 +1461,7 @@ qs(".pageTest")?.onChild("click", "#restartTestButtonWithSameWordset", () => {
 
 qs(".pageTest")?.onChild("click", "#backToLessonsButton", () => {
   LessonProgress.setActiveLesson(null);
-  navigationEvent.dispatch({ url: "/lessons", options: {} });
+  navigateToLessonsHub();
 });
 
 // little roadblock for basic cheating

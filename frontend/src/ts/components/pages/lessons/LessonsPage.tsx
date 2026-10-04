@@ -49,24 +49,25 @@ import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
 import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
 import {
-  checkpointCardNumber,
   checkpointLockMessage,
   checkpointProgressKey,
   continueOrder,
   ContinueItem,
   incompleteCheckpointBeforeLesson,
-  isLessonBlockedByCheckpoint,
-  lessonCardNumber,
-  rowItemsFor,
 } from "../../../lessons/lesson-checkpoint-order";
 import {
   HOME_ROW_GAME_IDS,
   HomeRowCheckpoint,
-  LESSON_GROUP_CHECKPOINTS,
 } from "../../../lessons/lesson-checkpoints";
 import { launchLessonWithIntro } from "../../../lessons/lesson-intro";
-import { LESSON_GROUP_INTRO_VIDEOS } from "../../../lessons/lesson-intro-videos";
 import { startCustomDrill } from "../../../lessons/lesson-launcher";
+import {
+  getContinueItem,
+  getFrontierItem,
+  isLessonLockedForProgress,
+  launchContinueTarget,
+  scrollToContinueTarget as scrollToContinueItem,
+} from "../../../lessons/lesson-navigation";
 import {
   ensureStarsGateGrandfather,
   getAllProgress,
@@ -74,7 +75,6 @@ import {
   getUserLessonStats,
   getWeakKeys,
   isCurriculumLesson,
-  isLessonLockedAt,
   LessonProgress,
   persistDailyChallengePick,
   pickDailyChallengeLesson,
@@ -90,7 +90,6 @@ import {
 import {
   findLesson,
   groupIdForLesson,
-  Lesson,
   LessonGroup,
   lessonGroups,
   lessonOrder,
@@ -109,10 +108,14 @@ import { FaSolidIcon } from "../../../types/font-awesome";
 import { cn } from "../../../utils/cn";
 import { localDateString } from "../../../utils/date-and-time";
 import { Avatar } from "../../common/Avatar";
+import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 import { H2, H3 } from "../../common/Headers";
 import { Page } from "../../common/Page";
-import { showLessonIntroVideo } from "../../modals/LessonIntroVideoModal";
+import { RankRow } from "../leaderboard/RankRow";
+import { LessonCard } from "./LessonCard";
+import { LessonGroupSection } from "./LessonGroupSection";
+import { LessonHero } from "./LessonHero";
 
 const allCheckpoints = continueOrder.filter(
   (
@@ -120,213 +123,6 @@ const allCheckpoints = continueOrder.filter(
   ): item is Extract<(typeof continueOrder)[number], { kind: "checkpoint" }> =>
     item.kind === "checkpoint",
 );
-
-function Stars(props: { count: number }): JSXElement {
-  return (
-    <div class="flex gap-0.5">
-      <For each={[1, 2, 3]}>
-        {(n) => (
-          <Fa
-            icon="fa-star"
-            variant={n <= props.count ? "solid" : "regular"}
-            class={n <= props.count ? "text-main" : "text-sub"}
-            size={0.75}
-          />
-        )}
-      </For>
-    </div>
-  );
-}
-
-function LessonButton(props: {
-  lesson: Lesson;
-  progress: LessonProgress | undefined;
-  number?: number;
-  locked?: boolean;
-  lockedMessage?: string;
-  next?: boolean;
-}): JSXElement {
-  const done = (): boolean => props.progress?.completed === true;
-  const locked = (): boolean => props.locked === true;
-  const needsImprovement = (): boolean =>
-    done() && (props.progress?.stars ?? 3) < 3;
-  const onClick = (): void => {
-    if (locked()) {
-      showNoticeNotification(
-        props.lockedMessage ?? "Complete the previous lesson first",
-      );
-      return;
-    }
-    launchLessonWithIntro(props.lesson);
-  };
-  return (
-    <button
-      type="button"
-      aria-label={`${props.number === undefined ? "Lesson" : `Lesson ${props.number}`}: ${props.lesson.name}${locked() ? ", locked" : ""}`}
-      class={cn(
-        "group relative grid min-h-48 grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-sub-alt bg-sub-alt text-left shadow-sm transition-all",
-        locked()
-          ? "cursor-not-allowed text-sub opacity-55"
-          : needsImprovement()
-            ? "cursor-pointer text-text ring-2 ring-main/50 hover:-translate-y-0.5 hover:shadow-lg"
-            : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
-        props.next && !done() && !locked() ? "ring-2 ring-main" : "",
-      )}
-      onClick={onClick}
-    >
-      <div class="flex items-start justify-between px-4 pt-3">
-        <span class="text-2xl font-bold text-sub tabular-nums">
-          {props.number === undefined
-            ? ""
-            : String(props.number).padStart(2, "0")}
-        </span>
-        <Show when={locked()} fallback={<LessonStatus done={done()} />}>
-          <Fa icon="fa-lock" class="mt-1 text-sub" />
-        </Show>
-      </div>
-      <div class="flex flex-col items-center justify-center gap-3 px-3 py-2 text-center">
-        <Show
-          when={props.lesson.newKeys}
-          fallback={
-            <Fa
-              icon={locked() ? "fa-lock" : "fa-keyboard"}
-              class={locked() ? "text-sub" : "text-main"}
-              size={2.35}
-            />
-          }
-        >
-          {(keys) => (
-            <span class="text-4xl font-black tracking-wider text-main">
-              {keys().toUpperCase()}
-            </span>
-          )}
-        </Show>
-        <Show when={done()}>
-          <Stars count={props.progress?.stars ?? 1} />
-        </Show>
-        <Show when={props.next && !done() && !locked()}>
-          <span class="rounded-full bg-main px-3 py-1 text-em-xs font-bold text-bg">
-            Start here
-          </span>
-        </Show>
-      </div>
-      <div class="border-t border-bg px-3 py-2.5 text-center">
-        <div class="truncate font-medium" title={props.lesson.name}>
-          {props.lesson.name}
-        </div>
-        <Show when={props.progress !== undefined}>
-          <div class="mt-0.5 text-em-xs text-sub">
-            best {Math.round(props.progress?.bestWpm ?? 0)} wpm
-          </div>
-        </Show>
-      </div>
-    </button>
-  );
-}
-
-function LessonStatus(props: { done: boolean }): JSXElement {
-  return (
-    <Show when={props.done}>
-      <Fa icon="fa-check-circle" class="text-main" size={0.9} />
-    </Show>
-  );
-}
-
-/** A checkpoint game tile, styled to match LessonButton so it sits inline in the grid. */
-function checkpointSubtitle(checkpoint: HomeRowCheckpoint): string {
-  return checkpoint.gameType === "toss"
-    ? "Required · full round"
-    : "Required · 3 waves";
-}
-
-function GameCheckpointButton(props: {
-  group: LessonGroup;
-  checkpoint: HomeRowCheckpoint;
-  progressFor: (id: string) => LessonProgress | undefined;
-  number: number;
-  loading: boolean;
-  next?: boolean;
-  onPlay: (group: LessonGroup, checkpoint: HomeRowCheckpoint) => void;
-}): JSXElement {
-  const key = (): string =>
-    `${GAME_PREFIX}${props.group.id}:${HOME_ROW_GAME_IDS[props.checkpoint.gameType]}`;
-  const reviewLessonIds = (): string[] =>
-    props.checkpoint.reviewLessonIds === "all"
-      ? props.group.lessons.map((l) => l.id)
-      : props.checkpoint.reviewLessonIds;
-  const locked = (): boolean =>
-    !reviewLessonIds().every((id) => props.progressFor(id)?.completed === true);
-  const done = (): boolean => props.progressFor(key())?.completed === true;
-
-  const onClick = (): void => {
-    if (locked()) {
-      showNoticeNotification("Finish the lessons above first");
-      return;
-    }
-    props.onPlay(props.group, props.checkpoint);
-  };
-
-  return (
-    <button
-      type="button"
-      class={cn(
-        "relative grid min-h-48 grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-sub-alt bg-sub-alt text-left shadow-sm transition-all",
-        locked()
-          ? "cursor-not-allowed text-sub opacity-55"
-          : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
-        props.next === true && !locked() && !done() ? "ring-2 ring-main" : "",
-      )}
-      onClick={onClick}
-      disabled={props.loading}
-    >
-      <div class="flex items-start justify-between px-4 pt-3">
-        <span class="text-2xl font-bold text-sub tabular-nums">
-          {String(props.number).padStart(2, "0")}
-        </span>
-        <Show
-          when={locked()}
-          fallback={
-            <Show
-              when={done()}
-              fallback={
-                <Fa icon={props.checkpoint.icon} class="text-sub" size={0.9} />
-              }
-            >
-              <Fa icon="fa-check-circle" class="text-main" size={0.9} />
-            </Show>
-          }
-        >
-          <Fa icon="fa-lock" class="text-sub" size={0.9} />
-        </Show>
-      </div>
-      <div class="flex flex-col items-center justify-center gap-3 px-3 py-2">
-        <Fa
-          icon={locked() ? "fa-lock" : props.checkpoint.icon}
-          class={locked() ? "text-sub" : "text-main"}
-          size={2.35}
-        />
-        <Show when={done()}>
-          <Stars count={3} />
-        </Show>
-        <Show when={props.next === true && !locked() && !done()}>
-          <span class="rounded-full bg-main px-3 py-1 text-em-xs font-bold text-bg">
-            Do this next
-          </span>
-        </Show>
-      </div>
-      <div class="border-t border-bg px-3 py-2.5 text-center">
-        <div class="truncate font-medium" title={props.checkpoint.label}>
-          {props.checkpoint.label}
-        </div>
-        <div class="mt-0.5 text-em-xs text-sub">
-          <Show when={done()} fallback={checkpointSubtitle(props.checkpoint)}>
-            best {props.progressFor(key())?.bestScore ?? 0}
-          </Show>
-        </div>
-      </div>
-    </button>
-  );
-}
 
 function GameButton(props: {
   name: string;
@@ -644,29 +440,17 @@ function ClassLeaderboard(props: {
                 highlightQuery.data?.highlight;
 
               return (
-                <div
-                  class={cn(
-                    "flex items-center gap-3 rounded p-2",
-                    entry.uid === props.selfUid ? "bg-sub-alt" : "",
-                  )}
-                  style={
-                    highlight() === undefined
-                      ? undefined
-                      : {
-                          "border-left": `3px solid ${highlight()}`,
-                          "background-color": `${highlight()}22`,
-                        }
-                  }
-                >
-                  <span class="w-5 text-center text-em-xs text-sub">
-                    {i() + 1}
-                  </span>
-                  <span class="min-w-0 flex-1 truncate text-text">
-                    {entry.name}
-                    {entry.uid === props.selfUid ? " (you)" : ""}
-                  </span>
-                  <span class="text-main">{entry.lessonStars} ★</span>
-                </div>
+                <RankRow
+                  rank={i() + 1}
+                  variant={{
+                    kind: "lessonStars",
+                    name: entry.name,
+                    uid: entry.uid,
+                    lessonStars: entry.lessonStars,
+                  }}
+                  selfUid={props.selfUid}
+                  highlightColor={highlight()}
+                />
               );
             }}
           </For>
@@ -919,20 +703,11 @@ export function LessonsPage(): JSXElement {
     progress.data?.get(id);
 
   const isLessonLocked = (id: string): boolean => {
-    const index = lessonIndex.get(id);
-    if (index === undefined) return false; // not a gated curriculum lesson
     const progressMap = progress.data;
-    if (
-      progressMap !== undefined &&
-      isLessonBlockedByCheckpoint(id, progressMap)
-    ) {
-      return true;
-    }
-    const prev = previousLessonId.get(id);
-    const prevProgress = prev !== undefined ? progressFor(prev) : undefined;
-    return isLessonLockedAt(
-      index,
-      prevProgress,
+    if (progressMap === undefined) return false;
+    return isLessonLockedForProgress(
+      id,
+      progressMap,
       starsGateGrandfather.data ?? Infinity,
     );
   };
@@ -973,30 +748,13 @@ export function LessonsPage(): JSXElement {
   const frontierItem = createMemo((): ContinueItem | undefined => {
     const p = progress.data;
     if (p === undefined) return undefined;
-    return continueOrder.find((item) =>
-      item.kind === "lesson"
-        ? p.get(item.lesson.id)?.completed !== true
-        : p.get(checkpointProgressKey(item.group, item.checkpoint))
-            ?.completed !== true,
-    );
+    return getFrontierItem(p);
   });
 
   const continueItem = createMemo((): ContinueItem | undefined => {
     const p = progress.data;
     if (p === undefined) return undefined;
-    const item = frontierItem();
-    // frontierItem only checks "completed", not the 2-star gate - if the
-    // naive next lesson is actually locked, redirect to its predecessor
-    // instead (the lesson the student needs to replay for a higher star
-    // rating), so this shortcut can never bypass the gate.
-    if (item?.kind === "lesson" && isLessonLocked(item.lesson.id)) {
-      const prevId = previousLessonId.get(item.lesson.id);
-      const prevLesson = prevId !== undefined ? findLesson(prevId) : undefined;
-      if (prevLesson !== undefined) {
-        return { kind: "lesson", lesson: prevLesson };
-      }
-    }
-    return item;
+    return getContinueItem(p, starsGateGrandfather.data ?? Infinity);
   });
 
   const currentGroupId = createMemo((): string | undefined => {
@@ -1045,8 +803,56 @@ export function LessonsPage(): JSXElement {
       manuallyToggledGroups,
       collapsed(),
     );
+    const currentIdx =
+      id === undefined
+        ? 0
+        : Math.max(
+            0,
+            lessonGroups.findIndex((group) => group.id === id),
+          );
+    for (let i = 0; i < lessonGroups.length; i++) {
+      const group = lessonGroups[i];
+      if (group === undefined) continue;
+      if (i <= currentIdx || manuallyToggledGroups.has(group.id)) continue;
+      next.add(group.id);
+      const firstLessonId = group.lessons[0]?.id;
+      if (firstLessonId !== undefined && isLessonLocked(firstLessonId)) {
+        next.add(group.id);
+      }
+    }
+    const hashGroupId = window.location.hash.replace(/^#/, "");
+    const hashTarget =
+      hashGroupId.length > 0 &&
+      lessonGroups.some((group) => group.id === hashGroupId)
+        ? hashGroupId
+        : undefined;
+    next.delete("typing-lessons");
+    const expandGroupId = hashTarget ?? id;
+    if (expandGroupId !== undefined) {
+      next.delete(expandGroupId);
+    }
     setCollapsed(next);
     persistCollapsed(next);
+
+    queueMicrotask(() => {
+      if (hashTarget !== undefined) {
+        document.getElementById(hashTarget)?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        return;
+      }
+      if (
+        !isAuthenticated() ||
+        sessionStorage.getItem("lessonsScrolledToFrontier") === "1"
+      ) {
+        return;
+      }
+      const item = getContinueItem(p, starsGateGrandfather.data ?? Infinity);
+      if (item === undefined) return;
+      scrollToContinueItem(item);
+      sessionStorage.setItem("lessonsScrolledToFrontier", "1");
+    });
   });
 
   const continueIcon = (): FaSolidIcon => {
@@ -1061,11 +867,15 @@ export function LessonsPage(): JSXElement {
   const onContinueClick = (reward = false): void => {
     const item = continueItem();
     if (item === undefined) return;
-    if (item.kind === "lesson") {
-      launchLessonWithIntro(item.lesson, reward ? "recommendation" : undefined);
-    } else {
-      void openCheckpointGame(item.group, item.checkpoint, reward);
-    }
+    launchContinueTarget(
+      item,
+      {
+        launchLesson: launchLessonWithIntro,
+        openCheckpoint: (group, checkpoint, rewardFlag) =>
+          void openCheckpointGame(group, checkpoint, rewardFlag),
+      },
+      reward,
+    );
   };
 
   // ?? undefined: classId can come back as a literal null from Firestore
@@ -1446,25 +1256,16 @@ export function LessonsPage(): JSXElement {
     launchLessonWithIntro(lesson, "dailyChallenge");
   };
 
-  type PracticeRecommendation = {
-    icon: FaSolidIcon;
-    eyebrow: string;
-    title: string;
-    description: string;
-    action: string;
-    onStart: () => void;
+  const scrollToContinueTarget = (): void => {
+    const item = continueItem();
+    if (item === undefined) return;
+    scrollToContinueItem(item);
   };
 
   const practiceRecommendation = createMemo(
-    (): PracticeRecommendation | undefined => {
+    (): import("./LessonHero").PracticeRecommendation | undefined => {
       if (!isAuthenticated()) return undefined;
-      if (
-        progress.data === undefined ||
-        weakKeysQuery.data === undefined ||
-        userStatsQuery.data === undefined
-      ) {
-        return undefined;
-      }
+      if (progress.data === undefined) return undefined;
 
       const item = continueItem();
       if (item !== undefined) {
@@ -1475,27 +1276,35 @@ export function LessonsPage(): JSXElement {
           icon: continueIcon(),
           eyebrow:
             item.kind === "checkpoint"
-              ? "review checkpoint"
+              ? "Next up: checkpoint"
               : hasStarted
-                ? "continue learning"
-                : "start here",
+                ? "Next up: lesson"
+                : "Start here",
           title: continueLabel(),
           description:
             item.kind === "checkpoint"
               ? item.checkpoint.gameType === "toss"
                 ? "Play the full Type Toss round to unlock your next lesson."
                 : "Beat 3 waves in this checkpoint game to unlock your next lesson."
-              : "Keep moving along your personalized lesson path.",
+              : "Opens your next lesson in the typing area.",
           action:
             item.kind === "checkpoint"
               ? item.checkpoint.gameType === "toss"
-                ? "Play full round"
-                : "Play checkpoint · 3 waves"
+                ? "Go to checkpoint"
+                : "Go to checkpoint"
               : hasStarted
-                ? "Continue lesson"
+                ? "Go to next lesson"
                 : "Start first lesson",
           onStart: () => onContinueClick(true),
+          onScrollToTarget: scrollToContinueTarget,
         };
+      }
+
+      if (
+        weakKeysQuery.data === undefined ||
+        userStatsQuery.data === undefined
+      ) {
+        return undefined;
       }
 
       const builtinGames = games.filter(
@@ -1552,180 +1361,83 @@ export function LessonsPage(): JSXElement {
     });
   };
 
+  const currentGroupIndex = createMemo((): number => {
+    const id = currentGroupId();
+    if (id === undefined) return 0;
+    const idx = lessonGroups.findIndex((group) => group.id === id);
+    return idx === -1 ? 0 : idx;
+  });
+
   return (
     <Page id="lessons">
-      <div class="content-grid grid gap-5">
-        <section class="rounded bg-sub-alt px-4 py-3 text-center text-sm text-sub">
-          <p class="font-medium text-text">Welcome to your typing lessons!</p>
-          <p class="mt-1">
-            Tap the big green button below to see what to do next. Finish
-            checkpoint games when they appear — they unlock the next lesson.
-          </p>
-        </section>
-
-        <Show when={!isAuthenticated()}>
-          <section class="rounded bg-sub-alt p-4 text-center text-sub">
-            <Fa icon="fa-info-circle" class="mr-2" />
-            Sign in to save your lesson progress across devices.
-          </section>
-        </Show>
-
-        <Show
-          when={
+      <div class="lessons-student-ui content-grid grid gap-5">
+        <LessonHero
+          signedIn={isAuthenticated()}
+          showClassSetupNotice={
             isAuthenticated() &&
             !isCurrentUserAdmin() &&
             classId() === undefined
           }
-        >
-          <section class="rounded bg-sub-alt p-4 text-center">
-            <div class="font-bold text-text">
-              <Fa icon="fa-user-clock" class="mr-2 text-main" />
-              Welcome! Your teacher is setting up your class.
-            </div>
-            <p class="mt-1 text-sm text-sub">
-              You can start lessons now. Class assignments and scores will
-              appear automatically when ready.
-            </p>
-          </section>
-        </Show>
+          streakDays={userStatsQuery.data?.streakDays ?? 0}
+          streakFreezes={userStatsQuery.data?.streakFreezesAvailable ?? 0}
+          recommendation={practiceRecommendation()}
+          todayPracticeDone={todayPracticeDone()}
+          practiceRewardLabel={practiceRewardLabel}
+          dailyChallengeName={dailyChallenge().lessonName}
+          dailyChallengeDone={dailyChallenge().done}
+          onDailyChallenge={launchDailyChallenge}
+          onAdaptiveReview={() => void reviewWeakKeys()}
+          adaptiveLoading={reviewLoading()}
+          adaptiveDoneToday={
+            userStatsQuery.data?.practiceRewardDates.adaptive ===
+            localDateString()
+          }
+          primaryLoading={reviewLoading() || lessonGameLoading()}
+          avatar={
+            isAuthenticated()
+              ? {
+                  color: equippedAvatarColor(),
+                  shape: avatarStateQuery.data?.shape,
+                  hair: avatarStateQuery.data?.equipped.hair,
+                  hat: avatarStateQuery.data?.equipped.hat,
+                  accessory: avatarStateQuery.data?.equipped.accessory,
+                  face: avatarStateQuery.data?.equipped.face,
+                  background: avatarStateQuery.data?.equipped.background,
+                  highlightColor: equippedAvatarHighlight(),
+                  animalImage: animalAvatarQuery.data?.animalImage,
+                }
+              : undefined
+          }
+        />
 
-        <Show when={(userStatsQuery.data?.streakDays ?? 0) > 0}>
-          <section class="flex items-center gap-2 rounded bg-sub-alt px-4 py-2 text-main">
-            <Fa icon="fa-fire" />
-            <span class="font-bold">
-              {userStatsQuery.data?.streakDays ?? 0}
+        <Show when={isAuthenticated() && continueItem() !== undefined}>
+          <div
+            class={cn(
+              "sticky top-0 z-10 flex flex-wrap items-center justify-center gap-2 rounded-lg border border-sub-alt bg-bg/95 px-3 py-2 text-sm shadow-sm backdrop-blur-sm",
+            )}
+            data-ui-element="lessonsContinueBar"
+          >
+            <span class="max-w-[min(100%,14rem)] truncate font-medium text-text">
+              Next: {continueLabel()}
             </span>
-            <span class="text-sub">
-              {(userStatsQuery.data?.streakDays ?? 0) === 1
-                ? "day streak"
-                : "day streak — keep going!"}
-            </span>
-            <Show when={(userStatsQuery.data?.streakFreezesAvailable ?? 0) > 0}>
-              <span
-                class="ml-1 rounded bg-bg px-1.5 py-0.5 text-em-xs text-sub"
-                title="Miss a day and this protects your streak once."
-              >
-                🧊 freeze ready
-              </span>
-            </Show>
-          </section>
-        </Show>
-
-        <Show when={practiceRecommendation()} keyed>
-          {(recommendation) => (
-            <section class="grid gap-2" aria-labelledby="today-practice-title">
-              <div class="flex items-end justify-between gap-3">
-                <div>
-                  <h1
-                    id="today-practice-title"
-                    class="text-[1.65em] font-bold text-text sm:text-[1.85em]"
-                  >
-                    Today&apos;s Practice
-                  </h1>
-                  <p class="text-sm text-sub">Do these three activities.</p>
-                </div>
-                <span class="shrink-0 rounded bg-sub-alt px-3 py-1 text-sm font-bold text-main">
-                  {todayPracticeDone()}/3 done
-                </span>
-              </div>
-              <div class="grid gap-3 rounded bg-sub-alt p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-                <div class="grid gap-2">
-                  <div class="flex items-center gap-2 text-em-xs font-medium text-main">
-                    <Fa icon={recommendation.icon} />
-                    {recommendation.eyebrow}
-                  </div>
-                  <div class="text-xl font-bold text-text">
-                    {recommendation.title}
-                  </div>
-                  <p class="max-w-2xl text-sm text-sub">
-                    {recommendation.description}
-                  </p>
-                  <div class="text-em-xs text-sub">
-                    <Fa icon="fa-clock" class="mr-1.5" /> about 3–5 minutes
-                    <span class="ml-3 text-main">
-                      {practiceRewardLabel("recommendation")}
-                    </span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-5 py-3 font-bold text-bg transition-opacity hover:opacity-80"
-                  onClick={recommendation.onStart}
-                  disabled={reviewLoading() || lessonGameLoading()}
-                >
-                  {recommendation.action}
-                  <Fa icon="fa-arrow-right" class="ml-2" />
-                </button>
-              </div>
-
-              <div class="grid gap-2 sm:grid-cols-2">
-                <div class="flex items-center justify-between gap-3 rounded bg-sub-alt p-3">
-                  <div class="grid gap-1">
-                    <div class="flex items-center gap-2 font-medium text-text">
-                      <Fa icon="fa-calendar-day" class="text-main" />
-                      Today&apos;s Challenge
-                    </div>
-                    <span class="text-em-xs text-sub">
-                      {dailyChallenge().lessonName}
-                    </span>
-                    <span class="text-em-xs text-main">
-                      {practiceRewardLabel("dailyChallenge")}
-                    </span>
-                  </div>
-                  <Show
-                    when={dailyChallenge().done}
-                    fallback={
-                      <button
-                        type="button"
-                        class="cursor-pointer rounded bg-bg px-3 py-2 text-em-xs text-text transition-colors hover:bg-text hover:text-bg"
-                        onClick={launchDailyChallenge}
-                      >
-                        start
-                      </button>
-                    }
-                  >
-                    <span class="flex items-center gap-1.5 text-em-xs text-main">
-                      <Fa icon="fa-check-circle" /> done
-                    </span>
-                  </Show>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 rounded bg-sub-alt p-3">
-                  <div class="grid gap-1">
-                    <div class="flex items-center gap-2 font-medium text-text">
-                      <Fa icon="fa-dumbbell" class="text-main" />
-                      Adaptive Review
-                    </div>
-                    <span class="text-em-xs text-sub">
-                      Practice the keys you miss most
-                    </span>
-                    <span class="text-em-xs text-main">
-                      {practiceRewardLabel("adaptive")}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    class="cursor-pointer rounded bg-bg px-3 py-2 text-em-xs text-text transition-colors hover:bg-text hover:text-bg"
-                    onClick={() => void reviewWeakKeys()}
-                    disabled={reviewLoading()}
-                  >
-                    <Fa
-                      icon={
-                        reviewLoading() ? "fa-circle-notch" : "fa-arrow-right"
-                      }
-                      class={reviewLoading() ? "fa-spin" : ""}
-                    />
-                    <span class="ml-1.5">
-                      {userStatsQuery.data?.practiceRewardDates.adaptive ===
-                      localDateString()
-                        ? "Practice again"
-                        : "Start"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </section>
-          )}
+            <Button
+              class="min-h-9 bg-main px-3 py-1.5 text-sm text-bg hover:opacity-90"
+              fa={{ icon: continueIcon(), fixedWidth: true }}
+              text={
+                continueItem()?.kind === "checkpoint"
+                  ? "Go"
+                  : "Go to next lesson"
+              }
+              onClick={() => onContinueClick(false)}
+            />
+            <Button
+              variant="text"
+              class="min-h-9 px-3 py-1.5 text-sm"
+              fa={{ icon: "fa-list", fixedWidth: true }}
+              text="Show"
+              onClick={scrollToContinueTarget}
+            />
+          </div>
         </Show>
 
         {/* Teacher work stays near the primary action, before optional areas. */}
@@ -1941,215 +1653,26 @@ export function LessonsPage(): JSXElement {
             </p>
             <div class="grid gap-1">
               <For each={lessonGroups}>
-                {(group) => {
-                  const doneCount = (): number =>
-                    group.lessons.filter(
-                      (l) => progressFor(l.id)?.completed === true,
-                    ).length;
-                  const isCurrent = (): boolean =>
-                    group.id === currentGroupId();
-                  return (
-                    <div id={group.id}>
-                      <button
-                        type="button"
-                        class={cn(
-                          "flex w-full items-center justify-between rounded px-2 py-2 text-left transition-colors hover:bg-sub-alt",
-                          isCurrent() ? "ring-1 ring-main/50" : "",
-                        )}
-                        onClick={() => toggle(group.id)}
-                      >
-                        <div class="flex items-center gap-2 text-sub">
-                          <Fa icon={group.icon} size={0.9} />
-                          <span class="font-medium text-text">
-                            {group.name}
-                          </span>
-                          <Show when={isCurrent()}>
-                            <span class="rounded bg-main px-1.5 py-0.5 text-em-xs text-bg">
-                              current
-                            </span>
-                          </Show>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <span class="text-em-xs text-sub">
-                            {doneCount()}/{group.lessons.length}
-                          </span>
-                          <div class="h-1 w-10 rounded-full bg-bg">
-                            <div
-                              class="h-1 rounded-full bg-main transition-[width]"
-                              style={{
-                                width: `${Math.min(100, (doneCount() / group.lessons.length) * 100)}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <Fa
-                            icon="fa-chevron-down"
-                            size={0.8}
-                            class={cn(
-                              "text-sub transition-transform duration-200",
-                              collapsed().has(group.id) ? "-rotate-90" : "",
-                            )}
-                          />
-                        </div>
-                      </button>
-                      <Show when={!collapsed().has(group.id)}>
-                        <p class="mt-1 mb-2 pl-2 text-em-xs text-sub">
-                          {group.description}
-                        </p>
-                        <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
-                          <Show
-                            when={LESSON_GROUP_INTRO_VIDEOS[group.id]}
-                            keyed
-                          >
-                            {(videoId) => (
-                              <button
-                                type="button"
-                                class="grid min-h-48 cursor-pointer grid-rows-[auto_1fr_auto] overflow-hidden rounded-lg border border-sub-alt bg-sub-alt text-left text-text shadow-sm transition-all hover:-translate-y-0.5 hover:border-main hover:shadow-lg"
-                                onClick={() => showLessonIntroVideo(videoId)}
-                              >
-                                <div class="px-4 pt-3 text-2xl font-bold text-sub">
-                                  <Fa icon="fa-video" />
-                                </div>
-                                <div class="flex items-center justify-center">
-                                  <Fa
-                                    icon="fa-play-circle"
-                                    class="text-main"
-                                    size={2.8}
-                                  />
-                                </div>
-                                <div class="border-t border-bg px-3 py-2.5 text-center">
-                                  <div class="font-medium">Intro video</div>
-                                  <div class="mt-0.5 text-em-xs text-sub">
-                                    watch before you start
-                                  </div>
-                                </div>
-                              </button>
-                            )}
-                          </Show>
-                          <For each={rowItemsFor(group)}>
-                            {(item) =>
-                              // oxlint-disable-next-line solid/prefer-show -- item.kind is fixed per row (static config), a ternary here is simpler than Show's cast-heavy discriminated narrowing
-                              item.kind === "lesson" ? (
-                                <LessonButton
-                                  lesson={item.lesson}
-                                  progress={progressFor(item.lesson.id)}
-                                  number={lessonCardNumber(item.lesson.id)}
-                                  next={frontierLessonId() === item.lesson.id}
-                                  locked={isLessonLocked(item.lesson.id)}
-                                  lockedMessage={getLessonLockMessage(
-                                    item.lesson.id,
-                                  )}
-                                />
-                              ) : (
-                                <GameCheckpointButton
-                                  group={group}
-                                  checkpoint={item.checkpoint}
-                                  number={checkpointCardNumber(
-                                    group,
-                                    item.checkpoint,
-                                  )}
-                                  next={
-                                    frontierCheckpointTarget()?.groupId ===
-                                      group.id &&
-                                    frontierCheckpointTarget()?.gameType ===
-                                      item.checkpoint.gameType
-                                  }
-                                  progressFor={progressFor}
-                                  loading={lessonGameLoading()}
-                                  onPlay={(g, c) =>
-                                    void openCheckpointGame(g, c)
-                                  }
-                                />
-                              )
-                            }
-                          </For>
-                        </div>
-                        {/* Group games — unlocked after all lessons done
-                          (groups with interspersed checkpoints above skip this) */}
-                        <Show
-                          when={
-                            LESSON_GROUP_CHECKPOINTS[group.id] === undefined
-                          }
-                        >
-                          <div class="mb-2 flex gap-3 pl-2">
-                            <For
-                              each={[
-                                {
-                                  gameId: "balloon-pop" as const,
-                                  label: "Balloon Pop",
-                                  icon: "fa-circle" as const,
-                                  type: "balloon" as const,
-                                },
-                                {
-                                  gameId: "word-defender" as const,
-                                  label: "Word Defender",
-                                  icon: "fa-rocket" as const,
-                                  type: "defender" as const,
-                                },
-                              ]}
-                            >
-                              {(g) => {
-                                const key = (): string =>
-                                  `${GAME_PREFIX}${group.id}:${g.gameId}`;
-                                const done = (): boolean =>
-                                  progressFor(key())?.completed === true;
-                                const locked = (): boolean =>
-                                  !isGroupComplete(group);
-                                return (
-                                  <button
-                                    type="button"
-                                    class={cn(
-                                      "flex items-center gap-2 rounded px-3 py-2 text-em-sm transition-colors",
-                                      locked()
-                                        ? "cursor-not-allowed bg-sub-alt text-sub opacity-50"
-                                        : "cursor-pointer bg-sub-alt text-text hover:bg-text hover:text-bg",
-                                    )}
-                                    onClick={() => {
-                                      if (locked()) {
-                                        showNoticeNotification(
-                                          "Finish all lessons in this group first",
-                                        );
-                                        return;
-                                      }
-                                      void openLessonGame(group, g.type);
-                                    }}
-                                    disabled={lessonGameLoading()}
-                                  >
-                                    <Show
-                                      when={locked()}
-                                      fallback={
-                                        <Show
-                                          when={done()}
-                                          fallback={
-                                            <Fa icon={g.icon} size={0.8} />
-                                          }
-                                        >
-                                          <Fa
-                                            icon="fa-check-circle"
-                                            class="text-main"
-                                            size={0.8}
-                                          />
-                                        </Show>
-                                      }
-                                    >
-                                      <Fa icon="fa-lock" size={0.8} />
-                                    </Show>
-                                    {g.label}
-                                    <Show when={done() && !locked()}>
-                                      <span class="text-em-xs text-sub">
-                                        best:{" "}
-                                        {progressFor(key())?.bestScore ?? 0}
-                                      </span>
-                                    </Show>
-                                  </button>
-                                );
-                              }}
-                            </For>
-                          </div>
-                        </Show>
-                      </Show>
-                    </div>
-                  );
-                }}
+                {(group, index) => (
+                  <LessonGroupSection
+                    group={group}
+                    collapsed={collapsed().has(group.id)}
+                    onToggle={() => toggle(group.id)}
+                    isCurrent={group.id === currentGroupId()}
+                    isFuture={index() > currentGroupIndex()}
+                    isComplete={isGroupComplete(group)}
+                    progressFor={progressFor}
+                    isLessonLocked={isLessonLocked}
+                    getLessonLockMessage={getLessonLockMessage}
+                    frontierLessonId={frontierLessonId()}
+                    frontierCheckpointTarget={frontierCheckpointTarget()}
+                    lessonGameLoading={lessonGameLoading()}
+                    onCheckpointPlay={(g, c) => void openCheckpointGame(g, c)}
+                    onGroupGame={(g, type) => void openLessonGame(g, type)}
+                    grade={grade()}
+                    isGroupComplete={isGroupComplete}
+                  />
+                )}
               </For>
             </div>
           </Show>
@@ -2272,7 +1795,7 @@ export function LessonsPage(): JSXElement {
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       <For each={group.lessons}>
                         {(lesson) => (
-                          <LessonButton
+                          <LessonCard
                             lesson={lesson}
                             progress={progressFor(lesson.id)}
                           />

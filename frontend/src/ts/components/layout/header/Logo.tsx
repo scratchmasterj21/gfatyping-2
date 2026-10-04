@@ -1,6 +1,7 @@
 import { JSXElement } from "solid-js";
 
 import { restartTestEvent } from "../../../events/test";
+import { getActiveLesson } from "../../../lessons/lesson-progress";
 import { getActivePage } from "../../../states/core";
 import { getFocus } from "../../../states/test";
 import { cn } from "../../../utils/cn";
@@ -15,7 +16,9 @@ export function Logo(): JSXElement {
       style={{ "box-sizing": "content-box" }}
       data-ui-element="logo"
       onClick={() => {
-        if (getActivePage() === "test") restartTestEvent.dispatch();
+        if (getActivePage() === "test" && getActiveLesson() === null) {
+          restartTestEvent.dispatch();
+        }
       }}
     >
       <img

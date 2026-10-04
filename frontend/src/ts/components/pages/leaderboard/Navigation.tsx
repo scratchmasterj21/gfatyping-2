@@ -16,23 +16,25 @@ export function Navigation(props: {
   isLoading?: boolean;
   class?: string;
 }): JSXElement {
-  const buttonClass = "px-3 sm:px-4 text-em-base";
+  const buttonClass = "px-2 sm:px-3 text-em-sm sm:text-em-base";
 
   return (
     <div
-      class={cn(
-        "grid grid-flow-col items-center gap-2 justify-self-end",
-        props.class,
-      )}
+      class={cn("flex flex-wrap items-center justify-end gap-2", props.class)}
     >
       <Show when={props.isLoading}>
         <LoadingCircle color="sub" class="text-2xl" />
       </Show>
+      <span class="w-full text-center text-sm text-sub sm:w-auto sm:text-right">
+        Page {props.currentPage + 1} of {Math.max(1, props.lastPage)}
+      </span>
       <Button
         onClick={() => props.onPageChange(0)}
         fa={{ icon: "fa-crown", fixedWidth: true }}
+        text="Top"
         disabled={props.currentPage === 0}
         class={buttonClass}
+        aria-label="First page"
       />
       <Show when={props.userPage !== undefined}>
         <Button
@@ -41,10 +43,12 @@ export function Navigation(props: {
             props.onScrollToUser(true);
           }}
           fa={{ icon: "fa-user", fixedWidth: true }}
+          text="My rank"
           disabled={
             props.userPage === undefined || props.currentPage === props.userPage
           }
           class={buttonClass}
+          aria-label="Go to my rank"
         />
       </Show>
       <Button
@@ -53,15 +57,16 @@ export function Navigation(props: {
           props.onPageChange((old) => Math.max(0, Math.min(old, lastPage) - 1));
         }}
         fa={{ icon: "fa-chevron-left", fixedWidth: true }}
+        text="Prev"
         disabled={props.currentPage === 0}
         class={buttonClass}
+        aria-label="Previous page"
       />
       <Button
         onClick={() =>
           showSimpleModal({
             title: "Go to page",
             schema: z.object({
-              //not using PageNumberSchema because we don't allow zero here
               pageNumber: z.number().int().safe().min(1),
             }),
             inputs: {
@@ -83,15 +88,17 @@ export function Navigation(props: {
         fa={{ icon: "fa-hashtag", fixedWidth: true }}
         class={buttonClass}
         disabled={props.lastPage <= 1}
+        aria-label="Jump to page"
       >
-        {" "}
         {props.currentPage + 1}
       </Button>
       <Button
         onClick={() => props.onPageChange((old) => old + 1)}
         fa={{ icon: "fa-chevron-right", fixedWidth: true }}
+        text="Next"
         disabled={props.currentPage + 1 >= props.lastPage}
         class={buttonClass}
+        aria-label="Next page"
       />
     </div>
   );

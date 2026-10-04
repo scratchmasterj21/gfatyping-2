@@ -13,6 +13,7 @@ import { restartTestEvent } from "../../../events/test";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
 import { useClassroomAlerts } from "../../../lessons/classroom-alerts";
+import { leaveLessonDrillThen } from "../../../lessons/lesson-launcher";
 import { prefetchLeaderboardPage } from "../../../queries/prefetch";
 import { getServerConfigurationQueryOptions } from "../../../queries/server-configuration";
 import { getActivePage } from "../../../states/core";
@@ -70,17 +71,28 @@ export function Nav(): JSXElement {
     <span class="hidden text-sm font-semibold lg:inline">{label}</span>
   );
 
-  const pageProperties = (page: string, label: string) => ({
-    active: getActivePage() === page,
-    "aria-label": label,
-    "aria-current": getActivePage() === page ? ("page" as const) : undefined,
-  });
+  const isLessonsNavActive = (): boolean => {
+    if (getActivePage() === "lessons") return true;
+    const path = window.location.pathname;
+    return path === "/" || path === "/lessons";
+  };
+
+  const pageProperties = (page: string, label: string) => {
+    const active =
+      page === "lessons" ? isLessonsNavActive() : getActivePage() === page;
+    return {
+      active,
+      "aria-label": label,
+      "aria-current": active ? ("page" as const) : undefined,
+    };
+  };
 
   const destinationButtonClass = () => cn(buttonClass(), "hidden lg:flex");
   const mobileDestinationClass = (page: string) =>
     cn(
       "w-full justify-start border-l-4 border-transparent",
-      getActivePage() === page && "border-main bg-sub-alt text-text",
+      (page === "lessons" ? isLessonsNavActive() : getActivePage() === page) &&
+        "border-main bg-sub-alt text-text",
     );
 
   createEffectOn(getActivePage, () => setMobileMenuOpen(false));
@@ -158,7 +170,9 @@ export function Nav(): JSXElement {
               {...pageProperties("test", "Free typing practice")}
               onClick={() => {
                 setMobileMenuOpen(false);
-                if (getActivePage() === "test") restartTestEvent.dispatch();
+                leaveLessonDrillThen(() => {
+                  if (getActivePage() === "test") restartTestEvent.dispatch();
+                });
               }}
             />
             <Button
@@ -248,7 +262,9 @@ export function Nav(): JSXElement {
           "data-nav-item": "test",
         }}
         onClick={() => {
-          if (getActivePage() === "test") restartTestEvent.dispatch();
+          leaveLessonDrillThen(() => {
+            if (getActivePage() === "test") restartTestEvent.dispatch();
+          });
         }}
       >
         {navLabel("Free typing")}

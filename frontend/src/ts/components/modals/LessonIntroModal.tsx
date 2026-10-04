@@ -67,8 +67,11 @@ export function LessonIntroModal(): JSXElement {
         window.speechSynthesis.cancel();
       }}
     >
-      <div class="grid justify-items-center gap-6 text-center">
-        <div class="text-3xl text-main">{getIntroLesson()?.name}</div>
+      <div
+        class="grid justify-items-center gap-6 text-center"
+        style={{ "font-family": '"Lexend Deca", sans-serif' }}
+      >
+        <div class="text-3xl font-bold text-main">{getIntroLesson()?.name}</div>
 
         <div class="flex flex-wrap justify-center gap-3">
           <For each={keys()}>

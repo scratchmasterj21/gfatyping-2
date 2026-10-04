@@ -1,0 +1,22 @@
+@keyframes lessons-ring-flash {
+  0% {
+    box-shadow: 0 0 0 0.25em var(--main-color);
+  }
+  100% {
+    box-shadow: 0 0 0 0.25em transparent;
+  }
+}
+
+.lessons-student-ui {
+  h1,
+  h2,
+  h3,
+  .lesson-card-title,
+  .lesson-hero-heading {
+    font-family: "Lexend Deca", sans-serif;
+  }
+
+  .lesson-card-next {
+    animation: lessons-ring-flash 1.5s ease-in-out infinite;
+  }
+}

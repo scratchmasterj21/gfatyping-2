@@ -1,3 +1,4 @@
+import { ValidModeRule } from "@monkeytype/schemas/configuration";
 import { useQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, JSXElement, Show } from "solid-js";
 
@@ -29,17 +30,18 @@ import {
   updateGetParameters,
 } from "../../../states/leaderboard-selection";
 import { cn } from "../../../utils/cn";
+import { abbreviateNumber } from "../../../utils/numbers";
 import AsyncContent from "../../common/AsyncContent";
+import { Fa } from "../../common/Fa";
 import { LoadingCircle } from "../../common/LoadingCircle";
 import { Page } from "../../common/Page";
-import { Separator } from "../../common/Separator";
 import { GameScoresSection } from "./GameScoresSection";
 import { Navigation } from "./Navigation";
-import { NextUpdate } from "./NextUpdate";
+import { SelfSummaryCard } from "./SelfSummaryCard";
 import { Sidebar } from "./Sidebar";
-import { Table } from "./Table";
+import { Table, TableEntry } from "./Table";
 import { Title } from "./Title";
-import { UserRank } from "./UserRank";
+import { TopThreePodium } from "./TopThreePodium";
 
 const pageName: PageName = "leaderboards";
 
@@ -47,6 +49,26 @@ export function LeaderboardPage(): JSXElement {
   const isOpen = () => getActivePage() === pageName;
 
   const [scrollToUser, setScrollToUser] = createSignal(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = createSignal(false);
+
+  const classroomSelfStat = (
+    entry: TableEntry | undefined,
+  ): string | undefined => {
+    if (entry === undefined) return undefined;
+    if (tableType() === "speed" && "wpm" in entry) {
+      return `${Math.round(entry.wpm)} WPM`;
+    }
+    if ("totalXp" in entry) {
+      const xp = entry.totalXp;
+      return `${xp < 1000 ? xp.toFixed(0) : abbreviateNumber(xp)} XP`;
+    }
+    if ("bestRaceWpm" in entry) {
+      return tableType() === "raceacc"
+        ? `${Math.round(entry.bestRaceAcc)}% acc`
+        : `${Math.round(entry.bestRaceWpm)} WPM`;
+    }
+    return undefined;
+  };
 
   //invalidate cache for daily and weekly lb on close
   createEffectOn(isOpen, (open) => {
@@ -231,187 +253,200 @@ export function LeaderboardPage(): JSXElement {
     return diff;
   };
 
+  const sidebarContent = (validModeRules: ValidModeRule[]) => (
+    <Sidebar
+      selection={getSelection}
+      onSelect={onSelectionChange}
+      validModeRules={validModeRules}
+      canHideAdmin={canHideAdmin()}
+      hideAdmin={getHideAdmin()}
+      onHideAdminChange={setHideAdmin}
+    />
+  );
+
   return (
     <Page id="leaderboards">
-      <div class="content-grid flex flex-col gap-5 lg:gap-6">
-        <div class="w-full">
-          <AsyncContent queries={{ serverConfigurationQuery }}>
-            {({ serverConfigurationQueryData }) => (
-              <Sidebar
-                selection={getSelection}
-                onSelect={onSelectionChange}
-                validModeRules={
-                  serverConfigurationQueryData().dailyLeaderboards
-                    .validModeRules ?? []
+      <div class="rankings-student-ui content-grid">
+        <div class="grid gap-6 lg:grid-cols-[minmax(17.5rem,20rem)_1fr] lg:items-start">
+          <aside class="lg:sticky lg:top-4 lg:self-start">
+            <div class="mb-2 lg:hidden">
+              <button
+                type="button"
+                class="flex w-full items-center justify-between rounded-lg bg-sub-alt px-4 py-3 text-left font-semibold text-text"
+                aria-expanded={mobileFiltersOpen()}
+                onClick={() => setMobileFiltersOpen((open) => !open)}
+              >
+                Choose ranking
+                <Fa
+                  icon="fa-chevron-down"
+                  class={cn(
+                    "transition-transform",
+                    mobileFiltersOpen() ? "rotate-180" : "",
+                  )}
+                />
+              </button>
+            </div>
+            <div
+              class={cn("grid gap-3", !mobileFiltersOpen() && "hidden lg:grid")}
+            >
+              <AsyncContent queries={{ serverConfigurationQuery }}>
+                {({ serverConfigurationQueryData }) =>
+                  sidebarContent(
+                    serverConfigurationQueryData().dailyLeaderboards
+                      .validModeRules ?? [],
+                  )
+                }
+              </AsyncContent>
+            </div>
+          </aside>
+
+          <main class="flex min-w-0 flex-col gap-5 lg:gap-6">
+            <Title
+              selection={getSelection()}
+              onPreviousSelect={() =>
+                setSelection((old) => ({ ...old, previous: !old.previous }))
+              }
+            />
+
+            <Show when={isGamesMetric()}>
+              <GameScoresSection
+                scope={(getSelection() as ClassroomSelectionType).type}
+                classId={(getSelection() as ClassroomSelectionType).classId}
+                grade={(getSelection() as ClassroomSelectionType).grade}
+                selfUid={getSnapshot()?.uid}
+                isOpen={isOpen()}
+                selectedGameId={
+                  (getSelection() as ClassroomSelectionType).gameId
                 }
               />
-            )}
-          </AsyncContent>
-        </div>
+            </Show>
 
-        <div class="flex w-full flex-1 flex-col gap-5 lg:gap-8">
-          <Title
-            selection={getSelection()}
-            onPreviousSelect={() =>
-              setSelection((old) => ({ ...old, previous: !old.previous }))
-            }
-          />
-
-          <Show
-            when={
-              isAuthenticated() && !isClassroom() && !entriesQuery().isLoading
-            }
-            fallback={<Separator />}
-          >
-            <AsyncContent
-              queries={{
-                entriesQuery: entriesQuery(),
-                rankQuery,
-                serverConfigurationQuery,
-              }}
-              alwaysShowContent
-              errorClass="rounded bg-sub-alt p-4"
-            >
-              {({
-                entriesQueryData,
-                rankQueryData,
-                serverConfigurationQueryData,
-              }) => {
-                const minWpm = () => {
-                  const d = entriesQueryData();
-                  return d && "minWpm" in d ? (d.minWpm as number) : undefined;
-                };
-
-                return (
-                  <UserRank
-                    type={tableType() as "speed" | "xp"}
-                    data={rankQueryData()}
-                    friendsOnly={getSelection().friendsOnly}
-                    total={entriesQueryData()?.count}
-                    minWpm={minWpm()}
-                    memoryDifference={getLbMemoryDifference(
-                      getSelection(),
-                      rankQueryData()?.rank,
-                    )}
-                    isLbOptOut={getSnapshot()?.lbOptOut ?? false}
-                    isBanned={getSnapshot()?.banned ?? false}
-                    minTimeTyping={
-                      serverConfigurationQueryData()?.leaderboards
-                        .minTimeTyping ?? 0
-                    }
-                    userTimeTyping={getSnapshot()?.typingStats.timeTyping ?? 0}
-                  />
-                );
-              }}
-            </AsyncContent>
-          </Show>
-
-          <Show when={isGamesMetric()}>
-            <GameScoresSection
-              scope={(getSelection() as ClassroomSelectionType).type}
-              classId={(getSelection() as ClassroomSelectionType).classId}
-              grade={(getSelection() as ClassroomSelectionType).grade}
-              selfUid={getSnapshot()?.uid}
-              isOpen={isOpen()}
-              selectedGameId={(getSelection() as ClassroomSelectionType).gameId}
-            />
-          </Show>
-
-          <Show when={!isGamesMetric()}>
-            <AsyncContent
-              queries={{ entriesQuery: entriesQuery() }}
-              loader={
-                <div class="flex justify-center pt-4 text-4xl">
-                  <LoadingCircle />
-                </div>
-              }
-            >
-              {({ entriesQueryData }) => (
-                <div>
-                  <Show when={isClassroom()}>
-                    {(() => {
-                      const selfEntry = () =>
-                        entriesQueryData()?.entries.find(
-                          (entry) => entry.uid === getSnapshot()?.uid,
-                        );
-                      return (
-                        <Show when={selfEntry()}>
-                          {(entry) => (
-                            <div class="mb-3 flex min-h-12 items-center justify-between rounded bg-sub-alt px-4 py-3 text-text">
-                              <span class="font-semibold">Your position</span>
-                              <span class="text-lg font-semibold text-main">
-                                #{entry().rank}
-                              </span>
-                            </div>
-                          )}
-                        </Show>
-                      );
-                    })()}
-                  </Show>
-                  <Show when={!isClassroom()}>
-                    <div
-                      class={cn(
-                        "mb-2 grid grid-cols-1 items-center justify-between gap-2 text-sm sm:grid-cols-2 sm:text-base",
-                      )}
-                    >
-                      <NextUpdate type={getSelection().type} />
-                      <Navigation
-                        isLoading={
-                          entriesQuery().isLoading ||
-                          entriesQuery().isFetching ||
-                          entriesQuery().isRefetching
-                        }
-                        lastPage={Math.ceil(
-                          (entriesQueryData()?.count ?? 0) / pageSize,
-                        )}
-                        userPage={userPage()}
-                        currentPage={getPage()}
-                        onPageChange={setPage}
-                        onScrollToUser={setScrollToUser}
-                        class="w-full sm:w-max"
-                      />
-                    </div>
-                  </Show>
-
-                  <Show when={canHideAdmin()}>
-                    <label class="mb-2 flex w-max items-center gap-2 text-sm text-sub">
-                      <input
-                        type="checkbox"
-                        checked={getHideAdmin()}
-                        onChange={(e) => setHideAdmin(e.currentTarget.checked)}
-                      />
-                      Hide teacher from rankings
-                    </label>
-                  </Show>
-
-                  <div>
-                    <Table
-                      type={tableType()}
-                      compactXp={isClassroom()}
-                      entries={entriesQueryData()?.entries ?? []}
-                      friendsOnly={getSelection().friendsOnly}
-                      scrollToUser={scrollToUser}
-                      onScrolledToUser={() => setScrollToUser(false)}
-                    />
+            <Show when={!isGamesMetric()}>
+              <AsyncContent
+                queries={{
+                  entriesQuery: entriesQuery(),
+                  ...(isClassroom() ? {} : { rankQuery }),
+                  serverConfigurationQuery,
+                }}
+                loader={
+                  <div class="flex justify-center pt-4 text-4xl">
+                    <LoadingCircle />
                   </div>
+                }
+                alwaysShowContent
+              >
+                {(queryResults) => {
+                  const entriesQueryData = queryResults.entriesQueryData;
+                  const rankQueryData = queryResults.rankQueryData;
+                  const serverConfigurationQueryData =
+                    queryResults.serverConfigurationQueryData;
+                  const entries = () => entriesQueryData()?.entries ?? [];
+                  const selfEntry = () =>
+                    entries().find(
+                      (entry) => entry.uid === getSnapshot()?.uid,
+                    ) as TableEntry | undefined;
+                  const minWpm = () => {
+                    const d = entriesQueryData();
+                    return d && "minWpm" in d
+                      ? (d.minWpm as number)
+                      : undefined;
+                  };
+                  const showPodium = () =>
+                    getPage() === 0 && entries().length >= 2;
 
-                  <Show when={!isClassroom()}>
-                    <div class="mt-4 grid grid-cols-1 items-center justify-between text-sm sm:text-base">
-                      <Navigation
-                        lastPage={Math.ceil(
-                          (entriesQueryData()?.count ?? 0) / pageSize,
-                        )}
-                        currentPage={getPage()}
-                        onPageChange={setPage}
-                        onScrollToUser={setScrollToUser}
-                        class="w-full sm:w-max"
+                  return (
+                    <div class="grid gap-4">
+                      <Show when={isAuthenticated()}>
+                        <SelfSummaryCard
+                          type={tableType()}
+                          data={
+                            isClassroom()
+                              ? (selfEntry() ?? null)
+                              : (rankQueryData?.() ?? null)
+                          }
+                          classroomRank={selfEntry()?.rank}
+                          classroomPrimaryLabel={classroomSelfStat(selfEntry())}
+                          friendsOnly={getSelection().friendsOnly}
+                          total={entriesQueryData()?.count}
+                          minWpm={minWpm()}
+                          memoryDifference={
+                            isClassroom()
+                              ? undefined
+                              : getLbMemoryDifference(
+                                  getSelection(),
+                                  rankQueryData?.()?.rank,
+                                )
+                          }
+                          isLbOptOut={getSnapshot()?.lbOptOut ?? false}
+                          isBanned={getSnapshot()?.banned ?? false}
+                          minTimeTyping={
+                            serverConfigurationQueryData()?.leaderboards
+                              .minTimeTyping ?? 0
+                          }
+                          userTimeTyping={
+                            getSnapshot()?.typingStats.timeTyping ?? 0
+                          }
+                          loading={
+                            entriesQuery().isLoading ||
+                            (!isClassroom() && rankQuery.isLoading)
+                          }
+                        />
+                      </Show>
+
+                      <Show when={!isClassroom()}>
+                        <Navigation
+                          isLoading={
+                            entriesQuery().isLoading ||
+                            entriesQuery().isFetching ||
+                            entriesQuery().isRefetching
+                          }
+                          lastPage={Math.ceil(
+                            (entriesQueryData()?.count ?? 0) / pageSize,
+                          )}
+                          userPage={userPage()}
+                          currentPage={getPage()}
+                          onPageChange={setPage}
+                          onScrollToUser={setScrollToUser}
+                        />
+                      </Show>
+
+                      <TopThreePodium
+                        type={tableType()}
+                        entries={entries()}
+                        friendsOnly={getSelection().friendsOnly}
+                        compactXp={isClassroom()}
+                        enabled={showPodium()}
+                        selfUid={getSnapshot()?.uid}
                       />
+
+                      <Table
+                        type={tableType()}
+                        compactXp={isClassroom()}
+                        entries={entries()}
+                        friendsOnly={getSelection().friendsOnly}
+                        scrollToUser={scrollToUser}
+                        onScrolledToUser={() => setScrollToUser(false)}
+                        currentPage={getPage()}
+                        showPodium={showPodium()}
+                        selfUid={getSnapshot()?.uid}
+                      />
+
+                      <Show when={!isClassroom()}>
+                        <Navigation
+                          lastPage={Math.ceil(
+                            (entriesQueryData()?.count ?? 0) / pageSize,
+                          )}
+                          currentPage={getPage()}
+                          onPageChange={setPage}
+                          onScrollToUser={setScrollToUser}
+                        />
+                      </Show>
                     </div>
-                  </Show>
-                </div>
-              )}
-            </AsyncContent>
-          </Show>
+                  );
+                }}
+              </AsyncContent>
+            </Show>
+          </main>
         </div>
       </div>
     </Page>

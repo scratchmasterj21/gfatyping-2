@@ -38,6 +38,9 @@ export function Sidebar(props: {
   selection: Accessor<Selection>;
   onSelect: (selection: Selection) => void;
   validModeRules: ValidModeRule[];
+  canHideAdmin?: boolean;
+  hideAdmin?: boolean;
+  onHideAdminChange?: (value: boolean) => void;
 }): JSXElement {
   const updateSelection = (patch: Partial<Selection>) => {
     props.onSelect(
@@ -305,6 +308,17 @@ export function Sidebar(props: {
           )}
         />
       </Show>
+
+      <Show when={props.canHideAdmin === true}>
+        <label class="flex items-center gap-2 rounded-lg border border-sub-alt bg-bg px-3 py-2 text-sm text-sub">
+          <input
+            type="checkbox"
+            checked={props.hideAdmin ?? false}
+            onChange={(e) => props.onHideAdminChange?.(e.currentTarget.checked)}
+          />
+          Hide teacher from rankings
+        </label>
+      </Show>
     </div>
   );
 }
@@ -321,17 +335,17 @@ function Group<T>(props: {
   return (
     <div class="grid gap-2 rounded-xl bg-sub-alt p-3">
       <div class="text-sm font-semibold text-sub">{props.title}</div>
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
         <For each={props.items}>
           {(item) => (
             <Button
               onClick={() => props.onSelect(item.id)}
               fa={{ icon: item.icon, fixedWidth: true }}
-              class="min-h-12 justify-start px-3"
+              class="min-h-11 shrink-0 justify-start px-3 sm:shrink"
               active={isEqual(item.id, props.selected)}
             >
               <span class="grid text-left">
-                <span>{item.text}</span>
+                <span class="whitespace-nowrap">{item.text}</span>
                 <Show when={item.description !== undefined}>
                   <span class="text-xs font-normal opacity-70">
                     {item.description}

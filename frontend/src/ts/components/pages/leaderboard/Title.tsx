@@ -8,6 +8,7 @@ import {
   isClassroomType,
   Selection,
 } from "../../../states/leaderboard-selection";
+import { cn } from "../../../utils/cn";
 import { capitalizeFirstLetter } from "../../../utils/strings";
 import { Button } from "../../common/Button";
 import { H2 } from "../../common/Headers";
@@ -17,46 +18,50 @@ export function Title(props: {
   selection: Selection;
   onPreviousSelect: () => void;
 }): JSXElement {
+  const eyebrow = createMemo(() =>
+    isClassroomType(props.selection.type)
+      ? "School rankings"
+      : "Global rankings",
+  );
+
   const title = createMemo(() => {
     if (isClassroomType(props.selection.type)) {
       const cs = props.selection as ClassroomSelectionType;
       const metric =
         cs.metric === "wpm"
-          ? "WPM"
+          ? "Typing speed"
           : cs.metric === "racewpm"
-            ? "Race WPM"
+            ? "Race speed"
             : cs.metric === "raceacc"
-              ? "Race Accuracy"
+              ? "Race accuracy"
               : cs.metric === "games"
-                ? "Games"
+                ? "Game scores"
                 : cs.metric === "xpAllTime"
                   ? "All-time XP"
-                  : "XP";
+                  : "Weekly XP";
       const scope =
         cs.type === "class"
-          ? (cs.classId ?? "Class")
+          ? (cs.classId ?? "Your class")
           : cs.type === "grade"
-            ? (cs.grade ?? "Grade")
-            : "School";
-      return `${scope} ${metric} Leaderboard`;
+            ? (cs.grade ?? "Your grade")
+            : "Whole school";
+      return `${scope} · ${metric}`;
     }
 
     const type =
       props.selection.type === "allTime"
-        ? "All-time"
+        ? "All-time speed"
         : props.selection.type === "weekly"
           ? "Weekly XP"
-          : "Daily";
-
-    const friend = props.selection.friendsOnly ? "Friends " : "";
+          : "Daily speed";
 
     const language = capitalizeFirstLetter(props.selection.language ?? "");
 
     const mode =
       props.selection.type !== "weekly"
-        ? ` ${capitalizeFirstLetter(props.selection.mode ?? "")} ${props.selection.mode2}`
+        ? ` · ${props.selection.mode2}s ${capitalizeFirstLetter(props.selection.mode ?? "")}`
         : "";
-    return `${type} ${language} ${mode} ${friend}Leaderboard`;
+    return `${type} · ${language}${mode}`;
   });
 
   const subTitle = createMemo(() => {
@@ -70,7 +75,7 @@ export function Title(props: {
       }
       return {
         dateString: `${dateFormat(timestamp, japanDateFormat)} JST`,
-        buttonText: props.selection.previous ? "show today" : "show yesterday",
+        buttonText: props.selection.previous ? "Show today" : "Show yesterday",
       };
     } else if (props.selection.type === "weekly") {
       let timestamp = startOfWeek(japanNow, { weekStartsOn: 1 });
@@ -80,10 +85,10 @@ export function Title(props: {
       const endTimestamp = endOfWeek(timestamp, { weekStartsOn: 1 });
 
       return {
-        dateString: `${dateFormat(timestamp, japanDateFormat)} - ${dateFormat(endTimestamp, japanDateFormat)} JST`,
+        dateString: `${dateFormat(timestamp, japanDateFormat)} – ${dateFormat(endTimestamp, japanDateFormat)} JST`,
         buttonText: props.selection.previous
-          ? "show this week"
-          : "show last week",
+          ? "Show this week"
+          : "Show last week",
       };
     }
     return null;
@@ -95,28 +100,36 @@ export function Title(props: {
       (props.selection as ClassroomSelectionType).metric === "wpm",
   );
 
-  const isWeeklyPeriodMetric = createMemo(
-    () =>
-      isClassroomType(props.selection.type) &&
-      ["wpm", "xp"].includes(
-        (props.selection as ClassroomSelectionType).metric ?? "",
-      ),
-  );
+  const resetType = createMemo((): Selection["type"] | undefined => {
+    if (isClassroomType(props.selection.type)) {
+      const m = (props.selection as ClassroomSelectionType).metric;
+      if (m === "xp" || m === "wpm") return "weekly";
+      return undefined;
+    }
+    if (
+      props.selection.type === "daily" ||
+      props.selection.type === "weekly" ||
+      props.selection.type === "allTime"
+    ) {
+      return props.selection.type;
+    }
+    return undefined;
+  });
 
   const description = createMemo(() => {
     if (!isClassroomType(props.selection.type)) {
       return props.selection.type === "weekly"
-        ? "XP earned by the Monkeytype community."
-        : "Typing scores from the global Monkeytype community.";
+        ? "See who earned the most XP this week."
+        : "Compare your best typing scores with everyone.";
     }
 
     const selection = props.selection as ClassroomSelectionType;
     const scope =
       selection.type === "class"
-        ? `students in ${selection.classId ?? "your class"}`
+        ? `Students in ${selection.classId ?? "your class"}`
         : selection.type === "grade"
-          ? `students in ${selection.grade ?? "your grade"}`
-          : "all students in the school";
+          ? `Students in ${selection.grade ?? "your grade"}`
+          : "Everyone at your school";
     const metric =
       selection.metric === "xpAllTime"
         ? "total XP"
@@ -128,41 +141,49 @@ export function Title(props: {
               ? "best race accuracy"
               : selection.metric === "games"
                 ? "game high scores"
-                : "XP earned this week";
-    return `Ranking ${scope} by ${metric}.`;
+                : "XP this week";
+    return `${scope}, ranked by ${metric}.`;
   });
 
   return (
-    <div>
+    <header class="grid gap-2">
+      <p class="text-sm font-semibold tracking-wide text-main uppercase">
+        {eyebrow()}
+      </p>
       <H2
         text={title()}
-        class="p-0 text-2xl text-text md:text-3xl xl:text-4xl"
+        class="rankings-heading p-0 text-2xl text-text md:text-3xl"
       />
-      <div class="text-sub">{description()}</div>
+      <p class="max-w-2xl text-sub">{description()}</p>
       <Show when={isWpmMetric()}>
-        <div class="text-sub">
-          ranked by {(props.selection as ClassroomSelectionType).mode2 ?? "30"}s
-          English test scores only
-        </div>
+        <p class="text-sm text-sub">
+          Uses {(props.selection as ClassroomSelectionType).mode2 ?? "30"}{" "}
+          second English tests only.
+        </p>
       </Show>
-      <Show when={isWeeklyPeriodMetric()}>
-        <NextUpdate type="weekly" />
-      </Show>
-      <Show when={subTitle() !== null}>
-        <div class="flex items-center gap-2">
-          <div class="text-sub">{subTitle()?.dateString}</div>
-          <div class="h-[1.75em] w-[0.25em] rounded bg-sub-alt"></div>
+      <div class="flex flex-wrap items-center gap-2">
+        <Show when={resetType()}>
+          {(type) => (
+            <NextUpdate
+              type={type()}
+              class="rounded-full bg-sub-alt px-3 py-1 text-sm text-sub"
+            />
+          )}
+        </Show>
+        <Show when={subTitle() !== null}>
+          <span class="text-sm text-sub">{subTitle()?.dateString}</span>
           <Button
             text={subTitle()?.buttonText}
             variant="text"
+            class={cn("text-sm")}
             onClick={props.onPreviousSelect}
             fa={{
               icon: props.selection.previous ? "fa-forward" : "fa-backward",
               variant: "solid",
             }}
           />
-        </div>
-      </Show>
-    </div>
+        </Show>
+      </div>
+    </header>
   );
 }

@@ -1,11 +1,35 @@
+import { loadFromLocalStorage } from "../config/lifecycle";
 import { setConfig } from "../config/setters";
 import { navigationEvent } from "../events/navigation";
 import { restartTestEvent } from "../events/test";
-import { setCustomTextIndicator, getActivePage } from "../states/core";
+import {
+  getActivePage,
+  getCustomTextIndicator,
+  setCustomTextIndicator,
+} from "../states/core";
 import { showErrorNotification } from "../states/notifications";
 import * as CustomText from "../test/custom-text";
 import { Lesson } from "./lessons-data";
-import { PracticeRewardCategory, setActiveLesson } from "./lesson-progress";
+import {
+  getActiveLesson,
+  PracticeRewardCategory,
+  setActiveLesson,
+} from "./lesson-progress";
+
+/** Drop lesson/assignment drill state and restore saved typing settings. */
+export async function exitLessonDrillForFreeTyping(): Promise<void> {
+  if (getActiveLesson() === null && getCustomTextIndicator() === undefined) {
+    return;
+  }
+  setActiveLesson(null);
+  setCustomTextIndicator(undefined);
+  await loadFromLocalStorage();
+}
+
+/** Run after any in-memory lesson drill is cleared (and config restored if needed). */
+export function leaveLessonDrillThen(run: () => void): void {
+  void exitLessonDrillForFreeTyping().then(run);
+}
 
 /**
  * Configure a custom test from already-resolved tokens and start it on the test

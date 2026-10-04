@@ -9,6 +9,7 @@ import { For, JSXElement, Show } from "solid-js";
 import { setConfig, setQuoteLengthAll } from "../../config/setters";
 import { getConfig } from "../../config/store";
 import { restartTestEvent } from "../../events/test";
+import { leaveLessonDrillThen } from "../../lessons/lesson-launcher";
 import { getActiveLesson } from "../../lessons/lesson-progress";
 import { getCustomTextIndicator, isAuthenticated } from "../../states/core";
 import { showModal } from "../../states/modals";
@@ -59,9 +60,11 @@ const isPunctuationDisabled = () =>
 
 export function MobileTestConfigModal(): JSXElement {
   const handleModeClick = (mode: Mode) => {
-    if (mode === getConfig.mode) return;
-    setConfig("mode", mode);
-    restartTestEvent.dispatch();
+    if (mode === getConfig.mode && getActiveLesson() === null) return;
+    leaveLessonDrillThen(() => {
+      setConfig("mode", mode);
+      restartTestEvent.dispatch();
+    });
   };
 
   const handleTimeClick = (time: number | "custom") => {

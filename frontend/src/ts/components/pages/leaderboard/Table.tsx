@@ -20,6 +20,7 @@ import { abbreviateNumber } from "../../../utils/numbers";
 import { Fa } from "../../common/Fa";
 import { User } from "../../common/User";
 import { DataTable, DataTableColumnDef } from "../../ui/table/DataTable";
+import { RankList } from "./RankList";
 
 type SpeedEntry = LeaderboardEntry;
 type XpEntry = XpLeaderboardEntry;
@@ -33,6 +34,9 @@ export function Table(
     hideHeader?: true;
     /** Classroom XP boards only show rank + user + total xp. */
     compactXp?: boolean;
+    currentPage?: number;
+    showPodium?: boolean;
+    selfUid?: string;
   } & (
     | {
         scrollToUser: Accessor<boolean>;
@@ -92,21 +96,28 @@ export function Table(
     getRaceAccColumns({ userOverride: props.userOverride }),
   );
 
+  const useCardList = (): boolean =>
+    props.userOverride === undefined && !bp().xl;
+
+  const skipTop = (): number =>
+    props.showPodium === true && (props.currentPage ?? 0) === 0 ? 3 : 0;
+
   createEffectOn(
     () => props.scrollToUser?.(),
     (enabled) => {
       if (enabled) {
         requestAnimationFrame(() => {
-          qs("#leaderboardTable tr[data-state='selected']")?.scrollIntoView({
-            block: "center",
-          });
+          const target =
+            qs("[data-rank-user]") ??
+            qs("#leaderboardTable tr[data-state='selected']");
+          target?.scrollIntoView({ block: "center" });
           props.onScrolledToUser?.();
         });
       }
     },
   );
 
-  return (
+  const dataTable = () => (
     <Show
       when={props.type === "racewpm" || props.type === "raceacc"}
       fallback={
@@ -136,6 +147,24 @@ export function Table(
         data={props.entries as RaceLeaderboardEntry[]}
         noDataRow={{ content: <NoEntriesFound type={props.type} /> }}
       />
+    </Show>
+  );
+
+  return (
+    <Show when={useCardList()} fallback={dataTable()}>
+      <Show
+        when={props.entries.length > 0}
+        fallback={<NoEntriesFound type={props.type} />}
+      >
+        <RankList
+          type={props.type}
+          entries={props.entries}
+          friendsOnly={props.friendsOnly}
+          compactXp={props.compactXp}
+          skipTop={skipTop()}
+          selfUid={props.selfUid}
+        />
+      </Show>
     </Show>
   );
 }

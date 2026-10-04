@@ -1,0 +1,16 @@
+.rankings-student-ui {
+  h1,
+  h2,
+  h3,
+  .rankings-heading {
+    font-family: "Lexend Deca", sans-serif;
+  }
+
+  .rank-row-self {
+    border-left: 4px solid var(--main-color);
+  }
+
+  .rankings-podium-slot {
+    min-height: 5rem;
+  }
+}

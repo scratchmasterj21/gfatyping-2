@@ -15,6 +15,11 @@ import {
   addNotificationWithLevel,
 } from "../states/notifications";
 import { getCustomTextIndicator, isAuthenticated } from "../states/core";
+import { getAuthenticatedUser } from "../firebase";
+import {
+  curriculumNextAction,
+  curriculumNextButtonLabel,
+} from "../lessons/lesson-navigation";
 import * as LessonProgress from "../lessons/lesson-progress";
 import { getStudentGrade } from "../lessons/lessons-data";
 import * as GlarsesMode from "../legacy-states/glarses-mode";
@@ -805,6 +810,30 @@ function updateTestType(randomQuote: Quote | null): void {
   qsa("#result .stats .testType .bottom")?.setHtml(testType);
 }
 
+async function applyCurriculumNextButtonLabel(
+  lessonId: string,
+  finishedStars?: number,
+): Promise<void> {
+  const uid = getAuthenticatedUser()?.uid;
+  let progress: Map<string, LessonProgress.LessonProgress> | undefined;
+  let grandfatherIndex = Infinity;
+  if (uid !== undefined) {
+    progress = await LessonProgress.getAllProgress();
+    grandfatherIndex = await LessonProgress.ensureStarsGateGrandfather(
+      uid,
+      progress,
+    );
+  }
+  const action = curriculumNextAction(lessonId, {
+    progress,
+    grandfatherIndex,
+    finishedStars,
+  });
+  const label = curriculumNextButtonLabel(action);
+  qs("#nextTestButton .lessonActionText")?.setText(label);
+  qs("#nextTestButton")?.setAttribute("aria-label", label);
+}
+
 // Shows server-confirmed lesson feedback and emphasizes one existing result
 // action. Retry remains Monkeytype's normal repeat-with-same-wordset control.
 async function updateLessonGate(
@@ -840,10 +869,10 @@ async function updateLessonGate(
   nextButton?.addClass("lessonAction");
   retryButton?.addClass("lessonAction");
   backButton?.show();
-  qs("#nextTestButton .lessonActionText")?.setText("Next lesson");
   qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
     "Try again",
   );
+  void applyCurriculumNextButtonLabel(lessonId);
   const threshold = LessonProgress.lessonPassAccuracy(getStudentGrade());
   if (completionPromise !== undefined) {
     el.removeClass("pass")
@@ -880,7 +909,7 @@ async function updateLessonGate(
         .show();
       if (stars >= 2) {
         nextButton?.addClass("lessonPrimary");
-        nextButton?.setAttribute("aria-label", "Next lesson");
+        await applyCurriculumNextButtonLabel(lessonId, stars);
       } else {
         retryButton?.addClass("lessonPrimary");
         nextButton?.hide();
@@ -899,7 +928,7 @@ async function updateLessonGate(
       .setHtml(`<i class="fas fa-check"></i> Passed! Great typing.`)
       .show();
     nextButton?.addClass("lessonPrimary");
-    nextButton?.setAttribute("aria-label", "Next lesson");
+    void applyCurriculumNextButtonLabel(lessonId);
   } else {
     el.removeClass("pass")
       .addClass("fail")

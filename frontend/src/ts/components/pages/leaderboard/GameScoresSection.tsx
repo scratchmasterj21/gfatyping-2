@@ -7,9 +7,9 @@ import {
   GameScoresLeaderboard,
   getGameScoresLeaderboard,
 } from "../../../classroom/classroom";
-import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
 import { LoadingCircle } from "../../common/LoadingCircle";
+import { RankRow } from "./RankRow";
 
 export const GAME_LABELS: Record<string, string> = {
   "word-defender": "Word Defender",
@@ -54,24 +54,19 @@ function ScoreBoard(props: {
           {GAME_LABELS[props.gameId] ?? props.gameId}
         </div>
       </Show>
-      <div class="grid gap-0.5">
+      <div class="grid gap-1">
         <For each={shown()}>
           {(entry, i) => (
-            <div
-              class={cn(
-                "flex items-center gap-3 rounded px-1 py-1",
-                entry.uid === props.selfUid ? "bg-main/10 text-main" : "",
-              )}
-            >
-              <span class="w-5 text-center text-em-xs text-sub">
-                {rankAt(i())}
-              </span>
-              <span class="min-w-0 flex-1 truncate text-em-sm">
-                {entry.name}
-                {entry.uid === props.selfUid ? " (you)" : ""}
-              </span>
-              <span class="text-em-sm font-semibold">{entry.score}</span>
-            </div>
+            <RankRow
+              rank={rankAt(i())}
+              variant={{
+                kind: "gameScore",
+                name: entry.name,
+                uid: entry.uid,
+                score: entry.score,
+              }}
+              selfUid={props.selfUid}
+            />
           )}
         </For>
       </div>
