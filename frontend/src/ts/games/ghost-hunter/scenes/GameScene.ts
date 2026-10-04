@@ -284,7 +284,9 @@ export class GameScene extends Scene {
     this.emitUI();
     if (this.multiplayerRole !== "guest") {
       this.startWave();
-      if (this.multiplayerRole === null) this.schedulePowerUpSpawn();
+      if (this.multiplayerRole === null && this.maxWave === 0) {
+        this.schedulePowerUpSpawn();
+      }
     }
     this.game.events.on(
       "multiplayer-remote-action",
@@ -547,7 +549,7 @@ export class GameScene extends Scene {
   }
 
   private schedulePowerUpSpawn(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.maxWave > 0) return;
     const delay =
       POWERUP_SPAWN_MIN_MS +
       Math.random() * (POWERUP_SPAWN_MAX_MS - POWERUP_SPAWN_MIN_MS);
@@ -558,7 +560,7 @@ export class GameScene extends Scene {
 
   /** Only one power-up can be out (or held) at a time - retries later if the slot's taken. */
   private trySpawnPowerUp(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.maxWave > 0) return;
     if (this.heldPowerUp !== null || this.powerUp !== null) {
       this.schedulePowerUpSpawn();
       return;

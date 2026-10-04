@@ -224,7 +224,7 @@ export class GameScene extends Scene {
     this.scene.launch("UI");
     this.emitUI();
     this.startWave();
-    this.schedulePowerUpSpawn();
+    if (this.maxWave === 0) this.schedulePowerUpSpawn();
   }
 
   override update(_time: number, delta: number): void {
@@ -373,7 +373,7 @@ export class GameScene extends Scene {
   }
 
   private schedulePowerUpSpawn(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.maxWave > 0) return;
     const delay =
       POWERUP_SPAWN_MIN_MS +
       Math.random() * (POWERUP_SPAWN_MAX_MS - POWERUP_SPAWN_MIN_MS);
@@ -388,7 +388,7 @@ export class GameScene extends Scene {
    * without a power-up word competing for attention too.
    */
   private trySpawnPowerUp(): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.maxWave > 0) return;
     if (
       this.heldPowerUp !== null ||
       this.powerUp !== null ||
