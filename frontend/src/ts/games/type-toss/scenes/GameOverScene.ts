@@ -29,6 +29,7 @@ export class GameOverScene extends Scene {
     this.game.events.emit("game-result", {
       score: data.score,
       wave: data.wordsTyped,
+      cleared: this.registry.get("lessonCheckpoint") === true,
     });
 
     const panel = this.add.graphics();

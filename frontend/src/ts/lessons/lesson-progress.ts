@@ -13,6 +13,7 @@ import { createSignal } from "solid-js";
 import { callApi } from "../api-client";
 import { configEvent } from "../events/config";
 import { getAuthenticatedUser, getDb } from "../firebase";
+import { LESSON_CHECKPOINT_COMPLETE_WAVE } from "./lesson-checkpoints";
 import { findLesson, lessonGroups, lessonOrder } from "./lessons-data";
 import { invalidateCoinQueries } from "../queries/coins";
 import { queryClient } from "../queries";
@@ -547,12 +548,13 @@ export async function getAllProgress(): Promise<Map<string, LessonProgress>> {
 /**
  * Record a game result for a lesson group game.
  * key format: "game:{groupId}:{gameId}" (e.g. "game:home-row:balloon-pop")
- * wave > 5 counts as cleared (completed = true).
+ * wave > LESSON_CHECKPOINT_COMPLETE_WAVE counts as cleared (completed = true).
  */
 export async function recordGameResult(
   key: string,
   score: number,
   wave: number,
+  options?: { cleared?: boolean },
 ): Promise<void> {
   if (!isAuthenticated()) return;
   const uid = getAuthenticatedUser()?.uid;
@@ -563,7 +565,10 @@ export async function recordGameResult(
   const prev = snap.exists() ? (snap.data() as Partial<LessonProgress>) : {};
 
   const bestScore = Math.max(prev.bestScore ?? 0, score);
-  const completed = prev.completed === true || wave > 5;
+  const completed =
+    prev.completed === true ||
+    wave > LESSON_CHECKPOINT_COMPLETE_WAVE ||
+    options?.cleared === true;
 
   try {
     await setDoc(

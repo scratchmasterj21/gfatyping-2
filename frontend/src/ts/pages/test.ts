@@ -9,7 +9,7 @@ import { resetIncompleteTests } from "../states/test";
 export const page = new Page({
   id: "test",
   element: qsr(".page.pageTest"),
-  path: "/",
+  path: "/test",
   beforeHide: async (): Promise<void> => {
     blurInputElement();
   },

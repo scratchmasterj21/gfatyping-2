@@ -49,6 +49,17 @@ import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
 import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
 import {
+  checkpointCardNumber,
+  checkpointLockMessage,
+  checkpointProgressKey,
+  continueOrder,
+  ContinueItem,
+  incompleteCheckpointBeforeLesson,
+  isLessonBlockedByCheckpoint,
+  lessonCardNumber,
+  rowItemsFor,
+} from "../../../lessons/lesson-checkpoint-order";
+import {
   HOME_ROW_GAME_IDS,
   HomeRowCheckpoint,
   LESSON_GROUP_CHECKPOINTS,
@@ -103,23 +114,12 @@ import { H2, H3 } from "../../common/Headers";
 import { Page } from "../../common/Page";
 import { showLessonIntroVideo } from "../../modals/LessonIntroVideoModal";
 
-type GroupRowItem =
-  | { kind: "lesson"; lesson: Lesson }
-  | { kind: "game"; checkpoint: HomeRowCheckpoint };
-
-/** Lessons, with the group's game checkpoints (if any) spliced in after their lesson. */
-function rowItemsFor(group: LessonGroup): GroupRowItem[] {
-  const checkpoints = LESSON_GROUP_CHECKPOINTS[group.id] ?? [];
-  const items: GroupRowItem[] = [];
-  for (const lesson of group.lessons) {
-    items.push({ kind: "lesson", lesson });
-    const checkpoint = checkpoints.find((c) => c.afterLessonId === lesson.id);
-    if (checkpoint !== undefined) {
-      items.push({ kind: "game", checkpoint });
-    }
-  }
-  return items;
-}
+const allCheckpoints = continueOrder.filter(
+  (
+    item,
+  ): item is Extract<(typeof continueOrder)[number], { kind: "checkpoint" }> =>
+    item.kind === "checkpoint",
+);
 
 function Stars(props: { count: number }): JSXElement {
   return (
@@ -233,12 +233,19 @@ function LessonStatus(props: { done: boolean }): JSXElement {
 }
 
 /** A checkpoint game tile, styled to match LessonButton so it sits inline in the grid. */
+function checkpointSubtitle(checkpoint: HomeRowCheckpoint): string {
+  return checkpoint.gameType === "toss"
+    ? "Required · full round"
+    : "Required · 3 waves";
+}
+
 function GameCheckpointButton(props: {
   group: LessonGroup;
   checkpoint: HomeRowCheckpoint;
   progressFor: (id: string) => LessonProgress | undefined;
   number: number;
   loading: boolean;
+  next?: boolean;
   onPlay: (group: LessonGroup, checkpoint: HomeRowCheckpoint) => void;
 }): JSXElement {
   const key = (): string =>
@@ -267,6 +274,7 @@ function GameCheckpointButton(props: {
         locked()
           ? "cursor-not-allowed text-sub opacity-55"
           : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
+        props.next === true && !locked() && !done() ? "ring-2 ring-main" : "",
       )}
       onClick={onClick}
       disabled={props.loading}
@@ -300,13 +308,18 @@ function GameCheckpointButton(props: {
         <Show when={done()}>
           <Stars count={3} />
         </Show>
+        <Show when={props.next === true && !locked() && !done()}>
+          <span class="rounded-full bg-main px-3 py-1 text-em-xs font-bold text-bg">
+            Do this next
+          </span>
+        </Show>
       </div>
       <div class="border-t border-bg px-3 py-2.5 text-center">
         <div class="truncate font-medium" title={props.checkpoint.label}>
           {props.checkpoint.label}
         </div>
         <div class="mt-0.5 text-em-xs text-sub">
-          <Show when={done()} fallback="checkpoint game">
+          <Show when={done()} fallback={checkpointSubtitle(props.checkpoint)}>
             best {props.progressFor(key())?.bestScore ?? 0}
           </Show>
         </div>
@@ -438,7 +451,8 @@ function ProgressSummary(props: {
     const p = props.progress;
     return allCheckpoints.filter(
       (item) =>
-        p?.get(checkpointKey(item.group, item.checkpoint))?.completed === true,
+        p?.get(checkpointProgressKey(item.group, item.checkpoint))
+          ?.completed === true,
     ).length;
   });
 
@@ -570,51 +584,6 @@ lessonOrder.forEach((id, i) => {
   previousLessonId.set(id, i === 0 ? undefined : lessonOrder[i - 1]);
   lessonIndex.set(id, i);
 });
-
-type ContinueItem =
-  | { kind: "lesson"; lesson: Lesson }
-  | { kind: "checkpoint"; group: LessonGroup; checkpoint: HomeRowCheckpoint };
-
-/** Progress-map key for a checkpoint's game result, matching GameCheckpointButton. */
-const checkpointKey = (
-  group: LessonGroup,
-  checkpoint: HomeRowCheckpoint,
-): string =>
-  `${GAME_PREFIX}${group.id}:${HOME_ROW_GAME_IDS[checkpoint.gameType]}`;
-
-// Same lesson/checkpoint interleaving as rowItemsFor, flattened across every
-// group and carrying the owning group (needed to key checkpoint progress and
-// to launch the game) - lets "continue where you left off" stop at an
-// un-played checkpoint instead of skipping straight to the next lesson.
-const continueOrder: ContinueItem[] = lessonGroups.flatMap((group) =>
-  rowItemsFor(group).map(
-    (item): ContinueItem =>
-      item.kind === "lesson"
-        ? { kind: "lesson", lesson: item.lesson }
-        : { kind: "checkpoint", group, checkpoint: item.checkpoint },
-  ),
-);
-
-const allCheckpoints = continueOrder.filter(
-  (item): item is Extract<ContinueItem, { kind: "checkpoint" }> =>
-    item.kind === "checkpoint",
-);
-
-const lessonCardNumber = (lessonId: string): number =>
-  continueOrder.findIndex(
-    (item) => item.kind === "lesson" && item.lesson.id === lessonId,
-  ) + 1;
-
-const checkpointCardNumber = (
-  group: LessonGroup,
-  checkpoint: HomeRowCheckpoint,
-): number =>
-  continueOrder.findIndex(
-    (item) =>
-      item.kind === "checkpoint" &&
-      item.group.id === group.id &&
-      item.checkpoint.gameType === checkpoint.gameType,
-  ) + 1;
 
 function ContentButton(props: {
   title: string;
@@ -952,6 +921,13 @@ export function LessonsPage(): JSXElement {
   const isLessonLocked = (id: string): boolean => {
     const index = lessonIndex.get(id);
     if (index === undefined) return false; // not a gated curriculum lesson
+    const progressMap = progress.data;
+    if (
+      progressMap !== undefined &&
+      isLessonBlockedByCheckpoint(id, progressMap)
+    ) {
+      return true;
+    }
     const prev = previousLessonId.get(id);
     const prevProgress = prev !== undefined ? progressFor(prev) : undefined;
     return isLessonLockedAt(
@@ -963,6 +939,13 @@ export function LessonsPage(): JSXElement {
 
   const getLessonLockMessage = (id: string): string | undefined => {
     if (!isLessonLocked(id)) return undefined;
+    const progressMap = progress.data;
+    if (progressMap !== undefined) {
+      const block = incompleteCheckpointBeforeLesson(id, progressMap);
+      if (block !== undefined) {
+        return checkpointLockMessage(block.checkpoint);
+      }
+    }
     const prevId = previousLessonId.get(id);
     if (prevId === undefined) return undefined;
     const previous = findLesson(prevId);
@@ -993,7 +976,8 @@ export function LessonsPage(): JSXElement {
     return continueOrder.find((item) =>
       item.kind === "lesson"
         ? p.get(item.lesson.id)?.completed !== true
-        : p.get(checkpointKey(item.group, item.checkpoint))?.completed !== true,
+        : p.get(checkpointProgressKey(item.group, item.checkpoint))
+            ?.completed !== true,
     );
   });
 
@@ -1026,6 +1010,18 @@ export function LessonsPage(): JSXElement {
     const item = frontierItem();
     return item?.kind === "lesson" ? item.lesson.id : undefined;
   });
+  const frontierCheckpointTarget = createMemo(
+    ():
+      | { groupId: string; gameType: HomeRowCheckpoint["gameType"] }
+      | undefined => {
+      const item = frontierItem();
+      if (item?.kind !== "checkpoint") return undefined;
+      return {
+        groupId: item.group.id,
+        gameType: item.checkpoint.gameType,
+      };
+    },
+  );
 
   // Once progress is available, tuck finished groups away and expose the
   // current frontier. Manual choices made during this session always win.
@@ -1486,11 +1482,15 @@ export function LessonsPage(): JSXElement {
           title: continueLabel(),
           description:
             item.kind === "checkpoint"
-              ? "Use the keys you just learned in a quick game."
+              ? item.checkpoint.gameType === "toss"
+                ? "Play the full Type Toss round to unlock your next lesson."
+                : "Beat 3 waves in this checkpoint game to unlock your next lesson."
               : "Keep moving along your personalized lesson path.",
           action:
             item.kind === "checkpoint"
-              ? "Play checkpoint"
+              ? item.checkpoint.gameType === "toss"
+                ? "Play full round"
+                : "Play checkpoint · 3 waves"
               : hasStarted
                 ? "Continue lesson"
                 : "Start first lesson",
@@ -1555,11 +1555,12 @@ export function LessonsPage(): JSXElement {
   return (
     <Page id="lessons">
       <div class="content-grid grid gap-5">
-        <section class="text-center text-sub">
-          Build muscle memory from the ground up. Each drill warms up with a
-          little rhythm, then turns into real words using the keys you know -
-          and gets easier or harder to match your grade. Your best speed and
-          accuracy are saved per lesson.
+        <section class="rounded bg-sub-alt px-4 py-3 text-center text-sm text-sub">
+          <p class="font-medium text-text">Welcome to your typing lessons!</p>
+          <p class="mt-1">
+            Tap the big green button below to see what to do next. Finish
+            checkpoint games when they appear — they unlock the next lesson.
+          </p>
         </section>
 
         <Show when={!isAuthenticated()}>
@@ -1582,8 +1583,8 @@ export function LessonsPage(): JSXElement {
               Welcome! Your teacher is setting up your class.
             </div>
             <p class="mt-1 text-sm text-sub">
-              You can start Typing Practice and beginner lessons now. Class
-              assignments and scores will appear automatically when ready.
+              You can start lessons now. Class assignments and scores will
+              appear automatically when ready.
             </p>
           </section>
         </Show>
@@ -2046,6 +2047,12 @@ export function LessonsPage(): JSXElement {
                                     group,
                                     item.checkpoint,
                                   )}
+                                  next={
+                                    frontierCheckpointTarget()?.groupId ===
+                                      group.id &&
+                                    frontierCheckpointTarget()?.gameType ===
+                                      item.checkpoint.gameType
+                                  }
                                   progressFor={progressFor}
                                   loading={lessonGameLoading()}
                                   onPlay={(g, c) =>
@@ -2647,13 +2654,14 @@ export function LessonsPage(): JSXElement {
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
-          onResult={(score, wave) => {
+          onResult={(score, wave, _label, _group, checkpointCleared) => {
             const gid = lessonTossGroupId();
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:type-toss`,
                 score,
                 wave,
+                { cleared: checkpointCleared },
               );
               claimRecommendedGame("type-toss", score, wave);
             }

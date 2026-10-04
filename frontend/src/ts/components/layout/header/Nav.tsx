@@ -140,26 +140,26 @@ export function Nav(): JSXElement {
           >
             <Button
               variant="text"
-              fa={{ icon: "fa-keyboard", fixedWidth: true }}
-              text="Type"
-              class={mobileDestinationClass("test")}
+              fa={{ icon: "fa-graduation-cap", fixedWidth: true }}
+              text="Lessons"
+              class={mobileDestinationClass("lessons")}
               href="/"
               router-link
-              {...pageProperties("test", "Typing practice")}
+              {...pageProperties("lessons", "Typing lessons")}
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            <Button
+              variant="text"
+              fa={{ icon: "fa-keyboard", fixedWidth: true }}
+              text="Free typing"
+              class={mobileDestinationClass("test")}
+              href="/test"
+              router-link
+              {...pageProperties("test", "Free typing practice")}
               onClick={() => {
                 setMobileMenuOpen(false);
                 if (getActivePage() === "test") restartTestEvent.dispatch();
               }}
-            />
-            <Button
-              variant="text"
-              fa={{ icon: "fa-graduation-cap", fixedWidth: true }}
-              text="Continue lesson"
-              class={mobileDestinationClass("lessons")}
-              href="/lessons"
-              router-link
-              {...pageProperties("lessons", "Continue lesson")}
-              onClick={() => setMobileMenuOpen(false)}
             />
             <Button
               variant="text"
@@ -221,25 +221,6 @@ export function Nav(): JSXElement {
       <Button
         variant="text"
         fa={{
-          icon: "fa-keyboard",
-          fixedWidth: true,
-        }}
-        router-link
-        href="/"
-        class={destinationButtonClass()}
-        {...pageProperties("test", "Typing practice")}
-        dataset={{
-          "data-nav-item": "test",
-        }}
-        onClick={() => {
-          if (getActivePage() === "test") restartTestEvent.dispatch();
-        }}
-      >
-        {navLabel("Type")}
-      </Button>
-      <Button
-        variant="text"
-        fa={{
           icon: "fa-graduation-cap",
           fixedWidth: true,
         }}
@@ -248,10 +229,29 @@ export function Nav(): JSXElement {
           "data-nav-item": "lessons",
         }}
         class={destinationButtonClass()}
-        href="/lessons"
-        {...pageProperties("lessons", "Continue lesson")}
+        href="/"
+        {...pageProperties("lessons", "Typing lessons")}
       >
-        {navLabel("Continue lesson")}
+        {navLabel("Lessons")}
+      </Button>
+      <Button
+        variant="text"
+        fa={{
+          icon: "fa-keyboard",
+          fixedWidth: true,
+        }}
+        router-link
+        href="/test"
+        class={destinationButtonClass()}
+        {...pageProperties("test", "Free typing practice")}
+        dataset={{
+          "data-nav-item": "test",
+        }}
+        onClick={() => {
+          if (getActivePage() === "test") restartTestEvent.dispatch();
+        }}
+      >
+        {navLabel("Free typing")}
       </Button>
       <Button
         variant="text"

@@ -12,6 +12,7 @@ import {
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
+import { LESSON_CHECKPOINT_MAX_WAVE } from "../../lessons/lesson-checkpoints";
 import { cn } from "../../utils/cn";
 import {
   createWordDefenderGame,
@@ -79,7 +80,7 @@ export function WordDefenderModal(props: Props): JSXElement {
       containerRef,
       words,
       usedDifficulty,
-      wordsOverride !== undefined ? 5 : 0,
+      wordsOverride !== undefined ? LESSON_CHECKPOINT_MAX_WAVE : 0,
     );
     setAvatarVisible(true);
     game.events.on("game-avatar-visible", setAvatarVisible);

@@ -154,7 +154,7 @@ export function RacePage(): JSXElement {
                 <Button
                   text="go to the test"
                   fa={{ icon: "fa-keyboard" }}
-                  href="/"
+                  href="/test"
                   router-link
                 />
               </div>

@@ -62,6 +62,7 @@ type Props = {
     wave: number,
     difficultyLabel: string,
     wordListGroup: string,
+    checkpointCleared?: boolean,
   ) => void;
 };
 
@@ -108,9 +109,16 @@ export function TypeTossModal(props: Props): JSXElement {
     setPhase("playing");
     await Promise.resolve();
     if (containerRef === undefined) return;
+    const lessonCheckpoint = wordsOverride !== undefined;
     const usedDifficulty =
       multiplayerRoom === undefined
-        ? difficulty()
+        ? lessonCheckpoint
+          ? ({
+              label: "Medium",
+              cols: 3,
+              time: 60,
+            } satisfies GameDifficulty)
+          : difficulty()
         : ({
             label: "Medium",
             cols: 3,
@@ -123,15 +131,25 @@ export function TypeTossModal(props: Props): JSXElement {
       usedDifficulty,
       multiplayerRoom !== undefined,
       multiplayerRoom?.seed,
+      lessonCheckpoint,
     );
     setAvatarVisible(true);
     game.events.on("game-avatar-visible", setAvatarVisible);
-    game.events.on("game-result", (data: { score: number; wave: number }) => {
-      setAvatarVisible(false);
-      if (multiplayerRoom === undefined) {
-        onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
-      }
-    });
+    game.events.on(
+      "game-result",
+      (data: { score: number; wave: number; cleared?: boolean }) => {
+        setAvatarVisible(false);
+        if (multiplayerRoom === undefined) {
+          onResult?.(
+            data.score,
+            data.wave,
+            usedDifficulty.label,
+            usedGroup,
+            data.cleared,
+          );
+        }
+      },
+    );
     if (multiplayerRoom !== undefined) {
       game.events.on(
         "type-toss-local-stats",

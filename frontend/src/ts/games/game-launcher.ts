@@ -34,7 +34,7 @@ export function startGame(game: FunboxGame): void {
   if (getActivePage() === "test") {
     restartTestEvent.dispatch();
   } else {
-    navigationEvent.dispatch({ url: "/", options: {} });
+    navigationEvent.dispatch({ url: "/test", options: {} });
   }
 }
 

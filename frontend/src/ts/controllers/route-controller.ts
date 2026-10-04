@@ -62,6 +62,13 @@ const routes: Route[] = [
     path: "/",
     load: async (_params, options) => {
       if (!(await requireLogin(options))) return;
+      await PageController.change("lessons", options);
+    },
+  },
+  {
+    path: "/test",
+    load: async (_params, options) => {
+      if (!(await requireLogin(options))) return;
       await PageController.change("test", options);
     },
   },

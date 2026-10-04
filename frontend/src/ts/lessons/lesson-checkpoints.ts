@@ -21,9 +21,13 @@ export const HOME_ROW_GAME_IDS: Record<HomeRowGameType, string> = {
   ghost: "ghost-hunter",
 };
 
-// Games interspersed through the "home-row" group specifically, each
-// reviewing the lessons just completed. Non-blocking: lessons keep unlocking
-// purely by lesson completion (see isLessonLocked) regardless of these.
+/** Lesson checkpoint games run for this many waves (see recordGameResult). */
+export const LESSON_CHECKPOINT_MAX_WAVE = 3;
+/** Cleared when the game reports `wave` strictly greater than this. */
+export const LESSON_CHECKPOINT_COMPLETE_WAVE = 3;
+
+// Games interspersed through lesson groups; the next lesson in the grid stays
+// locked until the checkpoint is cleared (see isLessonBlockedByCheckpoint).
 export const HOME_ROW_CHECKPOINTS: HomeRowCheckpoint[] = [
   {
     afterLessonId: "home-middle",

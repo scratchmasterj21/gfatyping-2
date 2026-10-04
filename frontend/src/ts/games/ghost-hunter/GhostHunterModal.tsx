@@ -13,6 +13,7 @@ import {
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
+import { LESSON_CHECKPOINT_MAX_WAVE } from "../../lessons/lesson-checkpoints";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import {
@@ -153,7 +154,7 @@ export function GhostHunterModal(props: Props): JSXElement {
       multiplayerRole !== undefined
         ? (multiplayerMaxWave ?? 5)
         : wordsOverride !== undefined
-          ? 5
+          ? LESSON_CHECKPOINT_MAX_WAVE
           : 0,
       multiplayerRole,
     );

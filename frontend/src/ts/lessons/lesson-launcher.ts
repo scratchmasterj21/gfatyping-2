@@ -55,7 +55,7 @@ export function startCustomDrill(drill: {
   if (getActivePage() === "test") {
     restartTestEvent.dispatch();
   } else {
-    navigationEvent.dispatch({ url: "/", options: {} });
+    navigationEvent.dispatch({ url: "/test", options: {} });
   }
 }
 
