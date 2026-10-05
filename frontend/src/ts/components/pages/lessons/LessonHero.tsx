@@ -7,6 +7,7 @@ import { cn } from "../../../utils/cn";
 import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
+import { WeeklyQuests } from "./WeeklyQuests";
 
 export type PracticeRecommendation = {
   icon: FaSolidIcon;
@@ -47,6 +48,8 @@ export function LessonHero(props: {
   adaptiveDoneToday: boolean;
   primaryLoading: boolean;
   avatar?: AvatarProps;
+  weeklyQuestProgress?: Record<string, number>;
+  weeklyQuestClaimed?: string[];
 }): JSXElement {
   return (
     <>
@@ -145,7 +148,8 @@ export function LessonHero(props: {
                   Your next step
                 </h1>
                 <p class="text-sm text-sub">
-                  Then try the extra practice below if you have time.
+                  Daily extras and weekly quests are below; your lesson list is
+                  further down.
                 </p>
               </div>
               <span class="shrink-0 rounded bg-sub-alt px-3 py-1 text-sm font-bold text-main">
@@ -259,6 +263,13 @@ export function LessonHero(props: {
                 </button>
               </div>
             </div>
+
+            <Show when={props.signedIn}>
+              <WeeklyQuests
+                progress={props.weeklyQuestProgress ?? {}}
+                claimed={props.weeklyQuestClaimed ?? []}
+              />
+            </Show>
           </section>
         )}
       </Show>

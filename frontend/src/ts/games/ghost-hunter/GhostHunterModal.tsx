@@ -16,6 +16,17 @@ import { getAuthenticatedUser } from "../../firebase";
 import { LESSON_CHECKPOINT_MAX_WAVE } from "../../lessons/lesson-checkpoints";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
+import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameModalFrame } from "../components/GameModalFrame";
+import { GameModalHeader } from "../components/GameModalHeader";
+import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
+import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
+import { GameSetupSection } from "../components/GameSetupSection";
+import { groupWordListOptions } from "../components/groupWordListOptions";
+import { MULTIPLAYER_UNLOCK_HINT_GHOST } from "../components/multiplayer-unlock-hints";
+import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
+import { WordListPicker } from "../components/WordListPicker";
 import {
   getWordListOptions,
   WordListOption,
@@ -52,18 +63,6 @@ const MULTIPLAYER_OPTIONS = OPTIONS.slice(
     OPTIONS.findIndex((option) => option.id === "all-keys"),
   ),
 );
-
-function grouped(
-  options: WordListOption[],
-): { group: string; items: WordListOption[] }[] {
-  const map = new Map<string, WordListOption[]>();
-  for (const o of options) {
-    const list = map.get(o.group) ?? [];
-    list.push(o);
-    map.set(o.group, list);
-  }
-  return [...map.entries()].map(([group, items]) => ({ group, items }));
-}
 
 type Props = {
   open: boolean;
@@ -106,7 +105,7 @@ export function GhostHunterModal(props: Props): JSXElement {
   let lastPositionWrite = 0;
 
   const groups = createMemo(() =>
-    grouped(mode() === "together" ? MULTIPLAYER_OPTIONS : OPTIONS),
+    groupWordListOptions(mode() === "together" ? MULTIPLAYER_OPTIONS : OPTIONS),
   );
   const availableDifficulties = createMemo(() =>
     mode() === "together"
@@ -379,391 +378,285 @@ export function GhostHunterModal(props: Props): JSXElement {
     }
   });
 
+  const frameLayout = createMemo((): "pick" | "playing" | "compact" => {
+    if (phase() === "playing") return "playing";
+    if (phase() === "pick" && props.lessonWords === undefined) return "pick";
+    return "compact";
+  });
+
+  const setPlayMode = (next: "solo" | "together"): void => {
+    setMode(next);
+    if (next === "together") {
+      setSelected(MULTIPLAYER_OPTIONS[0] as WordListOption);
+      if (difficulty().label === "Easy") {
+        setDifficulty(GHOST_DIFFICULTIES[1] as GameDifficulty);
+      }
+    }
+  };
+
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95">
-        <div
-          class={cn(
-            "relative flex flex-col overflow-hidden rounded-xl border border-main/30 bg-bg shadow-2xl",
-            phase() === "playing"
-              ? "h-[90vh] w-[95vw] max-w-5xl"
-              : "max-h-[94vh] w-full max-w-lg overflow-y-auto p-4 sm:p-5",
-          )}
-        >
-          <button
-            type="button"
-            class="absolute top-3 right-3 z-10 flex min-h-10 items-center justify-center rounded bg-sub-alt px-3 text-sm font-semibold text-sub hover:text-text"
-            onClick={() => props.onClose()}
-          >
-            ← Back to lessons
-          </button>
-
-          {/* Picker — hidden in lesson mode */}
-          <Show when={phase() === "pick" && props.lessonWords === undefined}>
-            <h2 class="mb-1 pr-40 text-lg font-bold text-text">Ghost Hunter</h2>
-            <p class="mt-1 text-em-xs font-bold tracking-wider text-main uppercase">
-              How to play
-            </p>
-            <p class="mb-3 text-em-xs leading-snug text-sub">
-              {mode() === "together"
-                ? "Move ↑/↓ · face ←/→ · type the shared ghosts with your team. Everyone protects the same logs."
-                : "Move ↑/↓ · face ←/→ · type a ghost's word. Type ❄️ freeze or 🧨 tnt, then press ENTER to use it."}
-            </p>
-
-            <div class="mb-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                class={cn(
-                  "rounded px-3 py-1.5 text-sm font-semibold transition-colors",
-                  mode() === "solo"
-                    ? "bg-main text-bg"
-                    : "bg-sub-alt text-sub hover:text-text",
-                )}
-                onClick={() => setMode("solo")}
-              >
-                Play solo
-              </button>
-              <button
-                type="button"
-                class={cn(
-                  "rounded px-3 py-1.5 text-sm font-semibold transition-colors",
-                  mode() === "together"
-                    ? "bg-main text-bg"
-                    : "bg-sub-alt text-sub hover:text-text",
-                )}
-                disabled={props.multiplayerUnlocked !== true}
-                onClick={() => {
-                  if (props.multiplayerUnlocked !== true) return;
-                  setMode("together");
-                  setSelected(MULTIPLAYER_OPTIONS[0] as WordListOption);
-                  if (difficulty().label === "Easy") {
-                    setDifficulty(GHOST_DIFFICULTIES[1] as GameDifficulty);
-                  }
-                }}
-              >
-                {props.multiplayerUnlocked === true
-                  ? "Play together"
-                  : "🔒 Play together"}
-              </button>
-            </div>
-
-            <Show when={props.multiplayerUnlocked !== true}>
-              <p class="mb-3 text-center text-em-xs text-sub">
-                Unlock the All keys lessons to play multiplayer.
-              </p>
-            </Show>
-
-            <p class="mb-1 text-em-xs font-semibold tracking-wider text-sub uppercase">
-              Choose difficulty
-            </p>
-            <div class="mb-3 flex gap-2">
-              <For each={availableDifficulties()}>
-                {(d) => (
-                  <button
-                    type="button"
-                    class={cn(
-                      "flex-1 rounded px-2 py-1 text-em-xs font-semibold transition-colors",
-                      difficulty().label === d.label
-                        ? "bg-main text-bg"
-                        : "bg-sub-alt text-sub hover:text-text",
-                    )}
-                    onClick={() => setDifficulty(d)}
-                  >
-                    {d.label}
-                  </button>
-                )}
-              </For>
-            </div>
-
-            <Show when={mode() === "together"}>
-              <p class="mb-1 text-em-xs font-semibold tracking-wider text-sub uppercase">
-                Match length
-              </p>
-              <div class="mb-3 grid grid-cols-2 gap-2">
-                <For each={[5, 10] as const}>
-                  {(waves) => (
-                    <button
-                      type="button"
-                      class={cn(
-                        "rounded px-2 py-1 text-em-xs font-semibold transition-colors",
-                        maxWave() === waves
-                          ? "bg-main text-bg"
-                          : "bg-sub-alt text-sub hover:text-text",
-                      )}
-                      onClick={() => setMaxWave(waves)}
-                    >
-                      {waves} waves
-                    </button>
-                  )}
-                </For>
-              </div>
-            </Show>
-
-            <p class="mb-1 text-em-xs font-semibold tracking-wider text-sub uppercase">
-              Choose a word list
-            </p>
-            <div class="max-h-40 overflow-y-auto rounded border border-main/20 bg-sub-alt sm:max-h-52">
-              <For each={groups()}>
-                {(g) => (
-                  <div>
-                    <div class="sticky top-0 bg-sub-alt px-3 py-1 text-em-xs font-bold tracking-widest text-sub uppercase">
-                      {g.group}
-                    </div>
-                    <For each={g.items}>
-                      {(opt) => (
-                        <button
-                          type="button"
-                          class={cn(
-                            "w-full px-4 py-1.5 text-left text-em-xs transition-colors",
-                            selected().id === opt.id
-                              ? "bg-main/20 text-text"
-                              : "text-sub hover:bg-main/10 hover:text-text",
-                          )}
-                          onClick={() => setSelected(opt)}
-                        >
-                          {opt.label}
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                )}
-              </For>
-            </div>
-
-            <Show
-              when={mode() === "together"}
-              fallback={
-                <button
-                  type="button"
-                  class="button primary mt-4"
-                  onClick={() => void startGame()}
-                >
-                  Start solo game →
-                </button>
-              }
-            >
-              <div class="mt-3 grid gap-2 rounded bg-sub-alt p-3">
-                <button
-                  type="button"
-                  class="button primary"
-                  disabled={roomBusy()}
-                  onClick={() => void createRoom()}
-                >
-                  {roomBusy() ? "Please wait…" : "Create multiplayer room"}
-                </button>
-                <div class="text-center text-em-xs text-sub">
-                  or join a room
-                </div>
-                <div class="flex gap-2">
-                  <input
-                    class="min-w-0 flex-1 rounded bg-bg px-3 py-2 text-center font-bold tracking-widest text-text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="6-digit code"
-                    value={joinCode()}
-                    onInput={(event) =>
-                      setJoinCode(
-                        event.currentTarget.value
-                          .replace(/\D/g, "")
-                          .slice(0, 6),
-                      )
-                    }
-                  />
-                  <button
-                    type="button"
-                    class="button"
-                    disabled={roomBusy()}
-                    onClick={() => void joinRoom()}
-                  >
-                    Join
-                  </button>
-                </div>
-              </div>
-            </Show>
-          </Show>
-
-          <Show when={phase() === "loading"}>
-            <div class="flex items-center justify-center py-12 text-sub">
-              Loading…
-            </div>
-          </Show>
-
-          <Show when={phase() === "lobby"}>
-            <div class="grid gap-4 p-6 pt-16">
-              <div class="text-center">
-                <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
-                  room code
-                </div>
-                <div class="text-4xl font-bold tracking-[0.25em] text-main">
-                  {roomCode()}
-                </div>
-                <div class="mt-2 text-sm text-sub">
-                  {room()?.wordListLabel} · {room()?.difficultyLabel} ·{" "}
-                  {room()?.maxWave ?? 5} waves
-                </div>
-              </div>
-              <div class="grid gap-2">
-                <div class="font-semibold text-text">
-                  Players ({Object.keys(room()?.players ?? {}).length}/8)
-                </div>
-                <For each={Object.values(room()?.players ?? {})}>
-                  {(player) => (
-                    <div class="flex items-center justify-between rounded bg-sub-alt px-3 py-2">
-                      <span class="text-text">
-                        {player.name}
-                        {player.uid === room()?.hostUid ? " · host" : ""}
-                      </span>
-                      <span class={player.online ? "text-main" : "text-sub"}>
-                        {player.online ? "ready" : "offline"}
-                      </span>
-                    </div>
-                  )}
-                </For>
-              </div>
+      <GameModalFrame layout={frameLayout()} onClose={() => props.onClose()}>
+        <Show when={phase() === "pick" && props.lessonWords === undefined}>
+          <GamePickLayout
+            header={
+              <GameModalHeader
+                title="Ghost Hunter"
+                onClose={() => props.onClose()}
+              />
+            }
+            footer={
               <Show
-                when={room()?.status === "countdown"}
+                when={mode() === "together"}
                 fallback={
-                  <Show
-                    when={room()?.hostUid === getAuthenticatedUser()?.uid}
-                    fallback={
-                      <div class="text-center text-sub">
-                        Waiting for the host to start…
-                      </div>
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="button primary"
-                      disabled={Object.keys(room()?.players ?? {}).length < 2}
-                      onClick={() => {
-                        const code = roomCode();
-                        if (code !== undefined) void startGhostRoom(code);
-                      }}
-                    >
-                      Start team game →
-                    </button>
-                  </Show>
+                  <GameSetupPrimaryAction
+                    text="Start solo game"
+                    onClick={() => void startGame()}
+                  />
                 }
               >
-                <div class="text-center text-xl font-bold text-main">
-                  Get ready…
-                </div>
+                <GameMultiplayerRoomFooter
+                  roomBusy={roomBusy()}
+                  joinCode={joinCode()}
+                  onJoinCodeChange={setJoinCode}
+                  onCreateRoom={() => void createRoom()}
+                  onJoinRoom={() => void joinRoom()}
+                />
               </Show>
-            </div>
-          </Show>
+            }
+          >
+            <GameSetupSection title="How to play" accent>
+              <p class="text-em-sm leading-snug text-sub">
+                {mode() === "together"
+                  ? "Move ↑/↓ · face ←/→ · type the shared ghosts with your team. Everyone protects the same logs."
+                  : "Move ↑/↓ · face ←/→ · type a ghost's word. Type ❄️ freeze or 🧨 tnt, then press ENTER to use it."}
+              </p>
+            </GameSetupSection>
 
-          <Show when={phase() === "playing"}>
-            <Show when={roomCode() !== undefined}>
-              <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
-                <div class="font-bold text-main">Team room {roomCode()}</div>
-                <For each={Object.values(room()?.players ?? {})}>
-                  {(player) => (
-                    <div class="flex min-w-44 justify-between gap-4 text-sub">
-                      <span class="max-w-28 truncate">{player.name}</span>
-                      <span>{player.score}</span>
-                    </div>
-                  )}
-                </For>
-              </div>
+            <GameSetupSection title="Mode">
+              <SoloTogetherToggle
+                mode={mode()}
+                multiplayerUnlocked={props.multiplayerUnlocked === true}
+                unlockHint={MULTIPLAYER_UNLOCK_HINT_GHOST}
+                onModeChange={setPlayMode}
+              />
+            </GameSetupSection>
+
+            <GameSetupSection title="Choose difficulty">
+              <DifficultySegmented
+                options={availableDifficulties()}
+                selectedLabel={difficulty().label}
+                onSelect={(d) => setDifficulty(d)}
+                compact
+              />
+            </GameSetupSection>
+
+            <Show when={mode() === "together"}>
+              <GameSetupSection title="Match length">
+                <div class="grid grid-cols-2 gap-2">
+                  <For each={[5, 10] as const}>
+                    {(waves) => (
+                      <button
+                        type="button"
+                        class={cn(
+                          "rounded-lg px-2 py-2 text-em-sm font-semibold",
+                          maxWave() === waves
+                            ? "bg-main text-bg"
+                            : "bg-sub-alt text-sub",
+                        )}
+                        onClick={() => setMaxWave(waves)}
+                      >
+                        {waves} waves
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </GameSetupSection>
             </Show>
-            <div class="pointer-events-none absolute inset-0 z-10 overflow-hidden">
-              <Show
-                when={roomCode() === undefined && getAuthenticatedUser()?.uid}
-              >
-                {(uid) => (
-                  <div
-                    class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-[top] duration-100 ease-linear"
-                    style={{
-                      left: "50%",
-                      top: `calc(68% + ${28 + localPlayerPosition() * 130}px)`,
-                    }}
-                  >
-                    <div class="relative z-10 h-8 w-8 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main">
-                      <UserAvatar uid={uid()} class="h-8 w-8" />
-                    </div>
-                  </div>
-                )}
-              </Show>
-              <For each={multiplayerPlayers()}>
+
+            <GameSetupSection title="Choose a word list">
+              <WordListPicker
+                groups={groups()}
+                selectedId={selected().id}
+                onSelect={setSelected}
+                listClass="max-h-40 sm:max-h-52"
+              />
+            </GameSetupSection>
+          </GamePickLayout>
+        </Show>
+
+        <Show when={phase() === "loading"}>
+          <div class="flex items-center justify-center py-12 text-sub">
+            Loading…
+          </div>
+        </Show>
+
+        <Show when={phase() === "lobby"}>
+          <div class="grid gap-4 p-6 pt-16">
+            <div class="text-center">
+              <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
+                room code
+              </div>
+              <div class="text-4xl font-bold tracking-[0.25em] text-main">
+                {roomCode()}
+              </div>
+              <div class="mt-2 text-sm text-sub">
+                {room()?.wordListLabel} · {room()?.difficultyLabel} ·{" "}
+                {room()?.maxWave ?? 5} waves
+              </div>
+            </div>
+            <div class="grid gap-2">
+              <div class="font-semibold text-text">
+                Players ({Object.keys(room()?.players ?? {}).length}/8)
+              </div>
+              <For each={Object.values(room()?.players ?? {})}>
                 {(player) => (
-                  <div
-                    class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-[top] duration-200 ease-linear"
-                    style={{
-                      left: `calc(50% + ${playerXOffset(player.uid)}px)`,
-                      top: `calc(68% + ${
-                        28 +
-                        (player.uid === getAuthenticatedUser()?.uid
-                          ? localPlayerPosition()
-                          : (player.position ?? 0.5)) *
-                          130
-                      }px)`,
-                    }}
-                  >
-                    <div class="relative z-10 h-8 w-8 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main">
-                      <UserAvatar uid={player.uid} class="h-8 w-8" />
-                    </div>
-                    <Show when={player.uid !== getAuthenticatedUser()?.uid}>
-                      <div
-                        class="-mt-1 h-7 w-5 rounded bg-main opacity-80"
-                        style={{
-                          transform:
-                            player.facing === "left"
-                              ? "scaleX(-1)"
-                              : "scaleX(1)",
-                        }}
-                      ></div>
-                      <span class="mt-0.5 max-w-20 truncate rounded bg-bg/80 px-1 text-[10px] text-text">
-                        {player.name}
-                      </span>
-                    </Show>
+                  <div class="flex items-center justify-between rounded bg-sub-alt px-3 py-2">
+                    <span class="text-text">
+                      {player.name}
+                      {player.uid === room()?.hostUid ? " · host" : ""}
+                    </span>
+                    <span class={player.online ? "text-main" : "text-sub"}>
+                      {player.online ? "ready" : "offline"}
+                    </span>
                   </div>
                 )}
               </For>
             </div>
-            <div
-              ref={(el) => {
-                containerRef = el;
-              }}
-              class="h-full w-full"
-            ></div>
-          </Show>
-
-          <Show when={phase() === "results"}>
-            <div class="grid gap-4 p-6 pt-16">
-              <div class="text-center text-2xl font-bold text-main">
-                Team game complete!
-              </div>
-              <div class="grid gap-2">
-                <For
-                  each={Object.values(room()?.players ?? {}).sort(
-                    (a, b) => b.score - a.score,
-                  )}
-                >
-                  {(player, index) => (
-                    <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
-                      <span class="w-6 font-bold text-main">{index() + 1}</span>
-                      <span class="min-w-0 flex-1 truncate text-text">
-                        {player.name}
-                      </span>
-                      <span class="font-bold text-text">{player.score}</span>
-                      <span class="text-em-xs text-sub">
-                        wave {player.wave}
-                      </span>
+            <Show
+              when={room()?.status === "countdown"}
+              fallback={
+                <Show
+                  when={room()?.hostUid === getAuthenticatedUser()?.uid}
+                  fallback={
+                    <div class="text-center text-sub">
+                      Waiting for the host to start…
                     </div>
-                  )}
-                </For>
+                  }
+                >
+                  <GameSetupPrimaryAction
+                    text="Start team game"
+                    disabled={Object.keys(room()?.players ?? {}).length < 2}
+                    onClick={() => {
+                      const code = roomCode();
+                      if (code !== undefined) void startGhostRoom(code);
+                    }}
+                  />
+                </Show>
+              }
+            >
+              <div class="text-center text-xl font-bold text-main">
+                Get ready…
               </div>
-              <button
-                type="button"
-                class="button primary"
-                onClick={() => props.onClose()}
-              >
-                Back to lessons
-              </button>
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={phase() === "playing"}>
+          <Show when={roomCode() !== undefined}>
+            <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
+              <div class="font-bold text-main">Team room {roomCode()}</div>
+              <For each={Object.values(room()?.players ?? {})}>
+                {(player) => (
+                  <div class="flex min-w-44 justify-between gap-4 text-sub">
+                    <span class="max-w-28 truncate">{player.name}</span>
+                    <span>{player.score}</span>
+                  </div>
+                )}
+              </For>
             </div>
           </Show>
-        </div>
-      </div>
+          <div class="pointer-events-none absolute inset-0 z-10 overflow-hidden">
+            <Show
+              when={roomCode() === undefined && getAuthenticatedUser()?.uid}
+            >
+              {(uid) => (
+                <div
+                  class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-[top] duration-100 ease-linear"
+                  style={{
+                    left: "50%",
+                    top: `calc(68% + ${28 + localPlayerPosition() * 130}px)`,
+                  }}
+                >
+                  <div class="relative z-10 h-8 w-8 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main">
+                    <UserAvatar uid={uid()} class="h-8 w-8" />
+                  </div>
+                </div>
+              )}
+            </Show>
+            <For each={multiplayerPlayers()}>
+              {(player) => (
+                <div
+                  class="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center transition-[top] duration-200 ease-linear"
+                  style={{
+                    left: `calc(50% + ${playerXOffset(player.uid)}px)`,
+                    top: `calc(68% + ${
+                      28 +
+                      (player.uid === getAuthenticatedUser()?.uid
+                        ? localPlayerPosition()
+                        : (player.position ?? 0.5)) *
+                        130
+                    }px)`,
+                  }}
+                >
+                  <div class="relative z-10 h-8 w-8 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main">
+                    <UserAvatar uid={player.uid} class="h-8 w-8" />
+                  </div>
+                  <Show when={player.uid !== getAuthenticatedUser()?.uid}>
+                    <div
+                      class="-mt-1 h-7 w-5 rounded bg-main opacity-80"
+                      style={{
+                        transform:
+                          player.facing === "left" ? "scaleX(-1)" : "scaleX(1)",
+                      }}
+                    ></div>
+                    <span class="mt-0.5 max-w-20 truncate rounded bg-bg/80 px-1 text-[10px] text-text">
+                      {player.name}
+                    </span>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+          <div
+            ref={(el) => {
+              containerRef = el;
+            }}
+            class="h-full w-full"
+          ></div>
+        </Show>
+
+        <Show when={phase() === "results"}>
+          <div class="grid gap-4 p-6 pt-16">
+            <div class="text-center text-2xl font-bold text-main">
+              Team game complete!
+            </div>
+            <div class="grid gap-2">
+              <For
+                each={Object.values(room()?.players ?? {}).sort(
+                  (a, b) => b.score - a.score,
+                )}
+              >
+                {(player, index) => (
+                  <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
+                    <span class="w-6 font-bold text-main">{index() + 1}</span>
+                    <span class="min-w-0 flex-1 truncate text-text">
+                      {player.name}
+                    </span>
+                    <span class="font-bold text-text">{player.score}</span>
+                    <span class="text-em-xs text-sub">wave {player.wave}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+            <GameSetupPrimaryAction
+              text="Back to lessons"
+              showArrow={false}
+              onClick={() => props.onClose()}
+            />
+          </div>
+        </Show>
+      </GameModalFrame>
     </Show>
   );
 }

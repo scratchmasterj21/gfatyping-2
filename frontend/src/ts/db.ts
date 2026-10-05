@@ -1,6 +1,7 @@
 import { evaluateAchievements } from "./achievements/achievements";
 import Ape from "./ape";
 import { showErrorNotification } from "./states/notifications";
+import { getIdToken } from "./firebase";
 import { isAuthenticated } from "./states/core";
 import * as Dates from "date-fns";
 import {
@@ -84,6 +85,11 @@ export async function initSnapshot(): Promise<Snapshot | false> {
 
   try {
     if (!isAuthenticated()) return false;
+
+    // After storage clears / cold start, Firestore rules can reject reads until
+    // the auth token is attached to the Firestore client.
+    const token = await getIdToken();
+    if (token === null) return false;
 
     const [userData] = await Promise.all([fetchUserFromApi()]);
 

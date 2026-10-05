@@ -739,6 +739,77 @@
 }
 
 #result {
+  &.lesson-result-student .wrapper {
+    grid-template-areas:
+      "lesson lesson"
+      "stats chart"
+      "morestats morestats";
+
+    .lesson-result-top {
+      grid-area: lesson;
+    }
+
+    .stats.morestats .group.testType .tags,
+    .stats.morestats .group.info,
+    .stats.morestats .group.dailyLeaderboard,
+    .stats.morestats .group.source,
+    .loginTip {
+      display: none;
+    }
+
+    .lesson-result-actions {
+      width: 100%;
+      max-width: none;
+      margin-inline: 0;
+    }
+
+    #lessonGateNotice {
+      font-size: 1.25rem;
+      font-weight: 600;
+      max-width: 36rem;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: var(--roundness);
+      background: var(--sub-alt-color);
+      text-align: center;
+    }
+
+    .lesson-result-top .buttons {
+      grid-auto-flow: row;
+      grid-template-columns: 1fr;
+      max-width: 22rem;
+      margin-inline: auto;
+
+      @media (min-width: 640px) {
+        grid-auto-flow: column;
+        grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+        max-width: none;
+      }
+    }
+
+    .lesson-result-top .buttons .lessonPrimary {
+      order: -1;
+      font-size: 1.05rem;
+      min-height: 3.25rem;
+    }
+
+    .lesson-result-top #backToLessonsButton {
+      order: 2;
+    }
+
+    .lesson-result-top #practiseWordsButton {
+      order: 3;
+      font-size: 0.95rem;
+      color: var(--sub-color);
+    }
+
+    .lesson-result-top #showWordHistoryButton,
+    .lesson-result-top #watchReplayButton,
+    .lesson-result-top #saveScreenshotButton {
+      display: none;
+    }
+  }
+
   &:focus-visible {
     outline: none;
   }
@@ -796,50 +867,19 @@
       display: flex;
     }
 
-    &.lesson-result-student {
-      .stats.morestats .group.testType .tags,
-      .stats.morestats .group.info,
-      .stats.morestats .group.dailyLeaderboard,
-      .stats.morestats .group.source,
-      .loginTip {
-        display: none;
-      }
-
-      .lesson-result-actions {
-        grid-column: 1 / -1;
-      }
-
-      #lessonGateNotice {
-        font-size: 1.25rem;
-        font-weight: 600;
-        max-width: 36rem;
-        padding: 0.75rem 1rem;
-        border-radius: var(--roundness);
-        background: var(--sub-alt-color);
-      }
+    .lesson-result-top {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
 
       .buttons {
-        grid-auto-flow: row;
-        grid-template-columns: 1fr;
-        max-width: 22rem;
-        margin-inline: auto;
+        // Don't inherit `#result .wrapper .buttons { grid-column: 1/3 }` — that
+        // turned this block into a 2-col grid and floated pass/fail beside the header.
+        grid-column: auto;
         width: 100%;
-
-        @media (min-width: 640px) {
-          grid-auto-flow: column;
-          grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-          max-width: none;
-        }
-      }
-
-      .buttons .lessonPrimary {
-        order: -1;
-        font-size: 1.05rem;
-        min-height: 3.25rem;
-      }
-
-      #backToLessonsButton {
-        order: 2;
       }
     }
 

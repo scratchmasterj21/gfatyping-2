@@ -1,5 +1,6 @@
-import { JSXElement, Show } from "solid-js";
+import { createSignal, JSXElement, onCleanup, Show } from "solid-js";
 
+import { lessonResultHeaderEvent } from "../../../events/lesson-result-ui";
 import {
   getActiveLesson,
   isCurriculumLesson,
@@ -8,6 +9,17 @@ import { getResultVisible } from "../../../states/test";
 import { StudentPageHeader } from "../../common/StudentPageHeader";
 
 export function ResultsLessonActions(): JSXElement {
+  const [title, setTitle] = createSignal("Nice work!");
+  const [subtitle, setSubtitle] = createSignal(
+    "Pick what to do next—your score is below.",
+  );
+
+  const unsub = lessonResultHeaderEvent.subscribe((state) => {
+    setTitle(state.title);
+    setSubtitle(state.subtitle);
+  });
+  onCleanup(unsub);
+
   const show = () => {
     const id = getActiveLesson();
     return getResultVisible() && id !== null && isCurriculumLesson(id);
@@ -21,8 +33,8 @@ export function ResultsLessonActions(): JSXElement {
       >
         <StudentPageHeader
           eyebrow="Lesson"
-          title="Nice work!"
-          subtitle="See your score below, then pick what to do next."
+          title={title()}
+          subtitle={subtitle()}
         />
       </div>
     </Show>

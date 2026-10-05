@@ -13,7 +13,9 @@ import { Fa } from "../../common/Fa";
 
 export function LessonTestNav(): JSXElement {
   const showBar = createMemo(
-    () => getActiveLesson() !== null || getCustomTextIndicator() !== undefined,
+    () =>
+      !getResultVisible() &&
+      (getActiveLesson() !== null || getCustomTextIndicator() !== undefined),
   );
   const showNextLesson = createMemo(() => {
     const id = getActiveLesson();

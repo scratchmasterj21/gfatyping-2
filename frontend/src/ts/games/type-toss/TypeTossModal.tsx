@@ -15,6 +15,17 @@ import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
+import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameModalFrame } from "../components/GameModalFrame";
+import { GameModalHeader } from "../components/GameModalHeader";
+import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
+import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
+import { GameSetupSection } from "../components/GameSetupSection";
+import { groupWordListOptions } from "../components/groupWordListOptions";
+import { MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS } from "../components/multiplayer-unlock-hints";
+import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
+import { WordListPicker } from "../components/WordListPicker";
 import {
   getWordListOptions,
   WordListOption,
@@ -38,18 +49,7 @@ import {
 } from "./type-toss-multiplayer";
 
 const OPTIONS = getWordListOptions();
-
-function grouped(
-  options: WordListOption[],
-): { group: string; items: WordListOption[] }[] {
-  const map = new Map<string, WordListOption[]>();
-  for (const o of options) {
-    const list = map.get(o.group) ?? [];
-    list.push(o);
-    map.set(o.group, list);
-  }
-  return [...map.entries()].map(([group, items]) => ({ group, items }));
-}
+const GROUPS = groupWordListOptions(OPTIONS);
 
 type Props = {
   open: boolean;
@@ -89,7 +89,6 @@ export function TypeTossModal(props: Props): JSXElement {
   let startTimer: ReturnType<typeof setTimeout> | undefined;
   let multiplayerGameStarted = false;
 
-  const groups = createMemo(() => grouped(OPTIONS));
   const players = createMemo(() =>
     Object.values(room()?.players ?? {}).sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
@@ -295,85 +294,78 @@ export function TypeTossModal(props: Props): JSXElement {
     }
   });
 
+  const frameLayout = createMemo((): "pick" | "playing" | "compact" => {
+    if (phase() === "playing") return "playing";
+    if (phase() === "pick" && props.lessonWords === undefined) return "pick";
+    return "compact";
+  });
+
+  const tossDifficultyOptions = createMemo(() =>
+    TYPE_TOSS_DIFFICULTIES.map((d) => ({
+      ...d,
+      hint: `${d.time}s · ${d.cols * 3} targets`,
+    })),
+  );
+
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95">
-        <div
-          class={cn(
-            "relative flex flex-col overflow-hidden rounded-xl border border-main/30 bg-bg shadow-2xl",
-            phase() === "playing"
-              ? "h-[90vh] w-[95vw] max-w-5xl"
-              : "max-h-[94vh] w-full max-w-lg overflow-y-auto p-5",
-          )}
-        >
-          <button
-            type="button"
-            class="absolute top-3 right-3 z-10 flex min-h-10 items-center justify-center rounded bg-sub-alt px-3 text-sm font-semibold text-sub hover:text-text"
-            onClick={() => props.onClose()}
+      <GameModalFrame layout={frameLayout()} onClose={() => props.onClose()}>
+        <Show when={phase() === "pick" && props.lessonWords === undefined}>
+          <GamePickLayout
+            header={
+              <GameModalHeader
+                title="Type Toss"
+                onClose={() => props.onClose()}
+              />
+            }
+            footer={
+              <Show
+                when={mode() === "together"}
+                fallback={
+                  <GameSetupPrimaryAction
+                    text="Start game"
+                    onClick={() => void startGame()}
+                  />
+                }
+              >
+                <GameMultiplayerRoomFooter
+                  roomBusy={roomBusy()}
+                  joinCode={joinCode()}
+                  onJoinCodeChange={setJoinCode}
+                  onCreateRoom={() => void createRoom()}
+                  onJoinRoom={() => void joinRoom()}
+                />
+              </Show>
+            }
           >
-            ← Back to lessons
-          </button>
-
-          <Show when={phase() === "pick" && props.lessonWords === undefined}>
-            <h2 class="mb-1 pr-40 text-lg font-bold text-text">Type Toss</h2>
-            <p class="mt-2 text-em-xs font-bold tracking-wider text-main uppercase">
-              How to play
-            </p>
-            <p class="mb-4 text-em-sm text-sub">
-              {mode() === "solo"
-                ? "Type as many words as you can before time runs out! Watch for ⏱️ bonus time and ✨ double points — avoid the 💣 trap."
-                : "Everyone gets the same starting board and words. Score the most points before time runs out!"}
-            </p>
-
-            <div class="mb-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                class={cn(
-                  "rounded px-3 py-1.5 text-sm font-semibold",
-                  mode() === "solo" ? "bg-main text-bg" : "bg-sub-alt text-sub",
-                )}
-                onClick={() => setMode("solo")}
-              >
-                Play solo
-              </button>
-              <button
-                type="button"
-                class={cn(
-                  "rounded px-3 py-1.5 text-sm font-semibold",
-                  mode() === "together"
-                    ? "bg-main text-bg"
-                    : "bg-sub-alt text-sub",
-                )}
-                disabled={props.multiplayerUnlocked !== true}
-                onClick={() => {
-                  if (props.multiplayerUnlocked === true) setMode("together");
-                }}
-              >
-                {props.multiplayerUnlocked === true
-                  ? "Play together"
-                  : "🔒 Play together"}
-              </button>
-            </div>
-            <Show when={props.multiplayerUnlocked !== true}>
-              <p class="mb-3 text-center text-em-xs text-sub">
-                Complete Full Home Row to play multiplayer.
+            <GameSetupSection title="How to play" accent>
+              <p class="text-em-sm text-sub">
+                {mode() === "solo"
+                  ? "Type as many words as you can before time runs out! Watch for ⏱️ bonus time and ✨ double points — avoid the 💣 trap."
+                  : "Everyone gets the same starting board and words. Score the most points before time runs out!"}
               </p>
-            </Show>
+            </GameSetupSection>
+
+            <GameSetupSection title="Mode">
+              <SoloTogetherToggle
+                mode={mode()}
+                multiplayerUnlocked={props.multiplayerUnlocked === true}
+                unlockHint={MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS}
+                onModeChange={setMode}
+              />
+            </GameSetupSection>
 
             <Show
               when={mode() === "solo"}
               fallback={
-                <>
-                  <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
-                    Match length
-                  </p>
-                  <div class="mb-4 grid grid-cols-2 gap-2">
+                <GameSetupSection title="Match length">
+                  <div class="grid grid-cols-2 gap-2">
                     <For each={[30, 60] as const}>
                       {(seconds) => (
                         <button
                           type="button"
                           class={cn(
-                            "rounded px-3 py-1.5 text-em-sm font-semibold",
+                            "rounded-lg px-3 py-2 text-em-sm font-semibold",
                             matchLength() === seconds
                               ? "bg-main text-bg"
                               : "bg-sub-alt text-sub",
@@ -385,249 +377,151 @@ export function TypeTossModal(props: Props): JSXElement {
                       )}
                     </For>
                   </div>
-                </>
+                </GameSetupSection>
               }
             >
-              <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
-                Choose difficulty
-              </p>
-              <div class="mb-4 flex gap-2">
-                <For each={TYPE_TOSS_DIFFICULTIES}>
-                  {(d) => (
-                    <button
-                      type="button"
-                      class={cn(
-                        "flex-1 rounded px-3 py-1.5 text-em-sm font-semibold transition-colors",
-                        difficulty().label === d.label
-                          ? "bg-main text-bg"
-                          : "bg-sub-alt text-sub hover:text-text",
-                      )}
-                      onClick={() => setDifficulty(d)}
-                    >
-                      <span class="block">{d.label}</span>
-                      <span class="block text-xs opacity-70">
-                        {d.time}s · {d.cols * 3} targets
-                      </span>
-                    </button>
-                  )}
-                </For>
-              </div>
+              <GameSetupSection title="Choose difficulty">
+                <DifficultySegmented
+                  options={tossDifficultyOptions()}
+                  selectedLabel={difficulty().label}
+                  onSelect={(d) => setDifficulty(d)}
+                />
+              </GameSetupSection>
             </Show>
 
-            <p class="mb-2 text-em-sm font-semibold tracking-wider text-sub uppercase">
-              Choose a word list
-            </p>
-            <div class="max-h-72 overflow-y-auto rounded border border-main/20 bg-sub-alt">
-              <For each={groups()}>
-                {(g) => (
-                  <div>
-                    <div class="sticky top-0 bg-sub-alt px-3 py-1.5 text-em-xs font-bold tracking-widest text-sub uppercase">
-                      {g.group}
-                    </div>
-                    <For each={g.items}>
-                      {(opt) => (
-                        <button
-                          type="button"
-                          class={cn(
-                            "w-full px-4 py-2 text-left text-em-sm transition-colors",
-                            selected().id === opt.id
-                              ? "bg-main/20 text-text"
-                              : "text-sub hover:bg-main/10 hover:text-text",
-                          )}
-                          onClick={() => setSelected(opt)}
-                        >
-                          {opt.label}
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                )}
-              </For>
-            </div>
+            <GameSetupSection title="Choose a word list">
+              <WordListPicker
+                groups={GROUPS}
+                selectedId={selected().id}
+                onSelect={setSelected}
+              />
+            </GameSetupSection>
+          </GamePickLayout>
+        </Show>
 
-            <Show
-              when={mode() === "together"}
-              fallback={
-                <button
-                  type="button"
-                  class="button primary mt-4"
-                  onClick={() => void startGame()}
-                >
-                  Start game →
-                </button>
-              }
-            >
-              <div class="mt-4 grid gap-2 rounded bg-sub-alt p-3">
-                <button
-                  type="button"
-                  class="button primary"
-                  disabled={roomBusy()}
-                  onClick={() => void createRoom()}
-                >
-                  {roomBusy() ? "Please wait…" : "Create multiplayer room"}
-                </button>
-                <div class="text-center text-em-xs text-sub">
-                  or join a room
-                </div>
-                <div class="flex gap-2">
-                  <input
-                    class="min-w-0 flex-1 rounded bg-bg px-3 py-2 text-center font-bold tracking-widest text-text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="6-digit code"
-                    value={joinCode()}
-                    onInput={(event) =>
-                      setJoinCode(
-                        event.currentTarget.value
-                          .replace(/\D/g, "")
-                          .slice(0, 6),
-                      )
-                    }
-                  />
-                  <button
-                    type="button"
-                    class="button"
-                    disabled={roomBusy()}
-                    onClick={() => void joinRoom()}
-                  >
-                    Join
-                  </button>
-                </div>
+        <Show when={phase() === "loading"}>
+          <div class="flex items-center justify-center py-12 text-sub">
+            Loading…
+          </div>
+        </Show>
+
+        <Show when={phase() === "lobby"}>
+          <div class="grid gap-4 pt-12">
+            <div class="text-center">
+              <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
+                room code
               </div>
-            </Show>
-          </Show>
-
-          <Show when={phase() === "loading"}>
-            <div class="flex items-center justify-center py-12 text-sub">
-              Loading…
-            </div>
-          </Show>
-
-          <Show when={phase() === "lobby"}>
-            <div class="grid gap-4 pt-12">
-              <div class="text-center">
-                <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
-                  room code
-                </div>
-                <div class="text-4xl font-bold tracking-[0.25em] text-main">
-                  {roomCode()}
-                </div>
-                <div class="mt-2 text-sm text-sub">
-                  {room()?.wordListLabel} · {room()?.durationSec}s
-                </div>
+              <div class="text-4xl font-bold tracking-[0.25em] text-main">
+                {roomCode()}
               </div>
-              <For each={players()}>
-                {(player) => (
-                  <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
-                    <UserAvatar uid={player.uid} class="h-8 w-8" />
-                    <span class="flex-1 truncate text-text">
-                      {player.name}
-                      {player.uid === room()?.hostUid ? " · host" : ""}
-                    </span>
-                    <span class={player.online ? "text-main" : "text-sub"}>
-                      {player.online ? "ready" : "offline"}
-                    </span>
-                  </div>
-                )}
-              </For>
-              <Show
-                when={room()?.status === "countdown"}
-                fallback={
-                  <Show
-                    when={room()?.hostUid === getAuthenticatedUser()?.uid}
-                    fallback={
-                      <div class="text-center text-sub">Waiting for host…</div>
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="button primary"
-                      disabled={
-                        players().filter((player) => player.online).length < 2
-                      }
-                      onClick={() => {
-                        const code = roomCode();
-                        if (code !== undefined) void startTossRoom(code);
-                      }}
-                    >
-                      Start match →
-                    </button>
-                  </Show>
-                }
-              >
-                <div class="text-center text-xl font-bold text-main">
-                  Get ready…
-                </div>
-              </Show>
-            </div>
-          </Show>
-
-          <Show when={phase() === "playing"}>
-            <Show when={roomCode() !== undefined}>
-              <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
-                <div class="font-bold text-main">Type Toss {roomCode()}</div>
-                <For each={players()}>
-                  {(player, index) => (
-                    <div class="flex min-w-44 gap-2 text-sub">
-                      <span>{index() + 1}.</span>
-                      <span class="max-w-24 flex-1 truncate">
-                        {player.name}
-                      </span>
-                      <span>{player.score}</span>
-                    </div>
-                  )}
-                </For>
+              <div class="mt-2 text-sm text-sub">
+                {room()?.wordListLabel} · {room()?.durationSec}s
               </div>
-            </Show>
-            <Show when={avatarVisible() && getAuthenticatedUser()?.uid}>
-              {(uid) => (
-                <div class="pointer-events-none absolute bottom-8 left-[4.5%] z-10 flex flex-col items-center">
-                  <UserAvatar
-                    uid={uid()}
-                    class="h-10 w-10 rounded-full bg-sub-alt ring-2 ring-main"
-                  />
-                  <div class="-mt-1 h-9 w-6 rounded-t-lg bg-main/80"></div>
+            </div>
+            <For each={players()}>
+              {(player) => (
+                <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
+                  <UserAvatar uid={player.uid} class="h-8 w-8" />
+                  <span class="flex-1 truncate text-text">
+                    {player.name}
+                    {player.uid === room()?.hostUid ? " · host" : ""}
+                  </span>
+                  <span class={player.online ? "text-main" : "text-sub"}>
+                    {player.online ? "ready" : "offline"}
+                  </span>
                 </div>
               )}
-            </Show>
-            <div
-              ref={(el) => {
-                containerRef = el;
-              }}
-              class="h-full w-full"
-            ></div>
-          </Show>
-
-          <Show when={phase() === "results"}>
-            <div class="grid gap-3 pt-12">
-              <div class="text-center text-2xl font-bold text-main">
-                Match complete!
+            </For>
+            <Show
+              when={room()?.status === "countdown"}
+              fallback={
+                <Show
+                  when={room()?.hostUid === getAuthenticatedUser()?.uid}
+                  fallback={
+                    <div class="text-center text-sub">Waiting for host…</div>
+                  }
+                >
+                  <GameSetupPrimaryAction
+                    text="Start match"
+                    disabled={
+                      players().filter((player) => player.online).length < 2
+                    }
+                    onClick={() => {
+                      const code = roomCode();
+                      if (code !== undefined) void startTossRoom(code);
+                    }}
+                  />
+                </Show>
+              }
+            >
+              <div class="text-center text-xl font-bold text-main">
+                Get ready…
               </div>
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={phase() === "playing"}>
+          <Show when={roomCode() !== undefined}>
+            <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
+              <div class="font-bold text-main">Type Toss {roomCode()}</div>
               <For each={players()}>
                 {(player, index) => (
-                  <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
-                    <span class="w-6 font-bold text-main">{index() + 1}</span>
-                    <UserAvatar uid={player.uid} class="h-9 w-9" />
-                    <span class="min-w-0 flex-1 truncate text-text">
-                      {player.name}
-                    </span>
-                    <span class="text-right text-em-xs text-sub">
-                      {player.score} pts · {player.accuracy}%
-                    </span>
+                  <div class="flex min-w-44 gap-2 text-sub">
+                    <span>{index() + 1}.</span>
+                    <span class="max-w-24 flex-1 truncate">{player.name}</span>
+                    <span>{player.score}</span>
                   </div>
                 )}
               </For>
-              <button
-                type="button"
-                class="button primary"
-                onClick={() => props.onClose()}
-              >
-                Back to lessons
-              </button>
             </div>
           </Show>
-        </div>
-      </div>
+          <Show when={avatarVisible() && getAuthenticatedUser()?.uid}>
+            {(uid) => (
+              <div class="pointer-events-none absolute bottom-8 left-[4.5%] z-10 flex flex-col items-center">
+                <UserAvatar
+                  uid={uid()}
+                  class="h-10 w-10 rounded-full bg-sub-alt ring-2 ring-main"
+                />
+                <div class="-mt-1 h-9 w-6 rounded-t-lg bg-main/80"></div>
+              </div>
+            )}
+          </Show>
+          <div
+            ref={(el) => {
+              containerRef = el;
+            }}
+            class="h-full w-full"
+          ></div>
+        </Show>
+
+        <Show when={phase() === "results"}>
+          <div class="grid gap-3 pt-12">
+            <div class="text-center text-2xl font-bold text-main">
+              Match complete!
+            </div>
+            <For each={players()}>
+              {(player, index) => (
+                <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
+                  <span class="w-6 font-bold text-main">{index() + 1}</span>
+                  <UserAvatar uid={player.uid} class="h-9 w-9" />
+                  <span class="min-w-0 flex-1 truncate text-text">
+                    {player.name}
+                  </span>
+                  <span class="text-right text-em-xs text-sub">
+                    {player.score} pts · {player.accuracy}%
+                  </span>
+                </div>
+              )}
+            </For>
+            <GameSetupPrimaryAction
+              text="Back to lessons"
+              showArrow={false}
+              onClick={() => props.onClose()}
+            />
+          </div>
+        </Show>
+      </GameModalFrame>
     </Show>
   );
 }

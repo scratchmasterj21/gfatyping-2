@@ -108,20 +108,46 @@ export const getSelection = (): Selection => {
   const withoutFriends = selection.friendsOnly
     ? { ...selection, friendsOnly: false }
     : selection;
-  if (!isClassroomType(withoutFriends.type) || isCurrentUserAdmin()) {
+
+  if (!isClassroomType(withoutFriends.type)) {
     return withoutFriends;
   }
-  const classId = getSnapshot()?.classId;
-  if (withoutFriends.type === "class") {
-    return typeof classId === "string"
-      ? { ...withoutFriends, classId }
-      : { ...withoutFriends, type: "school", classId: undefined };
+
+  let cs = withoutFriends as ClassroomSelectionType;
+
+  const missingClass =
+    cs.type === "class" && (cs.classId === undefined || cs.classId === "");
+  const missingGrade =
+    cs.type === "grade" && (cs.grade === undefined || cs.grade === "");
+  if (missingClass || missingGrade) {
+    cs = {
+      ...cs,
+      type: "school",
+      classId: undefined,
+      grade: undefined,
+    };
   }
-  if (withoutFriends.type !== "grade") return withoutFriends;
-  return {
-    ...withoutFriends,
-    grade: typeof classId === "string" ? gradeOf(classId) : undefined,
-  };
+
+  if (isCurrentUserAdmin()) {
+    return cs;
+  }
+
+  const snapClassId = getSnapshot()?.classId;
+  if (cs.type === "class") {
+    return typeof snapClassId === "string" && snapClassId !== ""
+      ? { ...cs, classId: snapClassId }
+      : { ...cs, type: "school", classId: undefined };
+  }
+  if (cs.type === "grade") {
+    const grade =
+      typeof snapClassId === "string" && snapClassId !== ""
+        ? gradeOf(snapClassId)
+        : undefined;
+    return grade !== undefined
+      ? { ...cs, grade }
+      : { ...cs, type: "school", grade: undefined };
+  }
+  return cs;
 };
 
 export { setSelection };
@@ -218,7 +244,7 @@ function lsSelection(): [Accessor<Selection>, Setter<Selection>] {
     key: "leaderboardSelector",
     schema: SelectionSchema,
     fallback: {
-      type: "class",
+      type: "school",
       metric: "xp",
       friendsOnly: false,
       previous: false,
@@ -240,6 +266,17 @@ function lsSelection(): [Accessor<Selection>, Setter<Selection>] {
         delete result.mode;
         delete result.mode2;
         delete result.language;
+      }
+      if (
+        isClassroomType(result.type) &&
+        ((result.type === "class" &&
+          (result.classId === undefined || result.classId === "")) ||
+          (result.type === "grade" &&
+            (result.grade === undefined || result.grade === "")))
+      ) {
+        result.type = "school";
+        delete result.classId;
+        delete result.grade;
       }
       return result;
     },

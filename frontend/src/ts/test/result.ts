@@ -21,7 +21,8 @@ import {
   curriculumNextButtonLabel,
 } from "../lessons/lesson-navigation";
 import * as LessonProgress from "../lessons/lesson-progress";
-import { getStudentGrade } from "../lessons/lessons-data";
+import { findLesson, getStudentGrade } from "../lessons/lessons-data";
+import { lessonResultHeaderEvent } from "../events/lesson-result-ui";
 import * as GlarsesMode from "../legacy-states/glarses-mode";
 import * as SlowTimer from "../legacy-states/slow-timer";
 import * as DateTime from "../utils/date-and-time";
@@ -765,7 +766,26 @@ async function updateTags(dontSave: boolean): Promise<void> {
   }
 }
 
+function syncLessonResultHeader(tone: "pass" | "fail" | "neutral"): void {
+  const title =
+    tone === "pass" ? "Nice work!" : tone === "fail" ? "Try again" : "Lesson";
+  lessonResultHeaderEvent.dispatch({
+    title,
+    subtitle: "Pick what to do next—your score is below.",
+  });
+}
+
 function updateTestType(randomQuote: Quote | null): void {
+  const lessonId = LessonProgress.getActiveLesson();
+  if (lessonId !== null && LessonProgress.isCurriculumLesson(lessonId)) {
+    const lesson = findLesson(lessonId);
+    if (lesson !== undefined) {
+      qs("#result .stats .testType .top")?.setText("lesson");
+      qs("#result .stats .testType .bottom")?.setText(lesson.name);
+      return;
+    }
+  }
+
   let testType = "";
 
   testType += Config.mode;
@@ -868,6 +888,7 @@ async function updateLessonGate(
     return;
   }
   qs("#result")?.addClass("lesson-result-student");
+  syncLessonResultHeader("neutral");
   nextButton?.addClass("lessonAction");
   retryButton?.addClass("lessonAction");
   backButton?.show();
@@ -883,6 +904,7 @@ async function updateLessonGate(
       .show();
     const outcome = await completionPromise;
     if (outcome?.ok !== true) {
+      syncLessonResultHeader("fail");
       el.addClass("fail")
         .setHtml(
           `<i class="fas fa-exclamation-circle"></i> Lesson progress could not be saved. Check your connection and retry.`,
@@ -903,6 +925,7 @@ async function updateLessonGate(
         (outcome.coinsAwarded ?? 0) > 0
           ? ` · +${outcome.coinsAwarded ?? 0} coins`
           : "";
+      syncLessonResultHeader("pass");
       el.removeClass("fail")
         .addClass("pass")
         .setHtml(
@@ -913,6 +936,7 @@ async function updateLessonGate(
         nextButton?.addClass("lessonPrimary");
         await applyCurriculumNextButtonLabel(lessonId, stars);
       } else {
+        syncLessonResultHeader("fail");
         retryButton?.addClass("lessonPrimary");
         nextButton?.hide();
         retryButton?.setAttribute("aria-label", "Improve to 2 stars");
@@ -925,6 +949,7 @@ async function updateLessonGate(
   }
 
   if (res.acc >= threshold && completionPromise === undefined) {
+    syncLessonResultHeader("pass");
     el.removeClass("fail")
       .addClass("pass")
       .setHtml(`<i class="fas fa-check"></i> Passed! Great typing.`)
@@ -932,6 +957,7 @@ async function updateLessonGate(
     nextButton?.addClass("lessonPrimary");
     void applyCurriculumNextButtonLabel(lessonId);
   } else {
+    syncLessonResultHeader("fail");
     el.removeClass("pass")
       .addClass("fail")
       .setHtml(

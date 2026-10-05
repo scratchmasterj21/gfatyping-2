@@ -2,6 +2,7 @@ import type Phaser from "phaser";
 
 import {
   createEffect,
+  createMemo,
   createSignal,
   JSXElement,
   onCleanup,
@@ -13,6 +14,11 @@ import { getAuthenticatedUser } from "../../firebase";
 import { realWords } from "../../lessons/lessons-data";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
+import { GameModalFrame } from "../components/GameModalFrame";
+import { GameModalHeader } from "../components/GameModalHeader";
+import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
+import { GameSetupSection } from "../components/GameSetupSection";
 import { playerMaxHp, type QuestMode } from "./endless-rules";
 import { createTypingRpgGame } from "./game-config";
 import { prepareRpgWords } from "./rpg-words";
@@ -369,519 +375,513 @@ export function TypingRpgModal(props: Props): JSXElement {
   });
   onCleanup(cleanup);
 
+  const frameLayout = createMemo((): "pick" | "playing" | "compact" => {
+    if (phase() === "playing") return "playing";
+    if (phase() === "intro") return "pick";
+    return "compact";
+  });
+
   return (
     <Show when={props.open}>
-      <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95">
-        <div
-          class={cn(
-            "relative overflow-hidden rounded-xl border border-main/30 bg-bg shadow-2xl",
-            phase() === "playing"
-              ? "h-[90vh] w-[95vw] max-w-5xl"
-              : "w-[95vw] max-w-lg p-6",
-          )}
-        >
-          <button
-            type="button"
-            class="absolute top-3 right-3 z-30 min-h-10 rounded bg-sub-alt px-3 text-sm font-semibold text-sub hover:text-text"
-            onClick={() => props.onClose()}
+      <GameModalFrame layout={frameLayout()} onClose={() => props.onClose()}>
+        <Show when={phase() === "intro"}>
+          <GamePickLayout
+            header={
+              <GameModalHeader
+                title="Typing Quest"
+                onClose={() => props.onClose()}
+              />
+            }
+            footer={
+              <div class="grid gap-2 sm:grid-cols-2">
+                <GameSetupPrimaryAction
+                  text="Start quest"
+                  onClick={() => void start("normal")}
+                />
+                <button
+                  type="button"
+                  class="w-full cursor-pointer rounded-xl bg-sub-alt py-3 text-base font-bold text-text transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!fastUnlocked()}
+                  onClick={() => void start("fast")}
+                >
+                  Fast mode
+                </button>
+              </div>
+            }
           >
-            ← Back to lessons
-          </button>
+            <GameSetupSection title="How to play" accent>
+              <p class="text-em-sm text-sub">
+                Survive endless waves in the forest. Defeat every monster, then
+                choose to continue or leave with your coins.
+              </p>
+            </GameSetupSection>
+            <GameSetupSection title="Controls">
+              <p class="text-em-sm text-sub">
+                Hold arrows or WASD to move. Talk to the Guide with Enter.
+                Monsters patrol; type as many words as you can during each
+                battle turn. Battles use common English words.
+              </p>
+            </GameSetupSection>
+            <GameSetupSection title="Rewards">
+              <p class="text-em-sm text-sub">
+                Start with 100 HP and no healing. Typing turns shrink from 20 to
+                8 seconds. First completed run: 100 coins. Next 10: 10 coins
+                each; later runs: 1 coin. Bonus clears reset daily. Deeper waves
+                add up to 10 depth coins per normal run.
+              </p>
+            </GameSetupSection>
+            <GameSetupSection title="Fast mode">
+              <p class="text-em-sm text-sub">
+                50 HP, 8-second turns, double run coins, plus 8 depth coins per
+                extra wave (up to 80 per run). Modes share 10 daily bonus clears
+                and an 80-unit daily depth pool.{" "}
+                {fastUnlocked()
+                  ? "Unlocked."
+                  : "Unlock with two 30-second English tests at 40+ WPM and 95%+ accuracy."}
+              </p>
+            </GameSetupSection>
+          </GamePickLayout>
+        </Show>
 
-          <Show when={phase() === "intro"}>
-            <h2 class="mb-3 pr-40 text-xl font-bold text-text">Typing Quest</h2>
-            <p class="mb-3 text-sub">
-              Survive endless waves in the forest. Defeat every monster, then
-              choose to continue or leave with your coins.
-            </p>
-            <p class="mb-2 text-em-sm text-sub">
-              Hold arrows or WASD to move. Talk to the Guide with Enter.
-              Monsters patrol; type as many words as you can during each battle
-              turn.
-            </p>
-            <p class="mb-5 text-em-sm text-main">
-              Battles use common English words.
-            </p>
-            <p class="mb-5 text-em-sm text-main">
-              Start with 100 HP and no healing. Typing turns shrink from 20 to 8
-              seconds. First completed run: 100 coins. Next 10: 10 coins each;
-              later runs: 1 coin. These 10 bonus clears reset daily. Deeper
-              waves add up to 10 depth coins per normal run.
-            </p>
-            <div class="flex flex-wrap gap-2">
+        <Show when={phase() === "loading"}>
+          <div class="py-12 text-center text-sub">Loading quest…</div>
+        </Show>
+
+        <Show when={phase() === "playing"}>
+          <div
+            ref={(element) => {
+              containerRef = element;
+            }}
+            class="h-full w-full"
+          ></div>
+          <Show when={position() && getAuthenticatedUser()?.uid}>
+            {(uid) => (
+              <div
+                class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main"
+                style={{
+                  left: `${position()?.x ?? 0}px`,
+                  top: `${position()?.y ?? 0}px`,
+                  width: `${position()?.size ?? 28}px`,
+                  height: `${position()?.size ?? 28}px`,
+                }}
+              >
+                <UserAvatar uid={uid()} class="h-full w-full" />
+              </div>
+            )}
+          </Show>
+          <div
+            class="pointer-events-none absolute top-12 left-3 z-10 rounded border border-main/40 bg-bg/90 px-3 py-2 text-em-sm font-bold text-text"
+            aria-live="polite"
+          >
+            {objective()} · Best {bestWave()}
+          </div>
+          <div class="pointer-events-none absolute right-2 bottom-2 left-2 z-20 rounded bg-bg/90 px-3 py-2 text-center text-em-xs text-text">
+            {prompt()}
+          </div>
+          <Show when={battle() === null && dialogue() === null}>
+            <div class="absolute bottom-12 left-3 z-20 grid touch-none grid-cols-3 gap-1 rounded bg-bg/80 p-2">
+              <div></div>
               <button
                 type="button"
-                class="button primary"
-                onClick={() => void start("normal")}
+                class="button"
+                aria-label="Move up"
+                onPointerDown={() => startMoving("up")}
+                onPointerUp={() => stopMoving("up")}
+                onPointerLeave={() => stopMoving("up")}
+                onPointerCancel={() => stopMoving("up")}
+                onClick={(event) => nudgeOnTap("up", event.detail)}
               >
-                Start quest →
+                ↑
+              </button>
+              <div></div>
+              <button
+                type="button"
+                class="button"
+                aria-label="Move left"
+                onPointerDown={() => startMoving("left")}
+                onPointerUp={() => stopMoving("left")}
+                onPointerLeave={() => stopMoving("left")}
+                onPointerCancel={() => stopMoving("left")}
+                onClick={(event) => nudgeOnTap("left", event.detail)}
+              >
+                ←
               </button>
               <button
                 type="button"
                 class="button"
-                disabled={!fastUnlocked()}
-                onClick={() => void start("fast")}
+                aria-label="Move down"
+                onPointerDown={() => startMoving("down")}
+                onPointerUp={() => stopMoving("down")}
+                onPointerLeave={() => stopMoving("down")}
+                onPointerCancel={() => stopMoving("down")}
+                onClick={(event) => nudgeOnTap("down", event.detail)}
               >
-                Fast Mode →
+                ↓
+              </button>
+              <button
+                type="button"
+                class="button"
+                aria-label="Move right"
+                onPointerDown={() => startMoving("right")}
+                onPointerUp={() => stopMoving("right")}
+                onPointerLeave={() => stopMoving("right")}
+                onPointerCancel={() => stopMoving("right")}
+                onClick={(event) => nudgeOnTap("right", event.detail)}
+              >
+                →
+              </button>
+              <button
+                type="button"
+                class="button col-span-3"
+                onClick={() => game?.events.emit("rpg-interact")}
+              >
+                Talk
               </button>
             </div>
-            <p class="mt-3 text-em-sm text-sub">
-              Fast Mode: 50 HP, 8-second turns, double run coins, plus 8 depth
-              coins per extra wave (up to 80 per run). Modes share 10 daily
-              bonus clears and an 80-unit daily depth pool (worth up to 160 Fast
-              coins).{" "}
-              {fastUnlocked()
-                ? "Unlocked"
-                : "Unlock with two 30-second English tests at 40+ WPM and 95%+ accuracy."}
-            </p>
           </Show>
-
-          <Show when={phase() === "loading"}>
-            <div class="py-12 text-center text-sub">Loading quest…</div>
-          </Show>
-
-          <Show when={phase() === "playing"}>
-            <div
-              ref={(element) => {
-                containerRef = element;
-              }}
-              class="h-full w-full"
-            ></div>
-            <Show when={position() && getAuthenticatedUser()?.uid}>
-              {(uid) => (
-                <div
-                  class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-sub-alt ring-2 ring-main"
-                  style={{
-                    left: `${position()?.x ?? 0}px`,
-                    top: `${position()?.y ?? 0}px`,
-                    width: `${position()?.size ?? 28}px`,
-                    height: `${position()?.size ?? 28}px`,
-                  }}
-                >
-                  <UserAvatar uid={uid()} class="h-full w-full" />
+          <Show when={dialogue()}>
+            {(message) => (
+              <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
+                <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 text-text shadow-xl">
+                  <p class="mb-4">{message()}</p>
+                  <button
+                    type="button"
+                    class="button primary"
+                    onClick={() => {
+                      setDialogue(null);
+                      game?.events.emit("rpg-close-dialogue");
+                    }}
+                  >
+                    Got it
+                  </button>
                 </div>
-              )}
-            </Show>
-            <div
-              class="pointer-events-none absolute top-12 left-3 z-10 rounded border border-main/40 bg-bg/90 px-3 py-2 text-em-sm font-bold text-text"
-              aria-live="polite"
-            >
-              {objective()} · Best {bestWave()}
-            </div>
-            <div class="pointer-events-none absolute right-2 bottom-2 left-2 z-20 rounded bg-bg/90 px-3 py-2 text-center text-em-xs text-text">
-              {prompt()}
-            </div>
-            <Show when={battle() === null && dialogue() === null}>
-              <div class="absolute bottom-12 left-3 z-20 grid touch-none grid-cols-3 gap-1 rounded bg-bg/80 p-2">
-                <div></div>
-                <button
-                  type="button"
-                  class="button"
-                  aria-label="Move up"
-                  onPointerDown={() => startMoving("up")}
-                  onPointerUp={() => stopMoving("up")}
-                  onPointerLeave={() => stopMoving("up")}
-                  onPointerCancel={() => stopMoving("up")}
-                  onClick={(event) => nudgeOnTap("up", event.detail)}
-                >
-                  ↑
-                </button>
-                <div></div>
-                <button
-                  type="button"
-                  class="button"
-                  aria-label="Move left"
-                  onPointerDown={() => startMoving("left")}
-                  onPointerUp={() => stopMoving("left")}
-                  onPointerLeave={() => stopMoving("left")}
-                  onPointerCancel={() => stopMoving("left")}
-                  onClick={(event) => nudgeOnTap("left", event.detail)}
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  class="button"
-                  aria-label="Move down"
-                  onPointerDown={() => startMoving("down")}
-                  onPointerUp={() => stopMoving("down")}
-                  onPointerLeave={() => stopMoving("down")}
-                  onPointerCancel={() => stopMoving("down")}
-                  onClick={(event) => nudgeOnTap("down", event.detail)}
-                >
-                  ↓
-                </button>
-                <button
-                  type="button"
-                  class="button"
-                  aria-label="Move right"
-                  onPointerDown={() => startMoving("right")}
-                  onPointerUp={() => stopMoving("right")}
-                  onPointerLeave={() => stopMoving("right")}
-                  onPointerCancel={() => stopMoving("right")}
-                  onClick={(event) => nudgeOnTap("right", event.detail)}
-                >
-                  →
-                </button>
-                <button
-                  type="button"
-                  class="button col-span-3"
-                  onClick={() => game?.events.emit("rpg-interact")}
-                >
-                  Talk
-                </button>
               </div>
-            </Show>
-            <Show when={dialogue()}>
-              {(message) => (
-                <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
-                  <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 text-text shadow-xl">
-                    <p class="mb-4">{message()}</p>
+            )}
+          </Show>
+          <Show when={waveClear()}>
+            {(clear) => (
+              <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/80 p-4">
+                <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-6 text-center text-text shadow-xl">
+                  <h3 class="mb-3 text-2xl font-bold text-main">
+                    Wave {clear().wave} cleared!
+                  </h3>
+                  <p class="mb-2">
+                    HP: {clear().hp}/{playerMaxHp(mode())} · No recovery
+                  </p>
+                  <p class="mb-5 text-em-sm text-sub">
+                    Next floor: {clear().nextFloorName} ·{" "}
+                    {clear().nextMonsterCount} monsters ·{" "}
+                    {clear().nextTurnSeconds}s per turn
+                  </p>
+                  <div class="flex justify-center gap-3">
                     <button
                       type="button"
                       class="button primary"
-                      onClick={() => {
-                        setDialogue(null);
-                        game?.events.emit("rpg-close-dialogue");
-                      }}
+                      onClick={() => game?.events.emit("rpg-continue")}
                     >
-                      Got it
+                      Continue →
+                    </button>
+                    <button
+                      type="button"
+                      class="button"
+                      onClick={() => game?.events.emit("rpg-leave")}
+                    >
+                      Leave with coins
                     </button>
                   </div>
                 </div>
-              )}
-            </Show>
-            <Show when={waveClear()}>
-              {(clear) => (
-                <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/80 p-4">
-                  <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-6 text-center text-text shadow-xl">
-                    <h3 class="mb-3 text-2xl font-bold text-main">
-                      Wave {clear().wave} cleared!
-                    </h3>
-                    <p class="mb-2">
-                      HP: {clear().hp}/{playerMaxHp(mode())} · No recovery
-                    </p>
-                    <p class="mb-5 text-em-sm text-sub">
-                      Next floor: {clear().nextFloorName} ·{" "}
-                      {clear().nextMonsterCount} monsters ·{" "}
-                      {clear().nextTurnSeconds}s per turn
-                    </p>
-                    <div class="flex justify-center gap-3">
-                      <button
-                        type="button"
-                        class="button primary"
-                        onClick={() => game?.events.emit("rpg-continue")}
-                      >
-                        Continue →
-                      </button>
-                      <button
-                        type="button"
-                        class="button"
-                        onClick={() => game?.events.emit("rpg-leave")}
-                      >
-                        Leave with coins
-                      </button>
-                    </div>
+              </div>
+            )}
+          </Show>
+          <Show when={battle()}>
+            {(enemy) => (
+              <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
+                <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 shadow-xl">
+                  <div class="mb-1 text-em-xs font-bold tracking-widest text-sub uppercase">
+                    Wave {enemy().wave} · typing turn {enemy().turn}
                   </div>
-                </div>
-              )}
-            </Show>
-            <Show when={battle()}>
-              {(enemy) => (
-                <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
-                  <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 shadow-xl">
-                    <div class="mb-1 text-em-xs font-bold tracking-widest text-sub uppercase">
-                      Wave {enemy().wave} · typing turn {enemy().turn}
-                    </div>
-                    <div
-                      class={cn(
-                        "mb-4 rounded px-3 py-2 text-center text-em-sm font-bold",
-                        enemy().stage === "typing"
-                          ? "bg-main/15 text-main"
-                          : "bg-error/15 text-error",
-                      )}
-                      aria-live="polite"
-                    >
-                      {enemy().stage === "typing"
-                        ? enemy().ready
-                          ? "YOUR TURN · TYPE WORDS"
-                          : "READY · FOCUS THE TYPING BOX"
-                        : enemy().hp === 0
-                          ? "MONSTER DEFEATED!"
-                          : enemy().message?.includes("hit you")
-                            ? "MONSTER ATTACKED"
-                            : "MONSTER'S TURN"}
-                    </div>
-                    <div class="mb-4 grid grid-cols-[1fr_auto_1fr] items-start gap-3 text-center">
-                      <div class="min-w-0">
-                        <div
-                          class={cn(
-                            "relative mx-auto mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-main bg-bg transition-transform duration-150",
-                            impact()?.target === "player" &&
-                              "scale-110 ring-4 ring-error",
-                          )}
-                        >
-                          <Show
-                            when={getAuthenticatedUser()?.uid}
-                            fallback={<span class="text-3xl">🙂</span>}
-                          >
-                            {(uid) => (
-                              <UserAvatar
-                                uid={uid()}
-                                size={80}
-                                class="h-full w-full"
-                              />
-                            )}
-                          </Show>
-                          <Show when={impact()?.target === "player"}>
-                            <span
-                              class="absolute inset-x-0 bottom-0 bg-bg/85 text-em-xs font-bold text-error"
-                              aria-live="polite"
-                            >
-                              {impact()?.label}
-                            </span>
-                          </Show>
-                        </div>
-                        <div class="text-em-sm font-bold text-text">You</div>
-                        <div class="text-em-xs text-sub">
-                          {enemy().playerHp}/{playerMaxHp(mode())} HP
-                        </div>
-                        <div class="mt-1 h-2 rounded bg-bg">
-                          <div
-                            class="h-2 rounded bg-main motion-safe:transition-[width] motion-safe:duration-300"
-                            style={{
-                              width: `${(enemy().playerHp / playerMaxHp(mode())) * 100}%`,
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                      <span class="pt-7 text-em-sm font-bold text-sub">VS</span>
-                      <div class="min-w-0">
-                        <div
-                          class={cn(
-                            "relative mx-auto mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-error bg-bg transition-transform duration-150",
-                            impact()?.target === "monster" &&
-                              "scale-110 ring-4 ring-main",
-                            enemy().stage === "enemy" &&
-                              !enemy().message?.includes("hit you") &&
-                              "animate-pulse",
-                          )}
-                        >
-                          <MonsterPortrait
-                            name={enemy().name}
-                            kind={enemy().kind}
-                          />
-                          <Show when={impact()?.target === "monster"}>
-                            <span
-                              class="absolute inset-x-0 bottom-0 bg-bg/85 text-em-xs font-bold text-main"
-                              aria-live="polite"
-                            >
-                              {impact()?.label}
-                            </span>
-                          </Show>
-                        </div>
-                        <div
-                          class="truncate text-em-sm font-bold text-text"
-                          title={enemy().name}
-                        >
-                          {enemy().name}
-                        </div>
-                        <div class="text-em-xs text-sub">
-                          {enemy().hp}/{enemy().maxHp} HP
-                        </div>
-                        <div class="mt-1 h-2 rounded bg-bg">
-                          <div
-                            class="h-2 rounded bg-error motion-safe:transition-[width] motion-safe:duration-300"
-                            style={{
-                              width: `${(100 * enemy().hp) / enemy().maxHp}%`,
-                            }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                    <Show
-                      when={enemy().stage === "typing"}
-                      fallback={
-                        <p class="rounded bg-bg p-4 text-center text-xl font-bold text-text">
-                          {enemy().message ??
-                            `${enemy().name} prepares to attack…`}
-                        </p>
-                      }
-                    >
-                      <p class="mb-2 text-em-sm text-main">
-                        {enemy().ready ? "Your turn" : "Tap the box to start"}:{" "}
-                        {enemy().seconds}s · {enemy().wordsTyped} words typed
-                      </p>
+                  <div
+                    class={cn(
+                      "mb-4 rounded px-3 py-2 text-center text-em-sm font-bold",
+                      enemy().stage === "typing"
+                        ? "bg-main/15 text-main"
+                        : "bg-error/15 text-error",
+                    )}
+                    aria-live="polite"
+                  >
+                    {enemy().stage === "typing"
+                      ? enemy().ready
+                        ? "YOUR TURN · TYPE WORDS"
+                        : "READY · FOCUS THE TYPING BOX"
+                      : enemy().hp === 0
+                        ? "MONSTER DEFEATED!"
+                        : enemy().message?.includes("hit you")
+                          ? "MONSTER ATTACKED"
+                          : "MONSTER'S TURN"}
+                  </div>
+                  <div class="mb-4 grid grid-cols-[1fr_auto_1fr] items-start gap-3 text-center">
+                    <div class="min-w-0">
                       <div
-                        class="mb-3 h-2 overflow-hidden rounded bg-bg"
-                        role="progressbar"
-                        aria-label="Time left in your turn"
-                        aria-valuemin={0}
-                        aria-valuemax={enemy().turnSeconds}
-                        aria-valuenow={enemy().seconds}
+                        class={cn(
+                          "relative mx-auto mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-main bg-bg transition-transform duration-150",
+                          impact()?.target === "player" &&
+                            "scale-110 ring-4 ring-error",
+                        )}
                       >
-                        <div
-                          class={cn(
-                            "h-full rounded",
-                            enemy().seconds <= 3 ? "bg-error" : "bg-main",
+                        <Show
+                          when={getAuthenticatedUser()?.uid}
+                          fallback={<span class="text-3xl">🙂</span>}
+                        >
+                          {(uid) => (
+                            <UserAvatar
+                              uid={uid()}
+                              size={80}
+                              class="h-full w-full"
+                            />
                           )}
-                          style={{
-                            width: `${(enemy().seconds / enemy().turnSeconds) * 100}%`,
-                          }}
-                        ></div>
-                      </div>
-                      <p class="mb-3 text-em-xs text-sub">
-                        Damage ready: {enemy().wordsTyped * 2} · No-mistake
-                        bonus: +
-                        {enemy().wordsTyped > 0 &&
-                        enemy().mistakesThisTurn === 0
-                          ? 2
-                          : 0}
-                        <Show when={impact()?.target === "power"}>
+                        </Show>
+                        <Show when={impact()?.target === "player"}>
                           <span
-                            class="ml-2 font-bold text-main"
+                            class="absolute inset-x-0 bottom-0 bg-bg/85 text-em-xs font-bold text-error"
                             aria-live="polite"
                           >
                             {impact()?.label}
                           </span>
                         </Show>
-                      </p>
-                      <div class="mb-3 rounded bg-bg p-3 text-center font-mono text-2xl tracking-wider text-text">
-                        <span class="text-main">
-                          {enemy().word.slice(0, typed().length)}
-                        </span>
-                        {enemy().word.slice(typed().length)}
                       </div>
-                      <input
-                        ref={(element) => {
-                          inputRef = element;
-                        }}
+                      <div class="text-em-sm font-bold text-text">You</div>
+                      <div class="text-em-xs text-sub">
+                        {enemy().playerHp}/{playerMaxHp(mode())} HP
+                      </div>
+                      <div class="mt-1 h-2 rounded bg-bg">
+                        <div
+                          class="h-2 rounded bg-main motion-safe:transition-[width] motion-safe:duration-300"
+                          style={{
+                            width: `${(enemy().playerHp / playerMaxHp(mode())) * 100}%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                    <span class="pt-7 text-em-sm font-bold text-sub">VS</span>
+                    <div class="min-w-0">
+                      <div
                         class={cn(
-                          "w-full rounded border bg-bg p-3 text-center font-mono text-xl text-text outline-none",
-                          wrongKey() ? "border-error" : "border-main",
+                          "relative mx-auto mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-error bg-bg transition-transform duration-150",
+                          impact()?.target === "monster" &&
+                            "scale-110 ring-4 ring-main",
+                          enemy().stage === "enemy" &&
+                            !enemy().message?.includes("hit you") &&
+                            "animate-pulse",
                         )}
-                        aria-label={`Type ${enemy().word} to attack`}
-                        autocomplete="off"
-                        autocapitalize="off"
-                        spellcheck={false}
-                        value={typed()}
-                        onFocus={() => game?.events.emit("rpg-input-focus")}
-                        onBlur={() => game?.events.emit("rpg-input-blur")}
-                        onInput={(event) =>
-                          handleTyping(event.currentTarget.value)
-                        }
-                      />
-                      <Show when={wrongKey()}>
-                        <p
-                          class="mt-2 text-center text-em-xs text-error"
+                      >
+                        <MonsterPortrait
+                          name={enemy().name}
+                          kind={enemy().kind}
+                        />
+                        <Show when={impact()?.target === "monster"}>
+                          <span
+                            class="absolute inset-x-0 bottom-0 bg-bg/85 text-em-xs font-bold text-main"
+                            aria-live="polite"
+                          >
+                            {impact()?.label}
+                          </span>
+                        </Show>
+                      </div>
+                      <div
+                        class="truncate text-em-sm font-bold text-text"
+                        title={enemy().name}
+                      >
+                        {enemy().name}
+                      </div>
+                      <div class="text-em-xs text-sub">
+                        {enemy().hp}/{enemy().maxHp} HP
+                      </div>
+                      <div class="mt-1 h-2 rounded bg-bg">
+                        <div
+                          class="h-2 rounded bg-error motion-safe:transition-[width] motion-safe:duration-300"
+                          style={{
+                            width: `${(100 * enemy().hp) / enemy().maxHp}%`,
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  <Show
+                    when={enemy().stage === "typing"}
+                    fallback={
+                      <p class="rounded bg-bg p-4 text-center text-xl font-bold text-text">
+                        {enemy().message ??
+                          `${enemy().name} prepares to attack…`}
+                      </p>
+                    }
+                  >
+                    <p class="mb-2 text-em-sm text-main">
+                      {enemy().ready ? "Your turn" : "Tap the box to start"}:{" "}
+                      {enemy().seconds}s · {enemy().wordsTyped} words typed
+                    </p>
+                    <div
+                      class="mb-3 h-2 overflow-hidden rounded bg-bg"
+                      role="progressbar"
+                      aria-label="Time left in your turn"
+                      aria-valuemin={0}
+                      aria-valuemax={enemy().turnSeconds}
+                      aria-valuenow={enemy().seconds}
+                    >
+                      <div
+                        class={cn(
+                          "h-full rounded",
+                          enemy().seconds <= 3 ? "bg-error" : "bg-main",
+                        )}
+                        style={{
+                          width: `${(enemy().seconds / enemy().turnSeconds) * 100}%`,
+                        }}
+                      ></div>
+                    </div>
+                    <p class="mb-3 text-em-xs text-sub">
+                      Damage ready: {enemy().wordsTyped * 2} · No-mistake bonus:
+                      +
+                      {enemy().wordsTyped > 0 && enemy().mistakesThisTurn === 0
+                        ? 2
+                        : 0}
+                      <Show when={impact()?.target === "power"}>
+                        <span
+                          class="ml-2 font-bold text-main"
                           aria-live="polite"
                         >
-                          Wrong key—try the next letter again.
-                        </p>
+                          {impact()?.label}
+                        </span>
                       </Show>
-                    </Show>
-                  </div>
-                </div>
-              )}
-            </Show>
-          </Show>
-
-          <Show when={phase() === "results"}>
-            <div class="pt-12 text-center">
-              <div class="mb-3 text-3xl font-bold text-main">
-                {result()?.outcome === "defeated"
-                  ? "Run ended"
-                  : "Well played! ✨"}
-              </div>
-              <p class="mb-4 text-sub">
-                {result()?.completedWaves} waves cleared ·{" "}
-                {result()?.outcome === "defeated"
-                  ? "You were defeated"
-                  : "You left safely"}
-              </p>
-              <p class="mb-1 text-text">
-                {result()?.hits} successful attacks · {result()?.mistakes}{" "}
-                mistakes
-              </p>
-              <p class="mb-5 text-text">
-                Time {result()?.elapsed}s · Score {result()?.score}
-              </p>
-              <div
-                class="mb-5 rounded-xl border border-main/50 bg-sub-alt p-4"
-                aria-live="polite"
-              >
-                <p class="mb-1 text-em-sm font-bold text-sub">Run reward</p>
-                <Show
-                  when={rewardClaim()}
-                  fallback={
-                    <p class="text-em-sm text-text">{rewardMessage()}</p>
-                  }
-                >
-                  {(claim) => (
-                    <Show
-                      when={claim().coins > 0}
-                      fallback={
-                        <p class="text-em-sm text-sub">{rewardMessage()}</p>
+                    </p>
+                    <div class="mb-3 rounded bg-bg p-3 text-center font-mono text-2xl tracking-wider text-text">
+                      <span class="text-main">
+                        {enemy().word.slice(0, typed().length)}
+                      </span>
+                      {enemy().word.slice(typed().length)}
+                    </div>
+                    <input
+                      ref={(element) => {
+                        inputRef = element;
+                      }}
+                      class={cn(
+                        "w-full rounded border bg-bg p-3 text-center font-mono text-xl text-text outline-none",
+                        wrongKey() ? "border-error" : "border-main",
+                      )}
+                      aria-label={`Type ${enemy().word} to attack`}
+                      autocomplete="off"
+                      autocapitalize="off"
+                      spellcheck={false}
+                      value={typed()}
+                      onFocus={() => game?.events.emit("rpg-input-focus")}
+                      onBlur={() => game?.events.emit("rpg-input-blur")}
+                      onInput={(event) =>
+                        handleTyping(event.currentTarget.value)
                       }
-                    >
-                      <p class="text-4xl font-bold text-main">
-                        +{claim().coins} coins
-                      </p>
-                      <p class="mt-1 text-em-xs text-sub">
-                        Run {claim().baseCoins} · Depth {claim().depthCoins}
-                        <Show when={claim().bestWave}>
-                          {" "}
-                          · Best wave {claim().bestWave}
-                        </Show>
-                      </p>
-                      <p class="mt-1 text-em-sm text-text">
-                        {claim().firstClear
-                          ? "First-clear bonus!"
-                          : claim().baseCoins === (mode() === "fast" ? 20 : 10)
-                            ? `${10 - (claim().bonusRepeatClears ?? 10)} bonus clears left today`
-                            : "Daily bonus clears used · Keep farming!"}
+                    />
+                    <Show when={wrongKey()}>
+                      <p
+                        class="mt-2 text-center text-em-xs text-error"
+                        aria-live="polite"
+                      >
+                        Wrong key—try the next letter again.
                       </p>
                     </Show>
-                  )}
-                </Show>
+                  </Show>
+                </div>
               </div>
-              <Show when={reward() === "error"}>
-                <button
-                  type="button"
-                  class="button mb-4"
-                  onClick={() => {
-                    const clear = result();
-                    if (
-                      clear !== undefined &&
-                      activeRewardRunId !== undefined
-                    ) {
-                      requestRunReward(clear, activeRewardRunId, runId);
-                    }
-                  }}
-                >
-                  Retry coin claim
-                </button>
-              </Show>
-              <div class="flex justify-center gap-3">
-                <button
-                  type="button"
-                  class="button primary"
-                  onClick={() => void start(mode())}
-                >
-                  Play again
-                </button>
-                <button
-                  type="button"
-                  class="button"
-                  onClick={() => props.onClose()}
-                >
-                  Back to lessons
-                </button>
-              </div>
-            </div>
+            )}
           </Show>
-        </div>
-      </div>
+        </Show>
+
+        <Show when={phase() === "results"}>
+          <div class="pt-12 text-center">
+            <div class="mb-3 text-3xl font-bold text-main">
+              {result()?.outcome === "defeated"
+                ? "Run ended"
+                : "Well played! ✨"}
+            </div>
+            <p class="mb-4 text-sub">
+              {result()?.completedWaves} waves cleared ·{" "}
+              {result()?.outcome === "defeated"
+                ? "You were defeated"
+                : "You left safely"}
+            </p>
+            <p class="mb-1 text-text">
+              {result()?.hits} successful attacks · {result()?.mistakes}{" "}
+              mistakes
+            </p>
+            <p class="mb-5 text-text">
+              Time {result()?.elapsed}s · Score {result()?.score}
+            </p>
+            <div
+              class="mb-5 rounded-xl border border-main/50 bg-sub-alt p-4"
+              aria-live="polite"
+            >
+              <p class="mb-1 text-em-sm font-bold text-sub">Run reward</p>
+              <Show
+                when={rewardClaim()}
+                fallback={<p class="text-em-sm text-text">{rewardMessage()}</p>}
+              >
+                {(claim) => (
+                  <Show
+                    when={claim().coins > 0}
+                    fallback={
+                      <p class="text-em-sm text-sub">{rewardMessage()}</p>
+                    }
+                  >
+                    <p class="text-4xl font-bold text-main">
+                      +{claim().coins} coins
+                    </p>
+                    <p class="mt-1 text-em-xs text-sub">
+                      Run {claim().baseCoins} · Depth {claim().depthCoins}
+                      <Show when={claim().bestWave}>
+                        {" "}
+                        · Best wave {claim().bestWave}
+                      </Show>
+                    </p>
+                    <p class="mt-1 text-em-sm text-text">
+                      {claim().firstClear
+                        ? "First-clear bonus!"
+                        : claim().baseCoins === (mode() === "fast" ? 20 : 10)
+                          ? `${10 - (claim().bonusRepeatClears ?? 10)} bonus clears left today`
+                          : "Daily bonus clears used · Keep farming!"}
+                    </p>
+                  </Show>
+                )}
+              </Show>
+            </div>
+            <Show when={reward() === "error"}>
+              <button
+                type="button"
+                class="button mb-4"
+                onClick={() => {
+                  const clear = result();
+                  if (clear !== undefined && activeRewardRunId !== undefined) {
+                    requestRunReward(clear, activeRewardRunId, runId);
+                  }
+                }}
+              >
+                Retry coin claim
+              </button>
+            </Show>
+            <div class="flex justify-center gap-3">
+              <button
+                type="button"
+                class="button primary"
+                onClick={() => void start(mode())}
+              >
+                Play again
+              </button>
+              <button
+                type="button"
+                class="button"
+                onClick={() => props.onClose()}
+              >
+                Back to lessons
+              </button>
+            </div>
+          </div>
+        </Show>
+      </GameModalFrame>
     </Show>
   );
 }

@@ -1,5 +1,78 @@
 <div id="result" class="content-grid full-width hidden" tabindex="-1">
   <div class="wrapper">
+    <div class="lesson-result-top">
+      <mount data-component="resultslessonactions"></mount>
+      <div id="lessonGateNotice" class="hidden"></div>
+      <div class="buttons">
+        <button
+          class="text"
+          id="nextTestButton"
+          aria-label="Next test"
+          role="button"
+          data-balloon-pos="down"
+        >
+          <i class="fas fa-fw fa-chevron-right"></i>
+          <span class="lessonActionText">New test</span>
+        </button>
+        <button
+          class="text"
+          id="restartTestButtonWithSameWordset"
+          aria-label="Repeat test"
+          role="button"
+          data-balloon-pos="down"
+        >
+          <i class="fas fa-fw fa-sync-alt"></i>
+          <span class="lessonActionText">Try again</span>
+        </button>
+        <button
+          class="text hidden"
+          id="backToLessonsButton"
+          aria-label="Back to lessons"
+          role="button"
+        >
+          <i class="fas fa-fw fa-graduation-cap"></i>
+          <span>Back to lessons</span>
+        </button>
+        <button
+          class="text"
+          id="practiseWordsButton"
+          aria-label="Practice words"
+          role="button"
+          data-balloon-pos="down"
+        >
+          <i class="fas fa-fw fa-exclamation-triangle"></i>
+          <span>Practice missed words</span>
+        </button>
+        <button
+          class="text"
+          id="showWordHistoryButton"
+          aria-label="Toggle words history"
+          role="button"
+          data-balloon-pos="down"
+        >
+          <i class="fas fa-fw fa-align-left"></i>
+        </button>
+        <button
+          class="text"
+          id="watchReplayButton"
+          aria-label="Watch replay"
+          role="button"
+          data-balloon-pos="down"
+        >
+          <i class="fas fa-fw fa-backward"></i>
+        </button>
+        <button
+          class="text"
+          id="saveScreenshotButton"
+          aria-label="Copy screenshot to clipboard&#10;(shift click to download)"
+          role="button"
+          data-balloon-pos="down"
+          data-balloon-break
+        >
+          <i class="far fa-fw fa-image"></i>
+        </button>
+      </div>
+    </div>
     <div class="stats">
       <!-- <div class="info">words 10<br>punctuation</div> -->
 
@@ -230,77 +303,6 @@
         <i class="fas fa-redo"></i>
         Retry saving result
       </button>
-      <mount data-component="resultslessonactions"></mount>
-      <div id="lessonGateNotice" class="hidden"></div>
-      <div class="buttons">
-        <button
-          class="text"
-          id="nextTestButton"
-          aria-label="Next test"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-chevron-right"></i>
-          <span class="lessonActionText">New test</span>
-        </button>
-        <button
-          class="text"
-          id="restartTestButtonWithSameWordset"
-          aria-label="Repeat test"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-sync-alt"></i>
-          <span class="lessonActionText">Try again</span>
-        </button>
-        <button
-          class="text hidden"
-          id="backToLessonsButton"
-          aria-label="Back to lessons"
-          role="button"
-        >
-          <i class="fas fa-fw fa-graduation-cap"></i>
-          <span>Back to lessons</span>
-        </button>
-        <button
-          class="text"
-          id="practiseWordsButton"
-          aria-label="Practice words"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-exclamation-triangle"></i>
-          <span>Practice missed words</span>
-        </button>
-        <button
-          class="text"
-          id="showWordHistoryButton"
-          aria-label="Toggle words history"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-align-left"></i>
-        </button>
-        <button
-          class="text"
-          id="watchReplayButton"
-          aria-label="Watch replay"
-          role="button"
-          data-balloon-pos="down"
-        >
-          <i class="fas fa-fw fa-backward"></i>
-        </button>
-        <button
-          class="text"
-          id="saveScreenshotButton"
-          aria-label="Copy screenshot to clipboard&#10;(shift click to download)"
-          role="button"
-          data-balloon-pos="down"
-          data-balloon-break
-        >
-          <i class="far fa-fw fa-image"></i>
-        </button>
-      </div>
     </div>
     <div class="loginTip">
       <a href="/login" router-link>Sign in</a>

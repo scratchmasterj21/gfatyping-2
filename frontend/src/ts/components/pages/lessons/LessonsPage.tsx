@@ -35,7 +35,7 @@ import {
   getLessonStarsLeaderboard,
   LessonLeaderboardEntry,
 } from "../../../classroom/classroom";
-import { getWeeklyQuestState, WEEKLY_QUESTS } from "../../../coins";
+import { getWeeklyQuestState } from "../../../coins";
 import { gradeOf } from "../../../constants/classes";
 import { getAuthenticatedUser } from "../../../firebase";
 import { BalloonPopModal } from "../../../games/balloon-pop/BalloonPopModal";
@@ -116,6 +116,7 @@ import { RankRow } from "../leaderboard/RankRow";
 import { LessonCard } from "./LessonCard";
 import { LessonGroupSection } from "./LessonGroupSection";
 import { LessonHero } from "./LessonHero";
+import { LessonsCollapsibleHeader } from "./LessonsCollapsibleHeader";
 
 const allCheckpoints = continueOrder.filter(
   (
@@ -130,27 +131,42 @@ function GameButton(props: {
   icon: FaSolidIcon;
   locked?: boolean;
   lockedMessage?: string;
+  recommended?: boolean;
   onClick: () => void;
 }): JSXElement {
   return (
     <button
       type="button"
       class={cn(
-        "flex flex-col gap-2 rounded p-3 text-left transition-colors",
+        "flex min-h-[5.5rem] flex-col gap-2 rounded-xl p-4 text-left transition-colors",
         props.locked
-          ? "cursor-not-allowed bg-sub-alt text-sub opacity-60"
+          ? "cursor-not-allowed bg-sub-alt text-sub"
           : "cursor-pointer bg-sub-alt text-text hover:bg-text hover:text-bg",
       )}
       aria-disabled={props.locked === true}
-      onClick={() => props.onClick()}
+      onClick={() => {
+        if (props.locked === true) return;
+        props.onClick();
+      }}
     >
-      <div class="flex items-center gap-2">
-        <Fa icon={props.icon} fixedWidth />
-        <span class="font-medium">{props.name}</span>
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex min-w-0 items-center gap-2">
+          <Fa icon={props.icon} class="text-main" fixedWidth />
+          <span class="font-medium">{props.name}</span>
+        </div>
+        <Show when={props.recommended === true}>
+          <span class="shrink-0 rounded bg-main px-2 py-0.5 text-em-xs font-semibold text-bg">
+            Today
+          </span>
+        </Show>
+        <Show when={props.locked === true}>
+          <Fa icon="fa-lock" class="shrink-0 text-sub" size={0.85} />
+        </Show>
       </div>
       <div class="text-em-xs text-sub">
         {props.locked
-          ? (props.lockedMessage ?? "🔒 Unlock the All Keys lessons to play")
+          ? (props.lockedMessage ??
+            "Complete the required typing lessons to play")
           : props.description}
       </div>
     </button>
@@ -498,58 +514,6 @@ function ClassCompare(props: {
         </div>
       </section>
     </Show>
-  );
-}
-
-function WeeklyQuests(props: {
-  progress: Record<string, number>;
-  claimed: string[];
-}): JSXElement {
-  return (
-    <section class="grid gap-3 rounded bg-sub-alt p-4">
-      <H2
-        class="text-[1.65em] sm:text-[1.85em]"
-        fa={{ icon: "fa-flag-checkered" }}
-        text="this week's quests"
-      />
-      <For each={WEEKLY_QUESTS}>
-        {(quest) => {
-          const current = (): number =>
-            Math.min(props.progress[quest.counterKey] ?? 0, quest.target);
-          const done = (): boolean => props.claimed.includes(quest.id);
-          const percent = (): number => (current() / quest.target) * 100;
-          const formatProgress = (value: number): string =>
-            quest.unit === "seconds"
-              ? `${Math.round(value / 60)}m`
-              : `${value}`;
-          return (
-            <div class="grid gap-1">
-              <div class="flex items-center justify-between text-em-xs">
-                <span class={done() ? "text-main" : "text-text"}>
-                  <Show when={done()}>
-                    <Fa icon="fa-check-circle" class="mr-1" />
-                  </Show>
-                  {quest.description}
-                </span>
-                <span class="flex items-center gap-1 text-sub">
-                  <Fa icon="fa-coins" size={0.7} />
-                  {quest.coinReward}
-                </span>
-              </div>
-              <div class="h-1 rounded-full bg-bg">
-                <div
-                  class="h-1 rounded-full bg-main transition-[width]"
-                  style={{ width: `${Math.min(100, percent())}%` }}
-                ></div>
-              </div>
-              <span class="text-em-xs text-sub">
-                {formatProgress(current())}/{formatProgress(quest.target)}
-              </span>
-            </div>
-          );
-        }}
-      </For>
-    </section>
   );
 }
 
@@ -1393,6 +1357,8 @@ export function LessonsPage(): JSXElement {
             localDateString()
           }
           primaryLoading={reviewLoading() || lessonGameLoading()}
+          weeklyQuestProgress={weeklyQuestQuery.data?.progress}
+          weeklyQuestClaimed={weeklyQuestQuery.data?.claimed}
           avatar={
             isAuthenticated()
               ? {
@@ -1616,64 +1582,47 @@ export function LessonsPage(): JSXElement {
               entries={classCompareQuery.data?.entries ?? []}
               selfClassId={classId()}
             />
-
-            {/* Weekly quests */}
-            <WeeklyQuests
-              progress={weeklyQuestQuery.data?.progress ?? {}}
-              claimed={weeklyQuestQuery.data?.claimed ?? []}
-            />
           </div>
         </Show>
 
         {/* 5. Typing Lessons — main section wrapping all lesson groups */}
         <section>
-          <div class="flex items-center justify-between">
-            <H2
-              class="text-[1.65em] sm:text-[1.85em]"
-              fa={{ icon: "fa-graduation-cap" }}
-              text="Typing Lessons"
-            />
-            <button
-              type="button"
-              class="rounded p-1.5 text-sub transition-colors hover:text-text"
-              onClick={() => toggle("typing-lessons")}
-            >
-              <Fa
-                icon="fa-chevron-down"
-                class={cn(
-                  "transition-transform duration-200",
-                  collapsed().has("typing-lessons") ? "-rotate-90" : "",
-                )}
-              />
-            </button>
-          </div>
+          <LessonsCollapsibleHeader
+            sectionId="typing-lessons"
+            text="Typing Lessons"
+            icon="fa-graduation-cap"
+            collapsed={collapsed}
+            onToggle={toggle}
+          />
           <Show when={!collapsed().has("typing-lessons")}>
-            <p class="mb-2 text-sm font-medium text-main">
-              Start with the lesson marked Next and complete lessons in order.
-            </p>
-            <div class="grid gap-1">
-              <For each={lessonGroups}>
-                {(group, index) => (
-                  <LessonGroupSection
-                    group={group}
-                    collapsed={collapsed().has(group.id)}
-                    onToggle={() => toggle(group.id)}
-                    isCurrent={group.id === currentGroupId()}
-                    isFuture={index() > currentGroupIndex()}
-                    isComplete={isGroupComplete(group)}
-                    progressFor={progressFor}
-                    isLessonLocked={isLessonLocked}
-                    getLessonLockMessage={getLessonLockMessage}
-                    frontierLessonId={frontierLessonId()}
-                    frontierCheckpointTarget={frontierCheckpointTarget()}
-                    lessonGameLoading={lessonGameLoading()}
-                    onCheckpointPlay={(g, c) => void openCheckpointGame(g, c)}
-                    onGroupGame={(g, type) => void openLessonGame(g, type)}
-                    grade={grade()}
-                    isGroupComplete={isGroupComplete}
-                  />
-                )}
-              </For>
+            <div id="lessons-section-typing-lessons">
+              <p class="mb-2 text-sm font-medium text-main">
+                Start with the lesson marked Next and complete lessons in order.
+              </p>
+              <div class="grid gap-1">
+                <For each={lessonGroups}>
+                  {(group, index) => (
+                    <LessonGroupSection
+                      group={group}
+                      collapsed={collapsed().has(group.id)}
+                      onToggle={() => toggle(group.id)}
+                      isCurrent={group.id === currentGroupId()}
+                      isFuture={index() > currentGroupIndex()}
+                      isComplete={isGroupComplete(group)}
+                      progressFor={progressFor}
+                      isLessonLocked={isLessonLocked}
+                      getLessonLockMessage={getLessonLockMessage}
+                      frontierLessonId={frontierLessonId()}
+                      frontierCheckpointTarget={frontierCheckpointTarget()}
+                      lessonGameLoading={lessonGameLoading()}
+                      onCheckpointPlay={(g, c) => void openCheckpointGame(g, c)}
+                      onGroupGame={(g, type) => void openLessonGame(g, type)}
+                      grade={grade()}
+                      isGroupComplete={isGroupComplete}
+                    />
+                  )}
+                </For>
+              </div>
             </div>
           </Show>
         </section>
@@ -1686,298 +1635,275 @@ export function LessonsPage(): JSXElement {
           }
         >
           <section>
-            <div class="flex items-center justify-between">
-              <H2
-                class="text-[1.65em] sm:text-[1.85em]"
-                fa={{ icon: "fa-keyboard" }}
-                text="Class Practice"
-              />
-              <button
-                type="button"
-                class="rounded p-1.5 text-sub transition-colors hover:text-text"
-                onClick={() => toggle("class-practice")}
-              >
-                <Fa
-                  icon="fa-chevron-down"
-                  class={cn(
-                    "transition-transform duration-200",
-                    collapsed().has("class-practice") ? "-rotate-90" : "",
-                  )}
-                />
-              </button>
-            </div>
+            <LessonsCollapsibleHeader
+              sectionId="class-practice"
+              text="Class Practice"
+              icon="fa-keyboard"
+              collapsed={collapsed}
+              onToggle={toggle}
+            />
             <Show when={!collapsed().has("class-practice")}>
-              <Show when={(wordListsQuery.data?.length ?? 0) > 0}>
-                <p class="mb-4 text-sub">Word lists shared with your class.</p>
-                <div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <For each={wordListsQuery.data}>
-                    {(wl) => (
-                      <ContentButton
-                        title={wl.title}
-                        subtitle={(() => {
-                          const p = progressFor(`${WORDLIST_PREFIX}${wl.id}`);
-                          return p !== undefined && p.bestWpm > 0
-                            ? `${Math.round(p.bestWpm)} wpm`
-                            : undefined;
-                        })()}
-                        done={
-                          progressFor(`${WORDLIST_PREFIX}${wl.id}`)
-                            ?.completed === true
-                        }
-                        onClick={() => launchWordList(wl)}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
-              <Show when={(passagesQuery.data?.length ?? 0) > 0}>
-                <p class="mb-4 text-sub">
-                  Type these passages exactly as written.
-                </p>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <For each={passagesQuery.data}>
-                    {(p) => (
-                      <ContentButton
-                        title={p.title}
-                        subtitle={(() => {
-                          const pr = progressFor(`${PASSAGE_PREFIX}${p.id}`);
-                          return pr !== undefined && pr.bestWpm > 0
-                            ? `${Math.round(pr.bestWpm)} wpm`
-                            : undefined;
-                        })()}
-                        done={
-                          progressFor(`${PASSAGE_PREFIX}${p.id}`)?.completed ===
-                          true
-                        }
-                        onClick={() => launchPassage(p)}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
+              <div id="lessons-section-class-practice">
+                <Show when={(wordListsQuery.data?.length ?? 0) > 0}>
+                  <p class="mb-4 text-sub">
+                    Word lists shared with your class.
+                  </p>
+                  <div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <For each={wordListsQuery.data}>
+                      {(wl) => (
+                        <ContentButton
+                          title={wl.title}
+                          subtitle={(() => {
+                            const p = progressFor(`${WORDLIST_PREFIX}${wl.id}`);
+                            return p !== undefined && p.bestWpm > 0
+                              ? `${Math.round(p.bestWpm)} wpm`
+                              : undefined;
+                          })()}
+                          done={
+                            progressFor(`${WORDLIST_PREFIX}${wl.id}`)
+                              ?.completed === true
+                          }
+                          onClick={() => launchWordList(wl)}
+                        />
+                      )}
+                    </For>
+                  </div>
+                </Show>
+                <Show when={(passagesQuery.data?.length ?? 0) > 0}>
+                  <p class="mb-4 text-sub">
+                    Type these passages exactly as written.
+                  </p>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <For each={passagesQuery.data}>
+                      {(p) => (
+                        <ContentButton
+                          title={p.title}
+                          subtitle={(() => {
+                            const pr = progressFor(`${PASSAGE_PREFIX}${p.id}`);
+                            return pr !== undefined && pr.bestWpm > 0
+                              ? `${Math.round(pr.bestWpm)} wpm`
+                              : undefined;
+                          })()}
+                          done={
+                            progressFor(`${PASSAGE_PREFIX}${p.id}`)
+                              ?.completed === true
+                          }
+                          onClick={() => launchPassage(p)}
+                        />
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
             </Show>
           </section>
         </Show>
 
         {/* 7. Japanese */}
         <section>
-          <div class="flex items-center justify-between">
-            <H2
-              class="text-[1.65em] sm:text-[1.85em]"
-              fa={{ icon: "fa-language" }}
-              text="Japanese — Romaji"
-            />
-            <button
-              type="button"
-              class="rounded p-1.5 text-sub transition-colors hover:text-text"
-              onClick={() => toggle("japanese")}
-            >
-              <Fa
-                icon="fa-chevron-down"
-                class={cn(
-                  "transition-transform duration-200",
-                  collapsed().has("japanese") ? "-rotate-90" : "",
-                )}
-              />
-            </button>
-          </div>
+          <LessonsCollapsibleHeader
+            sectionId="japanese"
+            text="Japanese — Romaji"
+            icon="fa-language"
+            collapsed={collapsed}
+            onToggle={toggle}
+          />
           <Show when={!collapsed().has("japanese")}>
-            <p class="mb-4 text-sub">
-              Learn Japanese typing in romaji. Free practice - try these in any
-              order.
-            </p>
-            <div class="grid gap-6">
-              <For each={japaneseLessonGroups}>
-                {(group) => (
-                  <div>
-                    <H3 fa={{ icon: group.icon }} text={group.name} />
-                    <p class="mb-3 text-em-sm text-sub">{group.description}</p>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <For each={group.lessons}>
-                        {(lesson) => (
-                          <LessonCard
-                            lesson={lesson}
-                            progress={progressFor(lesson.id)}
-                          />
-                        )}
-                      </For>
+            <div id="lessons-section-japanese">
+              <p class="mb-4 text-sub">
+                Learn Japanese typing in romaji. Free practice - try these in
+                any order.
+              </p>
+              <div class="grid gap-6">
+                <For each={japaneseLessonGroups}>
+                  {(group) => (
+                    <div>
+                      <H3 fa={{ icon: group.icon }} text={group.name} />
+                      <p class="mb-3 text-em-sm text-sub">
+                        {group.description}
+                      </p>
+                      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <For each={group.lessons}>
+                          {(lesson) => (
+                            <LessonCard
+                              lesson={lesson}
+                              progress={progressFor(lesson.id)}
+                            />
+                          )}
+                        </For>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </For>
+                  )}
+                </For>
+              </div>
             </div>
           </Show>
         </section>
 
         {/* 8. Games */}
         <section>
-          <div class="flex items-center justify-between">
-            <H2
-              class="text-[1.65em] sm:text-[1.85em]"
-              fa={{ icon: "fa-gamepad" }}
-              text="Games"
-            />
-            <button
-              type="button"
-              class="rounded p-1.5 text-sub transition-colors hover:text-text"
-              onClick={() => toggle("games")}
-            >
-              <Fa
-                icon="fa-chevron-down"
-                class={cn(
-                  "transition-transform duration-200",
-                  collapsed().has("games") ? "-rotate-90" : "",
-                )}
-              />
-            </button>
-          </div>
+          <LessonsCollapsibleHeader
+            sectionId="games"
+            text="Games"
+            icon="fa-gamepad"
+            collapsed={collapsed}
+            onToggle={toggle}
+          />
           <Show when={!collapsed().has("games")}>
-            <p class="mb-4 text-sub">
-              Play solo, challenge classmates, or check your game rewards.
-            </p>
-            <div
-              role="tablist"
-              aria-label="Game categories"
-              class="mb-4 flex gap-2 border-b border-sub pb-2"
-            >
-              <For each={["solo", "multiplayer", "rewards"] as const}>
-                {(tab) => (
-                  <button
-                    id={`games-tab-${tab}`}
-                    type="button"
-                    role="tab"
-                    aria-selected={gamesTab() === tab}
-                    aria-controls="games-tab-panel"
-                    tabIndex={gamesTab() === tab ? 0 : -1}
-                    class={cn(
-                      "rounded px-3 py-2 transition-colors",
-                      gamesTab() === tab
-                        ? "bg-text text-bg"
-                        : "bg-sub-alt text-sub hover:text-text",
-                    )}
-                    onClick={() => setGamesTab(tab)}
-                    onKeyDown={(event) => {
-                      const tabs = ["solo", "multiplayer", "rewards"] as const;
-                      const index = tabs.indexOf(tab);
-                      const next =
-                        event.key === "ArrowRight"
-                          ? tabs[(index + 1) % tabs.length]
-                          : event.key === "ArrowLeft"
-                            ? tabs[(index + tabs.length - 1) % tabs.length]
-                            : event.key === "Home"
-                              ? tabs[0]
-                              : event.key === "End"
-                                ? tabs[tabs.length - 1]
-                                : undefined;
-                      if (next === undefined) return;
-                      event.preventDefault();
-                      setGamesTab(next);
-                      document.getElementById(`games-tab-${next}`)?.focus();
-                    }}
-                  >
-                    {tab === "solo"
-                      ? "Solo play"
-                      : tab === "multiplayer"
-                        ? "Multiplayer"
-                        : "Rewards"}
-                  </button>
-                )}
-              </For>
-            </div>
-            <div
-              id="games-tab-panel"
-              role="tabpanel"
-              aria-labelledby={`games-tab-${gamesTab()}`}
-            >
-              <Show when={gamesTab() === "solo"}>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <For each={games.filter((g) => g.type === "builtin")}>
-                    {(game) => (
-                      <GameButton
-                        name={game.name}
-                        description={game.description}
-                        icon={game.icon}
-                        locked={game.id === "typing-rpg" && !rpgUnlocked()}
-                        onClick={() => launchGame(game.id)}
-                      />
-                    )}
-                  </For>
-                </div>
-              </Show>
-              <Show when={gamesTab() === "multiplayer"}>
-                <p class="mb-3 text-sub">
-                  Create a room or join friends with a code.
-                </p>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <For
-                    each={games.filter(
-                      (g) =>
-                        g.type === "builtin" &&
-                        ["type-toss", "type-racer", "ghost-hunter"].includes(
-                          g.id,
-                        ),
-                    )}
-                  >
-                    {(game) => {
-                      const requiredLesson =
-                        game.id === "type-racer"
-                          ? "home-middle"
-                          : game.id === "type-toss"
-                            ? "home-words"
-                            : "all-keys-1";
-                      const locked = () =>
-                        !isCurrentUserAdmin() && isLessonLocked(requiredLesson);
-                      return (
+            <div id="lessons-section-games">
+              <p class="mb-4 text-sub">
+                Play solo, challenge classmates, or check your game rewards.
+              </p>
+              <div
+                role="tablist"
+                aria-label="Game categories"
+                class="mb-4 flex gap-2 border-b border-sub pb-2"
+              >
+                <For each={["solo", "multiplayer", "rewards"] as const}>
+                  {(tab) => (
+                    <button
+                      id={`games-tab-${tab}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={gamesTab() === tab}
+                      aria-controls="games-tab-panel"
+                      tabIndex={gamesTab() === tab ? 0 : -1}
+                      class={cn(
+                        "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        gamesTab() === tab
+                          ? "bg-main text-bg"
+                          : "bg-sub-alt text-sub hover:text-text",
+                      )}
+                      onClick={() => setGamesTab(tab)}
+                      onKeyDown={(event) => {
+                        const tabs = [
+                          "solo",
+                          "multiplayer",
+                          "rewards",
+                        ] as const;
+                        const index = tabs.indexOf(tab);
+                        const next =
+                          event.key === "ArrowRight"
+                            ? tabs[(index + 1) % tabs.length]
+                            : event.key === "ArrowLeft"
+                              ? tabs[(index + tabs.length - 1) % tabs.length]
+                              : event.key === "Home"
+                                ? tabs[0]
+                                : event.key === "End"
+                                  ? tabs[tabs.length - 1]
+                                  : undefined;
+                        if (next === undefined) return;
+                        event.preventDefault();
+                        setGamesTab(next);
+                        document.getElementById(`games-tab-${next}`)?.focus();
+                      }}
+                    >
+                      {tab === "solo"
+                        ? "Solo play"
+                        : tab === "multiplayer"
+                          ? "Multiplayer"
+                          : "Rewards"}
+                    </button>
+                  )}
+                </For>
+              </div>
+              <div
+                id="games-tab-panel"
+                role="tabpanel"
+                aria-labelledby={`games-tab-${gamesTab()}`}
+              >
+                <Show when={gamesTab() === "solo"}>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <For each={games.filter((g) => g.type === "builtin")}>
+                      {(game) => (
                         <GameButton
                           name={game.name}
                           description={game.description}
                           icon={game.icon}
-                          locked={locked()}
-                          lockedMessage="🔒 Complete the required typing lessons to play together"
-                          onClick={() => {
-                            if (!locked()) launchGame(game.id, "together");
-                          }}
+                          recommended={recommendedGameId() === game.id}
+                          locked={game.id === "typing-rpg" && !rpgUnlocked()}
+                          onClick={() => launchGame(game.id)}
                         />
-                      );
-                    }}
-                  </For>
-                </div>
-              </Show>
-              <Show when={gamesTab() === "rewards"}>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div class="rounded bg-sub-alt p-4">
-                    <h3 class="font-medium text-text">Typing Quest</h3>
-                    <p class="my-2 text-sub">
-                      Earn coins for clearing waves. Fast mode earns more; both
-                      modes share the daily bonus limit.
-                    </p>
-                    <button
-                      type="button"
-                      class="rounded bg-text px-3 py-2 text-bg"
-                      onClick={() => launchGame("typing-rpg")}
-                    >
-                      Play Typing Quest
-                    </button>
+                      )}
+                    </For>
                   </div>
-                  <div class="rounded bg-sub-alt p-4">
-                    <h3 class="font-medium text-text">
-                      Today&apos;s practice reward
-                    </h3>
-                    <p class="my-2 text-sub">
-                      Finish today&apos;s recommended activity for its daily
-                      practice reward.
-                    </p>
-                    <button
-                      type="button"
-                      class="rounded bg-text px-3 py-2 text-bg"
-                      onClick={() => practiceRecommendation()?.onStart()}
+                </Show>
+                <Show when={gamesTab() === "multiplayer"}>
+                  <p class="mb-3 text-sub">
+                    Create a room or join friends with a code.
+                  </p>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <For
+                      each={games.filter(
+                        (g) =>
+                          g.type === "builtin" &&
+                          ["type-toss", "type-racer", "ghost-hunter"].includes(
+                            g.id,
+                          ),
+                      )}
                     >
-                      {practiceRecommendation()?.title ??
-                        "See today's practice"}
-                    </button>
+                      {(game) => {
+                        const requiredLesson =
+                          game.id === "type-racer"
+                            ? "home-middle"
+                            : game.id === "type-toss"
+                              ? "home-words"
+                              : "all-keys-1";
+                        const locked = () =>
+                          !isCurrentUserAdmin() &&
+                          isLessonLocked(requiredLesson);
+                        return (
+                          <GameButton
+                            name={game.name}
+                            description={game.description}
+                            icon={game.icon}
+                            locked={locked()}
+                            lockedMessage="🔒 Complete the required typing lessons to play together"
+                            onClick={() => {
+                              if (!locked()) launchGame(game.id, "together");
+                            }}
+                          />
+                        );
+                      }}
+                    </For>
                   </div>
-                </div>
-              </Show>
+                </Show>
+                <Show when={gamesTab() === "rewards"}>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div class="rounded bg-sub-alt p-4">
+                      <h3 class="font-medium text-text">Typing Quest</h3>
+                      <p class="my-2 text-sub">
+                        Earn coins for clearing waves. Fast mode earns more;
+                        both modes share the daily bonus limit.
+                      </p>
+                      <button
+                        type="button"
+                        class="rounded bg-text px-3 py-2 text-bg"
+                        onClick={() => launchGame("typing-rpg")}
+                      >
+                        Play Typing Quest
+                      </button>
+                    </div>
+                    <div class="rounded bg-sub-alt p-4">
+                      <h3 class="font-medium text-text">
+                        Today&apos;s practice reward
+                      </h3>
+                      <p class="my-2 text-sub">
+                        Finish today&apos;s recommended activity for its daily
+                        practice reward.
+                      </p>
+                      <button
+                        type="button"
+                        class="rounded bg-text px-3 py-2 text-bg"
+                        onClick={() => practiceRecommendation()?.onStart()}
+                      >
+                        {practiceRecommendation()?.title ??
+                          "See today's practice"}
+                      </button>
+                    </div>
+                  </div>
+                </Show>
+              </div>
             </div>
           </Show>
         </section>
@@ -1985,43 +1911,32 @@ export function LessonsPage(): JSXElement {
         {/* 8b. Fun Box */}
         <Show when={FUNBOX_GAMES_ENABLED}>
           <section>
-            <div class="flex items-center justify-between">
-              <H2
-                class="text-[1.65em] sm:text-[1.85em]"
-                fa={{ icon: "fa-magic" }}
-                text="fun box"
-              />
-              <button
-                type="button"
-                class="rounded p-1.5 text-sub transition-colors hover:text-text"
-                onClick={() => toggle("funbox")}
-              >
-                <Fa
-                  icon="fa-chevron-down"
-                  class={cn(
-                    "transition-transform duration-200",
-                    collapsed().has("funbox") ? "-rotate-90" : "",
-                  )}
-                />
-              </button>
-            </div>
+            <LessonsCollapsibleHeader
+              sectionId="funbox"
+              text="fun box"
+              icon="fa-magic"
+              collapsed={collapsed}
+              onToggle={toggle}
+            />
             <Show when={!collapsed().has("funbox")}>
-              <p class="mb-4 text-sub">
-                Weird typing modes that change how the test feels.
-              </p>
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <For each={games.filter((g) => g.type === "funbox")}>
-                  {(game) => (
-                    <GameButton
-                      name={game.name}
-                      description={game.description}
-                      icon={game.icon}
-                      onClick={() => {
-                        if (game.type === "funbox") startGame(game);
-                      }}
-                    />
-                  )}
-                </For>
+              <div id="lessons-section-funbox">
+                <p class="mb-4 text-sub">
+                  Weird typing modes that change how the test feels.
+                </p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <For each={games.filter((g) => g.type === "funbox")}>
+                    {(game) => (
+                      <GameButton
+                        name={game.name}
+                        description={game.description}
+                        icon={game.icon}
+                        onClick={() => {
+                          if (game.type === "funbox") startGame(game);
+                        }}
+                      />
+                    )}
+                  </For>
+                </div>
               </div>
             </Show>
           </section>

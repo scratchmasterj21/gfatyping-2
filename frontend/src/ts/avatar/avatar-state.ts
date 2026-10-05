@@ -47,6 +47,7 @@ function userRef(uid: string): DocumentReference {
  * not an opt-in shown only once a student equips something.
  */
 export async function getEquippedAvatar(uid: string): Promise<EquippedAvatar> {
+  if (uid.trim().length === 0) return {};
   try {
     const snap = await getDoc(userRef(uid));
     if (!snap.exists()) return {};
@@ -82,6 +83,9 @@ export async function getEquippedAvatar(uid: string): Promise<EquippedAvatar> {
 }
 
 export async function getAvatarState(uid: string): Promise<AvatarState> {
+  if (uid.trim().length === 0) {
+    return { coins: 0, ownedCostumes: {}, equipped: {}, shape: "round" };
+  }
   try {
     const snap = await getDoc(userRef(uid));
     if (snap.exists()) {
