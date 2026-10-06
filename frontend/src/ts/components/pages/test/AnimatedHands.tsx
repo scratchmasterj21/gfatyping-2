@@ -23,8 +23,6 @@ import { getBackdropState } from "../../../backdrops/backdrop-state";
 import { getConfig } from "../../../config/store";
 import { HandStyleId } from "../../../hands/hand-styles";
 import { getHandsState } from "../../../hands/hands-state";
-import { KeyboardSkinItemId } from "../../../keyboard-skins/keyboard-skin-items";
-import { getKeyboardSkinState } from "../../../keyboard-skins/keyboard-skin-state";
 import { KeypressEffectItemId } from "../../../keypress-effects/keypress-effect-items";
 import { getKeypressEffectState } from "../../../keypress-effects/keypress-effect-state";
 import { fingerForChar, Finger } from "../../../lessons/finger-map";
@@ -34,9 +32,6 @@ import {
 } from "../../../rgb-palettes/rgb-palette-items";
 import { getRgbPaletteState } from "../../../rgb-palettes/rgb-palette-state";
 import { getUserId } from "../../../states/core";
-import { showModal } from "../../../states/modals";
-import { cn } from "../../../utils/cn";
-import { Fa } from "../../common/Fa";
 import {
   generateMechanicalKeyboardSvg,
   generateSkinKeyboardSvg,
@@ -47,83 +42,29 @@ export const [activeFinger, setActiveFinger] = createSignal<Finger | null>(
 );
 export const [activeChar, setActiveChar] = createSignal<string | null>(null);
 
-type KeyboardStyle =
-  | "flat"
-  | "cartoon"
-  | "modern"
-  | "marble"
-  | "rgb"
-  | KeyboardSkinItemId;
+import {
+  keyboardShowColors,
+  keyboardStyle,
+  rgbBrightness,
+  rgbMode,
+  type GuidedKeyboardStyle,
+} from "./guided-keyboard-prefs";
+
+export type { GuidedKeyboardStyle } from "./guided-keyboard-prefs";
+export {
+  keyboardShowColors,
+  keyboardStyle,
+  rgbBrightness,
+  rgbMode,
+  setKeyboardShowColors,
+  setKeyboardStyle,
+  setRgbBrightness,
+  setRgbMode,
+} from "./guided-keyboard-prefs";
+
+type KeyboardStyle = GuidedKeyboardStyle;
 type RgbMode = "wave" | "breathe" | "solid" | "static";
 type RgbBrightness = "low" | "med" | "high";
-
-function loadKeyboardStyle(): KeyboardStyle {
-  const stored = localStorage.getItem("keyboardGraphicStyle");
-  if (
-    stored === "cartoon" ||
-    stored === "modern" ||
-    stored === "marble" ||
-    stored === "rgb" ||
-    stored === "wood" ||
-    stored === "glass"
-  ) {
-    return stored;
-  }
-  return "marble";
-}
-
-export const [keyboardStyle, setKeyboardStyleSignal] =
-  createSignal<KeyboardStyle>(loadKeyboardStyle());
-
-export function setKeyboardStyle(style: KeyboardStyle): void {
-  localStorage.setItem("keyboardGraphicStyle", style);
-  setKeyboardStyleSignal(style);
-}
-
-const [showKeyColors, setShowKeyColorsSignal] = createSignal<boolean>(
-  localStorage.getItem("keyboardShowColors") !== "false",
-);
-
-function setShowKeyColors(val: boolean): void {
-  localStorage.setItem("keyboardShowColors", String(val));
-  setShowKeyColorsSignal(val);
-}
-
-function loadRgbMode(): RgbMode {
-  const s = localStorage.getItem("rgbMode");
-  if (s === "breathe" || s === "solid" || s === "static") return s;
-  return "wave";
-}
-
-function loadRgbBrightness(): RgbBrightness {
-  const s = localStorage.getItem("rgbBrightness");
-  if (s === "low" || s === "high") return s;
-  return "med";
-}
-
-const RGB_MODES: RgbMode[] = ["wave", "breathe", "solid", "static"];
-const RGB_MODE_LABELS: Record<RgbMode, string> = {
-  wave: "Wave",
-  breathe: "Breathe",
-  solid: "Solid",
-  static: "Static",
-};
-
-const [rgbMode, setRgbModeSignal] = createSignal<RgbMode>(loadRgbMode());
-const [rgbBrightness, setRgbBrightnessSignal] =
-  createSignal<RgbBrightness>(loadRgbBrightness());
-
-function setRgbMode(mode: RgbMode): void {
-  localStorage.setItem("rgbMode", mode);
-  setRgbModeSignal(mode);
-}
-
-function setRgbBrightness(b: RgbBrightness): void {
-  localStorage.setItem("rgbBrightness", b);
-  setRgbBrightnessSignal(b);
-}
-
-const BRIGHTNESS_STEPS: RgbBrightness[] = ["low", "med", "high"];
 
 // Returns CSS overrides for the current RGB mode + brightness combination.
 // Injected into the AnimatedHands <style> block only when rgb style is active.
@@ -513,18 +454,6 @@ export function AnimatedHands(): JSXElement {
   const rgbPalette = (): RgbPaletteItemId =>
     rgbPaletteStateQuery.data?.selectedPalette ?? "rainbow";
 
-  const keyboardSkinStateQuery = useQuery(() => ({
-    queryKey: ["keyboardSkinState", getUserId()],
-    queryFn: async () => {
-      const uid = getUserId();
-      if (uid === null) return { coins: 0, ownedSkins: {} };
-      return getKeyboardSkinState(uid);
-    },
-    staleTime: 0,
-  }));
-  const isSkinOwned = (id: KeyboardSkinItemId): boolean =>
-    keyboardSkinStateQuery.data?.ownedSkins[id] === true;
-
   const keypressEffectStateQuery = useQuery(() => ({
     queryKey: ["keypressEffectState", getUserId()],
     queryFn: async () => {
@@ -681,27 +610,6 @@ export function AnimatedHands(): JSXElement {
     return `${sel} { fill: var(--main-color) !important; stroke: var(--sub-color) !important; stroke-width: 2px !important; }`;
   };
 
-  const STYLES: KeyboardStyle[] = [
-    "flat",
-    "cartoon",
-    "modern",
-    "marble",
-    "rgb",
-    "wood",
-    "glass",
-  ];
-  const LABELS: Record<KeyboardStyle, string> = {
-    flat: "Classic",
-    cartoon: "Cartoon",
-    modern: "Modern",
-    marble: "Marble",
-    rgb: "RGB",
-    wood: "Wood",
-    glass: "Glass",
-  };
-  const isSkinStyle = (style: KeyboardStyle): style is KeyboardSkinItemId =>
-    style === "wood" || style === "glass";
-
   return (
     <Show when={getConfig.showGuidedHands}>
       <div
@@ -788,7 +696,7 @@ export function AnimatedHands(): JSXElement {
                 display: none !important;
               }
 
-              ${showKeyColors() ? config().fingerCss : ""}
+              ${keyboardShowColors() ? config().fingerCss : ""}
 
               ${config().edcSt1Css}
 
@@ -857,102 +765,6 @@ export function AnimatedHands(): JSXElement {
               </div>
             )}
           </For>
-        </div>
-
-        {/* Style picker + color toggle */}
-        <div class="mt-1 flex justify-center gap-2">
-          <For each={STYLES}>
-            {(style) => {
-              const locked = (): boolean =>
-                isSkinStyle(style) && !isSkinOwned(style);
-              return (
-                <button
-                  type="button"
-                  class={cn(
-                    "rounded px-3 py-0.5 text-sm transition-colors",
-                    keyboardStyle() === style
-                      ? "bg-main text-bg"
-                      : "bg-sub-alt text-sub hover:text-text",
-                    locked() && "opacity-60",
-                  )}
-                  onClick={() => {
-                    if (locked()) {
-                      showModal("KeyboardSkinShop");
-                      return;
-                    }
-                    setKeyboardStyle(style);
-                  }}
-                >
-                  <Show when={locked()}>
-                    <Fa icon="fa-lock" size={0.65} class="mr-1" />
-                  </Show>
-                  {LABELS[style]}
-                </button>
-              );
-            }}
-          </For>
-          <div class="mx-1 w-px bg-sub opacity-40"></div>
-          <button
-            type="button"
-            class={cn(
-              "rounded px-3 py-0.5 text-sm transition-colors",
-              showKeyColors()
-                ? "bg-main text-bg"
-                : "bg-sub-alt text-sub hover:text-text",
-            )}
-            onClick={() => setShowKeyColors(!showKeyColors())}
-          >
-            Colors
-          </button>
-          <Show when={keyboardStyle() === "rgb"}>
-            <div class="mx-1 w-px bg-sub opacity-40"></div>
-            <button
-              type="button"
-              class="rounded bg-sub-alt px-3 py-0.5 text-sm text-sub transition-colors hover:text-text"
-              onClick={() => {
-                const idx = RGB_MODES.indexOf(rgbMode());
-                setRgbMode(RGB_MODES[(idx + 1) % RGB_MODES.length] ?? "wave");
-              }}
-            >
-              {RGB_MODE_LABELS[rgbMode()]}
-            </button>
-            <button
-              type="button"
-              disabled={rgbBrightness() === "low"}
-              class={cn(
-                "rounded px-2 py-0.5 text-sm transition-colors",
-                rgbBrightness() === "low"
-                  ? "cursor-not-allowed bg-sub-alt text-sub opacity-30"
-                  : "bg-sub-alt text-sub hover:text-text",
-              )}
-              onClick={() => {
-                const idx = BRIGHTNESS_STEPS.indexOf(rgbBrightness());
-                if (idx > 0) {
-                  setRgbBrightness(BRIGHTNESS_STEPS[idx - 1] ?? "med");
-                }
-              }}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              disabled={rgbBrightness() === "high"}
-              class={cn(
-                "rounded px-2 py-0.5 text-sm transition-colors",
-                rgbBrightness() === "high"
-                  ? "cursor-not-allowed bg-sub-alt text-sub opacity-30"
-                  : "bg-sub-alt text-sub hover:text-text",
-              )}
-              onClick={() => {
-                const idx = BRIGHTNESS_STEPS.indexOf(rgbBrightness());
-                if (idx < BRIGHTNESS_STEPS.length - 1) {
-                  setRgbBrightness(BRIGHTNESS_STEPS[idx + 1] ?? "med");
-                }
-              }}
-            >
-              +
-            </button>
-          </Show>
         </div>
       </div>
     </Show>

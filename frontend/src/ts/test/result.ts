@@ -834,24 +834,47 @@ async function applyCurriculumNextButtonLabel(
   lessonId: string,
   finishedStars?: number,
 ): Promise<void> {
-  const uid = getAuthenticatedUser()?.uid;
-  let progress: Map<string, LessonProgress.LessonProgress> | undefined;
-  let grandfatherIndex = Infinity;
-  if (uid !== undefined) {
-    progress = await LessonProgress.getAllProgress();
-    grandfatherIndex = await LessonProgress.ensureStarsGateGrandfather(
-      uid,
+  try {
+    const uid = getAuthenticatedUser()?.uid;
+    let progress: Map<string, LessonProgress.LessonProgress> | undefined;
+    let grandfatherIndex = Infinity;
+    if (uid !== undefined) {
+      progress = await LessonProgress.getAllProgress();
+      grandfatherIndex = await LessonProgress.ensureStarsGateGrandfather(
+        uid,
+        progress,
+      );
+    }
+    const action = curriculumNextAction(lessonId, {
       progress,
-    );
+      grandfatherIndex,
+      finishedStars,
+    });
+    const label = curriculumNextButtonLabel(action);
+    qs("#nextTestButton .lessonActionText")?.setText(label);
+    qs("#nextTestButton")?.setAttribute("aria-label", label);
+  } catch (err) {
+    console.error("applyCurriculumNextButtonLabel failed", err);
   }
-  const action = curriculumNextAction(lessonId, {
-    progress,
-    grandfatherIndex,
-    finishedStars,
-  });
-  const label = curriculumNextButtonLabel(action);
-  qs("#nextTestButton .lessonActionText")?.setText(label);
-  qs("#nextTestButton")?.setAttribute("aria-label", label);
+}
+
+const LESSON_SAVE_TIMEOUT_MS = 45_000;
+
+async function awaitLessonCompletion(
+  completionPromise: Promise<LessonProgress.LessonCompletionResult | undefined>,
+): Promise<LessonProgress.LessonCompletionResult | undefined> {
+  try {
+    return await Promise.race([
+      completionPromise,
+      Misc.sleep(LESSON_SAVE_TIMEOUT_MS).then(() => ({
+        ok: false as const,
+        reason: "timeout",
+      })),
+    ]);
+  } catch (err) {
+    console.error("Lesson completion failed", err);
+    return { ok: false, reason: "error" };
+  }
 }
 
 // Shows server-confirmed lesson feedback and emphasizes one existing result
@@ -902,7 +925,7 @@ async function updateLessonGate(
       .removeClass("fail")
       .setHtml(`<i class="fas fa-spinner fa-spin"></i> Saving lesson…`)
       .show();
-    const outcome = await completionPromise;
+    const outcome = await awaitLessonCompletion(completionPromise);
     if (outcome?.ok !== true) {
       syncLessonResultHeader("fail");
       el.addClass("fail")
@@ -919,33 +942,48 @@ async function updateLessonGate(
       return;
     }
 
-    if (outcome.passed === true) {
-      const stars = Math.max(1, Math.min(3, outcome.stars ?? 1));
-      const reward =
-        (outcome.coinsAwarded ?? 0) > 0
-          ? ` · +${outcome.coinsAwarded ?? 0} coins`
-          : "";
-      syncLessonResultHeader("pass");
-      el.removeClass("fail")
-        .addClass("pass")
+    if (outcome.passed !== true) {
+      syncLessonResultHeader("fail");
+      el.removeClass("pass")
+        .addClass("fail")
         .setHtml(
-          `<i class="fas fa-check"></i> Lesson passed · ${"★".repeat(stars)}${"☆".repeat(3 - stars)}${reward}`,
+          `<i class="fas fa-redo"></i> You need ${threshold}% accuracy to pass this lesson - try again!`,
         )
         .show();
-      if (stars >= 2) {
-        nextButton?.addClass("lessonPrimary");
-        await applyCurriculumNextButtonLabel(lessonId, stars);
-      } else {
-        syncLessonResultHeader("fail");
-        retryButton?.addClass("lessonPrimary");
-        nextButton?.hide();
-        retryButton?.setAttribute("aria-label", "Improve to 2 stars");
-        qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
-          "Try again for 2 stars",
-        );
-      }
+      retryButton?.addClass("lessonPrimary");
+      nextButton?.hide();
+      retryButton?.setAttribute("aria-label", "Retry lesson");
+      qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+        "Retry lesson",
+      );
       return;
     }
+
+    const stars = Math.max(1, Math.min(3, outcome.stars ?? 1));
+    const reward =
+      (outcome.coinsAwarded ?? 0) > 0
+        ? ` · +${outcome.coinsAwarded ?? 0} coins`
+        : "";
+    syncLessonResultHeader("pass");
+    el.removeClass("fail")
+      .addClass("pass")
+      .setHtml(
+        `<i class="fas fa-check"></i> Lesson passed · ${"★".repeat(stars)}${"☆".repeat(3 - stars)}${reward}`,
+      )
+      .show();
+    if (stars >= 2) {
+      nextButton?.addClass("lessonPrimary");
+      await applyCurriculumNextButtonLabel(lessonId, stars);
+    } else {
+      syncLessonResultHeader("fail");
+      retryButton?.addClass("lessonPrimary");
+      nextButton?.hide();
+      retryButton?.setAttribute("aria-label", "Improve to 2 stars");
+      qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
+        "Try again for 2 stars",
+      );
+    }
+    return;
   }
 
   if (res.acc >= threshold && completionPromise === undefined) {

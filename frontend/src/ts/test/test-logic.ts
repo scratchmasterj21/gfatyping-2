@@ -1170,19 +1170,33 @@ export async function finish(difficultyFailed = false): Promise<void> {
     dontSave = true;
   }
 
-  const resultUpdatePromise = Result.update(
-    completedEvent,
-    difficultyFailed,
-    failReason,
-    afkDetected,
-    isRepeated(),
-    tooShort,
-    getCurrentQuote(),
-    dontSave,
-    lessonCompletionPromise,
-  );
-
-  await Promise.all([savingResultPromise, resultUpdatePromise]);
+  try {
+    await Promise.all([
+      savingResultPromise,
+      Result.update(
+        completedEvent,
+        difficultyFailed,
+        failReason,
+        afkDetected,
+        isRepeated(),
+        tooShort,
+        getCurrentQuote(),
+        dontSave,
+        lessonCompletionPromise,
+      ),
+    ]);
+  } catch (err) {
+    console.error("Test finish failed", err);
+    showErrorNotification(
+      "Something went wrong finishing your test. Try again or refresh the page.",
+      { important: true, durationMs: 8000 },
+    );
+    qs(".pageTest .loading")?.hide();
+    qs("#result")?.show();
+    qs("#typingTest")?.hide();
+  } finally {
+    TestState.setResultCalculating(false);
+  }
 }
 
 async function saveResult(

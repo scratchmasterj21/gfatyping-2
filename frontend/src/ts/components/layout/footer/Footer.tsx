@@ -3,6 +3,7 @@ import { JSXElement } from "solid-js";
 import { getIsScreenshotting } from "../../../states/core";
 import { getFocus } from "../../../states/test";
 import { cn } from "../../../utils/cn";
+import { GuidedKeyboardControls } from "../../pages/test/GuidedKeyboardControls";
 import { Keytips } from "./Keytips";
 import { ThemeIndicator } from "./ThemeIndicator";
 import { VersionButton } from "./VersionButton";
@@ -14,6 +15,7 @@ export function Footer(): JSXElement {
         "opacity-0": getIsScreenshotting(),
       })}
     >
+      <GuidedKeyboardControls />
       <Keytips />
 
       <div
