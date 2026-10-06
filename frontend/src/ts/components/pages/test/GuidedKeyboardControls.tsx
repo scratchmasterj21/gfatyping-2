@@ -68,7 +68,10 @@ export function GuidedKeyboardControls(): JSXElement {
       if (uid === null) return { coins: 0, ownedSkins: {} };
       return getKeyboardSkinState(uid);
     },
-    staleTime: 0,
+    // Only fetch while the test keyboard chrome is shown — not on every page
+    // via the global footer (was burning Firestore reads with staleTime: 0).
+    enabled: visible() && getUserId() !== null,
+    staleTime: 5 * 60 * 1000,
   }));
   const isSkinOwned = (id: KeyboardSkinItemId): boolean =>
     keyboardSkinStateQuery.data?.ownedSkins[id] === true;

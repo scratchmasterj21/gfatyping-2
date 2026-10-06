@@ -918,7 +918,6 @@ async function updateLessonGate(
   qs("#restartTestButtonWithSameWordset .lessonActionText")?.setText(
     "Try again",
   );
-  void applyCurriculumNextButtonLabel(lessonId);
   const threshold = LessonProgress.lessonPassAccuracy(getStudentGrade());
   if (completionPromise !== undefined) {
     el.removeClass("pass")

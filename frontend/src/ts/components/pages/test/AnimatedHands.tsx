@@ -428,7 +428,7 @@ export function AnimatedHands(): JSXElement {
       }
       return getHandsState(uid);
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
 
   const handStyle = (): HandStyleId =>
@@ -449,7 +449,7 @@ export function AnimatedHands(): JSXElement {
       }
       return getRgbPaletteState(uid);
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
   const rgbPalette = (): RgbPaletteItemId =>
     rgbPaletteStateQuery.data?.selectedPalette ?? "rainbow";
@@ -467,7 +467,7 @@ export function AnimatedHands(): JSXElement {
       }
       return getKeypressEffectState(uid);
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
   const keypressEffect = (): KeypressEffectItemId =>
     keypressEffectStateQuery.data?.selectedEffect ?? "none";
@@ -485,7 +485,7 @@ export function AnimatedHands(): JSXElement {
       }
       return getBackdropState(uid);
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
   const backdrop = (): BackdropItemId =>
     backdropStateQuery.data?.selectedBackdrop ?? "none";
