@@ -1,0 +1,31 @@
+---
+description: Stay within Firebase Spark (free) Firestore daily quotas
+alwaysApply: true
+---
+
+# Firebase Spark — stay on free tier
+
+Production must not depend on high-volume **Firestore** traffic. Daily limits (typical Spark): ~50K reads, ~20K writes, ~20K deletes. Quota resets at **Pacific midnight** (~4–5pm JST).
+
+**RTDB is separate** (own Spark quotas). In this repo RTDB is only **arcade multiplayer** (`tossRooms`, `racerRooms`, `ghostRooms` / `ghostWorlds` / `ghostActions`) plus legacy `config`, `searchCache`, `workerActivityLogs`. **Teacher classroom races** (`races/{pin}/participants`) are **Firestore**—live progress ticks count toward the 20K/day write limit.
+
+## Do not add
+
+- Global `setInterval` / heartbeat **writes** (presence, pings, progress ticks) on every student session
+- App-wide `onSnapshot` listeners; only subscribe while the relevant UI is open, unsubscribe on leave
+- Queries with `staleTime: 0` on large scans (`getAllProgress`, `getClassProgress`, full subcollections) unless behind explicit manual refresh
+- Firestore writes on every keystroke, timer tick, or page visibility ping
+
+## Do
+
+- Gate heavy queries: `enabled` when the page/tab is active (`getActivePage()`, route, tab signal)
+- Default **≥ 5 min** `staleTime` (and reasonable `gcTime`) for classroom/lessons bulk reads
+- Prefer one read/write per meaningful user action (finish test, save settings), not per second
+- Before shipping realtime features, estimate: `(users × writes per hour × active hours)` vs 20K/day
+- If live monitoring is needed later, prefer RTDB (like arcade multiplayer) or polling—not Firestore heartbeats on Spark
+
+## Review checklist (Firestore-touching PRs)
+
+1. Who runs this path (all students vs teachers only)?
+2. Reads/writes per user per minute at peak?
+3. Still safe if 30+ students have old cached bundles for a day?

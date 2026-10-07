@@ -51,7 +51,7 @@ import { lessonGroups } from "../../../lessons/lessons-data";
 import { queryClient } from "../../../queries";
 import { listHistoryForClass } from "../../../race/race-db";
 import { RaceHistory } from "../../../race/race-types";
-import { getUserId } from "../../../states/core";
+import { getActivePage, getUserId } from "../../../states/core";
 import {
   showErrorNotification,
   showNoticeNotification,
@@ -63,7 +63,6 @@ import { Button } from "../../common/Button";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
-import { LiveMonitorTab } from "./LiveMonitorTab";
 import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
 
@@ -72,9 +71,11 @@ const inputClass =
 const selectClass =
   "rounded bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
 
+/** Cache classroom Firestore scans — getClassProgress is very read-heavy. */
+const CLASSROOM_QUERY_STALE_MS = 5 * 60 * 1000;
+
 const TabSchema = z.enum([
   "students",
-  "live",
   "progress",
   "assignments",
   "wordlists",
@@ -86,7 +87,6 @@ const TabSchema = z.enum([
 type Tab = z.infer<typeof TabSchema>;
 
 const CLASS_TABS = new Set<Tab>([
-  "live",
   "progress",
   "assignments",
   "races",
@@ -1979,40 +1979,49 @@ export function ClassroomDashboard(): JSXElement {
     }
   };
 
+  const classroomOpen = (): boolean =>
+    isCurrentUserAdmin() && getActivePage() === "classroom";
+
   const progressQuery = useQuery(() => ({
     queryKey: ["classroom", "progress", selectedClass()],
     queryFn: async () => getClassProgress(selectedClass()),
-    enabled: isCurrentUserAdmin(),
+    enabled: classroomOpen(),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const assignmentsQuery = useQuery(() => ({
     queryKey: ["classroom", "assignments"],
     queryFn: listAssignments,
-    enabled: isCurrentUserAdmin(),
+    enabled: classroomOpen(),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const wordListsQuery = useQuery(() => ({
     queryKey: ["classroom", "wordlists"],
     queryFn: listWordLists,
-    enabled: isCurrentUserAdmin(),
+    enabled: classroomOpen(),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const passagesQuery = useQuery(() => ({
     queryKey: ["classroom", "passages"],
     queryFn: listReadingPassages,
-    enabled: isCurrentUserAdmin(),
+    enabled: classroomOpen(),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const racesQuery = useQuery(() => ({
     queryKey: ["classroom", "races", selectedClass()],
     queryFn: async () => listHistoryForClass(selectedClass()),
-    enabled: isCurrentUserAdmin(),
+    enabled: classroomOpen(),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const announcementsQuery = useQuery(() => ({
     queryKey: ["classroom", "announcements"],
     queryFn: listAnnouncements,
-    enabled: isCurrentUserAdmin(),
+    enabled: classroomOpen(),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const refetchAnnouncements = async (): Promise<void> => {
@@ -2105,7 +2114,6 @@ export function ClassroomDashboard(): JSXElement {
               "Students",
               <>
                 {tabButton("students", "Students", { icon: "fa-users" })}
-                {tabButton("live", "Live", { icon: "fa-signal" })}
                 {tabButton("progress", "Student progress", {
                   icon: "fa-chart-line",
                 })}
@@ -2139,9 +2147,6 @@ export function ClassroomDashboard(): JSXElement {
 
           <Show when={tab() === "students"}>
             <StudentsTab />
-          </Show>
-          <Show when={tab() === "live"}>
-            <LiveMonitorTab classId={selectedClass()} rows={rows()} />
           </Show>
           <Show when={tab() === "progress"}>
             <ProgressTab

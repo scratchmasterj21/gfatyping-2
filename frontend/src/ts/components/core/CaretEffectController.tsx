@@ -3,7 +3,7 @@ import { createEffect, JSXElement } from "solid-js";
 
 import { CaretEffectItemId } from "../../caret-effects/caret-effect-items";
 import { getCaretEffectState } from "../../caret-effects/caret-effect-state";
-import { getUserId } from "../../states/core";
+import { getActivePage, getUserId } from "../../states/core";
 
 const FX_CLASSES = ["fx-glow", "fx-comet", "fx-sparkle"];
 
@@ -23,7 +23,8 @@ export function CaretEffectController(): JSXElement {
       }
       return getCaretEffectState(uid);
     },
-    staleTime: 0,
+    enabled: getActivePage() === "test" && getUserId() !== null,
+    staleTime: 5 * 60 * 1000,
   }));
 
   createEffect(() => {

@@ -601,7 +601,7 @@ export function LessonsPage(): JSXElement {
     queryKey: ["lessonProgress"],
     queryFn: getAllProgress,
     enabled: isOpen() && isAuthenticated(),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
 
   // Lazily freezes (once) how far this student had already gotten before the
@@ -635,7 +635,7 @@ export function LessonsPage(): JSXElement {
       return getAvatarState(uid);
     },
     enabled: isOpen() && isAuthenticated(),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
   const equippedAvatarColor = (): string | undefined => {
     const id = avatarStateQuery.data?.equipped.color;
@@ -895,7 +895,7 @@ export function LessonsPage(): JSXElement {
       return getWeakKeys(uid);
     },
     enabled: isOpen() && isAuthenticated(),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
 
   const userStatsQuery = useQuery(() => ({
@@ -919,7 +919,7 @@ export function LessonsPage(): JSXElement {
       return getUserLessonStats(uid);
     },
     enabled: isOpen() && isAuthenticated(),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
 
   const classLeaderboardQuery = useQuery(() => ({
@@ -949,7 +949,7 @@ export function LessonsPage(): JSXElement {
       return getWeeklyQuestState(uid);
     },
     enabled: isOpen() && isAuthenticated(),
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   }));
 
   const dailyChallenge = createMemo(() => {
