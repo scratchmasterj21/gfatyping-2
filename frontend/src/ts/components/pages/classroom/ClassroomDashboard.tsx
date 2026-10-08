@@ -70,6 +70,18 @@ const inputClass =
   "w-full rounded bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
 const selectClass =
   "rounded bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
+const panelClass = "rounded-2xl bg-sub-alt p-4";
+
+function LoadingBars(): JSXElement {
+  return (
+    <div class="grid gap-3" aria-hidden="true">
+      <div class="h-4 w-1/3 animate-pulse rounded bg-bg"></div>
+      <div class="h-10 animate-pulse rounded bg-bg"></div>
+      <div class="h-10 animate-pulse rounded bg-bg"></div>
+      <div class="h-10 w-4/5 animate-pulse rounded bg-bg"></div>
+    </div>
+  );
+}
 
 /** Cache classroom Firestore scans — getClassProgress is very read-heavy. */
 const CLASSROOM_QUERY_STALE_MS = 5 * 60 * 1000;
@@ -432,10 +444,7 @@ function ProgressTab(props: {
   };
 
   return (
-    <Show
-      when={!props.loading}
-      fallback={<div class="text-sub">loading progress...</div>}
-    >
+    <Show when={!props.loading} fallback={<LoadingBars />}>
       <div class="mb-3 flex flex-wrap gap-2 text-sm text-sub">
         <span>
           <strong class="text-text">{summary().activeToday}</strong> active
@@ -564,7 +573,7 @@ function ProgressTab(props: {
       </p>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead class="text-sub">
+          <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
             <tr>
               <th class="w-8 p-2" aria-label="Select for certificates"></th>
               <th class="p-2">name</th>
@@ -743,13 +752,10 @@ function StudentDrilldown(props: {
     <div class="grid gap-4">
       <div class="grid gap-2">
         <div class="text-sub">{props.name} - lesson by lesson</div>
-        <Show
-          when={!details.loading}
-          fallback={<div class="text-sub">loading...</div>}
-        >
+        <Show when={!details.loading} fallback={<LoadingBars />}>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="text-sub">
+              <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
                 <tr>
                   <th class="p-1">lesson</th>
                   <th class="p-1 text-right">stars</th>
@@ -805,7 +811,7 @@ function StudentDrilldown(props: {
           <div class="text-sub">word lists</div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="text-sub">
+              <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
                 <tr>
                   <th class="p-1">title</th>
                   <th class="p-1 text-right">completed</th>
@@ -838,7 +844,7 @@ function StudentDrilldown(props: {
           <div class="text-sub">reading passages</div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs">
-              <thead class="text-sub">
+              <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
                 <tr>
                   <th class="p-1">title</th>
                   <th class="p-1 text-right">completed</th>
@@ -1900,10 +1906,7 @@ function RacesTab(props: {
   loading: boolean;
 }): JSXElement {
   return (
-    <Show
-      when={!props.loading}
-      fallback={<div class="text-sub">loading races...</div>}
-    >
+    <Show when={!props.loading} fallback={<LoadingBars />}>
       <div class="grid gap-2">
         <For
           each={props.races}
@@ -2066,6 +2069,7 @@ export function ClassroomDashboard(): JSXElement {
       text={text}
       fa={{ ...fa, fixedWidth: true }}
       active={tab() === id}
+      class={tab() === id ? "bg-bg hover:bg-bg" : undefined}
       onClick={() => setTab(id)}
     />
   );
@@ -2146,48 +2150,64 @@ export function ClassroomDashboard(): JSXElement {
           </div>
 
           <Show when={tab() === "students"}>
-            <StudentsTab />
+            <div class={panelClass}>
+              <StudentsTab />
+            </div>
           </Show>
           <Show when={tab() === "progress"}>
-            <ProgressTab
-              classId={selectedClass()}
-              rows={rows()}
-              assignments={assignments()}
-              wordLists={wordLists()}
-              passages={passages()}
-              loading={progressQuery.isLoading}
-            />
+            <div class={panelClass}>
+              <ProgressTab
+                classId={selectedClass()}
+                rows={rows()}
+                assignments={assignments()}
+                wordLists={wordLists()}
+                passages={passages()}
+                loading={progressQuery.isLoading}
+              />
+            </div>
           </Show>
           <Show when={tab() === "assignments"}>
-            <AssignmentsTab
-              assignments={assignments()}
-              wordLists={wordLists()}
-              passages={passages()}
-              rows={rows()}
-              onChanged={refetchAssignments}
-            />
+            <div class={panelClass}>
+              <AssignmentsTab
+                assignments={assignments()}
+                wordLists={wordLists()}
+                passages={passages()}
+                rows={rows()}
+                onChanged={refetchAssignments}
+              />
+            </div>
           </Show>
           <Show when={tab() === "wordlists"}>
-            <WordListsTab
-              wordLists={wordLists()}
-              onChanged={refetchWordLists}
-            />
+            <div class={panelClass}>
+              <WordListsTab
+                wordLists={wordLists()}
+                onChanged={refetchWordLists}
+              />
+            </div>
           </Show>
           <Show when={tab() === "passages"}>
-            <PassagesTab passages={passages()} onChanged={refetchPassages} />
+            <div class={panelClass}>
+              <PassagesTab passages={passages()} onChanged={refetchPassages} />
+            </div>
           </Show>
           <Show when={tab() === "races"}>
-            <RacesTab races={races()} loading={racesQuery.isLoading} />
+            <div class={panelClass}>
+              <RacesTab races={races()} loading={racesQuery.isLoading} />
+            </div>
           </Show>
           <Show when={tab() === "images"}>
-            <SideImageApprovals />
+            <div class={panelClass}>
+              <SideImageApprovals />
+            </div>
           </Show>
           <Show when={tab() === "announcements"}>
-            <AnnouncementsTab
-              announcements={announcements()}
-              rows={rows()}
-              onChanged={refetchAnnouncements}
-            />
+            <div class={panelClass}>
+              <AnnouncementsTab
+                announcements={announcements()}
+                rows={rows()}
+                onChanged={refetchAnnouncements}
+              />
+            </div>
           </Show>
 
           <details class="rounded bg-sub-alt p-3 text-sm">

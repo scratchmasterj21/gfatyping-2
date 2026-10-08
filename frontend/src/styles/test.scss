@@ -749,6 +749,13 @@
       grid-area: lesson;
     }
 
+    .stats:not(.morestats) {
+      justify-self: start;
+      padding: 1rem 1.5rem;
+      border-radius: 1rem;
+      background: var(--sub-alt-color);
+    }
+
     .stats.morestats .group.testType .tags,
     .stats.morestats .group.info,
     .stats.morestats .group.dailyLeaderboard,

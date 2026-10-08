@@ -11,7 +11,7 @@ export function LessonStars(props: { count: number }): JSXElement {
             icon="fa-star"
             variant={n <= props.count ? "solid" : "regular"}
             class={n <= props.count ? "text-main" : "text-sub"}
-            size={0.75}
+            size={1.1}
           />
         )}
       </For>

@@ -58,7 +58,9 @@ export function LessonCard(props: {
           ? "cursor-not-allowed text-sub opacity-55"
           : needsImprovement()
             ? "cursor-pointer text-text ring-2 ring-main/50 hover:-translate-y-0.5 hover:shadow-lg"
-            : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
+            : done()
+              ? "cursor-pointer text-text opacity-60 hover:-translate-y-0.5 hover:border-main hover:opacity-100 hover:shadow-lg"
+              : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
         isNext() ? "lesson-card-next ring-2 ring-main" : "",
       )}
       onClick={onClick}

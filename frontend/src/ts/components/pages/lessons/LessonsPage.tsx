@@ -1599,6 +1599,16 @@ export function LessonsPage(): JSXElement {
               <p class="mb-2 text-sm font-medium text-main">
                 Start with the lesson marked Next and complete lessons in order.
               </p>
+              <Show when={progress.isLoading && progress.data === undefined}>
+                <div class="mb-4 grid gap-3" aria-hidden="true">
+                  <div class="h-8 w-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                  </div>
+                </div>
+              </Show>
               <div class="grid gap-1">
                 <For each={lessonGroups}>
                   {(group, index) => (
