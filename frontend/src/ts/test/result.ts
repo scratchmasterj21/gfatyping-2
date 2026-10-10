@@ -860,6 +860,16 @@ async function applyCurriculumNextButtonLabel(
 
 const LESSON_SAVE_TIMEOUT_MS = 45_000;
 
+function celebrateLessonPass(): void {
+  if (Misc.prefersReducedMotion()) return;
+  if (qs("body")?.hasClass("kid-theme") !== true) return;
+  showConfetti();
+}
+
+function lessonFailMessage(threshold: number): string {
+  return `<i class="fas fa-redo"></i> Almost! Get ${threshold}% accuracy to pass. You can do it!`;
+}
+
 async function awaitLessonCompletion(
   completionPromise: Promise<LessonProgress.LessonCompletionResult | undefined>,
 ): Promise<LessonProgress.LessonCompletionResult | undefined> {
@@ -945,9 +955,7 @@ async function updateLessonGate(
       syncLessonResultHeader("fail");
       el.removeClass("pass")
         .addClass("fail")
-        .setHtml(
-          `<i class="fas fa-redo"></i> You need ${threshold}% accuracy to pass this lesson - try again!`,
-        )
+        .setHtml(lessonFailMessage(threshold))
         .show();
       retryButton?.addClass("lessonPrimary");
       nextButton?.hide();
@@ -970,6 +978,7 @@ async function updateLessonGate(
         `<i class="fas fa-check"></i> Lesson passed · ${"★".repeat(stars)}${"☆".repeat(3 - stars)}${reward}`,
       )
       .show();
+    celebrateLessonPass();
     if (stars >= 2) {
       nextButton?.addClass("lessonPrimary");
       await applyCurriculumNextButtonLabel(lessonId, stars);
@@ -991,15 +1000,14 @@ async function updateLessonGate(
       .addClass("pass")
       .setHtml(`<i class="fas fa-check"></i> Passed! Great typing.`)
       .show();
+    celebrateLessonPass();
     nextButton?.addClass("lessonPrimary");
     void applyCurriculumNextButtonLabel(lessonId);
   } else {
     syncLessonResultHeader("fail");
     el.removeClass("pass")
       .addClass("fail")
-      .setHtml(
-        `<i class="fas fa-redo"></i> You need ${threshold}% accuracy to pass this lesson - try again!`,
-      )
+      .setHtml(lessonFailMessage(threshold))
       .show();
     retryButton?.addClass("lessonPrimary");
     nextButton?.hide();

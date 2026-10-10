@@ -38,6 +38,7 @@ import "./ready";
 import { setVersion } from "./states/core";
 import { loadFromLocalStorage } from "./config/lifecycle";
 import "./input/hotkeys";
+import "./controllers/kid-theme-controller";
 import { showModal } from "./states/modals";
 import { lastEventLog } from "./test/test-state";
 import { buildEventLog } from "./test/events/data";

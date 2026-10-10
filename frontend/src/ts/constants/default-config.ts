@@ -1,9 +1,9 @@
 import { Config, CustomThemeColors } from "@monkeytype/schemas/configs";
 
 const obj: Config = {
-  theme: "viridescent",
-  themeLight: "viridescent",
-  themeDark: "viridescent",
+  theme: "jungle",
+  themeLight: "jungle",
+  themeDark: "jungle",
   autoSwitchTheme: false,
   customTheme: false,
   customThemeColors: [

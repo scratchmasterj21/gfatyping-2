@@ -1,0 +1,139 @@
+// Student-only look (body.kid-theme, toggled by kid-theme-controller.ts).
+// The typing words, replay and keymap keep var(--font) so caret and line
+// measurement in test-ui.ts stay identical.
+body.kid-theme {
+  --roundness: 1rem;
+  --kid-font: "Lexend Deca", "Roboto Mono", "Vazirharf", sans-serif;
+
+  font-family: var(--kid-font);
+
+  button,
+  .button,
+  input,
+  select,
+  textarea {
+    font-family: var(--kid-font);
+  }
+
+  #typingTest,
+  #words,
+  #wordsInput,
+  #resultWordsHistory,
+  #resultReplay,
+  .keymap,
+  #memoryTimer,
+  #liveStatsMini,
+  #liveStatsTextTop,
+  #liveStatsTextBottom {
+    font-family: var(--font);
+  }
+
+  #caret.default {
+    width: 0.14em;
+  }
+
+  // The header logo image has white lettering baked in.
+  &:not(.darkMode) [data-ui-element="logo"] {
+    background: color-mix(in srgb, var(--text-color) 88%, transparent);
+  }
+
+  #result.lesson-result-student .lesson-result-top .buttons button {
+    min-height: 3rem;
+  }
+
+  .lesson-stars > * {
+    animation: kid-star-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+
+    &:nth-child(2) {
+      animation-delay: 0.08s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.16s;
+    }
+  }
+
+  // Soft page pattern in the theme's own colors, very low contrast so it
+  // never competes with the words.
+  background-color: var(--bg-color);
+  background-attachment: fixed;
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--main-color) 9%, transparent) 2px,
+    transparent 2.5px
+  );
+  background-size: 28px 28px;
+
+  &[data-theme="jungle"] {
+    background-image:
+      radial-gradient(
+        ellipse 22px 12px at 30% 30%,
+        color-mix(in srgb, var(--main-color) 5%, transparent) 60%,
+        transparent 62%
+      ),
+      radial-gradient(
+        ellipse 12px 22px at 75% 70%,
+        color-mix(in srgb, var(--main-color) 4%, transparent) 60%,
+        transparent 62%
+      );
+    background-size: 140px 140px;
+  }
+
+  &[data-theme="ocean"] {
+    background-image:
+      radial-gradient(
+        circle at 25% 35%,
+        transparent 9px,
+        color-mix(in srgb, var(--main-color) 10%, transparent) 10px,
+        transparent 12px
+      ),
+      radial-gradient(
+        circle at 70% 75%,
+        transparent 5px,
+        color-mix(in srgb, var(--main-color) 9%, transparent) 6px,
+        transparent 8px
+      );
+    background-size: 110px 110px;
+  }
+
+  &[data-theme="sunny"] {
+    background-image: repeating-conic-gradient(
+      from 0deg at 100% 0%,
+      color-mix(in srgb, var(--main-color) 6%, transparent) 0deg 6deg,
+      transparent 6deg 18deg
+    );
+    background-size: auto;
+  }
+
+  &[data-theme="candy"] {
+    background-image:
+      radial-gradient(
+        color-mix(in srgb, var(--main-color) 10%, transparent) 3px,
+        transparent 3.5px
+      ),
+      radial-gradient(
+        color-mix(in srgb, var(--caret-color) 9%, transparent) 2px,
+        transparent 2.5px
+      );
+    background-position:
+      0 0,
+      18px 18px;
+    background-size: 36px 36px;
+  }
+}
+
+@keyframes kid-star-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-25deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion) {
+  body.kid-theme .lesson-stars > * {
+    animation: none;
+  }
+}

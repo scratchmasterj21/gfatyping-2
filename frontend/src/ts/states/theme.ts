@@ -4,8 +4,8 @@ import { ColorName, Theme, themes } from "../constants/themes";
 
 export type ThemeIdentifier = ThemeName | "custom";
 const defaultTheme: Theme & { name: ThemeIdentifier } = {
-  ...themes.viridescent,
-  name: "viridescent",
+  ...themes.jungle,
+  name: "jungle",
 };
 
 export const [getTheme, setTheme] = createSignal(defaultTheme);

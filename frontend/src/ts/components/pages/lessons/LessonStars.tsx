@@ -4,7 +4,7 @@ import { Fa } from "../../common/Fa";
 
 export function LessonStars(props: { count: number }): JSXElement {
   return (
-    <div class="flex gap-0.5">
+    <div class="lesson-stars flex gap-0.5">
       <For each={[1, 2, 3]}>
         {(n) => (
           <Fa

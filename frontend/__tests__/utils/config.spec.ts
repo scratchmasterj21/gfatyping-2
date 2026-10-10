@@ -6,10 +6,10 @@ import { PartialConfig } from "@monkeytype/schemas/configs";
 const defaultConfig = getDefaultConfig();
 
 describe("school defaults", () => {
-  it("starts new profiles with the Viridescent theme", () => {
-    expect(defaultConfig.theme).toBe("viridescent");
-    expect(defaultConfig.themeLight).toBe("viridescent");
-    expect(defaultConfig.themeDark).toBe("viridescent");
+  it("starts new profiles with the Jungle theme", () => {
+    expect(defaultConfig.theme).toBe("jungle");
+    expect(defaultConfig.themeLight).toBe("jungle");
+    expect(defaultConfig.themeDark).toBe("jungle");
   });
 });
 
