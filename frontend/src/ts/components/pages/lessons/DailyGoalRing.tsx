@@ -5,12 +5,13 @@ import {
   getDailyGoalSeconds,
   refreshDailyGoal,
 } from "../../../states/daily-goal";
+import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
 
 const RADIUS = 16;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-export function DailyGoalRing(): JSXElement {
+export function DailyGoalRing(props: { class?: string }): JSXElement {
   onMount(refreshDailyGoal);
 
   const pct = (): number =>
@@ -19,7 +20,12 @@ export function DailyGoalRing(): JSXElement {
   const done = (): boolean => pct() >= 1;
 
   return (
-    <section class="flex items-center gap-3 rounded-2xl bg-sub-alt px-4 py-2">
+    <div
+      class={cn(
+        "flex items-center gap-3 rounded-2xl bg-sub-alt px-4 py-2",
+        props.class,
+      )}
+    >
       <svg
         viewBox="0 0 40 40"
         class="h-10 w-10 shrink-0 -rotate-90"
@@ -60,6 +66,6 @@ export function DailyGoalRing(): JSXElement {
           </Show>
         </span>
       </div>
-    </section>
+    </div>
   );
 }

@@ -37,6 +37,7 @@ type AvatarProps = {
 export function LessonHero(props: {
   signedIn: boolean;
   showClassSetupNotice: boolean;
+  isNewStudent: boolean;
   streakDays: number;
   streakFreezes: number;
   recommendation: PracticeRecommendation | undefined;
@@ -56,16 +57,16 @@ export function LessonHero(props: {
   const tip = tipOfTheDay();
   return (
     <>
-      <section class="rounded-2xl bg-sub-alt px-4 py-4 sm:flex sm:items-center sm:gap-4 sm:text-left">
+      <section class="flex flex-wrap items-center gap-3 rounded-2xl bg-sub-alt px-4 py-3">
         <Show
           when={props.signedIn && props.avatar !== undefined}
           fallback={
-            <div class="mx-auto mb-3 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-bg sm:mx-0 sm:mb-0">
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-bg">
               <Fa icon="fa-graduation-cap" class="text-main" size={1.4} />
             </div>
           }
         >
-          <div class="mx-auto mb-3 shrink-0 sm:mx-0 sm:mb-0">
+          <div class="shrink-0">
             <Avatar
               color={props.avatar?.color}
               shape={props.avatar?.shape}
@@ -80,25 +81,47 @@ export function LessonHero(props: {
             />
           </div>
         </Show>
-        <div class="flex-1 text-center sm:text-left">
+        <div class="min-w-0 flex-1 basis-48">
           <p class="lesson-hero-heading text-lg font-bold text-text">
-            Welcome to your typing lessons!
+            {props.isNewStudent
+              ? "Welcome to your typing lessons!"
+              : "Welcome back!"}
           </p>
-          <p class="mt-1 text-base text-sub">
-            Tap the big yellow button to see what to do next. Finish checkpoint
-            games when they show up — they unlock the next lesson.
-          </p>
+          <Show when={props.isNewStudent}>
+            <p class="mt-1 text-base text-sub">
+              Tap the big yellow button to see what to do next. Finish
+              checkpoint games when they show up — they unlock the next lesson.
+            </p>
+          </Show>
           <Show when={props.signedIn}>
             <Button
               variant="text"
               href="/test"
               router-link
-              class="mt-2 text-sm text-main"
+              class="mt-1 text-sm text-main"
               text="Free typing practice"
               fa={{ icon: "fa-keyboard", fixedWidth: true }}
             />
           </Show>
         </div>
+        <Show when={props.signedIn}>
+          <DailyGoalRing class="bg-bg" />
+        </Show>
+        <Show when={props.streakDays > 0}>
+          <div class="flex items-center gap-2 rounded-2xl bg-bg px-4 py-3 text-main">
+            <Fa icon="fa-fire" />
+            <span class="font-bold">{props.streakDays}</span>
+            <span class="text-sub">day streak</span>
+            <Show when={props.streakFreezes > 0}>
+              <span
+                class="rounded bg-sub-alt px-1.5 py-0.5 text-em-xs text-sub"
+                title="Miss a day and this protects your streak once."
+              >
+                freeze ready
+              </span>
+            </Show>
+          </div>
+        </Show>
       </section>
 
       <Show when={!props.signedIn}>
@@ -121,28 +144,6 @@ export function LessonHero(props: {
         </section>
       </Show>
 
-      <Show when={props.signedIn}>
-        <DailyGoalRing />
-      </Show>
-
-      <Show when={props.streakDays > 0}>
-        <section class="flex items-center gap-2 rounded-2xl bg-sub-alt px-4 py-2 text-main">
-          <Fa icon="fa-fire" />
-          <span class="font-bold">{props.streakDays}</span>
-          <span class="text-sub">
-            {props.streakDays === 1 ? "day streak" : "day streak — keep going!"}
-          </span>
-          <Show when={props.streakFreezes > 0}>
-            <span
-              class="ml-1 rounded bg-bg px-1.5 py-0.5 text-em-xs text-sub"
-              title="Miss a day and this protects your streak once."
-            >
-              freeze ready
-            </span>
-          </Show>
-        </section>
-      </Show>
-
       <Show when={props.recommendation} keyed>
         {(recommendation) => (
           <section class="grid gap-2" aria-labelledby="today-practice-title">
@@ -155,8 +156,8 @@ export function LessonHero(props: {
                   Your next step
                 </h1>
                 <p class="text-sm text-sub">
-                  Daily extras and weekly quests are below; your lesson list is
-                  further down.
+                  Daily extras and weekly quests are below; the map and lesson
+                  list are further down.
                 </p>
               </div>
               <span class="shrink-0 rounded bg-sub-alt px-3 py-1 text-sm font-bold text-main">

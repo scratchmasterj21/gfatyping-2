@@ -98,7 +98,7 @@ import {
 } from "../../../lessons/lessons-data";
 import { japaneseLessonGroups } from "../../../lessons/lessons-data-jp";
 import { getActivePage, isAuthenticated } from "../../../states/core";
-import { showModal } from "../../../states/modals";
+import { ModalId, showModal } from "../../../states/modals";
 import {
   showErrorNotification,
   showNoticeNotification,
@@ -394,6 +394,66 @@ function ProgressSummary(props: {
 // bring the section back. Deliberately not deleted/removed, just hidden.
 const FUNBOX_GAMES_ENABLED = false;
 
+type ShopTab = "me" | "keyboard" | "home";
+
+const SHOP_TABS: { id: ShopTab; label: string }[] = [
+  { id: "me", label: "Me" },
+  { id: "keyboard", label: "Keyboard" },
+  { id: "home", label: "Home" },
+];
+
+const SHOP_ITEMS: {
+  tab: ShopTab;
+  modal: ModalId;
+  icon: FaSolidIcon;
+  label: string;
+}[] = [
+  { tab: "me", modal: "Avatar", icon: "fa-user", label: "customize" },
+  {
+    tab: "me",
+    modal: "HandsShop",
+    icon: "fa-hand-paper",
+    label: "hand styles",
+  },
+  {
+    tab: "keyboard",
+    modal: "KeyboardSkinShop",
+    icon: "fa-keyboard",
+    label: "keyboard skins",
+  },
+  {
+    tab: "keyboard",
+    modal: "BackdropShop",
+    icon: "fa-mountain",
+    label: "backdrops",
+  },
+  {
+    tab: "keyboard",
+    modal: "RgbPaletteShop",
+    icon: "fa-palette",
+    label: "rgb palettes",
+  },
+  {
+    tab: "keyboard",
+    modal: "KeypressEffectShop",
+    icon: "fa-star",
+    label: "keypress effects",
+  },
+  {
+    tab: "keyboard",
+    modal: "CaretEffectShop",
+    icon: "fa-i-cursor",
+    label: "caret effects",
+  },
+  { tab: "home", modal: "House", icon: "fa-home", label: "my house" },
+  {
+    tab: "home",
+    modal: "SideImagesShop",
+    icon: "fa-image",
+    label: "side images",
+  },
+];
+
 const previousLessonId = new Map<string, string | undefined>();
 const lessonIndex = new Map<string, number>();
 lessonOrder.forEach((id, i) => {
@@ -546,6 +606,10 @@ export function LessonsPage(): JSXElement {
   const [lessonGameLoading, setLessonGameLoading] = createSignal(false);
   const [recommendedGameId, setRecommendedGameId] = createSignal<string>();
   const [showExtras, setShowExtras] = createSignal(false);
+  const [shopTab, setShopTab] = createSignal<ShopTab>("me");
+  const shopItems = createMemo(() =>
+    SHOP_ITEMS.filter((item) => item.tab === shopTab()),
+  );
   const [gamesTab, setGamesTab] = createSignal<
     "solo" | "multiplayer" | "rewards"
   >("solo");
@@ -669,6 +733,13 @@ export function LessonsPage(): JSXElement {
 
   const progressFor = (id: string): LessonProgress | undefined =>
     progress.data?.get(id);
+
+  const isNewStudent = createMemo((): boolean => {
+    if (!isAuthenticated()) return true;
+    const map = progress.data;
+    if (map === undefined) return false;
+    return ![...map.values()].some((p) => p.completed);
+  });
 
   const isLessonLocked = (id: string): boolean => {
     const progressMap = progress.data;
@@ -1139,6 +1210,7 @@ export function LessonsPage(): JSXElement {
     max: group.lessons.length * 3,
   });
   const goToGroup = (group: LessonGroup): void => {
+    if (collapsed().has("typing-lessons")) toggle("typing-lessons");
     if (collapsed().has(group.id)) toggle(group.id);
     queueMicrotask(() => {
       document.getElementById(group.id)?.scrollIntoView({
@@ -1397,6 +1469,7 @@ export function LessonsPage(): JSXElement {
             !isCurrentUserAdmin() &&
             classId() === undefined
           }
+          isNewStudent={isNewStudent()}
           streakDays={userStatsQuery.data?.streakDays ?? 0}
           streakFreezes={userStatsQuery.data?.streakFreezesAvailable ?? 0}
           recommendation={practiceRecommendation()}
@@ -1489,6 +1562,57 @@ export function LessonsPage(): JSXElement {
           </section>
         </Show>
 
+        <Show when={isAuthenticated() && progress.data !== undefined}>
+          <section class="grid gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="flex items-center gap-2 text-lg font-bold text-text">
+                <Fa icon="fa-map" class="text-main" />
+                Adventure Map
+              </h2>
+              <Button
+                variant="text"
+                class="text-sm"
+                fa={{ icon: mapHidden() ? "fa-map" : "fa-eye-slash" }}
+                text={mapHidden() ? "Show map" : "Hide map"}
+                onClick={toggleMap}
+              />
+            </div>
+            <Show when={!mapHidden()}>
+              <AdventureMap
+                groups={lessonGroups}
+                stateFor={mapStopState}
+                starsFor={groupStars}
+                onSelect={goToGroup}
+                avatar={
+                  <Avatar
+                    color={equippedAvatarColor()}
+                    shape={avatarStateQuery.data?.shape}
+                    hair={avatarStateQuery.data?.equipped.hair}
+                    hat={avatarStateQuery.data?.equipped.hat}
+                    accessory={avatarStateQuery.data?.equipped.accessory}
+                    face={avatarStateQuery.data?.equipped.face}
+                    background={avatarStateQuery.data?.equipped.background}
+                    highlightColor={equippedAvatarHighlight()}
+                    size={28}
+                    animalImage={animalAvatarQuery.data?.animalImage}
+                  />
+                }
+              />
+            </Show>
+          </section>
+        </Show>
+
+        <Show when={classGoal()} keyed>
+          {(g) => (
+            <ClassGoalBar
+              classId={g.classId}
+              current={g.current}
+              goal={g.stars}
+              reward={g.reward}
+            />
+          )}
+        </Show>
+
         <Show when={isAuthenticated()}>
           <section class="rounded bg-sub-alt">
             <button
@@ -1539,88 +1663,60 @@ export function LessonsPage(): JSXElement {
                   {avatarStateQuery.data?.coins ?? 0}
                 </div>
               </div>
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-bg px-4 py-1.5 text-sm font-medium text-text transition-colors hover:bg-main hover:text-bg"
+                onClick={() => showModal("Achievements")}
+              >
+                <Fa icon="fa-trophy" class="mr-1.5 text-main" />
+                achievements
+              </button>
+            </section>
+
+            <section class="grid gap-3 rounded bg-sub-alt p-4">
               <div class="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("Avatar")}
-                >
-                  customize
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("SideImagesShop")}
-                >
-                  <Fa icon="fa-image" class="mr-1.5" />
-                  side images
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("House")}
-                >
-                  <Fa icon="fa-home" class="mr-1.5" />
-                  my house
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("HandsShop")}
-                >
-                  <Fa icon="fa-hand-paper" class="mr-1.5" />
-                  hand styles
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("RgbPaletteShop")}
-                >
-                  <Fa icon="fa-palette" class="mr-1.5" />
-                  rgb palettes
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("KeyboardSkinShop")}
-                >
-                  <Fa icon="fa-keyboard" class="mr-1.5" />
-                  keyboard skins
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("KeypressEffectShop")}
-                >
-                  <Fa icon="fa-star" class="mr-1.5" />
-                  keypress effects
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("CaretEffectShop")}
-                >
-                  <Fa icon="fa-i-cursor" class="mr-1.5" />
-                  caret effects
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("BackdropShop")}
-                >
-                  <Fa icon="fa-mountain" class="mr-1.5" />
-                  backdrops
-                </button>
-                <button
-                  type="button"
-                  class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
-                  onClick={() => showModal("Achievements")}
-                >
-                  <Fa icon="fa-trophy" class="mr-1.5" />
-                  achievements
-                </button>
+                <span class="mr-1 flex items-center gap-2 font-bold text-text">
+                  <Fa icon="fa-store" class="text-main" />
+                  Shop
+                </span>
+                <For each={SHOP_TABS}>
+                  {(tab) => (
+                    <button
+                      type="button"
+                      class={cn(
+                        "cursor-pointer rounded px-3 py-1 text-sm font-medium transition-colors",
+                        shopTab() === tab.id
+                          ? "bg-main text-bg"
+                          : "bg-bg text-sub hover:text-text",
+                      )}
+                      aria-pressed={shopTab() === tab.id}
+                      onClick={() => setShopTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <For each={shopItems()}>
+                  {(item) => (
+                    <button
+                      type="button"
+                      class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                      onClick={() => showModal(item.modal)}
+                    >
+                      <Fa icon={item.icon} class="mr-1.5" />
+                      {item.label}
+                    </button>
+                  )}
+                </For>
               </div>
             </section>
+
+            <StickerBook
+              groups={lessonGroups}
+              isGroupComplete={isGroupComplete}
+            />
 
             {/* Progress summary + leaderboards */}
             <ProgressSummary
@@ -1640,24 +1736,6 @@ export function LessonsPage(): JSXElement {
           </div>
         </Show>
 
-        <Show when={classGoal()} keyed>
-          {(g) => (
-            <ClassGoalBar
-              classId={g.classId}
-              current={g.current}
-              goal={g.stars}
-              reward={g.reward}
-            />
-          )}
-        </Show>
-
-        <Show when={isAuthenticated() && progress.data !== undefined}>
-          <StickerBook
-            groups={lessonGroups}
-            isGroupComplete={isGroupComplete}
-          />
-        </Show>
-
         {/* 5. Typing Lessons — main section wrapping all lesson groups */}
         <section>
           <LessonsCollapsibleHeader
@@ -1669,51 +1747,9 @@ export function LessonsPage(): JSXElement {
           />
           <Show when={!collapsed().has("typing-lessons")}>
             <div id="lessons-section-typing-lessons">
-              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p class="text-sm font-medium text-main">
-                  Start with the lesson marked Next and complete lessons in
-                  order.
-                </p>
-                <Show when={isAuthenticated()}>
-                  <Button
-                    variant="text"
-                    class="text-sm"
-                    fa={{ icon: mapHidden() ? "fa-map" : "fa-eye-slash" }}
-                    text={mapHidden() ? "Show map" : "Hide map"}
-                    onClick={toggleMap}
-                  />
-                </Show>
-              </div>
-              <Show
-                when={
-                  isAuthenticated() &&
-                  !mapHidden() &&
-                  progress.data !== undefined
-                }
-              >
-                <div class="mb-4">
-                  <AdventureMap
-                    groups={lessonGroups}
-                    stateFor={mapStopState}
-                    starsFor={groupStars}
-                    onSelect={goToGroup}
-                    avatar={
-                      <Avatar
-                        color={equippedAvatarColor()}
-                        shape={avatarStateQuery.data?.shape}
-                        hair={avatarStateQuery.data?.equipped.hair}
-                        hat={avatarStateQuery.data?.equipped.hat}
-                        accessory={avatarStateQuery.data?.equipped.accessory}
-                        face={avatarStateQuery.data?.equipped.face}
-                        background={avatarStateQuery.data?.equipped.background}
-                        highlightColor={equippedAvatarHighlight()}
-                        size={28}
-                        animalImage={animalAvatarQuery.data?.animalImage}
-                      />
-                    }
-                  />
-                </div>
-              </Show>
+              <p class="mb-2 text-sm font-medium text-main">
+                Start with the lesson marked Next and complete lessons in order.
+              </p>
               <Show when={progress.isLoading && progress.data === undefined}>
                 <div class="mb-4 grid gap-3" aria-hidden="true">
                   <div class="h-8 w-48 animate-pulse rounded-2xl bg-sub-alt"></div>
