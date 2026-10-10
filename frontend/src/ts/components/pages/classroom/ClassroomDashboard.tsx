@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/solid-query";
 import {
+  createEffect,
   createMemo,
   createResource,
   createSignal,
@@ -45,6 +46,11 @@ import {
   WordList,
 } from "../../../classroom/assignments";
 import { storeCertificateBatch } from "../../../classroom/certificate-batch";
+import {
+  ClassGoal,
+  getClassGoals,
+  setClassGoal,
+} from "../../../classroom/class-goals";
 import { buildProgressCsv } from "../../../classroom/progress-csv";
 import { awardCoins } from "../../../coins";
 import { CLASS_IDS, GRADES } from "../../../constants/classes";
@@ -62,6 +68,7 @@ import {
 import { cn } from "../../../utils/cn";
 import { download } from "../../../utils/misc";
 import { Button } from "../../common/Button";
+import { ClassGoalBar } from "../../common/ClassGoalBar";
 import { EmptyState } from "../../common/EmptyState";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
@@ -260,6 +267,46 @@ function ProgressTab(props: {
       practicedThisWeek: rows.filter((r) => r.lessonsThisWeek > 0).length,
     };
   });
+
+  const goalsQuery = useQuery(() => ({
+    queryKey: ["classroom", "progress", "classGoals"],
+    queryFn: getClassGoals,
+    staleTime: 1000 * 60 * 30,
+  }));
+  const currentGoal = (): ClassGoal | undefined =>
+    goalsQuery.data?.[props.classId];
+  const classStars = createMemo(() =>
+    props.rows.reduce((sum, r) => sum + r.lessonStars, 0),
+  );
+  const [goalStars, setGoalStars] = createSignal(0);
+  const [goalReward, setGoalReward] = createSignal("");
+  const [savingGoal, setSavingGoal] = createSignal(false);
+  createEffect(() => {
+    const g = currentGoal();
+    setGoalStars(
+      g?.stars ?? Math.max(50, Math.ceil((classStars() + 50) / 50) * 50),
+    );
+    setGoalReward(g?.reward ?? "");
+  });
+  const saveGoal = async (clear: boolean): Promise<void> => {
+    setSavingGoal(true);
+    try {
+      await setClassGoal(
+        props.classId,
+        clear ? null : { stars: goalStars(), reward: goalReward() },
+      );
+      await queryClient.invalidateQueries({ queryKey: ["classGoals"] });
+      await goalsQuery.refetch();
+      showSuccessNotification(
+        clear ? "Class goal removed" : "Class goal saved",
+      );
+    } catch (e) {
+      showErrorNotification("Failed to save class goal");
+      console.error(e);
+    } finally {
+      setSavingGoal(false);
+    }
+  };
 
   const selectAllForCert = (): void => {
     const visible = filteredRows().map((r) => r.uid);
@@ -492,8 +539,62 @@ function ProgressTab(props: {
           />
         }
       >
+        <div class="mb-4 grid gap-2">
+          <Show when={currentGoal()} keyed>
+            {(g) => (
+              <ClassGoalBar
+                class="bg-bg"
+                classId={props.classId}
+                current={classStars()}
+                goal={g.stars}
+                reward={g.reward}
+              />
+            )}
+          </Show>
+          <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+            <Fa icon="fa-flag-checkered" />
+            <span>Class goal:</span>
+            <input
+              type="number"
+              min="1"
+              class={cn(selectClass, "w-24")}
+              aria-label="Goal stars"
+              value={goalStars()}
+              onChange={(e) =>
+                setGoalStars(Math.max(1, Number(e.currentTarget.value) || 1))
+              }
+            />
+            <span>stars, reward</span>
+            <input
+              type="text"
+              maxLength={60}
+              placeholder="e.g. class party"
+              class={cn(selectClass, "w-48")}
+              aria-label="Goal reward"
+              value={goalReward()}
+              onInput={(e) => setGoalReward(e.currentTarget.value)}
+            />
+            <Button
+              text={currentGoal() === undefined ? "set goal" : "update goal"}
+              disabled={savingGoal()}
+              onClick={() => void saveGoal(false)}
+            />
+            <Show when={currentGoal() !== undefined}>
+              <Button
+                variant="text"
+                text="remove"
+                disabled={savingGoal()}
+                onClick={() => void saveGoal(true)}
+              />
+            </Show>
+            <span class="text-xs">
+              (class has {classStars()} stars now · students see the bar on
+              their lessons page)
+            </span>
+          </div>
+        </div>
         <div class="mb-4 grid gap-3 sm:grid-cols-3">
-          <div class="rounded-xl bg-bg p-3">
+          <div class="min-w-0 rounded-xl bg-bg p-3">
             <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
               <Fa icon="fa-fire" class="mr-1.5 text-main" />
               Busiest this week
@@ -518,14 +619,20 @@ function ProgressTab(props: {
               week
             </div>
           </div>
-          <button
-            type="button"
-            class="rounded-xl bg-bg p-3 text-left hover:bg-sub-alt"
-            onClick={() => setProgressFilter("stuck")}
-          >
-            <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
-              <Fa icon="fa-life-ring" class="mr-1.5 text-error" />
-              Stuck ({STUCK_ATTEMPTS}+ tries)
+          <div class="min-w-0 rounded-xl bg-bg p-3">
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+                <Fa icon="fa-life-ring" class="mr-1.5 text-error" />
+                Stuck ({STUCK_ATTEMPTS}+ tries)
+              </span>
+              <Show when={weekly().stuck.length > 0}>
+                <Button
+                  variant="text"
+                  class="px-1 py-0 text-xs"
+                  text="show"
+                  onClick={() => setProgressFilter("stuck")}
+                />
+              </Show>
             </div>
             <Show
               when={weekly().stuck.length > 0}
@@ -547,15 +654,21 @@ function ProgressTab(props: {
                 </div>
               </Show>
             </Show>
-          </button>
-          <button
-            type="button"
-            class="rounded-xl bg-bg p-3 text-left hover:bg-sub-alt"
-            onClick={() => setProgressFilter("quiet")}
-          >
-            <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
-              <Fa icon="fa-moon" class="mr-1.5 text-sub" />
-              Gone quiet (2d+)
+          </div>
+          <div class="min-w-0 rounded-xl bg-bg p-3">
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+                <Fa icon="fa-moon" class="mr-1.5 text-sub" />
+                Gone quiet (2d+)
+              </span>
+              <Show when={weekly().quiet.length > 0}>
+                <Button
+                  variant="text"
+                  class="px-1 py-0 text-xs"
+                  text="show"
+                  onClick={() => setProgressFilter("quiet")}
+                />
+              </Show>
             </div>
             <Show
               when={weekly().quiet.length > 0}
@@ -575,7 +688,7 @@ function ProgressTab(props: {
                 </div>
               </Show>
             </Show>
-          </button>
+          </div>
         </div>
         <div class="mb-3 flex flex-wrap gap-2 text-sm text-sub">
           <span>

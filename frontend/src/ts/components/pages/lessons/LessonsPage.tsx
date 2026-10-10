@@ -29,6 +29,7 @@ import {
   WORDLIST_PREFIX,
   wordListTokens,
 } from "../../../classroom/assignments";
+import { getClassGoals } from "../../../classroom/class-goals";
 import {
   ClassCompareEntry,
   getClassCompare,
@@ -109,10 +110,12 @@ import { cn } from "../../../utils/cn";
 import { localDateString } from "../../../utils/date-and-time";
 import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
+import { ClassGoalBar } from "../../common/ClassGoalBar";
 import { Fa } from "../../common/Fa";
 import { H2, H3 } from "../../common/Headers";
 import { Page } from "../../common/Page";
 import { RankRow } from "../leaderboard/RankRow";
+import { AdventureMap, MapStopState } from "./AdventureMap";
 import { LessonCard } from "./LessonCard";
 import { LessonGroupSection } from "./LessonGroupSection";
 import { LessonHero } from "./LessonHero";
@@ -942,6 +945,21 @@ export function LessonsPage(): JSXElement {
     staleTime: 1000 * 60,
   }));
 
+  const classGoalsQuery = useQuery(() => ({
+    queryKey: ["classGoals"],
+    queryFn: getClassGoals,
+    enabled: isOpen() && isAuthenticated() && classId() !== undefined,
+    staleTime: 1000 * 60 * 30,
+  }));
+  const classGoal = createMemo(() => {
+    const id = classId();
+    if (id === undefined) return undefined;
+    const goal = classGoalsQuery.data?.[id];
+    const entry = classCompareQuery.data?.entries.find((e) => e.classId === id);
+    if (goal === undefined || entry === undefined) return undefined;
+    return { classId: id, current: entry.totalStars, ...goal };
+  });
+
   const weeklyQuestQuery = useQuery(() => ({
     queryKey: ["weeklyQuests"],
     queryFn: async () => {
@@ -1093,6 +1111,42 @@ export function LessonsPage(): JSXElement {
 
   const isGroupComplete = (group: LessonGroup): boolean =>
     group.lessons.every((l) => progressFor(l.id)?.completed === true);
+
+  const [mapHidden, setMapHidden] = createSignal(
+    localStorage.getItem("lessonsMapHidden") === "1",
+  );
+  const toggleMap = (): void => {
+    const next = !mapHidden();
+    setMapHidden(next);
+    try {
+      localStorage.setItem("lessonsMapHidden", next ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  };
+  const mapStopState = (group: LessonGroup): MapStopState => {
+    if (isGroupComplete(group)) return "done";
+    if (group.id === currentGroupId()) return "current";
+    const first = group.lessons[0]?.id;
+    if (first !== undefined && isLessonLocked(first)) return "locked";
+    return "open";
+  };
+  const groupStars = (group: LessonGroup): { earned: number; max: number } => ({
+    earned: group.lessons.reduce(
+      (sum, l) => sum + (progressFor(l.id)?.stars ?? 0),
+      0,
+    ),
+    max: group.lessons.length * 3,
+  });
+  const goToGroup = (group: LessonGroup): void => {
+    if (collapsed().has(group.id)) toggle(group.id);
+    queueMicrotask(() => {
+      document.getElementById(group.id)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  };
 
   const openLessonGame = async (
     group: LessonGroup,
@@ -1586,6 +1640,17 @@ export function LessonsPage(): JSXElement {
           </div>
         </Show>
 
+        <Show when={classGoal()} keyed>
+          {(g) => (
+            <ClassGoalBar
+              classId={g.classId}
+              current={g.current}
+              goal={g.stars}
+              reward={g.reward}
+            />
+          )}
+        </Show>
+
         <Show when={isAuthenticated() && progress.data !== undefined}>
           <StickerBook
             groups={lessonGroups}
@@ -1604,9 +1669,51 @@ export function LessonsPage(): JSXElement {
           />
           <Show when={!collapsed().has("typing-lessons")}>
             <div id="lessons-section-typing-lessons">
-              <p class="mb-2 text-sm font-medium text-main">
-                Start with the lesson marked Next and complete lessons in order.
-              </p>
+              <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p class="text-sm font-medium text-main">
+                  Start with the lesson marked Next and complete lessons in
+                  order.
+                </p>
+                <Show when={isAuthenticated()}>
+                  <Button
+                    variant="text"
+                    class="text-sm"
+                    fa={{ icon: mapHidden() ? "fa-map" : "fa-eye-slash" }}
+                    text={mapHidden() ? "Show map" : "Hide map"}
+                    onClick={toggleMap}
+                  />
+                </Show>
+              </div>
+              <Show
+                when={
+                  isAuthenticated() &&
+                  !mapHidden() &&
+                  progress.data !== undefined
+                }
+              >
+                <div class="mb-4">
+                  <AdventureMap
+                    groups={lessonGroups}
+                    stateFor={mapStopState}
+                    starsFor={groupStars}
+                    onSelect={goToGroup}
+                    avatar={
+                      <Avatar
+                        color={equippedAvatarColor()}
+                        shape={avatarStateQuery.data?.shape}
+                        hair={avatarStateQuery.data?.equipped.hair}
+                        hat={avatarStateQuery.data?.equipped.hat}
+                        accessory={avatarStateQuery.data?.equipped.accessory}
+                        face={avatarStateQuery.data?.equipped.face}
+                        background={avatarStateQuery.data?.equipped.background}
+                        highlightColor={equippedAvatarHighlight()}
+                        size={28}
+                        animalImage={animalAvatarQuery.data?.animalImage}
+                      />
+                    }
+                  />
+                </div>
+              </Show>
               <Show when={progress.isLoading && progress.data === undefined}>
                 <div class="mb-4 grid gap-3" aria-hidden="true">
                   <div class="h-8 w-48 animate-pulse rounded-2xl bg-sub-alt"></div>
