@@ -28,6 +28,12 @@ import {
 import { lastEventLog } from "../test/test-state";
 import { localDateString } from "../utils/date-and-time";
 import { checkNewAchievements } from "./achievements";
+import {
+  isPermanentApiError,
+  PendingLessonPayload,
+  queuePendingLesson,
+  syncPendingLessons,
+} from "./pending-lessons";
 
 export const GAME_PREFIX = "game:";
 export type PracticeRewardCategory =
@@ -225,8 +231,19 @@ export async function recordCompletion(
   if (uid === undefined) return;
 
   const ref = doc(progressCol(uid), lessonId);
-  const snap = await getDoc(ref);
-  const prev = snap.exists() ? (snap.data() as Partial<LessonProgress>) : {};
+  const snap = await getDoc(ref).catch(() => null);
+  const prev =
+    snap?.exists() === true ? (snap.data() as Partial<LessonProgress>) : {};
+
+  const payload: PendingLessonPayload = {
+    lessonId,
+    wpm: ce.wpm,
+    acc: ce.acc,
+    testDuration: ce.testDuration,
+    incompleteTestSeconds: ce.incompleteTestSeconds,
+    afkDuration: ce.afkDuration,
+    practiceRewardCategory: activePracticeReward(),
+  };
 
   // Stars/completion/coins/quests are computed and written server-side (see
   // api/complete-lesson.ts) - this used to be a direct client write, which
@@ -235,15 +252,7 @@ export async function recordCompletion(
   try {
     const result = await callApi<LessonCompletionResult>(
       "/api/complete-lesson",
-      {
-        lessonId,
-        wpm: ce.wpm,
-        acc: ce.acc,
-        testDuration: ce.testDuration,
-        incompleteTestSeconds: ce.incompleteTestSeconds,
-        afkDuration: ce.afkDuration,
-        practiceRewardCategory: activePracticeReward(),
-      },
+      payload,
     );
     if (!result.ok) {
       console.error("Failed to save lesson progress:", result.reason);
@@ -268,9 +277,14 @@ export async function recordCompletion(
     void queryClient.invalidateQueries({ queryKey: ["userLessonStats"] });
     void queryClient.invalidateQueries({ queryKey: ["weeklyQuests"] });
     celebrateCompletedQuests(result.newlyCompletedQuests ?? []);
+    void syncPendingLessons();
     return result;
   } catch (e) {
     console.error("Failed to save lesson progress:", e);
+    if (isPermanentApiError(e)) {
+      return { ok: false, reason: "invalid" };
+    }
+    await queuePendingLesson(uid, payload).catch(() => undefined);
     showNoticeNotification(
       "You're offline — progress will save when reconnected",
     );

@@ -2,11 +2,13 @@ import { JSXElement, Show } from "solid-js";
 
 import { AvatarShape } from "../../../avatar/avatar-items";
 import { PracticeRewardCategory } from "../../../lessons/lesson-progress";
+import { tipOfTheDay } from "../../../lessons/typing-tips";
 import { FaSolidIcon } from "../../../types/font-awesome";
 import { cn } from "../../../utils/cn";
 import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
+import { DailyGoalRing } from "./DailyGoalRing";
 import { WeeklyQuests } from "./WeeklyQuests";
 
 export type PracticeRecommendation = {
@@ -51,6 +53,7 @@ export function LessonHero(props: {
   weeklyQuestProgress?: Record<string, number>;
   weeklyQuestClaimed?: string[];
 }): JSXElement {
+  const tip = tipOfTheDay();
   return (
     <>
       <section class="rounded-2xl bg-sub-alt px-4 py-4 sm:flex sm:items-center sm:gap-4 sm:text-left">
@@ -118,6 +121,10 @@ export function LessonHero(props: {
         </section>
       </Show>
 
+      <Show when={props.signedIn}>
+        <DailyGoalRing />
+      </Show>
+
       <Show when={props.streakDays > 0}>
         <section class="flex items-center gap-2 rounded-2xl bg-sub-alt px-4 py-2 text-main">
           <Fa icon="fa-fire" />
@@ -173,6 +180,10 @@ export function LessonHero(props: {
                   <span class="ml-3 text-main">
                     {props.practiceRewardLabel("recommendation")}
                   </span>
+                </div>
+                <div class="flex items-center gap-2 rounded-lg bg-bg px-3 py-1.5 text-em-xs text-text">
+                  <Fa icon="fa-lightbulb" class="text-main" />
+                  Tip: {tip.text}
                 </div>
               </div>
               <div class="flex flex-col gap-2 sm:items-stretch">

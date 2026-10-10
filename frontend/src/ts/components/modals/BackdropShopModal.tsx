@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/solid-query";
 import { For, JSXElement, Show } from "solid-js";
 
 import {
+  BACKDROP_BACKGROUNDS,
   BACKDROP_ITEMS,
   BackdropItem,
   BackdropItemId,
@@ -19,12 +20,7 @@ import { cn } from "../../utils/cn";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Fa } from "../common/Fa";
 
-const PREVIEW_BACKGROUNDS: Record<BackdropItemId, string> = {
-  none: "transparent",
-  ocean: "linear-gradient(135deg, #0f2942, #1c6ea4, #4fc0d0)",
-  wood: "linear-gradient(135deg, #3b2415, #6b4423, #8b5a2b)",
-  space: "linear-gradient(135deg, #05010d, #1a0b2e, #3d1a5e)",
-};
+const PREVIEW_BACKGROUNDS = BACKDROP_BACKGROUNDS;
 
 export function BackdropShopModal(): JSXElement {
   const { pendingId, guardedBuy } = useBuyGuard();

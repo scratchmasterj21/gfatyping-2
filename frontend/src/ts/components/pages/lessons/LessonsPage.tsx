@@ -117,6 +117,7 @@ import { LessonCard } from "./LessonCard";
 import { LessonGroupSection } from "./LessonGroupSection";
 import { LessonHero } from "./LessonHero";
 import { LessonsCollapsibleHeader } from "./LessonsCollapsibleHeader";
+import { StickerBook } from "./StickerBook";
 
 const allCheckpoints = continueOrder.filter(
   (
@@ -1583,6 +1584,13 @@ export function LessonsPage(): JSXElement {
               selfClassId={classId()}
             />
           </div>
+        </Show>
+
+        <Show when={isAuthenticated() && progress.data !== undefined}>
+          <StickerBook
+            groups={lessonGroups}
+            isGroupComplete={isGroupComplete}
+          />
         </Show>
 
         {/* 5. Typing Lessons — main section wrapping all lesson groups */}

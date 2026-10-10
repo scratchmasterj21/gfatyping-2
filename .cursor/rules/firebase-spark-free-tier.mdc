@@ -7,7 +7,7 @@ alwaysApply: true
 
 Production must not depend on high-volume **Firestore** traffic. Daily limits (typical Spark): ~50K reads, ~20K writes, ~20K deletes. Quota resets at **Pacific midnight** (~4–5pm JST).
 
-**RTDB is separate** (own Spark quotas). In this repo RTDB is only **arcade multiplayer** (`tossRooms`, `racerRooms`, `ghostRooms` / `ghostWorlds` / `ghostActions`) plus legacy `config`, `searchCache`, `workerActivityLogs`. **Teacher classroom races** (`races/{pin}/participants`) are **Firestore**—live progress ticks count toward the 20K/day write limit.
+**RTDB is separate** (own Spark quotas). In this repo RTDB holds **arcade multiplayer** (`tossRooms`, `racerRooms`, `ghostRooms` / `ghostWorlds` / `ghostActions`), **teacher classroom race participants** (`classRaces/{pin}/participants`, live progress ticks), plus legacy `config`, `searchCache`, `workerActivityLogs`. The race control doc (`races/{pin}`) and `raceHistory` stay in **Firestore**.
 
 ## Do not add
 

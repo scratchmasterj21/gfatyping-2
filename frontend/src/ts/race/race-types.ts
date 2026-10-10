@@ -4,7 +4,7 @@
  *
  * Documents:
  *  - races/{pin}                     the live race control doc (pin = doc id)
- *  - races/{pin}/participants/{uid}  one doc per student, live progress
+ *  - RTDB classRaces/{pin}/participants/{uid}  one node per student, live progress
  *  - raceHistory/{autoId}            an immutable snapshot saved when finished
  */
 
@@ -59,7 +59,7 @@ export type RaceParticipant = {
   finishedAt?: number;
   finalWpm?: number;
   finalAcc?: number;
-  /** Updated every 500ms while the test is running; used to detect disconnects. */
+  /** Updated with progress writes (RTDB) while running; used to detect disconnects. */
   lastSeen?: number;
 };
 

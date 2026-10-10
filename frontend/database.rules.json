@@ -110,6 +110,31 @@
         }
       }
     },
+    "classRaces": {
+      "$pin": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
+        "participants": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+            ".validate": "!newData.exists() || auth.token.email == 'john.limpiada@felice.ed.jp' || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('finished').isBoolean())",
+            "uid": { ".validate": "newData.val() == $uid" },
+            "name": { ".validate": "newData.isString() && newData.val().length <= 80" },
+            "avatarUrl": { ".validate": "newData.isString() && newData.val().length <= 2000" },
+            "joinedAt": { ".validate": "newData.isNumber()" },
+            "lastSeen": { ".validate": "newData.isNumber()" },
+            "wordIndex": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "progress": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
+            "liveWpm": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 400" },
+            "finished": { ".validate": "newData.isBoolean() && (newData.val() == false || auth.token.email == 'john.limpiada@felice.ed.jp')" },
+            "finishedAt": { ".validate": "newData.isNumber() && (newData.val() == 0 || auth.token.email == 'john.limpiada@felice.ed.jp')" },
+            "finalWpm": { ".validate": "newData.isNumber() && (newData.val() == 0 || auth.token.email == 'john.limpiada@felice.ed.jp')" },
+            "finalAcc": { ".validate": "newData.isNumber() && (newData.val() == 0 || auth.token.email == 'john.limpiada@felice.ed.jp')" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    },
     "ghostWorlds": {
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('ghostRooms').child($code).exists()",

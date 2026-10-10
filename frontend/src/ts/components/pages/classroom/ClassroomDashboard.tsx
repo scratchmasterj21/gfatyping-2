@@ -37,12 +37,14 @@ import {
   listReadingPassages,
   listWordLists,
   ReadingPassage,
+  STUCK_ATTEMPTS,
   StudentProgressRow,
   updateAssignment,
   updateReadingPassage,
   updateWordList,
   WordList,
 } from "../../../classroom/assignments";
+import { storeCertificateBatch } from "../../../classroom/certificate-batch";
 import { buildProgressCsv } from "../../../classroom/progress-csv";
 import { awardCoins } from "../../../coins";
 import { CLASS_IDS, GRADES } from "../../../constants/classes";
@@ -60,6 +62,7 @@ import {
 import { cn } from "../../../utils/cn";
 import { download } from "../../../utils/misc";
 import { Button } from "../../common/Button";
+import { EmptyState } from "../../common/EmptyState";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
@@ -205,7 +208,14 @@ function ProgressTab(props: {
   const noPracticeThisWeek = (row: StudentProgressRow): boolean =>
     Date.now() - row.lastActive > WEEK_MS;
 
-  type ProgressFilter = "all" | "quiet" | "incomplete" | "noWeek";
+  const isStuck = (row: StudentProgressRow): boolean =>
+    row.stuckLessons.length > 0;
+  const stuckTitle = (row: StudentProgressRow): string =>
+    row.stuckLessons
+      .map((l) => `${l.name}: ${l.attempts} tries, not passed`)
+      .join("\n");
+
+  type ProgressFilter = "all" | "quiet" | "incomplete" | "noWeek" | "stuck";
   const [progressFilter, setProgressFilter] =
     createSignal<ProgressFilter>("all");
   const [selectedForCert, setSelectedForCert] = createSignal<Set<string>>(
@@ -231,9 +241,31 @@ function ProgressTab(props: {
       list = list.filter((r) => assignmentsDone(r) < assignmentTotal(r));
     } else if (f === "noWeek") {
       list = list.filter(noPracticeThisWeek);
+    } else if (f === "stuck") {
+      list = list.filter(isStuck);
     }
     return list;
   });
+
+  const weekly = createMemo(() => {
+    const rows = props.rows;
+    const busiest = rows
+      .filter((r) => r.lessonsThisWeek > 0)
+      .sort((a, b) => b.lessonsThisWeek - a.lessonsThisWeek)
+      .slice(0, 3);
+    return {
+      busiest,
+      stuck: rows.filter(isStuck),
+      quiet: rows.filter(isGoneQuiet),
+      practicedThisWeek: rows.filter((r) => r.lessonsThisWeek > 0).length,
+    };
+  });
+
+  const selectAllForCert = (): void => {
+    const visible = filteredRows().map((r) => r.uid);
+    const allSelected = visible.every((uid) => selectedForCert().has(uid));
+    setSelectedForCert(allSelected ? new Set<string>() : new Set(visible));
+  };
 
   const summary = createMemo(() => {
     const rows = props.rows;
@@ -365,16 +397,21 @@ function ProgressTab(props: {
       showNoticeNotification("Select students using the checkboxes first");
       return;
     }
-    if (
-      !window.confirm(
-        `Open ${uids.length} certificate tab(s)? Your browser may block pop-ups — allow them if needed. Print each with Save as PDF.`,
-      )
-    ) {
-      return;
-    }
-    for (const uid of uids) {
-      window.open(`/certificate?uid=${encodeURIComponent(uid)}`, "_blank");
-    }
+    const selected = new Set(uids);
+    storeCertificateBatch(
+      props.rows
+        .filter((r) => selected.has(r.uid))
+        .map((r) => ({
+          uid: r.uid,
+          name: r.name,
+          classId: r.classId,
+          bestWpm: r.bestWpm,
+          bestAcc: r.bestAcc,
+          lessonsCompleted: r.lessonsCompleted,
+          lessonStars: r.lessonStars,
+        })),
+    );
+    window.open("/certificate?batch=1", "_blank");
   };
 
   const downloadAllPdf = async (): Promise<void> => {
@@ -445,287 +482,411 @@ function ProgressTab(props: {
 
   return (
     <Show when={!props.loading} fallback={<LoadingBars />}>
-      <div class="mb-3 flex flex-wrap gap-2 text-sm text-sub">
-        <span>
-          <strong class="text-text">{summary().activeToday}</strong> active
-          today
-        </span>
-        <span>·</span>
-        <span>
-          <strong class="text-error">{summary().quiet}</strong> gone quiet (2d+)
-        </span>
-        <span>·</span>
-        <span>
-          <strong class="text-text">{summary().incomplete}</strong> incomplete
-          assignments
-        </span>
-        <Show when={summary().pastDueAssignments > 0}>
+      <Show
+        when={props.rows.length > 0}
+        fallback={
+          <EmptyState
+            icon="fa-user-graduate"
+            title="No students in this class yet"
+            hint="Students show up here after they sign in and pick this class."
+          />
+        }
+      >
+        <div class="mb-4 grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl bg-bg p-3">
+            <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
+              <Fa icon="fa-fire" class="mr-1.5 text-main" />
+              Busiest this week
+            </div>
+            <Show
+              when={weekly().busiest.length > 0}
+              fallback={
+                <div class="text-sm text-sub">No lessons yet this week</div>
+              }
+            >
+              <For each={weekly().busiest}>
+                {(r) => (
+                  <div class="flex justify-between gap-2 text-sm text-text">
+                    <span class="truncate">{r.name}</span>
+                    <span class="text-sub">{r.lessonsThisWeek} lessons</span>
+                  </div>
+                )}
+              </For>
+            </Show>
+            <div class="mt-1 text-xs text-sub">
+              {weekly().practicedThisWeek}/{props.rows.length} practiced this
+              week
+            </div>
+          </div>
+          <button
+            type="button"
+            class="rounded-xl bg-bg p-3 text-left hover:bg-sub-alt"
+            onClick={() => setProgressFilter("stuck")}
+          >
+            <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
+              <Fa icon="fa-life-ring" class="mr-1.5 text-error" />
+              Stuck ({STUCK_ATTEMPTS}+ tries)
+            </div>
+            <Show
+              when={weekly().stuck.length > 0}
+              fallback={<div class="text-sm text-sub">Nobody is stuck</div>}
+            >
+              <For each={weekly().stuck.slice(0, 3)}>
+                {(r) => (
+                  <div class="flex justify-between gap-2 text-sm text-text">
+                    <span class="truncate">{r.name}</span>
+                    <span class="truncate text-sub">
+                      {r.stuckLessons[0]?.name}
+                    </span>
+                  </div>
+                )}
+              </For>
+              <Show when={weekly().stuck.length > 3}>
+                <div class="text-xs text-sub">
+                  +{weekly().stuck.length - 3} more
+                </div>
+              </Show>
+            </Show>
+          </button>
+          <button
+            type="button"
+            class="rounded-xl bg-bg p-3 text-left hover:bg-sub-alt"
+            onClick={() => setProgressFilter("quiet")}
+          >
+            <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
+              <Fa icon="fa-moon" class="mr-1.5 text-sub" />
+              Gone quiet (2d+)
+            </div>
+            <Show
+              when={weekly().quiet.length > 0}
+              fallback={<div class="text-sm text-sub">Everyone is active</div>}
+            >
+              <For each={weekly().quiet.slice(0, 3)}>
+                {(r) => (
+                  <div class="flex justify-between gap-2 text-sm text-text">
+                    <span class="truncate">{r.name}</span>
+                    <span class="text-sub">{formatDate(r.lastActive)}</span>
+                  </div>
+                )}
+              </For>
+              <Show when={weekly().quiet.length > 3}>
+                <div class="text-xs text-sub">
+                  +{weekly().quiet.length - 3} more
+                </div>
+              </Show>
+            </Show>
+          </button>
+        </div>
+        <div class="mb-3 flex flex-wrap gap-2 text-sm text-sub">
+          <span>
+            <strong class="text-text">{summary().activeToday}</strong> active
+            today
+          </span>
           <span>·</span>
           <span>
-            <strong class="text-text">{summary().pastDueAssignments}</strong>{" "}
-            assignments past due (class-wide)
+            <strong class="text-error">{summary().quiet}</strong> gone quiet
+            (2d+)
           </span>
-        </Show>
-      </div>
-      <div class="mb-3 flex flex-wrap gap-2">
-        <Button
-          variant="text"
-          text="All"
-          active={progressFilter() === "all"}
-          onClick={() => setProgressFilter("all")}
-        />
-        <Button
-          variant="text"
-          text="Gone quiet"
-          active={progressFilter() === "quiet"}
-          onClick={() => setProgressFilter("quiet")}
-        />
-        <Button
-          variant="text"
-          text="Incomplete assignments"
-          active={progressFilter() === "incomplete"}
-          onClick={() => setProgressFilter("incomplete")}
-        />
-        <Button
-          variant="text"
-          text="No practice (7d)"
-          active={progressFilter() === "noWeek"}
-          onClick={() => setProgressFilter("noWeek")}
-        />
-      </div>
-      <div class="mb-3 flex flex-wrap items-center justify-end gap-3">
-        <div class="flex items-center gap-1.5 text-sm text-sub">
-          <Fa icon="fa-coins" />
-          <span>coins to give:</span>
-          <input
-            type="number"
-            min="1"
-            class={cn(selectClass, "w-20")}
-            value={coinAmount()}
-            onChange={(e) =>
-              setCoinAmount(Math.max(1, Number(e.currentTarget.value) || 1))
+          <span>·</span>
+          <span>
+            <strong class="text-text">{summary().incomplete}</strong> incomplete
+            assignments
+          </span>
+          <Show when={summary().pastDueAssignments > 0}>
+            <span>·</span>
+            <span>
+              <strong class="text-text">{summary().pastDueAssignments}</strong>{" "}
+              assignments past due (class-wide)
+            </span>
+          </Show>
+        </div>
+        <div class="mb-3 flex flex-wrap gap-2">
+          <Button
+            variant="text"
+            text="All"
+            active={progressFilter() === "all"}
+            onClick={() => setProgressFilter("all")}
+          />
+          <Button
+            variant="text"
+            text="Gone quiet"
+            active={progressFilter() === "quiet"}
+            onClick={() => setProgressFilter("quiet")}
+          />
+          <Button
+            variant="text"
+            text="Incomplete assignments"
+            active={progressFilter() === "incomplete"}
+            onClick={() => setProgressFilter("incomplete")}
+          />
+          <Button
+            variant="text"
+            text="No practice (7d)"
+            active={progressFilter() === "noWeek"}
+            onClick={() => setProgressFilter("noWeek")}
+          />
+          <Button
+            variant="text"
+            text={`Stuck (${weekly().stuck.length})`}
+            active={progressFilter() === "stuck"}
+            onClick={() => setProgressFilter("stuck")}
+          />
+        </div>
+        <div class="mb-3 flex flex-wrap items-center justify-end gap-3">
+          <div class="flex items-center gap-1.5 text-sm text-sub">
+            <Fa icon="fa-coins" />
+            <span>coins to give:</span>
+            <input
+              type="number"
+              min="1"
+              class={cn(selectClass, "w-20")}
+              value={coinAmount()}
+              onChange={(e) =>
+                setCoinAmount(Math.max(1, Number(e.currentTarget.value) || 1))
+              }
+            />
+          </div>
+          <div class="flex items-center gap-1.5 text-sm text-sub">
+            <span>PDF period:</span>
+            <input
+              type="date"
+              class={selectClass}
+              value={rangeStart()}
+              max={rangeEnd()}
+              onChange={(e) => setRangeStart(e.currentTarget.value)}
+            />
+            <span>to</span>
+            <input
+              type="date"
+              class={selectClass}
+              value={rangeEnd()}
+              min={rangeStart()}
+              onChange={(e) => setRangeEnd(e.currentTarget.value)}
+            />
+            <Button
+              variant="text"
+              text="7d"
+              onClick={() => applyRangePreset(7)}
+            />
+            <Button
+              variant="text"
+              text="30d"
+              onClick={() => applyRangePreset(30)}
+            />
+            <Button
+              variant="text"
+              text="90d"
+              onClick={() => applyRangePreset(90)}
+            />
+          </div>
+          <Button
+            text={previewingAll() ? "opening…" : "preview all (pdf)"}
+            fa={{ icon: "fa-eye" }}
+            onClick={() => void previewAllPdf()}
+            disabled={
+              props.rows.length === 0 || previewingAll() || downloadingAll()
             }
           />
-        </div>
-        <div class="flex items-center gap-1.5 text-sm text-sub">
-          <span>PDF period:</span>
-          <input
-            type="date"
-            class={selectClass}
-            value={rangeStart()}
-            max={rangeEnd()}
-            onChange={(e) => setRangeStart(e.currentTarget.value)}
-          />
-          <span>to</span>
-          <input
-            type="date"
-            class={selectClass}
-            value={rangeEnd()}
-            min={rangeStart()}
-            onChange={(e) => setRangeEnd(e.currentTarget.value)}
+          <Button
+            text={downloadingAll() ? "building…" : "download all (pdf)"}
+            fa={{ icon: "fa-file-pdf" }}
+            onClick={() => void downloadAllPdf()}
+            disabled={props.rows.length === 0 || downloadingAll()}
           />
           <Button
-            variant="text"
-            text="7d"
-            onClick={() => applyRangePreset(7)}
+            text={
+              selectedForCert().size > 0
+                ? `print certificates (${selectedForCert().size})`
+                : "print certificates"
+            }
+            fa={{ icon: "fa-certificate" }}
+            onClick={openCertificatesForSelected}
+            disabled={selectedForCert().size === 0}
           />
           <Button
-            variant="text"
-            text="30d"
-            onClick={() => applyRangePreset(30)}
-          />
-          <Button
-            variant="text"
-            text="90d"
-            onClick={() => applyRangePreset(90)}
+            text="export csv"
+            fa={{ icon: "fa-file-csv" }}
+            onClick={exportCsv}
+            disabled={props.rows.length === 0}
           />
         </div>
-        <Button
-          text={previewingAll() ? "opening…" : "preview all (pdf)"}
-          fa={{ icon: "fa-eye" }}
-          onClick={() => void previewAllPdf()}
-          disabled={
-            props.rows.length === 0 || previewingAll() || downloadingAll()
-          }
-        />
-        <Button
-          text={downloadingAll() ? "building…" : "download all (pdf)"}
-          fa={{ icon: "fa-file-pdf" }}
-          onClick={() => void downloadAllPdf()}
-          disabled={props.rows.length === 0 || downloadingAll()}
-        />
-        <Button
-          text="print certificates"
-          fa={{ icon: "fa-certificate" }}
-          onClick={openCertificatesForSelected}
-          disabled={selectedForCert().size === 0}
-        />
-        <Button
-          text="export csv"
-          fa={{ icon: "fa-file-csv" }}
-          onClick={exportCsv}
-          disabled={props.rows.length === 0}
-        />
-      </div>
-      <p class="mb-2 text-xs text-sub">
-        PDF date range affects practice stats only; use preview then Print →
-        Save as PDF for conferences.
-      </p>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
-            <tr>
-              <th class="w-8 p-2" aria-label="Select for certificates"></th>
-              <th class="p-2">name</th>
-              <th class="p-2 text-right">best wpm</th>
-              <th class="p-2 text-right">acc</th>
-              <th class="p-2 text-right">xp</th>
-              <th class="p-2 text-right">lessons</th>
-              <th class="p-2 text-right">tries</th>
-              <th class="p-2 text-right">lesson acc</th>
-              <th class="p-2 text-right">on task</th>
-              <th class="p-2 text-right">assignments</th>
-              <th class="p-2 text-right">last active</th>
-              <th class="p-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <For each={filteredRows()}>
-              {(row) => (
-                <>
-                  <tr
-                    class="cursor-pointer border-t border-sub-alt hover:bg-sub-alt"
-                    onClick={() => toggleOpen(row.uid)}
-                  >
-                    <td class="p-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedForCert().has(row.uid)}
-                        aria-label={`Select ${row.name} for certificates`}
-                        onChange={() => toggleCertSelect(row.uid)}
-                      />
-                    </td>
-                    <td class="max-w-[12rem] p-2 text-text">
-                      <span class="flex min-w-0 items-center gap-2">
-                        <Fa
-                          icon={
-                            openUid() === row.uid
-                              ? "fa-chevron-down"
-                              : "fa-chevron-right"
-                          }
-                          size={0.75}
-                          class="shrink-0"
-                        />
-                        <span class="truncate" title={row.name}>
-                          {row.name}
-                        </span>
-                      </span>
-                    </td>
-                    <td class="p-2 text-right">{Math.round(row.bestWpm)}</td>
-                    <td class="p-2 text-right">{Math.round(row.bestAcc)}%</td>
-                    <td class="p-2 text-right">{row.xp}</td>
-                    <td class="p-2 text-right">{row.lessonsCompleted}</td>
-                    <td class="p-2 text-right">{row.lessonAttempts}</td>
-                    <td class="p-2 text-right">
-                      {row.lessonAvgAcc > 0
-                        ? `${Math.round(row.lessonAvgAcc)}%`
-                        : "-"}
-                    </td>
-                    <td class="p-2 text-right">
-                      {formatMinutes(row.lessonTime)}
-                    </td>
-                    <td class="p-2 text-right">
-                      {assignmentsDone(row)}/{assignmentTotal(row)}
-                    </td>
-                    <td
-                      class={cn(
-                        "p-2 text-right",
-                        isGoneQuiet(row) ? "text-error" : "text-sub",
-                      )}
-                      title={
-                        isGoneQuiet(row) ? "Hasn't practiced in 2+ days" : ""
-                      }
+        <p class="mb-2 text-xs text-sub">
+          PDF date range affects practice stats only; use preview then Print →
+          Save as PDF for conferences.
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
+              <tr>
+                <th class="w-8 p-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all shown for certificates"
+                    title="Select all shown"
+                    checked={
+                      filteredRows().length > 0 &&
+                      filteredRows().every((r) => selectedForCert().has(r.uid))
+                    }
+                    onChange={selectAllForCert}
+                  />
+                </th>
+                <th class="p-2">name</th>
+                <th class="p-2 text-right">best wpm</th>
+                <th class="p-2 text-right">acc</th>
+                <th class="p-2 text-right">xp</th>
+                <th class="p-2 text-right">lessons</th>
+                <th class="p-2 text-right">tries</th>
+                <th class="p-2 text-right">lesson acc</th>
+                <th class="p-2 text-right">on task</th>
+                <th class="p-2 text-right">assignments</th>
+                <th class="p-2 text-right">last active</th>
+                <th class="p-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={filteredRows()}>
+                {(row) => (
+                  <>
+                    <tr
+                      class="cursor-pointer border-t border-sub-alt hover:bg-sub-alt"
+                      onClick={() => toggleOpen(row.uid)}
                     >
-                      {formatDate(row.lastActive)}
-                    </td>
-                    <td class="p-2 text-right whitespace-nowrap">
-                      <Button
-                        variant="text"
-                        fa={{ icon: "fa-coins" }}
-                        balloon={{
-                          text: `give ${coinAmount()} coins`,
-                          position: "left",
-                        }}
-                        disabled={rewardingUid() !== null}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void giveCoins(row);
-                        }}
-                      />
-                      <Button
-                        variant="text"
-                        fa={{ icon: "fa-eye" }}
-                        balloon={{
-                          text: "preview progress report (pdf)",
-                          position: "left",
-                        }}
-                        disabled={
-                          previewingUid() !== null || downloadingUid() !== null
+                      <td class="p-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedForCert().has(row.uid)}
+                          aria-label={`Select ${row.name} for certificates`}
+                          onChange={() => toggleCertSelect(row.uid)}
+                        />
+                      </td>
+                      <td class="max-w-[12rem] p-2 text-text">
+                        <span class="flex min-w-0 items-center gap-2">
+                          <Fa
+                            icon={
+                              openUid() === row.uid
+                                ? "fa-chevron-down"
+                                : "fa-chevron-right"
+                            }
+                            size={0.75}
+                            class="shrink-0"
+                          />
+                          <span class="truncate" title={row.name}>
+                            {row.name}
+                          </span>
+                          <Show when={row.stuckLessons.length > 0}>
+                            <span
+                              class="shrink-0 rounded bg-error px-1.5 text-xs text-bg"
+                              title={stuckTitle(row)}
+                            >
+                              stuck
+                            </span>
+                          </Show>
+                        </span>
+                      </td>
+                      <td class="p-2 text-right">{Math.round(row.bestWpm)}</td>
+                      <td class="p-2 text-right">{Math.round(row.bestAcc)}%</td>
+                      <td class="p-2 text-right">{row.xp}</td>
+                      <td class="p-2 text-right">{row.lessonsCompleted}</td>
+                      <td class="p-2 text-right">{row.lessonAttempts}</td>
+                      <td class="p-2 text-right">
+                        {row.lessonAvgAcc > 0
+                          ? `${Math.round(row.lessonAvgAcc)}%`
+                          : "-"}
+                      </td>
+                      <td class="p-2 text-right">
+                        {formatMinutes(row.lessonTime)}
+                      </td>
+                      <td class="p-2 text-right">
+                        {assignmentsDone(row)}/{assignmentTotal(row)}
+                      </td>
+                      <td
+                        class={cn(
+                          "p-2 text-right",
+                          isGoneQuiet(row) ? "text-error" : "text-sub",
+                        )}
+                        title={
+                          isGoneQuiet(row) ? "Hasn't practiced in 2+ days" : ""
                         }
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void previewStudentPdf(row);
-                        }}
-                      />
-                      <Button
-                        variant="text"
-                        fa={{ icon: "fa-file-pdf" }}
-                        balloon={{
-                          text: "download progress report (pdf)",
-                          position: "left",
-                        }}
-                        disabled={downloadingUid() !== null}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void downloadStudentPdf(row);
-                        }}
-                      />
-                      <Button
-                        variant="text"
-                        fa={{ icon: "fa-certificate" }}
-                        balloon={{
-                          text: "print certificate",
-                          position: "left",
-                        }}
-                        href={`/certificate?uid=${row.uid}`}
-                        router-link
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
-                  </tr>
-                  <Show when={openUid() === row.uid}>
-                    <tr>
-                      <td colSpan="12" class="bg-bg p-3">
-                        <StudentDrilldown
-                          uid={row.uid}
-                          name={row.name}
-                          wordLists={props.wordLists}
-                          passages={props.passages}
-                          wordListStatus={row.wordListStatus}
-                          passageStatus={row.passageStatus}
+                      >
+                        {formatDate(row.lastActive)}
+                      </td>
+                      <td class="p-2 text-right whitespace-nowrap">
+                        <Button
+                          variant="text"
+                          fa={{ icon: "fa-coins" }}
+                          balloon={{
+                            text: `give ${coinAmount()} coins`,
+                            position: "left",
+                          }}
+                          disabled={rewardingUid() !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void giveCoins(row);
+                          }}
+                        />
+                        <Button
+                          variant="text"
+                          fa={{ icon: "fa-eye" }}
+                          balloon={{
+                            text: "preview progress report (pdf)",
+                            position: "left",
+                          }}
+                          disabled={
+                            previewingUid() !== null ||
+                            downloadingUid() !== null
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void previewStudentPdf(row);
+                          }}
+                        />
+                        <Button
+                          variant="text"
+                          fa={{ icon: "fa-file-pdf" }}
+                          balloon={{
+                            text: "download progress report (pdf)",
+                            position: "left",
+                          }}
+                          disabled={downloadingUid() !== null}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void downloadStudentPdf(row);
+                          }}
+                        />
+                        <Button
+                          variant="text"
+                          fa={{ icon: "fa-certificate" }}
+                          balloon={{
+                            text: "print certificate",
+                            position: "left",
+                          }}
+                          href={`/certificate?uid=${row.uid}`}
+                          router-link
+                          onClick={(e) => e.stopPropagation()}
                         />
                       </td>
                     </tr>
-                  </Show>
-                </>
-              )}
-            </For>
-          </tbody>
-        </table>
-        <Show when={props.rows.length === 0}>
-          <div class="p-2 text-sub">no students in this class yet</div>
-        </Show>
-      </div>
+                    <Show when={openUid() === row.uid}>
+                      <tr>
+                        <td colSpan="12" class="bg-bg p-3">
+                          <StudentDrilldown
+                            uid={row.uid}
+                            name={row.name}
+                            wordLists={props.wordLists}
+                            passages={props.passages}
+                            wordListStatus={row.wordListStatus}
+                            passageStatus={row.passageStatus}
+                          />
+                        </td>
+                      </tr>
+                    </Show>
+                  </>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+      </Show>
     </Show>
   );
 }
@@ -1133,7 +1294,13 @@ function AssignmentsTab(props: {
       <div class="grid gap-2">
         <For
           each={props.assignments}
-          fallback={<div class="text-sub">no assignments yet</div>}
+          fallback={
+            <EmptyState
+              icon="fa-tasks"
+              title="No assignments yet"
+              hint="Create one above to give your class something to practice."
+            />
+          }
         >
           {(a) => (
             <div class="rounded bg-sub-alt">
@@ -1438,7 +1605,13 @@ function AnnouncementsTab(props: {
       <div class="grid gap-2">
         <For
           each={props.announcements}
-          fallback={<div class="text-sub">no announcements yet</div>}
+          fallback={
+            <EmptyState
+              icon="fa-bullhorn"
+              title="No announcements yet"
+              hint="Post a message above and students will see it on their lessons page."
+            />
+          }
         >
           {(a) => (
             <div class="flex items-start justify-between gap-2 rounded bg-sub-alt p-3">
@@ -1594,7 +1767,13 @@ function WordListsTab(props: {
       <div class="grid gap-2">
         <For
           each={props.wordLists}
-          fallback={<div class="text-sub">no word lists yet</div>}
+          fallback={
+            <EmptyState
+              icon="fa-list"
+              title="No word lists yet"
+              hint="Add spelling or vocabulary words above to turn them into typing practice."
+            />
+          }
         >
           {(wl) => (
             <div class="rounded bg-sub-alt">
@@ -1813,7 +1992,13 @@ function PassagesTab(props: {
       <div class="grid gap-2">
         <For
           each={props.passages}
-          fallback={<div class="text-sub">no passages yet</div>}
+          fallback={
+            <EmptyState
+              icon="fa-book-open"
+              title="No passages yet"
+              hint="Paste a short reading passage above for students to type."
+            />
+          }
         >
           {(p) => (
             <div class="rounded bg-sub-alt">
@@ -1911,7 +2096,11 @@ function RacesTab(props: {
         <For
           each={props.races}
           fallback={
-            <div class="text-sub">no races recorded for this class yet</div>
+            <EmptyState
+              icon="fa-flag-checkered"
+              title="No races yet"
+              hint="Host a race and the results will show up here."
+            />
           }
         >
           {(r) => (
@@ -2052,6 +2241,32 @@ export function ClassroomDashboard(): JSXElement {
     });
   };
 
+  const [refreshing, setRefreshing] = createSignal(false);
+  // Every classroom query stays mounted, so only refetch what the open tab
+  // shows - the progress scan alone is ~1 read per lesson per student.
+  const REFRESH_KEYS: Record<Tab, string[]> = {
+    students: ["students"],
+    progress: ["progress"],
+    assignments: ["assignments"],
+    wordlists: ["wordlists"],
+    passages: ["passages"],
+    races: ["races"],
+    images: [],
+    announcements: ["announcements"],
+  };
+  const refreshAll = async (): Promise<void> => {
+    setRefreshing(true);
+    try {
+      await Promise.all(
+        REFRESH_KEYS[tab()].map(async (key) =>
+          queryClient.invalidateQueries({ queryKey: ["classroom", key] }),
+        ),
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const rows = createMemo<StudentProgressRow[]>(() => progressQuery.data ?? []);
   const assignments = createMemo<Assignment[]>(
     () => assignmentsQuery.data ?? [],
@@ -2097,20 +2312,36 @@ export function ClassroomDashboard(): JSXElement {
         <div class="content-grid grid gap-6">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <H2 fa={{ icon: "fa-chalkboard-teacher" }} text="classroom" />
-            <Show when={CLASS_TABS.has(tab())}>
-              <label class="flex items-center gap-2 text-sm text-sub">
-                Class
-                <select
-                  class={selectClass}
-                  value={selectedClass()}
-                  onChange={(e) => setSelectedClass(e.currentTarget.value)}
-                >
-                  <For each={CLASS_IDS}>
-                    {(c) => <option value={c}>{c}</option>}
-                  </For>
-                </select>
-              </label>
-            </Show>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button
+                variant="text"
+                text={refreshing() ? "refreshing…" : "refresh"}
+                fa={{
+                  icon: "fa-sync-alt",
+                  class: refreshing() ? "fa-spin" : undefined,
+                }}
+                balloon={{
+                  text: "Data is cached for 5 minutes. Refresh this tab to load the latest.",
+                  position: "left",
+                }}
+                disabled={refreshing()}
+                onClick={() => void refreshAll()}
+              />
+              <Show when={CLASS_TABS.has(tab())}>
+                <label class="flex items-center gap-2 text-sm text-sub">
+                  Class
+                  <select
+                    class={selectClass}
+                    value={selectedClass()}
+                    onChange={(e) => setSelectedClass(e.currentTarget.value)}
+                  >
+                    <For each={CLASS_IDS}>
+                      {(c) => <option value={c}>{c}</option>}
+                    </For>
+                  </select>
+                </label>
+              </Show>
+            </div>
           </div>
 
           <div class="flex flex-wrap gap-2 border-b border-sub-alt pb-3">

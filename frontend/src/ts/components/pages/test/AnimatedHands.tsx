@@ -18,7 +18,10 @@ import marbleKeyboardSvgRaw from "../../../../assets/keyboard-marble.svg?raw";
 import modernKeyboardSvgRaw from "../../../../assets/keyboard-modern.svg?raw";
 // eslint-disable-next-line no-restricted-imports
 import keyboardSvgRaw from "../../../../assets/keyboard.svg?raw";
-import { BackdropItemId } from "../../../backdrops/backdrop-items";
+import {
+  BACKDROP_BACKGROUNDS,
+  BackdropItemId,
+} from "../../../backdrops/backdrop-items";
 import { getBackdropState } from "../../../backdrops/backdrop-state";
 import { getConfig } from "../../../config/store";
 import { HandStyleId } from "../../../hands/hand-styles";
@@ -411,12 +414,7 @@ type Burst = {
   effect: Exclude<KeypressEffectItemId, "none">;
 };
 
-const BACKDROP_BG: Record<BackdropItemId, string> = {
-  none: "transparent",
-  ocean: "linear-gradient(135deg, #0f2942, #1c6ea4, #4fc0d0)",
-  wood: "linear-gradient(135deg, #3b2415, #6b4423, #8b5a2b)",
-  space: "linear-gradient(135deg, #05010d, #1a0b2e, #3d1a5e)",
-};
+const BACKDROP_BG = BACKDROP_BACKGROUNDS;
 
 export function AnimatedHands(): JSXElement {
   const handsStateQuery = useQuery(() => ({

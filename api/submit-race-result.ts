@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
 import { verifyStudent } from "./_lib/auth.js";
@@ -64,72 +63,74 @@ export default async function handler(
     return;
   }
 
+  if (!/^\d{4,8}$/.test(pin)) {
+    res.status(400).json({ ok: false, reason: "Invalid result" });
+    return;
+  }
+
   const app = getAdminApp();
-  const db = app.firestore();
-  const raceRef = db.collection("races").doc(pin);
-  const participantRef = raceRef.collection("participants").doc(auth.uid);
+  const raceRef = app.firestore().collection("races").doc(pin);
+  // Live participants are in RTDB (see race-db.ts); the race control doc
+  // stays in Firestore.
+  const participantRef = app
+    .database()
+    .ref(`classRaces/${pin}/participants/${auth.uid}`);
 
   try {
-    await db.runTransaction(async (tx: admin.firestore.Transaction) => {
-      const [raceSnap, participantSnap] = await Promise.all([
-        tx.get(raceRef),
-        tx.get(participantRef),
-      ]);
-      if (!raceSnap.exists) throw new SubmitError("Race not found");
-      if (!participantSnap.exists) {
-        throw new SubmitError("You haven't joined this race");
-      }
+    const [raceSnap, participantSnap] = await Promise.all([
+      raceRef.get(),
+      participantRef.get(),
+    ]);
+    if (!raceSnap.exists) throw new SubmitError("Race not found");
+    if (!participantSnap.exists()) {
+      throw new SubmitError("You haven't joined this race");
+    }
 
-      const race = raceSnap.data() as {
-        status?: string;
-        format?: string;
-        tokens?: string[];
-        durationSec?: number;
-        runningAt?: number;
-        finishedAt?: number;
-      };
-      const justFinished =
-        race.status === "finished" &&
-        Number.isFinite(race.finishedAt) &&
-        Date.now() - Number(race.finishedAt) <= 15_000;
-      if (race.status !== "running" && !justFinished) {
-        throw new SubmitError("Race is not running");
-      }
+    const race = raceSnap.data() as {
+      status?: string;
+      format?: string;
+      tokens?: string[];
+      durationSec?: number;
+      runningAt?: number;
+      finishedAt?: number;
+    };
+    const justFinished =
+      race.status === "finished" &&
+      Number.isFinite(race.finishedAt) &&
+      Date.now() - Number(race.finishedAt) <= 15_000;
+    if (race.status !== "running" && !justFinished) {
+      throw new SubmitError("Race is not running");
+    }
 
-      const tokenCount = Array.isArray(race.tokens) ? race.tokens.length : 0;
-      const runningAt = Number(race.runningAt);
-      const elapsedMs = Date.now() - runningAt;
-      const timedComplete =
-        race.format === "timed" &&
-        Number.isFinite(race.durationSec) &&
-        elapsedMs >= Number(race.durationSec) * 1000 - 1_000;
-      const textComplete = wordIndex >= tokenCount - 1;
-      if (
-        tokenCount === 0 ||
-        progress !== 1 ||
-        wordIndex > tokenCount ||
-        (!timedComplete && !textComplete)
-      ) {
-        throw new SubmitError("Result doesn't match the race content");
-      }
+    const tokenCount = Array.isArray(race.tokens) ? race.tokens.length : 0;
+    const runningAt = Number(race.runningAt);
+    const elapsedMs = Date.now() - runningAt;
+    const timedComplete =
+      race.format === "timed" &&
+      Number.isFinite(race.durationSec) &&
+      elapsedMs >= Number(race.durationSec) * 1000 - 1_000;
+    const textComplete = wordIndex >= tokenCount - 1;
+    if (
+      tokenCount === 0 ||
+      progress !== 1 ||
+      wordIndex > tokenCount ||
+      (!timedComplete && !textComplete)
+    ) {
+      throw new SubmitError("Result doesn't match the race content");
+    }
 
-      if (!Number.isFinite(runningAt) || Date.now() < runningAt) {
-        throw new SubmitError("Race hasn't started");
-      }
+    if (!Number.isFinite(runningAt) || Date.now() < runningAt) {
+      throw new SubmitError("Race hasn't started");
+    }
 
-      tx.set(
-        participantRef,
-        {
-          finished: true,
-          finishedAt: Date.now(),
-          finalWpm: wpm,
-          finalAcc: acc,
-          progress,
-          wordIndex,
-          lastSeen: Date.now(),
-        },
-        { merge: true },
-      );
+    await participantRef.update({
+      finished: true,
+      finishedAt: Date.now(),
+      finalWpm: wpm,
+      finalAcc: acc,
+      progress,
+      wordIndex,
+      lastSeen: Date.now(),
     });
     res.status(200).json({ ok: true });
   } catch (e) {

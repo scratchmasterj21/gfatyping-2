@@ -31,6 +31,7 @@ import { launchLessonWithIntro } from "../lessons/lesson-intro";
 import * as LessonProgress from "../lessons/lesson-progress";
 import { findNextLesson, lessonOrder } from "../lessons/lessons-data";
 import { clearQuoteStats } from "../states/quote-rate";
+import { addDailyTypingSeconds } from "../states/daily-goal";
 import * as Result from "./result";
 import {
   getActivePage,
@@ -1069,6 +1070,12 @@ export async function finish(difficultyFailed = false): Promise<void> {
   }
 
   // test is valid
+
+  if (!dontSaveLesson) {
+    addDailyTypingSeconds(
+      completedEvent.testDuration - completedEvent.afkDuration,
+    );
+  }
 
   const lessonCompletionPromise =
     !dontSaveLesson && LessonProgress.getActiveLesson() !== null

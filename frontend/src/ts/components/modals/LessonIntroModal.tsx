@@ -10,16 +10,19 @@ import {
   getIntroRewardCategory,
 } from "../../lessons/lesson-intro";
 import { startLesson } from "../../lessons/lesson-launcher";
+import { tipOfTheDay } from "../../lessons/typing-tips";
 import { hideModalAndClearChain } from "../../states/modals";
 import * as TTS from "../../test/tts";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Button } from "../common/Button";
+import { Fa } from "../common/Fa";
 
 function displayChar(c: string): string {
   return /[a-z]/i.test(c) ? c.toUpperCase() : c;
 }
 
 export function LessonIntroModal(): JSXElement {
+  const tip = tipOfTheDay();
   const keys = createMemo(() => [...(getIntroLesson()?.newKeys ?? "")]);
 
   // Unique fingers used by the new keys, in left-to-right order, as labels.
@@ -86,6 +89,11 @@ export function LessonIntroModal(): JSXElement {
         <Show when={fingerHint() !== ""}>
           <div class="text-xl text-sub">{fingerHint()}</div>
         </Show>
+
+        <div class="flex items-center gap-2 rounded-xl bg-sub-alt px-4 py-2 text-base text-text">
+          <Fa icon={tip.icon} class="text-main" />
+          {tip.text}
+        </div>
 
         <div class="flex flex-wrap justify-center gap-4">
           <Button onClick={speak} fa={{ icon: "fa-volume-up" }}>

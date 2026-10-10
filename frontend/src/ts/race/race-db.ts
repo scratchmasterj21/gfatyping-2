@@ -1,4 +1,13 @@
 import {
+  DatabaseReference,
+  get,
+  onValue,
+  ref as dbRef,
+  remove,
+  set,
+  update,
+} from "firebase/database";
+import {
   collection,
   CollectionReference,
   deleteDoc,
@@ -16,7 +25,7 @@ import {
 import { callApi } from "../api-client";
 import { getPassage, getWordList } from "../classroom/assignments";
 import { findLesson, realWords } from "../lessons/lessons-data";
-import { getAuthenticatedUser, getDb } from "../firebase";
+import { getAuthenticatedUser, getDb, getRealtimeDb } from "../firebase";
 import {
   generatePin,
   Race,
@@ -39,8 +48,22 @@ function raceDoc(pin: string): DocumentReference {
   return doc(getDb(), "races", pin);
 }
 
-function participantsCol(pin: string): CollectionReference {
-  return collection(getDb(), "races", pin, "participants");
+// Live participant progress lives in RTDB, not Firestore: every student writes
+// every couple of seconds while typing, which would eat the Spark daily
+// Firestore write quota with a full class.
+function participantsRef(pin: string): DatabaseReference {
+  return dbRef(getRealtimeDb(), `classRaces/${pin}/participants`);
+}
+
+function participantRef(pin: string, uid: string): DatabaseReference {
+  return dbRef(getRealtimeDb(), `classRaces/${pin}/participants/${uid}`);
+}
+
+function readParticipants(value: unknown): RaceParticipant[] {
+  if (value === null || typeof value !== "object") return [];
+  return Object.values(value as Record<string, RaceParticipant>).filter(
+    (p) => typeof p.uid === "string" && typeof p.name === "string",
+  );
 }
 
 function historyCol(): CollectionReference {
@@ -56,10 +79,9 @@ function clean<T extends Record<string, unknown>>(obj: T): T {
   return out as T;
 }
 
-/** Delete every participant doc under a PIN. */
+/** Delete every participant under a PIN. */
 async function clearParticipants(pin: string): Promise<void> {
-  const snap = await getDocs(participantsCol(pin));
-  await Promise.all(snap.docs.map(async (d) => deleteDoc(d.ref)));
+  await remove(dbRef(getRealtimeDb(), `classRaces/${pin}`));
 }
 
 /** Split a raw passage into typing tokens (whitespace separated). */
@@ -125,24 +147,18 @@ export async function createRace(input: {
   if (user === null) throw new Error("Not signed in");
 
   let pin = generatePin();
-  let reusingFinishedPin = false;
   // Avoid colliding with a race that is still live under the same PIN.
   for (let i = 0; i < 10; i++) {
     const existing = await getDoc(raceDoc(pin));
     const data = existing.data() as Race | undefined;
     if (!existing.exists()) break;
-    if (data?.status === "finished") {
-      reusingFinishedPin = true;
-      break;
-    }
+    if (data?.status === "finished") break;
     pin = generatePin();
   }
 
-  // The old race's participants would otherwise leak into the new one under
-  // the same PIN as ghost players.
-  if (reusingFinishedPin) {
-    await clearParticipants(pin);
-  }
+  // An old race's participants (finished race reusing the PIN, or a race doc
+  // removed without cleanup) would otherwise leak in as ghost players.
+  await clearParticipants(pin);
 
   const race: Race = {
     pin,
@@ -245,26 +261,22 @@ export async function joinRace(
     finished: false,
     lastSeen: Date.now(),
   };
-  await setDoc(doc(participantsCol(pin), user.uid), clean(participant));
+  await set(participantRef(pin, user.uid), clean(participant));
 }
 
 /** Student resets their own participant doc for a new round (kept in the room). */
 export async function resetParticipant(pin: string): Promise<void> {
   const user = getAuthenticatedUser();
   if (user === null) return;
-  await setDoc(
-    doc(participantsCol(pin), user.uid),
-    {
-      wordIndex: 0,
-      progress: 0,
-      finished: false,
-      finishedAt: 0,
-      finalWpm: 0,
-      finalAcc: 0,
-      lastSeen: Date.now(),
-    },
-    { merge: true },
-  );
+  await update(participantRef(pin, user.uid), {
+    wordIndex: 0,
+    progress: 0,
+    finished: false,
+    finishedAt: 0,
+    finalWpm: 0,
+    finalAcc: 0,
+    lastSeen: Date.now(),
+  });
 }
 
 /**
@@ -280,19 +292,15 @@ export async function resetAllParticipants(
 ): Promise<void> {
   await Promise.all(
     uids.map(async (uid) =>
-      setDoc(
-        doc(participantsCol(pin), uid),
-        {
-          wordIndex: 0,
-          progress: 0,
-          finished: false,
-          finishedAt: 0,
-          finalWpm: 0,
-          finalAcc: 0,
-          lastSeen: Date.now(),
-        },
-        { merge: true },
-      ),
+      update(participantRef(pin, uid), {
+        wordIndex: 0,
+        progress: 0,
+        finished: false,
+        finishedAt: 0,
+        finalWpm: 0,
+        finalAcc: 0,
+        lastSeen: Date.now(),
+      }),
     ),
   );
 }
@@ -301,7 +309,7 @@ export async function resetAllParticipants(
 export async function leaveRace(pin: string): Promise<void> {
   const user = getAuthenticatedUser();
   if (user === null) return;
-  await deleteDoc(doc(participantsCol(pin), user.uid)).catch(() => undefined);
+  await remove(participantRef(pin, user.uid)).catch(() => undefined);
 }
 
 /** Throttled live progress write for the current student. */
@@ -311,15 +319,14 @@ export async function writeProgress(
 ): Promise<void> {
   const user = getAuthenticatedUser();
   if (user === null) return;
-  await setDoc(
-    doc(participantsCol(pin), user.uid),
+  await update(
+    participantRef(pin, user.uid),
     clean({
       wordIndex: data.wordIndex,
       progress: data.progress,
       liveWpm: data.liveWpm,
       lastSeen: Date.now(),
     }),
-    { merge: true },
   );
 }
 
@@ -344,8 +351,8 @@ export async function writeFinal(
 
 /** One-shot read of all participant docs. */
 export async function getParticipants(pin: string): Promise<RaceParticipant[]> {
-  const snap = await getDocs(participantsCol(pin));
-  return snap.docs.map((d) => d.data() as RaceParticipant);
+  const snap = await get(participantsRef(pin));
+  return readParticipants(snap.val());
 }
 
 /** Subscribe to the race control doc. Returns an unsubscribe function. */
@@ -365,9 +372,9 @@ export function subscribeParticipants(
   pin: string,
   cb: (participants: RaceParticipant[]) => void,
 ): () => void {
-  return onSnapshot(
-    participantsCol(pin),
-    (snap) => cb(snap.docs.map((d) => d.data() as RaceParticipant)),
+  return onValue(
+    participantsRef(pin),
+    (snap) => cb(readParticipants(snap.val())),
     () => cb([]),
   );
 }

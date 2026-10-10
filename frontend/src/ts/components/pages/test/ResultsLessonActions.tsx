@@ -1,22 +1,28 @@
 import { createSignal, JSXElement, onCleanup, Show } from "solid-js";
 
-import { lessonResultHeaderEvent } from "../../../events/lesson-result-ui";
+import {
+  LessonKeyStats,
+  lessonResultHeaderEvent,
+} from "../../../events/lesson-result-ui";
 import {
   getActiveLesson,
   isCurriculumLesson,
 } from "../../../lessons/lesson-progress";
 import { getResultVisible } from "../../../states/test";
 import { StudentPageHeader } from "../../common/StudentPageHeader";
+import { LessonKeyHeatmap } from "./LessonKeyHeatmap";
 
 export function ResultsLessonActions(): JSXElement {
   const [title, setTitle] = createSignal("Nice work!");
   const [subtitle, setSubtitle] = createSignal(
     "Pick what to do next—your score is below.",
   );
+  const [keyStats, setKeyStats] = createSignal<LessonKeyStats | undefined>();
 
   const unsub = lessonResultHeaderEvent.subscribe((state) => {
     setTitle(state.title);
     setSubtitle(state.subtitle);
+    setKeyStats(state.keyStats);
   });
   onCleanup(unsub);
 
@@ -36,6 +42,9 @@ export function ResultsLessonActions(): JSXElement {
           title={title()}
           subtitle={subtitle()}
         />
+        <Show when={keyStats()}>
+          {(stats) => <LessonKeyHeatmap stats={stats()} />}
+        </Show>
       </div>
     </Show>
   );

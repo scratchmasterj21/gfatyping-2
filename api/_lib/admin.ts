@@ -15,5 +15,8 @@ export function getAdminApp(): admin.app.App {
   }
   return admin.initializeApp({
     credential: admin.credential.cert(JSON.parse(raw) as admin.ServiceAccount),
+    databaseURL:
+      process.env["FIREBASE_DATABASE_URL"] ??
+      "https://gfa-typing-default-rtdb.asia-southeast1.firebasedatabase.app",
   });
 }

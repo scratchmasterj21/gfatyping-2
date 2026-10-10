@@ -142,27 +142,10 @@ service cloud.firestore {
     match /races/{pin} {
       allow read: if isDomainUser();
       allow create, update, delete: if isAdminUser();
+      // Live participants moved to RTDB (classRaces/{pin}/participants in
+      // database.rules.json). Kept only so the admin can clean up old docs.
       match /participants/{uid} {
-        allow read: if isDomainUser();
-        allow create: if (isOwner(uid)
-          && request.resource.data.uid == request.auth.uid)
-          || isAdminUser();
-        // Live progress ticks (wordIndex/progress/liveWpm/lastSeen) and
-        // resetting back to zero stay student-writable; an actual final
-        // result (finished/finishedAt/finalWpm/finalAcc going non-zero)
-        // must go through api/submit-race-result.ts so it gets sanity
-        // checked against the race's real content instead of trusted as-is.
-        allow update: if isAdminUser()
-          || (isOwner(uid)
-            && request.resource.data.uid == request.auth.uid
-            && (
-              !request.resource.data.diff(resource.data).affectedKeys()
-                  .hasAny(['finished', 'finishedAt', 'finalWpm', 'finalAcc'])
-              || (request.resource.data.finished == false
-                && request.resource.data.finalWpm == 0
-                && request.resource.data.finalAcc == 0)
-            ));
-        allow delete: if isOwner(uid) || isAdminUser();
+        allow read, delete: if isAdminUser();
       }
     }
 

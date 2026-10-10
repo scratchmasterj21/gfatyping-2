@@ -14,6 +14,7 @@ import {
 } from "../../../states/notifications";
 import { showSimpleModal } from "../../../states/simple-modal";
 import { Button } from "../../common/Button";
+import { EmptyState } from "../../common/EmptyState";
 import { Fa } from "../../common/Fa";
 
 const studentsQueryKey = ["classroom", "students"];
@@ -303,7 +304,11 @@ export function StudentsTab(): JSXElement {
               </tbody>
             </table>
             <Show when={filtered().length === 0}>
-              <div class="p-2 text-sub">no students found</div>
+              <EmptyState
+                icon="fa-search"
+                title="No students found"
+                hint="Try a different name or class filter."
+              />
             </Show>
           </div>
         </Show>

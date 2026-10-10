@@ -294,6 +294,10 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     ocean: { price: 30 },
     wood: { price: 30 },
     space: { price: 50 },
+    jungle: { price: 30 },
+    candy: { price: 30 },
+    sunny: { price: 30 },
+    rainbow: { price: 50 },
   },
   animalAvatar: {
     "round-bear": { price: 200 },

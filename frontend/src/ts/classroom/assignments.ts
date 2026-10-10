@@ -401,7 +401,15 @@ export type StudentProgressRow = {
   wordListStatus: Record<string, boolean>;
   /** passageId -> completed */
   passageStatus: Record<string, boolean>;
+  /** curriculum lessons tried STUCK_ATTEMPTS+ times without passing */
+  stuckLessons: { lessonId: string; name: string; attempts: number }[];
+  /** curriculum lessons practiced in the last 7 days */
+  lessonsThisWeek: number;
+  lessonStars: number;
+  classId?: string;
 };
+
+export const STUCK_ATTEMPTS = 5;
 
 /** One curriculum lesson's progress for a single student (drill-down view). */
 export type LessonDetailRow = {
@@ -472,8 +480,19 @@ export async function getClassProgress(
       let lessonTime = 0;
       let accSum = 0;
       let accCount = 0;
+      let lessonsThisWeek = 0;
+      const stuckLessons: StudentProgressRow["stuckLessons"] = [];
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       for (const [key, p] of progress) {
         if (!isCurriculumKey(key)) continue;
+        if ((p.lastAt ?? 0) >= weekAgo) lessonsThisWeek++;
+        if (p.completed !== true && (p.attempts ?? 0) >= STUCK_ATTEMPTS) {
+          stuckLessons.push({
+            lessonId: key,
+            name: findLesson(key)?.name ?? key,
+            attempts: p.attempts ?? 0,
+          });
+        }
         if (p.completed === true) lessonsCompleted++;
         lessonAttempts += p.attempts ?? 0;
         lessonTime += p.timeSpent ?? 0;
@@ -522,6 +541,10 @@ export async function getClassProgress(
         assignmentStatus,
         wordListStatus,
         passageStatus,
+        stuckLessons,
+        lessonsThisWeek,
+        lessonStars: d.lessonStars ?? 0,
+        classId,
       };
       return row;
     }),

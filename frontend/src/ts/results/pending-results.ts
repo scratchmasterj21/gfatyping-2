@@ -1,5 +1,5 @@
 import { CompletedEvent } from "@monkeytype/schemas/results";
-import { DBSchema, openDB } from "idb";
+import { DBSchema, IDBPDatabase, openDB } from "idb";
 
 import { ApiError, callApi } from "../api-client";
 import { authEvent } from "../events/auth";
@@ -30,12 +30,16 @@ type SubmitResultResponse = {
 const MAX_PENDING_PER_USER = 100;
 const SYNC_INTERVAL_MS = 15 * 60 * 1000;
 
-const dbPromise = openDB<PendingResultsDb>("gfa-pending-results", 1, {
-  upgrade(db) {
-    const store = db.createObjectStore("results", { keyPath: "key" });
-    store.createIndex("by-uid", "uid");
-  },
-});
+let dbPromise: Promise<IDBPDatabase<PendingResultsDb>> | undefined;
+async function getDbPromise(): Promise<IDBPDatabase<PendingResultsDb>> {
+  dbPromise ??= openDB<PendingResultsDb>("gfa-pending-results", 1, {
+    upgrade(db) {
+      const store = db.createObjectStore("results", { keyPath: "key" });
+      store.createIndex("by-uid", "uid");
+    },
+  });
+  return dbPromise;
+}
 
 let syncing = false;
 
@@ -43,7 +47,7 @@ export async function queuePendingResult(
   uid: string,
   result: CompletedEvent,
 ): Promise<void> {
-  const db = await dbPromise;
+  const db = await getDbPromise();
   const tx = db.transaction("results", "readwrite");
   const store = tx.objectStore("results");
   const existing = await store.index("by-uid").getAll(uid);
@@ -66,7 +70,7 @@ export async function syncPendingResults(): Promise<void> {
   syncing = true;
   let uploaded = 0;
   try {
-    const db = await dbPromise;
+    const db = await getDbPromise();
     const pending = (await db.getAllFromIndex("results", "by-uid", user.uid))
       .sort((a, b) => a.queuedAt - b.queuedAt)
       .slice(0, 10);

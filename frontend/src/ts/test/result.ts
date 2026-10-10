@@ -22,7 +22,10 @@ import {
 } from "../lessons/lesson-navigation";
 import * as LessonProgress from "../lessons/lesson-progress";
 import { findLesson, getStudentGrade } from "../lessons/lessons-data";
-import { lessonResultHeaderEvent } from "../events/lesson-result-ui";
+import {
+  LessonKeyStats,
+  lessonResultHeaderEvent,
+} from "../events/lesson-result-ui";
 import * as GlarsesMode from "../legacy-states/glarses-mode";
 import * as SlowTimer from "../legacy-states/slow-timer";
 import * as DateTime from "../utils/date-and-time";
@@ -66,6 +69,8 @@ import { getTheme } from "../states/theme";
 import { getCurrentQuote, isTestInvalid } from "../states/test";
 import {
   getAccuracy,
+  getCorrectCharacters,
+  getMissedCharacters,
   getRawHistory,
   getTimerBoundaryLabels,
 } from "./events/stats";
@@ -766,12 +771,34 @@ async function updateTags(dontSave: boolean): Promise<void> {
   }
 }
 
+function lessonKeyStats(): LessonKeyStats | undefined {
+  const log = TestState.lastEventLog;
+  if (log === null) return undefined;
+  const stats: LessonKeyStats = {};
+  for (const [ch, n] of Object.entries(getCorrectCharacters(log))) {
+    const key = ch.toLowerCase();
+    stats[key] = {
+      correct: (stats[key]?.correct ?? 0) + n,
+      missed: stats[key]?.missed ?? 0,
+    };
+  }
+  for (const [ch, n] of Object.entries(getMissedCharacters(log))) {
+    const key = ch.toLowerCase();
+    stats[key] = {
+      correct: stats[key]?.correct ?? 0,
+      missed: (stats[key]?.missed ?? 0) + n,
+    };
+  }
+  return stats;
+}
+
 function syncLessonResultHeader(tone: "pass" | "fail" | "neutral"): void {
   const title =
     tone === "pass" ? "Nice work!" : tone === "fail" ? "Try again" : "Lesson";
   lessonResultHeaderEvent.dispatch({
     title,
     subtitle: "Pick what to do next—your score is below.",
+    keyStats: lessonKeyStats(),
   });
 }
 
