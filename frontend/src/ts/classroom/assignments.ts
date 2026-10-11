@@ -10,6 +10,8 @@ import {
   where,
 } from "firebase/firestore";
 
+import type { EquippedAvatar } from "../avatar/avatar-state";
+import { equippedFromDoc } from "../avatar/equipped-from-doc";
 import { gradeOf } from "../constants/classes";
 import { getAuthenticatedUser, getDb } from "../firebase";
 import { findLesson, lessonOrder } from "../lessons/lessons-data";
@@ -407,6 +409,7 @@ export type StudentProgressRow = {
   lessonsThisWeek: number;
   lessonStars: number;
   classId?: string;
+  avatar?: EquippedAvatar;
 };
 
 export const STUCK_ATTEMPTS = 5;
@@ -545,6 +548,7 @@ export async function getClassProgress(
         lessonsThisWeek,
         lessonStars: d.lessonStars ?? 0,
         classId,
+        avatar: equippedFromDoc(d as Record<string, unknown>),
       };
       return row;
     }),
@@ -585,6 +589,7 @@ export type StudentSummary = {
   bestAcc: number;
   lessonsCompleted: number;
   lessonStars: number;
+  avatar?: EquippedAvatar;
 };
 
 /** Single-student summary used by the certificate page (admin path). */
@@ -615,5 +620,6 @@ export async function getStudentSummary(
     bestAcc: best?.acc ?? 0,
     lessonsCompleted,
     lessonStars: data.lessonStars ?? 0,
+    avatar: equippedFromDoc(data as Record<string, unknown>),
   };
 }

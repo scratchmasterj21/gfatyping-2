@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
 import { isAdminEmail, verifyStudent } from "./_lib/auth.js";
+import { CATALOGS } from "./_lib/catalogs.js";
 import { tokyoDateString } from "./_lib/time.js";
 import {
   typingQuestDepthPayout,
@@ -26,6 +27,66 @@ const RECOMMENDED_GAME_IDS = new Set([
   "type-toss",
   "typing-rpg",
 ]);
+
+/** Mirrors frontend COLLECTION_CATEGORIES / COLLECTION_REWARD in avatar-items.ts. */
+const COLLECTION_CATEGORIES = new Set([
+  "color",
+  "accessory",
+  "face",
+  "background",
+  "highlight",
+]);
+const COLLECTION_REWARD = 40;
+
+/** One-time coin bonus for owning every year-round, coin-priced item in a category. */
+async function claimAvatarCollection(
+  uid: string,
+  category: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  if (typeof category !== "string" || !COLLECTION_CATEGORIES.has(category)) {
+    res.status(400).json({ claimed: false, coins: 0 });
+    return;
+  }
+  const required = Object.entries(CATALOGS.avatar)
+    .filter(
+      ([, item]) =>
+        item.category === category &&
+        item.price !== undefined &&
+        item.seasonal !== true,
+    )
+    .map(([id]) => id);
+  const userRef = getAdminApp().firestore().collection("users").doc(uid);
+  try {
+    let claimed = false;
+    await getAdminApp()
+      .firestore()
+      .runTransaction(async (tx: admin.firestore.Transaction) => {
+        claimed = false;
+        const data = (await tx.get(userRef)).data() ?? {};
+        const owned =
+          (data["ownedCostumes"] as Record<string, true> | undefined) ?? {};
+        const done =
+          (data["claimedCollections"] as Record<string, true> | undefined) ??
+          {};
+        if (done[category] === true) return;
+        if (!required.every((id) => owned[id] === true)) return;
+        tx.set(
+          userRef,
+          {
+            claimedCollections: { [category]: true },
+            coins: admin.firestore.FieldValue.increment(COLLECTION_REWARD),
+          },
+          { merge: true },
+        );
+        claimed = true;
+      });
+    res.status(200).json({ claimed, coins: claimed ? COLLECTION_REWARD : 0 });
+  } catch (e) {
+    console.error("claim-reward (avatarCollection) failed:", e);
+    res.status(500).json({ claimed: false, coins: 0 });
+  }
+}
 
 /**
  * Standalone rewards not tied to a completed typing test: the house greeting
@@ -57,7 +118,12 @@ export default async function handler(
     completedWaves?: unknown;
     runId?: unknown;
     mode?: unknown;
+    category?: unknown;
   };
+  if (body.type === "avatarCollection") {
+    await claimAvatarCollection(auth.uid, body.category, res);
+    return;
+  }
   if (
     body.type !== "dailyGreeting" &&
     body.type !== "recommendedGame" &&

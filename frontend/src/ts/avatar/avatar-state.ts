@@ -1,40 +1,32 @@
 import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
 
-import { findAnimalAvatarItem } from "../animal-avatars/animal-avatar-items";
 import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
-import {
-  AvatarCategory,
-  AvatarItem,
-  AvatarShape,
-  findAvatarItem,
-} from "./avatar-items";
+import { AvatarCategory, AvatarItem, AvatarShape } from "./avatar-items";
+import { EquippedAvatar, equippedFromDoc } from "./equipped-from-doc";
 
 export type AvatarState = {
   coins: number;
   ownedCostumes: Record<string, true>;
   equipped: Partial<Record<AvatarCategory, string>>;
   shape: AvatarShape;
+  ownedAnimalAvatars?: Record<string, true>;
+  equippedAnimalAvatarId?: string;
+  savedOutfits?: Partial<Record<string, SavedOutfit>>;
+  /** Avatar categories whose collection reward was already paid out. */
+  claimedCollections?: Record<string, true>;
 };
 
-export type EquippedAvatar = {
-  color?: string;
-  hair?: string;
-  hat?: string;
-  accessory?: string;
-  face?: string;
-  background?: string;
-  /** Hex color for the equipped leaderboard-row highlight, if any. */
-  highlight?: string;
-  shape?: AvatarShape;
-  /**
-   * Image URL for an equipped animal avatar, if any - takes over the whole
-   * avatar display in place of the procedural color/hair/hat/etc pieces
-   * above.
-   */
-  animalImage?: string;
+/** Snapshot of a look, stored server-side under users/{uid}.savedOutfits[slot]. */
+export type SavedOutfit = {
+  equipped: Partial<Record<AvatarCategory, string>>;
+  shape: AvatarShape;
 };
+
+export const OUTFIT_SLOTS = ["1", "2", "3"] as const;
+
+export type { EquippedAvatar } from "./equipped-from-doc";
 
 function userRef(uid: string): DocumentReference {
   return doc(collection(getDb(), "users"), uid);
@@ -51,31 +43,7 @@ export async function getEquippedAvatar(uid: string): Promise<EquippedAvatar> {
   try {
     const snap = await getDoc(userRef(uid));
     if (!snap.exists()) return {};
-    const data = snap.data();
-    const equipped =
-      (data["equipped"] as
-        | Partial<Record<AvatarCategory, string>>
-        | undefined) ?? {};
-    return {
-      color:
-        equipped.color === undefined
-          ? undefined
-          : findAvatarItem(equipped.color)?.value,
-      hair: equipped.hair,
-      hat: equipped.hat,
-      accessory: equipped.accessory,
-      face: equipped.face,
-      background: equipped.background,
-      highlight:
-        equipped.highlight === undefined
-          ? undefined
-          : findAvatarItem(equipped.highlight)?.value,
-      shape: data["avatarShape"] as AvatarShape | undefined,
-      animalImage: (() => {
-        const id = data["equippedAnimalAvatar"] as string | undefined;
-        return id === undefined ? undefined : findAnimalAvatarItem(id)?.image;
-      })(),
-    };
+    return equippedFromDoc(snap.data());
   } catch (e) {
     console.error("Failed to get equipped avatar:", e);
     return {};
@@ -97,6 +65,19 @@ export async function getAvatarState(uid: string): Promise<AvatarState> {
         equipped:
           (data["equipped"] as Partial<Record<AvatarCategory, string>>) ?? {},
         shape: (data["avatarShape"] as AvatarShape | undefined) ?? "round",
+        ownedAnimalAvatars:
+          (data["ownedAnimalAvatars"] as Record<string, true> | undefined) ??
+          {},
+        equippedAnimalAvatarId: data["equippedAnimalAvatar"] as
+          | string
+          | undefined,
+        savedOutfits:
+          (data["savedOutfits"] as
+            | Partial<Record<string, SavedOutfit>>
+            | undefined) ?? {},
+        claimedCollections:
+          (data["claimedCollections"] as Record<string, true> | undefined) ??
+          {},
       };
     }
   } catch (e) {
@@ -161,4 +142,33 @@ export async function equipAvatarItem(
   itemId: string | null,
 ): Promise<void> {
   await callApi("/api/equip-item", { target: "avatar", category, itemId });
+}
+
+/** Equips several categories in one write ("Surprise me"). null = take off. */
+export async function equipOutfit(
+  equipped: Partial<Record<AvatarCategory, string | null>>,
+): Promise<void> {
+  await callApi("/api/equip-item", { target: "outfit", equipped });
+}
+
+/** Saves the current look (as stored server-side) into an outfit slot. */
+export async function saveOutfit(slot: string): Promise<void> {
+  await callApi("/api/equip-item", { target: "saveOutfit", slot });
+}
+
+/** Puts on a saved outfit; pieces no longer owned are skipped server-side. */
+export async function wearOutfit(slot: string): Promise<void> {
+  await callApi("/api/equip-item", { target: "wearOutfit", slot });
+}
+
+/** Pays the one-time bonus for owning every item in a category. */
+export async function claimCollection(
+  category: AvatarCategory,
+): Promise<{ claimed: boolean; coins: number }> {
+  const result = await callApi<{ claimed: boolean; coins: number }>(
+    "/api/claim-reward",
+    { type: "avatarCollection", category },
+  );
+  if (result.claimed) invalidateCoinQueries();
+  return result;
 }

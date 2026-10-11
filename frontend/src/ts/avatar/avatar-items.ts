@@ -305,7 +305,141 @@ export const AVATAR_ITEMS: AvatarItem[] = [
     price: 30,
     shape: "cloud",
   },
+  ...(["oval", "hexagon", "cloud"] as const).flatMap((shape): AvatarItem[] => [
+    {
+      id: `long-hair-${shape}`,
+      category: "hair",
+      name: "Long Hair",
+      price: 40,
+      shape,
+    },
+    {
+      id: `ponytail-${shape}`,
+      category: "hair",
+      name: "Ponytail",
+      price: 40,
+      shape,
+    },
+    {
+      id: `beanie-${shape}`,
+      category: "hat",
+      name: "Beanie",
+      price: 40,
+      shape,
+    },
+    {
+      id: `party-${shape}`,
+      category: "hat",
+      name: "Party Hat",
+      price: 50,
+      shape,
+    },
+  ]),
+  {
+    id: "snow-bg",
+    category: "background",
+    name: "Snowfall",
+    price: 50,
+    seasonMonths: [1],
+  },
+  {
+    id: "clover-bg",
+    category: "background",
+    name: "Lucky Clover",
+    price: 50,
+    seasonMonths: [3],
+  },
+  {
+    id: "sakura-bg",
+    category: "background",
+    name: "Cherry Blossom",
+    price: 50,
+    seasonMonths: [4],
+  },
+  {
+    id: "sprout-bg",
+    category: "background",
+    name: "Spring Sprouts",
+    price: 50,
+    seasonMonths: [5],
+  },
+  {
+    id: "rain-bg",
+    category: "background",
+    name: "Rainy Day",
+    price: 50,
+    seasonMonths: [6],
+  },
+  {
+    id: "fireworks-bg",
+    category: "background",
+    name: "Fireworks",
+    price: 50,
+    seasonMonths: [7],
+  },
+  {
+    id: "beach-bg",
+    category: "background",
+    name: "Beach Day",
+    price: 50,
+    seasonMonths: [8],
+  },
+  {
+    id: "moon-bg",
+    category: "background",
+    name: "Harvest Moon",
+    price: 50,
+    seasonMonths: [9],
+  },
+  {
+    id: "autumn-bg",
+    category: "background",
+    name: "Autumn Leaves",
+    price: 50,
+    seasonMonths: [11],
+  },
 ];
+
+export type AvatarRarity = "common" | "rare" | "epic" | "legendary" | "limited";
+
+export const RARITY_LABELS: Record<AvatarRarity, string> = {
+  common: "Common",
+  rare: "Rare",
+  epic: "Epic",
+  legendary: "Legendary",
+  limited: "Limited",
+};
+
+export function rarityOf(item: AvatarItem): AvatarRarity {
+  if (item.requiresAchievement !== undefined) return "legendary";
+  if (item.seasonMonths !== undefined) return "limited";
+  const price = item.price ?? 0;
+  if (price >= 55) return "epic";
+  if (price >= 40) return "rare";
+  return "common";
+}
+
+/** Categories with a "collect them all" bonus (shape-free, so every student can finish). */
+export const COLLECTION_CATEGORIES: AvatarCategory[] = [
+  "color",
+  "accessory",
+  "face",
+  "background",
+  "highlight",
+];
+
+/** Coins paid once per completed collection. Mirrors api/claim-reward.ts. */
+export const COLLECTION_REWARD = 40;
+
+/** Items that count toward a category's collection: buyable all year. */
+export function collectionItems(category: AvatarCategory): AvatarItem[] {
+  return AVATAR_ITEMS.filter(
+    (i) =>
+      i.category === category &&
+      i.price !== undefined &&
+      i.seasonMonths === undefined,
+  );
+}
 
 export function findAvatarItem(id: string): AvatarItem | undefined {
   return AVATAR_ITEMS.find((i) => i.id === id);

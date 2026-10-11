@@ -1,9 +1,41 @@
-import { createUniqueId, JSXElement, Match, Show, Switch } from "solid-js";
+import { createUniqueId, For, JSXElement, Match, Show, Switch } from "solid-js";
 
 import { AvatarShape } from "../../avatar/avatar-items";
 import { cn } from "../../utils/cn";
 
 const INK = "#1a1a1a";
+
+/** Shapes whose long hair/ponytail/beanie/party hat reuse the round drawings, refit by transform. */
+const EXTRA_SHAPES = ["oval", "hexagon", "cloud"] as const;
+type ExtraShape = (typeof EXTRA_SHAPES)[number];
+
+/** Same top-of-head paths as each shape's Short Hair. */
+const HAIR_TOP: Record<ExtraShape, string> = {
+  oval: "M 18 46 Q 20 12 50 10 Q 80 12 82 46 Q 76 24 50 22 Q 24 24 18 46 Z",
+  hexagon: "M 22 40 L 30 13 L 70 13 L 78 40 Q 70 20 50 18 Q 30 20 22 40 Z",
+  cloud: "M 15 40 Q 18 8 50 6 Q 82 8 85 40 Q 76 20 50 18 Q 24 20 15 40 Z",
+};
+/** [left, right] long-hair strand offsets. */
+const SIDE_SHIFT: Record<ExtraShape, [string, string]> = {
+  oval: ["translate(4 4)", "translate(-4 4)"],
+  hexagon: ["translate(2 0)", "translate(-2 0)"],
+  cloud: ["translate(0 0)", "translate(0 0)"],
+};
+const TAIL_SHIFT: Record<ExtraShape, string> = {
+  oval: "translate(-4 0)",
+  hexagon: "translate(-6 -8)",
+  cloud: "translate(0 -4)",
+};
+const BEANIE_FIT: Record<ExtraShape, string> = {
+  oval: "translate(50 0) scale(0.78 1) translate(-50 -2)",
+  hexagon: "translate(50 0) scale(0.72 1) translate(-50 -9)",
+  cloud: "translate(50 0) scale(0.9 1) translate(-50 -4)",
+};
+const PARTY_FIT: Record<ExtraShape, string> = {
+  oval: "translate(0 -2)",
+  hexagon: "translate(0 -9)",
+  cloud: "translate(0 -5)",
+};
 
 /**
  * A simple procedural/geometric avatar - plain SVG shapes, no image assets.
@@ -212,6 +244,136 @@ export function Avatar(props: {
               fill="none"
               opacity="0.85"
             ></path>
+          </Show>
+
+          <Show when={props.background === "snow-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#e7f5ff"></circle>
+            <g fill="#ffffff" stroke="#a5d8ff" stroke-width="0.6">
+              <circle cx="22" cy="28" r="2.6"></circle>
+              <circle cx="78" cy="22" r="2.2"></circle>
+              <circle cx="14" cy="56" r="2"></circle>
+              <circle cx="86" cy="58" r="2.6"></circle>
+              <circle cx="48" cy="10" r="2"></circle>
+              <circle cx="28" cy="84" r="2.4"></circle>
+              <circle cx="72" cy="86" r="2"></circle>
+            </g>
+          </Show>
+          <Show when={props.background === "clover-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#ebfbee"></circle>
+            <g fill="#69db7c">
+              <circle cx="20" cy="26" r="3"></circle>
+              <circle cx="25" cy="26" r="3"></circle>
+              <circle cx="22.5" cy="22" r="3"></circle>
+              <circle cx="78" cy="30" r="3"></circle>
+              <circle cx="83" cy="30" r="3"></circle>
+              <circle cx="80.5" cy="26" r="3"></circle>
+              <circle cx="24" cy="80" r="3"></circle>
+              <circle cx="29" cy="80" r="3"></circle>
+              <circle cx="26.5" cy="76" r="3"></circle>
+              <circle cx="76" cy="80" r="3"></circle>
+              <circle cx="81" cy="80" r="3"></circle>
+              <circle cx="78.5" cy="76" r="3"></circle>
+            </g>
+          </Show>
+          <Show when={props.background === "sakura-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#fff0f6"></circle>
+            <g fill="#faa2c1">
+              <circle cx="20" cy="24" r="2.4"></circle>
+              <circle cx="24" cy="27" r="2.4"></circle>
+              <circle cx="22" cy="31" r="2.4"></circle>
+              <circle cx="17" cy="30" r="2.4"></circle>
+              <circle cx="16" cy="26" r="2.4"></circle>
+              <circle cx="80" cy="66" r="2.4"></circle>
+              <circle cx="84" cy="69" r="2.4"></circle>
+              <circle cx="82" cy="73" r="2.4"></circle>
+              <circle cx="77" cy="72" r="2.4"></circle>
+              <circle cx="76" cy="68" r="2.4"></circle>
+              <ellipse cx="74" cy="22" rx="3" ry="1.6"></ellipse>
+              <ellipse cx="26" cy="74" rx="3" ry="1.6"></ellipse>
+              <ellipse cx="50" cy="10" rx="3" ry="1.6"></ellipse>
+            </g>
+            <circle cx="20" cy="28" r="1.2" fill="#ffffff"></circle>
+            <circle cx="80" cy="70" r="1.2" fill="#ffffff"></circle>
+          </Show>
+          <Show when={props.background === "sprout-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#f4fce3"></circle>
+            <path
+              d="M 6 72 Q 50 62 94 72 L 90 82 Q 50 100 10 82 Z"
+              fill="#c0eb75"
+            ></path>
+            <g stroke="#5c940d" stroke-width="1.6" fill="#94d82d">
+              <path d="M 18 72 L 18 64" fill="none"></path>
+              <ellipse cx="15" cy="63" rx="3.5" ry="2"></ellipse>
+              <ellipse cx="21" cy="62" rx="3.5" ry="2"></ellipse>
+              <path d="M 82 72 L 82 64" fill="none"></path>
+              <ellipse cx="79" cy="63" rx="3.5" ry="2"></ellipse>
+              <ellipse cx="85" cy="62" rx="3.5" ry="2"></ellipse>
+            </g>
+          </Show>
+          <Show when={props.background === "rain-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#e9ecef"></circle>
+            <g fill="#74c0fc">
+              <path d="M 22 20 Q 19 26 22 28 Q 25 26 22 20 Z"></path>
+              <path d="M 78 16 Q 75 22 78 24 Q 81 22 78 16 Z"></path>
+              <path d="M 14 50 Q 11 56 14 58 Q 17 56 14 50 Z"></path>
+              <path d="M 86 46 Q 83 52 86 54 Q 89 52 86 46 Z"></path>
+              <path d="M 30 80 Q 27 86 30 88 Q 33 86 30 80 Z"></path>
+              <path d="M 70 82 Q 67 88 70 90 Q 73 88 70 82 Z"></path>
+            </g>
+          </Show>
+          <Show when={props.background === "fireworks-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#212529"></circle>
+            <path
+              d="M 24 26 L 24 16 M 24 26 L 32 20 M 24 26 L 34 28 M 24 26 L 30 34 M 24 26 L 18 34 M 24 26 L 14 28 M 24 26 L 16 20"
+              stroke="#ff6b6b"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M 76 30 L 76 20 M 76 30 L 84 24 M 76 30 L 86 32 M 76 30 L 82 38 M 76 30 L 70 38 M 76 30 L 66 32 M 76 30 L 68 24"
+              stroke="#ffd43b"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            ></path>
+            <path
+              d="M 50 84 L 50 76 M 50 84 L 57 79 M 50 84 L 58 86 M 50 84 L 43 79 M 50 84 L 42 86"
+              stroke="#4dabf7"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            ></path>
+          </Show>
+          <Show when={props.background === "beach-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#e3fafc"></circle>
+            <path
+              d="M 4 66 Q 50 58 96 66 L 92 80 Q 50 102 8 80 Z"
+              fill="#ffe8a3"
+            ></path>
+            <path
+              d="M 6 62 Q 16 58 26 62 Q 36 66 46 62 Q 56 58 66 62 Q 76 66 86 62 Q 92 60 95 62"
+              stroke="#3bc9db"
+              stroke-width="3"
+              fill="none"
+            ></path>
+            <circle cx="78" cy="22" r="8" fill="#ffd43b"></circle>
+          </Show>
+          <Show when={props.background === "moon-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#1e293b"></circle>
+            <circle cx="76" cy="24" r="10" fill="#fff3bf"></circle>
+            <circle cx="72" cy="21" r="1.6" fill="#ffe066"></circle>
+            <circle cx="79" cy="28" r="1.2" fill="#ffe066"></circle>
+            <circle cx="22" cy="24" r="1.4" fill="#ffe066"></circle>
+            <circle cx="14" cy="58" r="1.2" fill="#ffe066"></circle>
+            <circle cx="86" cy="62" r="1.4" fill="#ffe066"></circle>
+            <circle cx="34" cy="88" r="1.2" fill="#ffe066"></circle>
+          </Show>
+          <Show when={props.background === "autumn-bg"}>
+            <circle cx="50" cy="50" r="48" fill="#fff4e6"></circle>
+            <ellipse cx="22" cy="24" rx="5" ry="2.6" fill="#f76707"></ellipse>
+            <ellipse cx="80" cy="28" rx="5" ry="2.6" fill="#fab005"></ellipse>
+            <ellipse cx="14" cy="60" rx="5" ry="2.6" fill="#e8590c"></ellipse>
+            <ellipse cx="86" cy="64" rx="5" ry="2.6" fill="#f76707"></ellipse>
+            <ellipse cx="30" cy="86" rx="5" ry="2.6" fill="#fab005"></ellipse>
+            <ellipse cx="70" cy="88" rx="5" ry="2.6" fill="#e8590c"></ellipse>
           </Show>
 
           <ellipse
@@ -497,6 +659,56 @@ export function Avatar(props: {
                 stroke-width="1"
               ></path>
             </Show>
+
+            <For each={EXTRA_SHAPES}>
+              {(shape) => (
+                <>
+                  <Show when={props.hair === `long-hair-${shape}`}>
+                    <path
+                      d={HAIR_TOP[shape]}
+                      fill="#3e2723"
+                      stroke="rgba(0,0,0,0.25)"
+                      stroke-width="1"
+                    ></path>
+                    <g transform={SIDE_SHIFT[shape][0]}>
+                      <path
+                        d="M 14 40 Q 10 60 14 82 Q 20 84 22 82 Q 18 60 20 38 Z"
+                        fill="#3e2723"
+                      ></path>
+                    </g>
+                    <g transform={SIDE_SHIFT[shape][1]}>
+                      <path
+                        d="M 86 40 Q 90 60 86 82 Q 80 84 78 82 Q 82 60 80 38 Z"
+                        fill="#3e2723"
+                      ></path>
+                    </g>
+                  </Show>
+                  <Show when={props.hair === `ponytail-${shape}`}>
+                    <path
+                      d={HAIR_TOP[shape]}
+                      fill="#1a1a1a"
+                      stroke="rgba(0,0,0,0.25)"
+                      stroke-width="1"
+                    ></path>
+                    <g transform={TAIL_SHIFT[shape]}>
+                      <path
+                        d="M 76 24 Q 100 28 98 52 Q 96 76 78 86 Q 90 60 82 38 Q 78 30 76 24 Z"
+                        fill="#1a1a1a"
+                        stroke="rgba(0,0,0,0.25)"
+                        stroke-width="1"
+                      ></path>
+                      <ellipse
+                        cx="78"
+                        cy="28"
+                        rx="4.5"
+                        ry="3.5"
+                        fill="#495057"
+                      ></ellipse>
+                    </g>
+                  </Show>
+                </>
+              )}
+            </For>
 
             <circle
               cx="32"
@@ -1074,6 +1286,53 @@ export function Avatar(props: {
               ></path>
               <circle cx="50" cy="13" r="3" fill="#c2255c"></circle>
             </Show>
+
+            <For each={EXTRA_SHAPES}>
+              {(shape) => (
+                <>
+                  <Show when={props.hat === `beanie-${shape}`}>
+                    <g transform={BEANIE_FIT[shape]}>
+                      <path
+                        d="M 20 26 Q 50 -2 80 26 Z"
+                        fill="#2f9e44"
+                        stroke="rgba(0,0,0,0.25)"
+                        stroke-width="1.2"
+                      ></path>
+                      <rect
+                        x="18"
+                        y="22"
+                        width="64"
+                        height="8"
+                        rx="4"
+                        fill="#2b8a3e"
+                      ></rect>
+                      <circle cx="50" cy="4" r="4" fill="#f5f5f5"></circle>
+                    </g>
+                  </Show>
+                  <Show when={props.hat === `party-${shape}`}>
+                    <g transform={PARTY_FIT[shape]}>
+                      <path
+                        d="M 50 2 L 68 30 L 32 30 Z"
+                        fill="#f06595"
+                        stroke="rgba(0,0,0,0.25)"
+                        stroke-width="1.2"
+                      ></path>
+                      <path
+                        d="M 43 18 L 47 30 L 41 30 Z"
+                        fill="#ffd43b"
+                        opacity="0.9"
+                      ></path>
+                      <path
+                        d="M 57 18 L 53 30 L 59 30 Z"
+                        fill="#4dabf7"
+                        opacity="0.9"
+                      ></path>
+                      <circle cx="50" cy="4" r="3.5" fill="#ffd43b"></circle>
+                    </g>
+                  </Show>
+                </>
+              )}
+            </For>
           </g>
         </svg>
       }

@@ -69,6 +69,7 @@ import { cn } from "../../../utils/cn";
 import { download } from "../../../utils/misc";
 import { Button } from "../../common/Button";
 import { ClassGoalBar } from "../../common/ClassGoalBar";
+import { Avatar } from "../../common/Avatar";
 import { EmptyState } from "../../common/EmptyState";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
@@ -225,6 +226,7 @@ function ProgressTab(props: {
   type ProgressFilter = "all" | "quiet" | "incomplete" | "noWeek" | "stuck";
   const [progressFilter, setProgressFilter] =
     createSignal<ProgressFilter>("all");
+  const [showAvatarWall, setShowAvatarWall] = createSignal(false);
   const [selectedForCert, setSelectedForCert] = createSignal<Set<string>>(
     new Set(),
   );
@@ -456,6 +458,7 @@ function ProgressTab(props: {
           bestAcc: r.bestAcc,
           lessonsCompleted: r.lessonsCompleted,
           lessonStars: r.lessonStars,
+          avatar: r.avatar,
         })),
     );
     window.open("/certificate?batch=1", "_blank");
@@ -827,7 +830,45 @@ function ProgressTab(props: {
           PDF date range affects practice stats only; use preview then Print →
           Save as PDF for conferences.
         </p>
-        <div class="overflow-x-auto">
+        <div class="mb-2 flex justify-end">
+          <Button
+            variant="text"
+            class="text-sm"
+            fa={{ icon: showAvatarWall() ? "fa-table" : "fa-users" }}
+            text={showAvatarWall() ? "show table" : "avatar wall"}
+            onClick={() => setShowAvatarWall((v) => !v)}
+          />
+        </div>
+        <Show when={showAvatarWall()}>
+          <div class="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-8">
+            <For each={filteredRows()}>
+              {(r) => (
+                <div class="flex min-w-0 flex-col items-center gap-1 rounded bg-sub-alt p-2 text-center">
+                  <Avatar
+                    color={r.avatar?.color}
+                    shape={r.avatar?.shape}
+                    hair={r.avatar?.hair}
+                    hat={r.avatar?.hat}
+                    accessory={r.avatar?.accessory}
+                    face={r.avatar?.face}
+                    background={r.avatar?.background}
+                    highlightColor={r.avatar?.highlight}
+                    animalImage={r.avatar?.animalImage}
+                    size={56}
+                  />
+                  <span class="w-full truncate text-xs text-text">
+                    {r.name}
+                  </span>
+                  <span class="text-[0.65em] text-sub">
+                    <Fa icon="fa-star" class="mr-0.5 text-main" size={0.7} />
+                    {r.lessonStars}
+                  </span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+        <div class={cn("overflow-x-auto", showAvatarWall() ? "hidden" : "")}>
           <table class="w-full text-left text-sm">
             <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
               <tr>

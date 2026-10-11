@@ -15,6 +15,7 @@ const AVATAR_CATEGORIES = new Set([
   "highlight",
 ]);
 const AVATAR_SHAPES = new Set(["round", "square", "oval", "hexagon", "cloud"]);
+const OUTFIT_SLOTS = new Set(["1", "2", "3"]);
 const HOUSE_THEME_IDS = new Set([
   "plain",
   "cozy-wood",
@@ -50,6 +51,8 @@ export default async function handler(
     category?: unknown;
     itemId?: unknown;
     shape?: unknown;
+    slot?: unknown;
+    equipped?: unknown;
   };
   const app = getAdminApp();
   const userRef = app.firestore().collection("users").doc(auth.uid);
@@ -82,6 +85,99 @@ export default async function handler(
               [body.category]:
                 body.itemId ?? admin.firestore.FieldValue.delete(),
             },
+          },
+          { merge: true },
+        );
+        return;
+      }
+
+      if (
+        body.target === "outfit" ||
+        body.target === "saveOutfit" ||
+        body.target === "wearOutfit"
+      ) {
+        const owned =
+          (data["ownedCostumes"] as Record<string, true> | undefined) ?? {};
+        const shape =
+          typeof data["avatarShape"] === "string"
+            ? data["avatarShape"]
+            : "round";
+
+        if (body.target === "saveOutfit" || body.target === "wearOutfit") {
+          if (typeof body.slot !== "string" || !OUTFIT_SLOTS.has(body.slot)) {
+            throw new Error("Invalid outfit slot");
+          }
+        }
+
+        if (body.target === "saveOutfit") {
+          if (!snap.exists) throw new Error("Invalid outfit slot");
+          // update() with a field path replaces the slot whole, so pieces
+          // from an older save in this slot don't linger.
+          tx.update(userRef, {
+            [`savedOutfits.${body.slot as string}`]: {
+              equipped:
+                (data["equipped"] as Record<string, string> | undefined) ?? {},
+              shape,
+            },
+          });
+          return;
+        }
+
+        let wanted: Record<string, unknown>;
+        let wantedShape = shape;
+        if (body.target === "wearOutfit") {
+          const saved = (
+            data["savedOutfits"] as
+              | Record<string, { equipped?: unknown; shape?: unknown }>
+              | undefined
+          )?.[body.slot as string];
+          if (saved === undefined) throw new Error("Invalid outfit slot");
+          wantedShape =
+            typeof saved.shape === "string" && AVATAR_SHAPES.has(saved.shape)
+              ? saved.shape
+              : "round";
+          const savedEquipped =
+            typeof saved.equipped === "object" && saved.equipped !== null
+              ? (saved.equipped as Record<string, unknown>)
+              : {};
+          // A saved look replaces every slot, so unlisted ones come off.
+          wanted = Object.fromEntries(
+            [...AVATAR_CATEGORIES].map((c) => [c, savedEquipped[c] ?? null]),
+          );
+        } else {
+          if (typeof body.equipped !== "object" || body.equipped === null) {
+            throw new Error("Invalid outfit");
+          }
+          wanted = body.equipped as Record<string, unknown>;
+        }
+
+        const equippedUpdate: Record<string, unknown> = {};
+        for (const [category, itemId] of Object.entries(wanted)) {
+          if (!AVATAR_CATEGORIES.has(category)) {
+            throw new Error("Invalid outfit");
+          }
+          if (itemId === null) {
+            equippedUpdate[category] = admin.firestore.FieldValue.delete();
+            continue;
+          }
+          if (typeof itemId !== "string") throw new Error("Invalid outfit");
+          const item = CATALOGS.avatar[itemId];
+          const fits =
+            (category !== "hat" && category !== "hair") ||
+            avatarItemShape(itemId) === wantedShape;
+          // Skip (take off) pieces sold since saving or that no longer fit.
+          equippedUpdate[category] =
+            item?.category === category && owned[itemId] === true && fits
+              ? itemId
+              : admin.firestore.FieldValue.delete();
+        }
+        tx.set(
+          userRef,
+          {
+            equipped: equippedUpdate,
+            ...(body.target === "wearOutfit"
+              ? { avatarShape: wantedShape }
+              : {}),
           },
           { merge: true },
         );

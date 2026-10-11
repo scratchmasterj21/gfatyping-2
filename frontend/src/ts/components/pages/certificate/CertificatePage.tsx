@@ -15,6 +15,7 @@ import {
 import { readCertificateBatch } from "../../../classroom/certificate-batch";
 import { getAuthenticatedUser } from "../../../firebase";
 import { getActivePage } from "../../../states/core";
+import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 import { Page } from "../../common/Page";
@@ -192,8 +193,25 @@ function CertificateCard(props: {
           <div>
             <Divider />
             <div class="mt-4 text-sub italic">This certifies that</div>
-            <div class="mt-1 text-[2.5em] leading-tight font-bold text-main">
-              {formatName(props.data.name)}
+            <div class="mt-1 flex items-center justify-center gap-4">
+              <Show when={props.data.avatar}>
+                {(a) => (
+                  <Avatar
+                    color={a().color}
+                    shape={a().shape}
+                    hair={a().hair}
+                    hat={a().hat}
+                    accessory={a().accessory}
+                    face={a().face}
+                    background={a().background}
+                    animalImage={a().animalImage}
+                    size={64}
+                  />
+                )}
+              </Show>
+              <div class="text-[2.5em] leading-tight font-bold text-main">
+                {formatName(props.data.name)}
+              </div>
             </div>
             <Show when={props.data.classId !== undefined}>
               <div class="mt-1 text-em-sm text-sub">{props.data.classId}</div>

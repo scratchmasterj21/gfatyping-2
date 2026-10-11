@@ -83,6 +83,11 @@ type CachedResult = {
   computedAt: number;
 };
 
+/** Firestore rejects `undefined` fields (e.g. a student with no avatarUrl). */
+function withoutUndefined(record: CachedResult): CachedResult {
+  return JSON.parse(JSON.stringify(record)) as CachedResult;
+}
+
 function getAdminApp(): admin.app.App {
   if (admin.apps.length > 0) return admin.app();
   const raw = process.env["FIREBASE_SERVICE_ACCOUNT"];
@@ -376,7 +381,7 @@ export default async function handler(
   if (isClassCompare) {
     const result = rankClassPairs(students, grade as string);
     const record: CachedResult = { ...result, computedAt: Date.now() };
-    await cacheRef.set(record);
+    await cacheRef.set(withoutUndefined(record));
     res.status(200).json(result);
     return;
   }
@@ -387,7 +392,7 @@ export default async function handler(
 
   const result = rankStudents(students, metric as ClassroomMetric, wpmMode2);
   const record: CachedResult = { ...result, computedAt: Date.now() };
-  await cacheRef.set(record);
+  await cacheRef.set(withoutUndefined(record));
 
   res.status(200).json(result);
 }

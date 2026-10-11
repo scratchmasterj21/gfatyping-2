@@ -16,6 +16,8 @@ export type CatalogItem = {
   requiresAchievement?: string;
   /** Avatar only - which equip slot this item occupies. */
   category?: string;
+  /** Avatar only - only sold some months, so it doesn't count toward collections. */
+  seasonal?: true;
 };
 
 export type ShopId =
@@ -203,8 +205,8 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     halo: { category: "hat", requiresAchievement: "accuracy-perfect" },
     wizard: { category: "hat", requiresAchievement: "speed-50" },
     crown: { category: "hat", requiresAchievement: "streak-30" },
-    pumpkin: { category: "hat", price: 60 },
-    santa: { category: "hat", price: 60 },
+    pumpkin: { category: "hat", price: 60, seasonal: true },
+    santa: { category: "hat", price: 60, seasonal: true },
     glasses: { category: "accessory", price: 30 },
     bow: { category: "accessory", price: 30 },
     mustache: { category: "accessory", price: 40 },
@@ -227,7 +229,7 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     "grid-bg": { category: "background", price: 35 },
     "waves-bg": { category: "background", price: 45 },
     "rainbow-bg": { category: "background", price: 55 },
-    "hearts-bg": { category: "background", price: 45 },
+    "hearts-bg": { category: "background", price: 45, seasonal: true },
     "gold-highlight": { category: "highlight", price: 60 },
     "ice-highlight": { category: "highlight", price: 60 },
     "fire-highlight": { category: "highlight", price: 60 },
@@ -257,6 +259,27 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     "spiky-hair-cloud": { category: "hair", price: 45 },
     "cap-cloud": { category: "hat", price: 40 },
     "headband-cloud": { category: "hat", price: 30 },
+    "long-hair-oval": { category: "hair", price: 40 },
+    "ponytail-oval": { category: "hair", price: 40 },
+    "beanie-oval": { category: "hat", price: 40 },
+    "party-oval": { category: "hat", price: 50 },
+    "long-hair-hexagon": { category: "hair", price: 40 },
+    "ponytail-hexagon": { category: "hair", price: 40 },
+    "beanie-hexagon": { category: "hat", price: 40 },
+    "party-hexagon": { category: "hat", price: 50 },
+    "long-hair-cloud": { category: "hair", price: 40 },
+    "ponytail-cloud": { category: "hair", price: 40 },
+    "beanie-cloud": { category: "hat", price: 40 },
+    "party-cloud": { category: "hat", price: 50 },
+    "snow-bg": { category: "background", price: 50, seasonal: true },
+    "clover-bg": { category: "background", price: 50, seasonal: true },
+    "sakura-bg": { category: "background", price: 50, seasonal: true },
+    "sprout-bg": { category: "background", price: 50, seasonal: true },
+    "rain-bg": { category: "background", price: 50, seasonal: true },
+    "fireworks-bg": { category: "background", price: 50, seasonal: true },
+    "beach-bg": { category: "background", price: 50, seasonal: true },
+    "moon-bg": { category: "background", price: 50, seasonal: true },
+    "autumn-bg": { category: "background", price: 50, seasonal: true },
   },
   hands: {
     classic: {},
