@@ -9,7 +9,7 @@ export function Keytips(): JSXElement {
   return (
     <Show when={getConfig.showKeyTips}>
       <div
-        class="mb-8 flex flex-col items-center gap-2 transition-opacity"
+        class="mb-8 flex flex-col items-center gap-2 transition-opacity max-md:pointer-coarse:hidden"
         classList={{
           "opacity-0": getFocus(),
         }}

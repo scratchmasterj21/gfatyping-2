@@ -383,7 +383,11 @@ export function TypingRpgModal(props: Props): JSXElement {
 
   return (
     <Show when={props.open}>
-      <GameModalFrame layout={frameLayout()} onClose={() => props.onClose()}>
+      <GameModalFrame
+        layout={frameLayout()}
+        needsKeyboard={false}
+        onClose={() => props.onClose()}
+      >
         <Show when={phase() === "intro"}>
           <GamePickLayout
             header={

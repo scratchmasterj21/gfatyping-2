@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/solid-query";
 import { For, JSXElement, Show } from "solid-js";
 
 import { getConfig } from "../../../config/store";
+import { focusInputElement } from "../../../input/input-element";
 import {
   KEYBOARD_SKIN_ITEMS,
   KeyboardSkinItemId,
@@ -15,10 +16,13 @@ import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
 import { FingerLegendRow } from "./FingerLegendRow";
 import {
+  isGuideFolded,
+  isPhoneWidth,
   keyboardShowColors,
   keyboardStyle,
   rgbBrightness,
   rgbMode,
+  setGuideFolded,
   setKeyboardShowColors,
   setKeyboardStyle,
   setRgbBrightness,
@@ -52,6 +56,18 @@ const RGB_MODE_LABELS: Record<(typeof RGB_MODES)[number], string> = {
   static: "Static",
 };
 const BRIGHTNESS_STEPS = ["low", "med", "high"] as const;
+
+/** Taller on touch screens so small fingers hit the chip, not its neighbor. */
+const CHIP =
+  "rounded px-3 py-0.5 text-sm transition-colors pointer-coarse:min-h-10 pointer-coarse:px-4";
+
+/** Runs a control, then hands focus back so the next key types (not swallowed by the refocus in global.ts). */
+function thenType(action: () => void): () => void {
+  return () => {
+    action();
+    focusInputElement(true);
+  };
+}
 
 /** Style picker + finger legend — footer slot above Keytips during guided-hands tests. */
 export function GuidedKeyboardControls(): JSXElement {
@@ -87,103 +103,124 @@ export function GuidedKeyboardControls(): JSXElement {
   return (
     <Show when={visible()}>
       <div
-        class="mx-auto mb-4 flex w-full max-w-[900px] flex-col items-center transition-opacity md:max-w-[650px] xl:max-w-[900px]"
+        class="mx-auto mb-4 flex w-full max-w-[min(900px,88vh)] flex-col items-center transition-opacity md:max-w-[min(650px,88vh)] xl:max-w-[min(900px,88vh)]"
         classList={{
           "opacity-0": getFocus(),
         }}
       >
-        <div class="flex flex-wrap justify-center gap-2">
-          <For each={styles()}>
-            {(style) => (
+        <Show when={isPhoneWidth()}>
+          <button
+            type="button"
+            class={cn(CHIP, "mb-2 bg-sub-alt text-sub hover:text-text")}
+            onClick={thenType(() => setGuideFolded(!isGuideFolded()))}
+          >
+            <Fa
+              icon={isGuideFolded() ? "fa-keyboard" : "fa-eye-slash"}
+              size={0.75}
+              class="mr-1.5"
+            />
+            {isGuideFolded() ? "show keyboard guide" : "hide keyboard guide"}
+          </button>
+        </Show>
+        <Show when={!isGuideFolded()}>
+          <div class="flex flex-wrap justify-center gap-2">
+            <For each={styles()}>
+              {(style) => (
+                <button
+                  type="button"
+                  class={cn(
+                    CHIP,
+                    keyboardStyle() === style
+                      ? "bg-main text-bg"
+                      : "bg-sub-alt text-sub hover:text-text",
+                  )}
+                  onClick={thenType(() => setKeyboardStyle(style))}
+                >
+                  {LABELS[style]}
+                </button>
+              )}
+            </For>
+            <Show when={hasUnownedSkins()}>
               <button
                 type="button"
                 class={cn(
-                  "rounded px-3 py-0.5 text-sm transition-colors",
-                  keyboardStyle() === style
-                    ? "bg-main text-bg"
-                    : "bg-sub-alt text-sub hover:text-text",
+                  CHIP,
+                  "bg-sub-alt text-sub opacity-80 hover:text-text",
                 )}
-                onClick={() => setKeyboardStyle(style)}
+                onClick={() => showModal("KeyboardSkinShop")}
               >
-                {LABELS[style]}
+                <Fa icon="fa-store" size={0.65} class="mr-1" />
+                skins
               </button>
-            )}
-          </For>
-          <Show when={hasUnownedSkins()}>
-            <button
-              type="button"
-              class="rounded bg-sub-alt px-3 py-0.5 text-sm text-sub opacity-80 transition-colors hover:text-text"
-              onClick={() => showModal("KeyboardSkinShop")}
-            >
-              <Fa icon="fa-store" size={0.65} class="mr-1" />
-              skins
-            </button>
-          </Show>
-          <div class="mx-1 w-px bg-sub opacity-40"></div>
-          <button
-            type="button"
-            class={cn(
-              "rounded px-3 py-0.5 text-sm transition-colors",
-              keyboardShowColors()
-                ? "bg-main text-bg"
-                : "bg-sub-alt text-sub hover:text-text",
-            )}
-            onClick={() => setKeyboardShowColors(!keyboardShowColors())}
-          >
-            Colors
-          </button>
-          <Show when={keyboardStyle() === "rgb"}>
+            </Show>
             <div class="mx-1 w-px bg-sub opacity-40"></div>
             <button
               type="button"
-              class="rounded bg-sub-alt px-3 py-0.5 text-sm text-sub transition-colors hover:text-text"
-              onClick={() => {
-                const idx = RGB_MODES.indexOf(rgbMode());
-                setRgbMode(RGB_MODES[(idx + 1) % RGB_MODES.length] ?? "wave");
-              }}
-            >
-              {RGB_MODE_LABELS[rgbMode()]}
-            </button>
-            <button
-              type="button"
-              disabled={rgbBrightness() === "low"}
               class={cn(
-                "rounded px-2 py-0.5 text-sm transition-colors",
-                rgbBrightness() === "low"
-                  ? "cursor-not-allowed bg-sub-alt text-sub opacity-30"
+                CHIP,
+                keyboardShowColors()
+                  ? "bg-main text-bg"
                   : "bg-sub-alt text-sub hover:text-text",
               )}
-              onClick={() => {
-                const idx = BRIGHTNESS_STEPS.indexOf(rgbBrightness());
-                if (idx > 0) {
-                  setRgbBrightness(BRIGHTNESS_STEPS[idx - 1] ?? "med");
-                }
-              }}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              disabled={rgbBrightness() === "high"}
-              class={cn(
-                "rounded px-2 py-0.5 text-sm transition-colors",
-                rgbBrightness() === "high"
-                  ? "cursor-not-allowed bg-sub-alt text-sub opacity-30"
-                  : "bg-sub-alt text-sub hover:text-text",
+              onClick={thenType(() =>
+                setKeyboardShowColors(!keyboardShowColors()),
               )}
-              onClick={() => {
-                const idx = BRIGHTNESS_STEPS.indexOf(rgbBrightness());
-                if (idx < BRIGHTNESS_STEPS.length - 1) {
-                  setRgbBrightness(BRIGHTNESS_STEPS[idx + 1] ?? "med");
-                }
-              }}
             >
-              +
+              Colors
             </button>
+            <Show when={keyboardStyle() === "rgb"}>
+              <div class="mx-1 w-px bg-sub opacity-40"></div>
+              <button
+                type="button"
+                class={cn(CHIP, "bg-sub-alt text-sub hover:text-text")}
+                onClick={thenType(() => {
+                  const idx = RGB_MODES.indexOf(rgbMode());
+                  setRgbMode(RGB_MODES[(idx + 1) % RGB_MODES.length] ?? "wave");
+                })}
+              >
+                {RGB_MODE_LABELS[rgbMode()]}
+              </button>
+              <button
+                type="button"
+                disabled={rgbBrightness() === "low"}
+                class={cn(
+                  "rounded px-2 py-0.5 text-sm transition-colors pointer-coarse:min-h-10 pointer-coarse:min-w-10",
+                  rgbBrightness() === "low"
+                    ? "cursor-not-allowed bg-sub-alt text-sub opacity-30"
+                    : "bg-sub-alt text-sub hover:text-text",
+                )}
+                onClick={thenType(() => {
+                  const idx = BRIGHTNESS_STEPS.indexOf(rgbBrightness());
+                  if (idx > 0) {
+                    setRgbBrightness(BRIGHTNESS_STEPS[idx - 1] ?? "med");
+                  }
+                })}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                disabled={rgbBrightness() === "high"}
+                class={cn(
+                  "rounded px-2 py-0.5 text-sm transition-colors pointer-coarse:min-h-10 pointer-coarse:min-w-10",
+                  rgbBrightness() === "high"
+                    ? "cursor-not-allowed bg-sub-alt text-sub opacity-30"
+                    : "bg-sub-alt text-sub hover:text-text",
+                )}
+                onClick={thenType(() => {
+                  const idx = BRIGHTNESS_STEPS.indexOf(rgbBrightness());
+                  if (idx < BRIGHTNESS_STEPS.length - 1) {
+                    setRgbBrightness(BRIGHTNESS_STEPS[idx + 1] ?? "med");
+                  }
+                })}
+              >
+                +
+              </button>
+            </Show>
+          </div>
+          <Show when={keyboardShowColors()}>
+            <FingerLegendRow class="!mt-2" />
           </Show>
-        </div>
-        <Show when={keyboardShowColors()}>
-          <FingerLegendRow class="!mt-2" />
         </Show>
       </div>
     </Show>

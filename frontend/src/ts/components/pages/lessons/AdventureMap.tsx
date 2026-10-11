@@ -5,8 +5,9 @@ import { getTheme } from "../../../states/theme";
 import { FaSolidIcon } from "../../../types/font-awesome";
 import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
+import { isPhoneWidth } from "../test/guided-keyboard-prefs";
 
-const COLS = 4;
+const cols = (): number => (isPhoneWidth() ? 2 : 4);
 
 export type MapStopState = "done" | "current" | "open" | "locked";
 
@@ -20,9 +21,10 @@ const DEFAULT_SCENERY: FaSolidIcon[] = ["fa-star", "fa-star", "fa-star"];
 
 /** Snake layout: left-to-right on even rows, right-to-left on odd rows. */
 function cellFor(index: number): { row: number; col: number } {
-  const row = Math.floor(index / COLS);
-  const inRow = index % COLS;
-  return { row, col: row % 2 === 0 ? inRow : COLS - 1 - inRow };
+  const perRow = cols();
+  const row = Math.floor(index / perRow);
+  const inRow = index % perRow;
+  return { row, col: row % 2 === 0 ? inRow : perRow - 1 - inRow };
 }
 
 export function AdventureMap(props: {
@@ -32,7 +34,7 @@ export function AdventureMap(props: {
   onSelect: (group: LessonGroup) => void;
   avatar?: JSXElement;
 }): JSXElement {
-  const rows = (): number => Math.ceil(props.groups.length / COLS);
+  const rows = (): number => Math.ceil(props.groups.length / cols());
   const scenery = (): FaSolidIcon[] =>
     SCENERY[getTheme().name] ?? DEFAULT_SCENERY;
 
@@ -73,13 +75,13 @@ export function AdventureMap(props: {
       <div
         class="relative grid"
         style={{
-          "grid-template-columns": `repeat(${COLS}, minmax(0, 1fr))`,
+          "grid-template-columns": `repeat(${cols()}, minmax(0, 1fr))`,
           "grid-template-rows": `repeat(${rows()}, 7.5rem)`,
         }}
       >
         <svg
           class="pointer-events-none absolute inset-0 h-full w-full"
-          viewBox={`0 0 ${COLS * 100} ${rows() * 100}`}
+          viewBox={`0 0 ${cols() * 100} ${rows() * 100}`}
           preserveAspectRatio="none"
           aria-hidden="true"
         >
@@ -151,7 +153,8 @@ export function AdventureMap(props: {
                 </button>
                 <span
                   class={cn(
-                    "max-w-full truncate px-1 text-center text-em-xs leading-tight",
+                    "max-w-full px-1 text-center text-em-xs leading-tight",
+                    state() === "current" ? "line-clamp-2" : "truncate",
                     state() === "locked" ? "text-sub" : "font-bold text-text",
                   )}
                 >

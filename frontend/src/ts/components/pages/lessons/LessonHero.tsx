@@ -1,4 +1,4 @@
-import { JSXElement, Show } from "solid-js";
+import { createSignal, JSXElement, Show } from "solid-js";
 
 import { AvatarShape } from "../../../avatar/avatar-items";
 import { PracticeRewardCategory } from "../../../lessons/lesson-progress";
@@ -55,6 +55,7 @@ export function LessonHero(props: {
   weeklyQuestClaimed?: string[];
 }): JSXElement {
   const tip = tipOfTheDay();
+  const [showFreezeInfo, setShowFreezeInfo] = createSignal(false);
   return (
     <>
       <section class="flex flex-wrap items-center gap-3 rounded-2xl bg-sub-alt px-4 py-3">
@@ -113,12 +114,18 @@ export function LessonHero(props: {
             <span class="font-bold">{props.streakDays}</span>
             <span class="text-sub">day streak</span>
             <Show when={props.streakFreezes > 0}>
-              <span
-                class="rounded bg-sub-alt px-1.5 py-0.5 text-em-xs text-sub"
+              <button
+                type="button"
+                class="cursor-pointer rounded bg-sub-alt px-1.5 py-0.5 text-em-xs text-sub hover:text-text pointer-coarse:min-h-8"
                 title="Miss a day and this protects your streak once."
+                aria-expanded={showFreezeInfo()}
+                onClick={() => setShowFreezeInfo(!showFreezeInfo())}
               >
-                freeze ready
-              </span>
+                <Fa icon="fa-snowflake" size={0.7} class="mr-1" />
+                {showFreezeInfo()
+                  ? "protects your streak if you miss a day"
+                  : "freeze ready"}
+              </button>
             </Show>
           </div>
         </Show>

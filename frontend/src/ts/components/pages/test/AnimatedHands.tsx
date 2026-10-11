@@ -50,6 +50,7 @@ export const [activeFinger, setActiveFinger] = createSignal<Finger | null>(
 export const [activeChar, setActiveChar] = createSignal<string | null>(null);
 
 import {
+  isGuideFolded,
   keyboardShowColors,
   keyboardStyle,
   rgbBrightness,
@@ -636,14 +637,23 @@ export function AnimatedHands(): JSXElement {
   };
 
   return (
-    <Show when={getConfig.showGuidedHands}>
+    <Show
+      when={getConfig.showGuidedHands && !isGuideFolded()}
+      fallback={
+        <Show when={getConfig.showGuidedHands}>
+          <style>{`#keymap { display: none !important; }`}</style>
+        </Show>
+      }
+    >
       <div
         id="animatedHandsContainer"
         // Narrower between md and xl: at those widths #typingTest isn't much
         // wider than 900px, leaving no room for the side image panels
         // (positioned relative to #typingTest) before they collide with the
         // keyboard. Plenty of room again at xl+, so it relaxes back to 900px.
-        class="max-w-[900px] md:max-w-[650px] xl:max-w-[900px]"
+        // The 88vh cap keeps keyboard + hands (~0.51x width tall) under about
+        // half the screen height, so short landscape screens still show words.
+        class="max-w-[min(900px,88vh)] md:max-w-[min(650px,88vh)] xl:max-w-[min(900px,88vh)]"
         style={{
           position: "relative",
           width: "100%",

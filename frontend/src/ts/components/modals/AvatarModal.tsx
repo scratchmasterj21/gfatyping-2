@@ -723,7 +723,7 @@ export function AvatarModal(): JSXElement {
                 </button>
               )}
             </For>
-            <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-em-xs text-sub">
+            <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-em-xs text-sub pointer-coarse:min-h-10 pointer-coarse:text-sm">
               <input
                 type="checkbox"
                 checked={onlyMine()}

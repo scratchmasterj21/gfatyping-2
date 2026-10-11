@@ -336,7 +336,7 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
       id={`${props.id as string}Modal`}
       ref={dialogRef}
       class={cn(
-        "fixed top-0 left-0 z-1000 m-0 hidden h-screen max-h-screen w-screen max-w-screen border-none bg-[rgba(0,0,0,0.5)] p-8 backdrop:bg-transparent",
+        "fixed top-0 left-0 z-1000 m-0 hidden h-screen max-h-screen w-screen max-w-screen border-none bg-[rgba(0,0,0,0.5)] p-2 backdrop:bg-transparent sm:p-8",
         "flex h-full w-full items-center justify-center",
         props.wrapperClass,
       )}
@@ -362,7 +362,7 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
                 props.closeOnWrapperClick !== false))
           }
         >
-          <div class="flex items-center justify-between gap-3">
+          <div class="sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg">
             <Show when={props.title !== undefined && props.title !== ""}>
               <div class="text-2xl text-sub">{props.title}</div>
             </Show>

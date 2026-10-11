@@ -137,3 +137,28 @@ body.kid-theme {
     animation: none;
   }
 }
+
+// Students never need the command line; on iPads it just covers the page corner.
+body.kid-theme #commandLineMobileButton {
+  display: none !important;
+}
+
+// Touch screens can't hover, so the icon-only result buttons get a short
+// visible label instead of relying on their balloon tooltip.
+.touchLabel {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  body.kid-theme #result {
+    .touchLabel {
+      display: inline;
+      margin-left: 0.4em;
+      font-size: 0.8em;
+    }
+
+    #saveScreenshotButton {
+      display: none;
+    }
+  }
+}

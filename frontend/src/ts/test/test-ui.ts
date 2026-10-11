@@ -88,6 +88,18 @@ let wordTopBeforeLineJump = 0;
 let lineTransition = false;
 let currentTestLine = 0;
 
+// Phones only: a 2.5rem kid font fits two or three words per line at 390px.
+const PHONE_FONT_MAX_WIDTH = 768;
+const PHONE_FONT_VW = 0.07;
+let typingFontRem = Config.fontSize;
+
+function computeTypingFontRem(): number {
+  const width = window.innerWidth;
+  if (width >= PHONE_FONT_MAX_WIDTH) return Config.fontSize;
+  const capRem = (width * PHONE_FONT_VW) / convertRemToPixels(1);
+  return Math.min(Config.fontSize, Math.max(1.25, capRem));
+}
+
 export function focusWords(force = false): void {
   if (force) {
     blurInputElement();
@@ -106,7 +118,8 @@ export function keepWordsInputInTheCenter(force = false): void {
   if (wordsInput === null || wordsWrapperEl === null) return;
 
   const wordsWrapperHeight = wordsWrapperEl.getOffsetHeight();
-  const windowHeight = window.innerHeight;
+  // visualViewport shrinks when an on-screen keyboard opens; innerHeight doesn't on iOS.
+  const windowHeight = window.visualViewport?.height ?? window.innerHeight;
 
   // dont do anything if the wrapper can fit on screen
   if (wordsWrapperHeight < windowHeight) return;
@@ -446,9 +459,10 @@ function updateWordWrapperClasses(): void {
     wordsEl.removeClass("colorfulMode");
   }
 
+  typingFontRem = computeTypingFontRem();
   qsa(
     "#caret, #paceCaret, #liveStatsMini, #typingTest, #wordsInput, #compositionDisplay",
-  ).setStyle({ fontSize: `${Config.fontSize}rem` });
+  ).setStyle({ fontSize: `${typingFontRem}rem` });
 
   if (TestState.isLanguageRightToLeft) {
     wordsEl.addClass("rightToLeftTest");
@@ -538,7 +552,7 @@ export function updateWordsInputPosition(): void {
     return;
   }
 
-  const letterHeight = convertRemToPixels(Config.fontSize);
+  const letterHeight = convertRemToPixels(typingFontRem);
   const targetTop =
     activeWord.getOffsetTop() + letterHeight / 2 - el.offsetHeight / 2 + 1; //+1 for half of border
 
@@ -2029,6 +2043,13 @@ qs(".pageTest")?.onChild("click", "#showWordHistoryButton", () => {
 
 qs("#wordsWrapper")?.on("click", () => {
   focusWords();
+});
+
+// On-screen keyboard opening/closing resizes the visual viewport only.
+window.visualViewport?.addEventListener("resize", () => {
+  if (TestState.isActive && isInputElementFocused()) {
+    keepWordsInputInTheCenter(true);
+  }
 });
 
 window.addEventListener("blur", () => {

@@ -9,6 +9,18 @@ const messages = {
   window: "Click anywhere to focus the window",
 };
 
+const touchMessages: typeof messages = {
+  default: "Tap here or press any key to type",
+  window: "Tap anywhere to keep typing",
+};
+
+function isTouchScreen(): boolean {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches
+  );
+}
+
 export function hide(): void {
   qsa("#words, #compositionDisplay")
     ?.setStyle({ transition: "none" })
@@ -24,7 +36,13 @@ export function show(mode: "default" | "window" = "default"): void {
       qsa("#words, #compositionDisplay")
         ?.setStyle({ transition: "0.25s" })
         ?.addClass("blurred");
-      qs(".outOfFocusWarning .text")?.setText(messages[mode]);
+      const touch = isTouchScreen();
+      qs(".outOfFocusWarning .text")?.setText(
+        (touch ? touchMessages : messages)[mode],
+      );
+      qs(".outOfFocusWarning i")
+        ?.removeClass(["fa-mouse-pointer", "fa-hand-pointer"])
+        .addClass(touch ? "fa-hand-pointer" : "fa-mouse-pointer");
       qs(".outOfFocusWarning")?.show();
     }, 1000),
   );
