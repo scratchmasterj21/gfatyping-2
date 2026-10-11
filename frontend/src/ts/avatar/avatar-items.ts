@@ -1,3 +1,5 @@
+import { Rarity, rarityFor } from "../utils/shop-rarity";
+
 export type AvatarCategory =
   | "color"
   | "hair"
@@ -400,23 +402,14 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   },
 ];
 
-export type AvatarRarity = "common" | "rare" | "epic" | "legendary" | "limited";
+export { RARITY_LABELS } from "../utils/shop-rarity";
 
-export const RARITY_LABELS: Record<AvatarRarity, string> = {
-  common: "Common",
-  rare: "Rare",
-  epic: "Epic",
-  legendary: "Legendary",
-  limited: "Limited",
-};
-
-export function rarityOf(item: AvatarItem): AvatarRarity {
-  if (item.requiresAchievement !== undefined) return "legendary";
-  if (item.seasonMonths !== undefined) return "limited";
-  const price = item.price ?? 0;
-  if (price >= 55) return "epic";
-  if (price >= 40) return "rare";
-  return "common";
+export function rarityOf(item: AvatarItem): Rarity {
+  return rarityFor(
+    item.price,
+    item.seasonMonths !== undefined,
+    item.requiresAchievement !== undefined,
+  );
 }
 
 /** Categories with a "collect them all" bonus (shape-free, so every student can finish). */

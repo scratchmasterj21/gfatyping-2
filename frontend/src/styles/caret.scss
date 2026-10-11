@@ -135,7 +135,111 @@
   }
 }
 
+@keyframes caretFxRainbowSpin {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes caretFxHeartbeat {
+  0%,
+  40%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  15%,
+  30% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes caretFxFireFlicker {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.2);
+  }
+}
+
+@keyframes caretFxPetalFall {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-6px, 14px) rotate(120deg);
+  }
+}
+
 #caret {
+  &.fx-rainbow,
+  &.fx-heartbeat,
+  &.fx-fire {
+    animation: caretFlashSmooth 1s infinite;
+
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+    }
+  }
+
+  &.fx-rainbow::before {
+    box-shadow: 0 0 10px 3px #ff4d4d;
+    animation: caretFxRainbowSpin 2s linear infinite;
+  }
+
+  &.fx-heartbeat::before {
+    box-shadow: 0 0 10px 3px var(--caret-color);
+    animation: caretFxHeartbeat 1.2s ease-in-out infinite;
+  }
+
+  &.fx-fire::before {
+    transform-origin: bottom;
+    box-shadow:
+      0 -4px 10px 2px #ff9a3c,
+      0 -8px 14px 1px #ff4d00;
+    animation: caretFxFireFlicker 0.35s ease-in-out infinite;
+  }
+
+  &.fx-sakura {
+    &::before,
+    &::after {
+      content: "";
+      position: absolute;
+      width: 5px;
+      height: 4px;
+      border-radius: 60% 0;
+      background: #f9a8d4;
+      pointer-events: none;
+      animation: caretFxPetalFall 1.6s ease-in infinite;
+    }
+
+    &::before {
+      top: 0;
+      right: -5px;
+    }
+
+    &::after {
+      top: 30%;
+      left: -5px;
+      background: #fbcfe8;
+      animation-delay: 0.8s;
+    }
+  }
+
   &.fx-glow {
     animation: caretFlashSmooth 1s infinite;
 

@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/solid-query";
 import { For, JSXElement, Show } from "solid-js";
 
 import { getConfig } from "../../../config/store";
-import { KeyboardSkinItemId } from "../../../keyboard-skins/keyboard-skin-items";
+import {
+  KEYBOARD_SKIN_ITEMS,
+  KeyboardSkinItemId,
+} from "../../../keyboard-skins/keyboard-skin-items";
 import { getKeyboardSkinState } from "../../../keyboard-skins/keyboard-skin-state";
 import { getActivePage, getUserId } from "../../../states/core";
 import { showModal } from "../../../states/modals";
@@ -23,14 +26,12 @@ import {
   type GuidedKeyboardStyle,
 } from "./guided-keyboard-prefs";
 
-const STYLES: GuidedKeyboardStyle[] = [
+const FREE_STYLES: GuidedKeyboardStyle[] = [
   "flat",
   "cartoon",
   "modern",
   "marble",
   "rgb",
-  "wood",
-  "glass",
 ];
 const LABELS: Record<GuidedKeyboardStyle, string> = {
   flat: "Classic",
@@ -38,8 +39,9 @@ const LABELS: Record<GuidedKeyboardStyle, string> = {
   modern: "Modern",
   marble: "Marble",
   rgb: "RGB",
-  wood: "Wood",
-  glass: "Glass",
+  ...(Object.fromEntries(
+    KEYBOARD_SKIN_ITEMS.map((skin) => [skin.id, skin.name]),
+  ) as Record<KeyboardSkinItemId, string>),
 };
 
 const RGB_MODES = ["wave", "breathe", "solid", "static"] as const;
@@ -50,9 +52,6 @@ const RGB_MODE_LABELS: Record<(typeof RGB_MODES)[number], string> = {
   static: "Static",
 };
 const BRIGHTNESS_STEPS = ["low", "med", "high"] as const;
-
-const isSkinStyle = (style: GuidedKeyboardStyle): style is KeyboardSkinItemId =>
-  style === "wood" || style === "glass";
 
 /** Style picker + finger legend — footer slot above Keytips during guided-hands tests. */
 export function GuidedKeyboardControls(): JSXElement {
@@ -75,6 +74,15 @@ export function GuidedKeyboardControls(): JSXElement {
   }));
   const isSkinOwned = (id: KeyboardSkinItemId): boolean =>
     keyboardSkinStateQuery.data?.ownedSkins[id] === true;
+  // Owned skins sit with the free styles; the rest live behind the shop button.
+  const styles = (): GuidedKeyboardStyle[] => [
+    ...FREE_STYLES,
+    ...KEYBOARD_SKIN_ITEMS.filter((skin) => isSkinOwned(skin.id)).map(
+      (skin) => skin.id,
+    ),
+  ];
+  const hasUnownedSkins = (): boolean =>
+    KEYBOARD_SKIN_ITEMS.some((skin) => !isSkinOwned(skin.id));
 
   return (
     <Show when={visible()}>
@@ -85,36 +93,32 @@ export function GuidedKeyboardControls(): JSXElement {
         }}
       >
         <div class="flex flex-wrap justify-center gap-2">
-          <For each={STYLES}>
-            {(style) => {
-              const locked = (): boolean =>
-                isSkinStyle(style) && !isSkinOwned(style);
-              return (
-                <button
-                  type="button"
-                  class={cn(
-                    "rounded px-3 py-0.5 text-sm transition-colors",
-                    keyboardStyle() === style
-                      ? "bg-main text-bg"
-                      : "bg-sub-alt text-sub hover:text-text",
-                    locked() && "opacity-60",
-                  )}
-                  onClick={() => {
-                    if (locked()) {
-                      showModal("KeyboardSkinShop");
-                      return;
-                    }
-                    setKeyboardStyle(style);
-                  }}
-                >
-                  <Show when={locked()}>
-                    <Fa icon="fa-lock" size={0.65} class="mr-1" />
-                  </Show>
-                  {LABELS[style]}
-                </button>
-              );
-            }}
+          <For each={styles()}>
+            {(style) => (
+              <button
+                type="button"
+                class={cn(
+                  "rounded px-3 py-0.5 text-sm transition-colors",
+                  keyboardStyle() === style
+                    ? "bg-main text-bg"
+                    : "bg-sub-alt text-sub hover:text-text",
+                )}
+                onClick={() => setKeyboardStyle(style)}
+              >
+                {LABELS[style]}
+              </button>
+            )}
           </For>
+          <Show when={hasUnownedSkins()}>
+            <button
+              type="button"
+              class="rounded bg-sub-alt px-3 py-0.5 text-sm text-sub opacity-80 transition-colors hover:text-text"
+              onClick={() => showModal("KeyboardSkinShop")}
+            >
+              <Fa icon="fa-store" size={0.65} class="mr-1" />
+              skins
+            </button>
+          </Show>
           <div class="mx-1 w-px bg-sub opacity-40"></div>
           <button
             type="button"

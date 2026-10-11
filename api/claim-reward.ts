@@ -4,7 +4,7 @@ import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
 import { isAdminEmail, verifyStudent } from "./_lib/auth.js";
-import { CATALOGS } from "./_lib/catalogs.js";
+import { CATALOGS, OWNED_FIELD, ShopId } from "./_lib/catalogs.js";
 import { tokyoDateString } from "./_lib/time.js";
 import {
   typingQuestDepthPayout,
@@ -37,25 +37,24 @@ const COLLECTION_CATEGORIES = new Set([
   "highlight",
 ]);
 const COLLECTION_REWARD = 40;
+/** Mirrors frontend COLLECTION_SHOPS in utils/shop-collections.ts. */
+const COLLECTION_SHOPS: ReadonlySet<ShopId> = new Set([
+  "hands",
+  "rgbPalette",
+  "keyboardSkin",
+  "keypressEffect",
+  "caretEffect",
+  "backdrop",
+]);
 
-/** One-time coin bonus for owning every year-round, coin-priced item in a category. */
-async function claimAvatarCollection(
+/** One-time coin bonus for owning every year-round, coin-priced item in a set. */
+async function claimCollection(
   uid: string,
-  category: unknown,
+  claimKey: string,
+  ownedField: string,
+  required: string[],
   res: VercelResponse,
 ): Promise<void> {
-  if (typeof category !== "string" || !COLLECTION_CATEGORIES.has(category)) {
-    res.status(400).json({ claimed: false, coins: 0 });
-    return;
-  }
-  const required = Object.entries(CATALOGS.avatar)
-    .filter(
-      ([, item]) =>
-        item.category === category &&
-        item.price !== undefined &&
-        item.seasonal !== true,
-    )
-    .map(([id]) => id);
   const userRef = getAdminApp().firestore().collection("users").doc(uid);
   try {
     let claimed = false;
@@ -65,16 +64,16 @@ async function claimAvatarCollection(
         claimed = false;
         const data = (await tx.get(userRef)).data() ?? {};
         const owned =
-          (data["ownedCostumes"] as Record<string, true> | undefined) ?? {};
+          (data[ownedField] as Record<string, true> | undefined) ?? {};
         const done =
           (data["claimedCollections"] as Record<string, true> | undefined) ??
           {};
-        if (done[category] === true) return;
+        if (done[claimKey] === true) return;
         if (!required.every((id) => owned[id] === true)) return;
         tx.set(
           userRef,
           {
-            claimedCollections: { [category]: true },
+            claimedCollections: { [claimKey]: true },
             coins: admin.firestore.FieldValue.increment(COLLECTION_REWARD),
           },
           { merge: true },
@@ -83,7 +82,7 @@ async function claimAvatarCollection(
       });
     res.status(200).json({ claimed, coins: claimed ? COLLECTION_REWARD : 0 });
   } catch (e) {
-    console.error("claim-reward (avatarCollection) failed:", e);
+    console.error("claim-reward (collection) failed:", e);
     res.status(500).json({ claimed: false, coins: 0 });
   }
 }
@@ -121,7 +120,38 @@ export default async function handler(
     category?: unknown;
   };
   if (body.type === "avatarCollection") {
-    await claimAvatarCollection(auth.uid, body.category, res);
+    const category = body.category;
+    if (typeof category !== "string" || !COLLECTION_CATEGORIES.has(category)) {
+      res.status(400).json({ claimed: false, coins: 0 });
+      return;
+    }
+    const required = Object.entries(CATALOGS.avatar)
+      .filter(
+        ([, item]) =>
+          item.category === category &&
+          item.price !== undefined &&
+          item.seasonal !== true,
+      )
+      .map(([id]) => id);
+    await claimCollection(auth.uid, category, "ownedCostumes", required, res);
+    return;
+  }
+  if (body.type === "shopCollection") {
+    const shop = body.category as ShopId;
+    if (typeof shop !== "string" || !COLLECTION_SHOPS.has(shop)) {
+      res.status(400).json({ claimed: false, coins: 0 });
+      return;
+    }
+    const required = Object.entries(CATALOGS[shop])
+      .filter(([, item]) => item.price !== undefined && item.seasonal !== true)
+      .map(([id]) => id);
+    await claimCollection(
+      auth.uid,
+      `shop-${shop}`,
+      OWNED_FIELD[shop],
+      required,
+      res,
+    );
     return;
   }
   if (

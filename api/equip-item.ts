@@ -2,8 +2,16 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
+import { qualifiesForAchievement } from "./_lib/achievements.js";
 import { verifyStudent } from "./_lib/auth.js";
-import { CATALOGS } from "./_lib/catalogs.js";
+import {
+  CATALOGS,
+  FREE_KEYBOARD_STYLES,
+  OWNED_FIELD,
+  SELECTED_FIELD,
+  ShopId,
+  TITLE_ACHIEVEMENTS,
+} from "./_lib/catalogs.js";
 
 const AVATAR_CATEGORIES = new Set([
   "color",
@@ -24,6 +32,51 @@ const HOUSE_THEME_IDS = new Set([
   "candy",
   "meadow",
 ]);
+
+/** Shops whose pick a saved setup / surprise covers. */
+const SETUP_SHOPS = [
+  "hands",
+  "rgbPalette",
+  "keypressEffect",
+  "caretEffect",
+  "backdrop",
+] as const satisfies readonly ShopId[];
+type SetupShop = (typeof SETUP_SHOPS)[number];
+
+function setupField(shop: SetupShop): string {
+  const field = SELECTED_FIELD[shop];
+  if (field === undefined) throw new Error(`No selected field for ${shop}`);
+  return field;
+}
+
+function ownsShopItem(
+  data: Record<string, unknown>,
+  shop: ShopId,
+  id: unknown,
+): id is string {
+  if (typeof id !== "string") return false;
+  const item = CATALOGS[shop][id];
+  if (item === undefined) return false;
+  if (item.price === undefined && item.requiresAchievement === undefined) {
+    return true;
+  }
+  const owned = data[OWNED_FIELD[shop]] as Record<string, true> | undefined;
+  return owned?.[id] === true;
+}
+
+function ownsKeyboardStyle(
+  data: Record<string, unknown>,
+  style: unknown,
+): style is string {
+  if (typeof style !== "string") return false;
+  return (
+    FREE_KEYBOARD_STYLES.has(style) || ownsShopItem(data, "keyboardSkin", style)
+  );
+}
+
+function pickRandom<T>(items: T[]): T | undefined {
+  return items[Math.floor(Math.random() * items.length)];
+}
 
 function avatarItemShape(id: string): string {
   for (const shape of ["square", "oval", "hexagon", "cloud"]) {
@@ -58,9 +111,94 @@ export default async function handler(
   const userRef = app.firestore().collection("users").doc(auth.uid);
 
   try {
-    await app.firestore().runTransaction(async (tx) => {
+    const result = await app.firestore().runTransaction<{
+      keyboardStyle?: string;
+    }>(async (tx) => {
       const snap = await tx.get(userRef);
       const data = snap.exists ? (snap.data() ?? {}) : {};
+
+      if (body.target === "title") {
+        if (body.itemId === null) {
+          tx.set(
+            userRef,
+            { selectedTitle: admin.firestore.FieldValue.delete() },
+            { merge: true },
+          );
+          return {};
+        }
+        const achievement =
+          typeof body.itemId === "string"
+            ? TITLE_ACHIEVEMENTS[body.itemId]
+            : undefined;
+        if (achievement === undefined) throw new Error("Invalid title");
+        if (!qualifiesForAchievement(data, achievement)) {
+          throw new Error("Item not owned");
+        }
+        tx.set(userRef, { selectedTitle: body.itemId }, { merge: true });
+        return {};
+      }
+
+      if (body.target === "saveSetup") {
+        if (typeof body.slot !== "string" || !OUTFIT_SLOTS.has(body.slot)) {
+          throw new Error("Invalid setup slot");
+        }
+        if (!snap.exists) throw new Error("Invalid setup slot");
+        const setup: Record<string, string> = {};
+        if (ownsKeyboardStyle(data, body.itemId)) {
+          setup["keyboardStyle"] = body.itemId;
+        }
+        for (const shop of SETUP_SHOPS) {
+          const picked = data[setupField(shop)];
+          if (ownsShopItem(data, shop, picked)) setup[shop] = picked;
+        }
+        tx.update(userRef, { [`savedSetups.${body.slot}`]: setup });
+        return {};
+      }
+
+      if (body.target === "wearSetup" || body.target === "surpriseLook") {
+        let wanted: Record<string, unknown>;
+        if (body.target === "wearSetup") {
+          if (typeof body.slot !== "string" || !OUTFIT_SLOTS.has(body.slot)) {
+            throw new Error("Invalid setup slot");
+          }
+          const saved = (
+            data["savedSetups"] as Record<string, unknown> | undefined
+          )?.[body.slot];
+          if (typeof saved !== "object" || saved === null) {
+            throw new Error("Invalid setup slot");
+          }
+          wanted = saved as Record<string, unknown>;
+        } else {
+          wanted = {
+            keyboardStyle: pickRandom(
+              [
+                ...FREE_KEYBOARD_STYLES,
+                ...Object.keys(CATALOGS.keyboardSkin),
+              ].filter((id) => ownsKeyboardStyle(data, id)),
+            ),
+          };
+          for (const shop of SETUP_SHOPS) {
+            wanted[shop] = pickRandom(
+              Object.keys(CATALOGS[shop]).filter((id) =>
+                ownsShopItem(data, shop, id),
+              ),
+            );
+          }
+        }
+        // Pieces sold or no longer owned are skipped, leaving that pick as is.
+        const update: Record<string, string> = {};
+        for (const shop of SETUP_SHOPS) {
+          if (ownsShopItem(data, shop, wanted[shop])) {
+            update[setupField(shop)] = wanted[shop];
+          }
+        }
+        if (Object.keys(update).length > 0) {
+          tx.set(userRef, update, { merge: true });
+        }
+        return ownsKeyboardStyle(data, wanted["keyboardStyle"])
+          ? { keyboardStyle: wanted["keyboardStyle"] }
+          : {};
+      }
 
       if (body.target === "avatar") {
         if (
@@ -88,7 +226,7 @@ export default async function handler(
           },
           { merge: true },
         );
-        return;
+        return {};
       }
 
       if (
@@ -120,7 +258,7 @@ export default async function handler(
               shape,
             },
           });
-          return;
+          return {};
         }
 
         let wanted: Record<string, unknown>;
@@ -181,7 +319,7 @@ export default async function handler(
           },
           { merge: true },
         );
-        return;
+        return {};
       }
 
       if (body.target === "animalAvatar") {
@@ -207,7 +345,7 @@ export default async function handler(
           },
           { merge: true },
         );
-        return;
+        return {};
       }
 
       if (body.target === "houseTheme") {
@@ -223,7 +361,7 @@ export default async function handler(
           throw new Error("Item not owned");
         }
         tx.set(userRef, { houseTheme: body.itemId }, { merge: true });
-        return;
+        return {};
       }
 
       if (body.target === "avatarShape") {
@@ -249,12 +387,12 @@ export default async function handler(
           },
           { merge: true },
         );
-        return;
+        return {};
       }
 
       throw new Error("Unknown equip target");
     });
-    res.status(200).json({ ok: true });
+    res.status(200).json({ ok: true, ...result });
   } catch (e) {
     const reason = e instanceof Error ? e.message : "Something went wrong";
     if (

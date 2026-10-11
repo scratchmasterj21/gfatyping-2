@@ -14,9 +14,11 @@ import {
   KeypressEffectItem,
   KeypressEffectItemId,
 } from "./keypress-effect-items";
+import { claimedFromDoc } from "../utils/shop-collections";
 
 export type KeypressEffectState = {
   coins: number;
+  claimedCollections?: Record<string, true>;
   ownedEffects: Record<string, true>;
   selectedEffect: KeypressEffectItemId;
 };
@@ -35,6 +37,7 @@ export async function getKeypressEffectState(
       const stored = data["selectedKeypressEffect"] as string | undefined;
       return {
         coins: (data["coins"] as number | undefined) ?? 0,
+        claimedCollections: claimedFromDoc(data),
         ownedEffects:
           (data["ownedKeypressEffects"] as Record<string, true> | undefined) ??
           {},

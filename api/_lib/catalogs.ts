@@ -16,7 +16,7 @@ export type CatalogItem = {
   requiresAchievement?: string;
   /** Avatar only - which equip slot this item occupies. */
   category?: string;
-  /** Avatar only - only sold some months, so it doesn't count toward collections. */
+  /** Only sold some months, so it doesn't count toward collections. */
   seasonal?: true;
 };
 
@@ -54,6 +54,23 @@ export const SELECTED_FIELD: Partial<Record<ShopId, string>> = {
   caretEffect: "selectedCaretEffect",
   backdrop: "selectedBackdrop",
   animalAvatar: "equippedAnimalAvatar",
+};
+
+/** Keyboard styles everyone has; skins (CATALOGS.keyboardSkin) must be owned. */
+export const FREE_KEYBOARD_STYLES: ReadonlySet<string> = new Set([
+  "flat",
+  "cartoon",
+  "modern",
+  "marble",
+  "rgb",
+]);
+
+/** Title id -> achievement that unlocks it. Mirrors frontend titles/titles.ts. */
+export const TITLE_ACHIEVEMENTS: Readonly<Record<string, string>> = {
+  speedy: "speed-50",
+  "accuracy-ace": "accuracy-perfect",
+  "streak-star": "streak-30",
+  "streak-legend": "streak-60",
 };
 
 export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
@@ -299,18 +316,31 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
   keyboardSkin: {
     wood: { price: 50 },
     glass: { price: 60 },
+    candy: { price: 60 },
+    jungle: { price: 60 },
+    neon: { price: 80 },
+    space: { price: 80 },
+    pumpkin: { price: 60, seasonal: true },
   },
   keypressEffect: {
     none: {},
     spark: { price: 30 },
     ripple: { price: 30 },
     confetti: { price: 50 },
+    stars: { price: 40 },
+    hearts: { price: 40 },
+    bubbles: { price: 40 },
+    snow: { price: 40, seasonal: true },
   },
   caretEffect: {
     none: {},
     glow: { price: 30 },
     comet: { price: 40 },
     sparkle: { price: 40 },
+    rainbow: { price: 50 },
+    heartbeat: { price: 40 },
+    fire: { price: 50 },
+    sakura: { price: 40, seasonal: true },
   },
   backdrop: {
     none: {},

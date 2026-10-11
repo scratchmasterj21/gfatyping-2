@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/solid-query";
-import { For, JSXElement, Show } from "solid-js";
+import { JSXElement } from "solid-js";
 
 import {
   keyboardStyle,
   setKeyboardStyle,
 } from "../../components/pages/test/AnimatedHands";
-import { useBuyGuard } from "../../hooks/useBuyGuard";
 import {
   KEYBOARD_SKIN_ITEMS,
   KeyboardSkinItem,
@@ -17,18 +16,11 @@ import {
 import { queryClient } from "../../queries";
 import { getUserId } from "../../states/core";
 import { showErrorNotification } from "../../states/notifications";
-import { cn } from "../../utils/cn";
-import { AnimatedModal } from "../common/AnimatedModal";
-import { Fa } from "../common/Fa";
-
-const PREVIEW_COLORS: Record<string, string> = {
-  wood: "#8b5a2b",
-  glass: "#7fb3d5",
-};
+import { CosmeticShop } from "../common/CosmeticShop";
+import { SkinKeyboardPreview } from "../common/SkinKeyboardPreview";
+import { shopCollection } from "../../utils/shop-collections";
 
 export function KeyboardSkinShopModal(): JSXElement {
-  const { pendingId, guardedBuy } = useBuyGuard();
-
   const stateQuery = useQuery(() => ({
     queryKey: ["keyboardSkinState", getUserId()],
     queryFn: async () => {
@@ -36,111 +28,46 @@ export function KeyboardSkinShopModal(): JSXElement {
       if (uid === null) return { coins: 0, ownedSkins: {} };
       return getKeyboardSkinState(uid);
     },
-    staleTime: 0,
+    staleTime: 60 * 1000,
   }));
 
   const refresh = (): void => {
     void queryClient.invalidateQueries({ queryKey: ["keyboardSkinState"] });
   };
 
-  const isOwned = (id: string): boolean =>
-    stateQuery.data?.ownedSkins[id] === true;
-
-  const isSelected = (id: string): boolean => keyboardStyle() === id;
-
-  const handleBuy = async (item: KeyboardSkinItem): Promise<void> => {
+  const handleBuy = async (item: KeyboardSkinItem): Promise<boolean> => {
     const uid = getUserId();
-    if (uid === null) return;
+    if (uid === null) return false;
     const result = await buyKeyboardSkin(uid, item);
     if (!result.ok) {
       showErrorNotification(result.reason ?? "Couldn't buy that");
-      return;
+      return false;
     }
     setKeyboardStyle(item.id);
     refresh();
+    return true;
   };
 
   return (
-    <AnimatedModal id="KeyboardSkinShop" title="Keyboard Skins">
-      <div class="grid gap-4">
-        <div class="flex items-center justify-center gap-2 text-lg font-bold text-main">
-          <Fa icon="fa-coins" />
-          {stateQuery.data?.coins ?? 0}
-        </div>
-
-        <p class="text-center text-em-xs text-sub">
-          Choose a keyboard. Buy it once, then select it whenever you want.
-        </p>
-
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <For each={KEYBOARD_SKIN_ITEMS}>
-            {(item) => {
-              const owned = (): boolean => isOwned(item.id);
-              const selected = (): boolean => isSelected(item.id);
-              const canAfford = (): boolean =>
-                (stateQuery.data?.coins ?? 0) >= item.price;
-              return (
-                <div
-                  class={cn(
-                    "flex flex-col items-center gap-1.5 rounded p-3 shadow-sm",
-                    selected() ? "bg-main text-bg" : "bg-sub-alt text-text",
-                  )}
-                >
-                  <div
-                    class="h-10 w-10 rounded"
-                    style={{ "background-color": PREVIEW_COLORS[item.id] }}
-                  ></div>
-                  <span class="text-center text-sm font-medium">
-                    {item.name}
-                  </span>
-                  <span class="text-center text-em-xs opacity-80">
-                    {item.description}
-                  </span>
-                  <Show
-                    when={!owned()}
-                    fallback={
-                      <Show
-                        when={!selected()}
-                        fallback={
-                          <span class="flex items-center gap-1 text-em-xs">
-                            <Fa icon="fa-check" size={0.7} /> selected
-                          </span>
-                        }
-                      >
-                        <button
-                          type="button"
-                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={pendingId() !== null}
-                          onClick={() => setKeyboardStyle(item.id)}
-                        >
-                          select
-                        </button>
-                      </Show>
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford() || pendingId() !== null}
-                      onClick={() =>
-                        void guardedBuy(item.id, async () => handleBuy(item))
-                      }
-                    >
-                      <Show
-                        when={pendingId() !== item.id}
-                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
-                      >
-                        <Fa icon="fa-coins" size={0.7} />
-                      </Show>
-                      {canAfford() ? item.price : "Not enough coins"}
-                    </button>
-                  </Show>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    </AnimatedModal>
+    <CosmeticShop
+      id="KeyboardSkinShop"
+      title="Keyboard Skins"
+      items={KEYBOARD_SKIN_ITEMS}
+      coins={stateQuery.data?.coins ?? 0}
+      isOwned={(id) => stateQuery.data?.ownedSkins[id] === true}
+      collection={shopCollection(
+        "keyboardSkin",
+        KEYBOARD_SKIN_ITEMS,
+        (id) => stateQuery.data?.ownedSkins[id] === true,
+        stateQuery.data?.claimedCollections,
+      )}
+      isSelected={(id) => keyboardStyle() === id}
+      thumb={(item) => <SkinKeyboardPreview skin={item.id} class="w-28" />}
+      preview={(item) => (
+        <SkinKeyboardPreview skin={item.id} class="w-full max-w-sm" />
+      )}
+      onBuy={handleBuy}
+      onSelect={setKeyboardStyle}
+    />
   );
 }

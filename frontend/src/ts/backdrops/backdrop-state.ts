@@ -14,9 +14,11 @@ import {
   BackdropItemId,
   isBackdropItemId,
 } from "./backdrop-items";
+import { claimedFromDoc } from "../utils/shop-collections";
 
 export type BackdropState = {
   coins: number;
+  claimedCollections?: Record<string, true>;
   ownedBackdrops: Record<string, true>;
   selectedBackdrop: BackdropItemId;
 };
@@ -33,6 +35,7 @@ export async function getBackdropState(uid: string): Promise<BackdropState> {
       const stored = data["selectedBackdrop"] as string | undefined;
       return {
         coins: (data["coins"] as number | undefined) ?? 0,
+        claimedCollections: claimedFromDoc(data),
         ownedBackdrops:
           (data["ownedBackdrops"] as Record<string, true> | undefined) ?? {},
         selectedBackdrop:

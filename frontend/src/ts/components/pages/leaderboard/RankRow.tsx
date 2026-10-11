@@ -12,6 +12,7 @@ import { getFormatting, getUserId } from "../../../states/core";
 import { cn } from "../../../utils/cn";
 import { secondsToString } from "../../../utils/date-and-time";
 import { abbreviateNumber } from "../../../utils/numbers";
+import { TitleBadge } from "../../common/TitleBadge";
 import { User } from "../../common/User";
 import { RankDisplay } from "./RankDisplay";
 
@@ -33,7 +34,15 @@ export function RankRow(props: {
   highlightColor?: string;
   class?: string;
   dataRankUser?: boolean;
+  /** Overrides the entry's own title (e.g. from an already-loaded avatar). */
+  titleId?: string;
 }): JSXElement {
+  const titleId = (): string | undefined => {
+    if (props.titleId !== undefined) return props.titleId;
+    if (props.variant.kind !== "entry") return undefined;
+    const entry = props.variant.entry as { title?: unknown };
+    return typeof entry.title === "string" ? entry.title : undefined;
+  };
   const isSelf = (): boolean => {
     const uid =
       props.variant.kind === "entry"
@@ -140,6 +149,7 @@ export function RankRow(props: {
           />
         )}
       </Show>
+      <TitleBadge titleId={titleId()} class="hidden sm:inline-flex" />
       <div class="shrink-0 text-right">
         <div class="font-semibold text-text">{stats().primary}</div>
         <Show when={stats().secondary !== undefined}>

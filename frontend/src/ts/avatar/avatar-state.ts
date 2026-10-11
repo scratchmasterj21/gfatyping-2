@@ -4,6 +4,7 @@ import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { AvatarCategory, AvatarItem, AvatarShape } from "./avatar-items";
+import { findTitle } from "../titles/titles";
 import { EquippedAvatar, equippedFromDoc } from "./equipped-from-doc";
 
 export type AvatarState = {
@@ -16,6 +17,9 @@ export type AvatarState = {
   savedOutfits?: Partial<Record<string, SavedOutfit>>;
   /** Avatar categories whose collection reward was already paid out. */
   claimedCollections?: Record<string, true>;
+  /** Keyboard/effects setups (see look/look-setups.ts), read here to share this doc read. */
+  savedSetups?: Partial<Record<string, Record<string, string>>>;
+  title?: string;
 };
 
 /** Snapshot of a look, stored server-side under users/{uid}.savedOutfits[slot]. */
@@ -78,6 +82,11 @@ export async function getAvatarState(uid: string): Promise<AvatarState> {
         claimedCollections:
           (data["claimedCollections"] as Record<string, true> | undefined) ??
           {},
+        savedSetups:
+          (data["savedSetups"] as
+            | Partial<Record<string, Record<string, string>>>
+            | undefined) ?? {},
+        title: findTitle(data["selectedTitle"])?.id,
       };
     }
   } catch (e) {
@@ -159,6 +168,12 @@ export async function saveOutfit(slot: string): Promise<void> {
 /** Puts on a saved outfit; pieces no longer owned are skipped server-side. */
 export async function wearOutfit(slot: string): Promise<void> {
   await callApi("/api/equip-item", { target: "wearOutfit", slot });
+}
+
+/** Shows an earned title on leaderboards; null takes it off. Checked server-side. */
+export async function setTitle(titleId: string | null): Promise<void> {
+  await callApi("/api/equip-item", { target: "title", itemId: titleId });
+  invalidateCoinQueries();
 }
 
 /** Pays the one-time bonus for owning every item in a category. */

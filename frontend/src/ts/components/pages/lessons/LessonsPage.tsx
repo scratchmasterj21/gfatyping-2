@@ -120,6 +120,7 @@ import { LessonCard } from "./LessonCard";
 import { LessonGroupSection } from "./LessonGroupSection";
 import { LessonHero } from "./LessonHero";
 import { LessonsCollapsibleHeader } from "./LessonsCollapsibleHeader";
+import { LookSetupsBar } from "./LookSetupsBar";
 import { StickerBook } from "./StickerBook";
 
 const allCheckpoints = continueOrder.filter(
@@ -530,6 +531,7 @@ function ClassLeaderboard(props: {
                   }}
                   selfUid={props.selfUid}
                   highlightColor={highlight()}
+                  titleId={highlightQuery.data?.title}
                 />
               );
             }}
@@ -1677,7 +1679,7 @@ export function LessonsPage(): JSXElement {
               <div class="flex flex-wrap items-center gap-2">
                 <span class="mr-1 flex items-center gap-2 font-bold text-text">
                   <Fa icon="fa-store" class="text-main" />
-                  Shop
+                  My Look
                 </span>
                 <For each={SHOP_TABS}>
                   {(tab) => (
@@ -1711,6 +1713,11 @@ export function LessonsPage(): JSXElement {
                   )}
                 </For>
               </div>
+              <Show when={shopTab() === "keyboard"}>
+                <LookSetupsBar
+                  savedSetups={avatarStateQuery.data?.savedSetups}
+                />
+              </Show>
             </section>
 
             <StickerBook

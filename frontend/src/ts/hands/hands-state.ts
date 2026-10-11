@@ -10,9 +10,11 @@ import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { HandStyle, HandStyleId, isHandStyleId } from "./hand-styles";
+import { claimedFromDoc } from "../utils/shop-collections";
 
 export type HandsState = {
   coins: number;
+  claimedCollections?: Record<string, true>;
   ownedStyles: Record<string, true>;
   selectedStyle: HandStyleId;
 };
@@ -29,6 +31,7 @@ export async function getHandsState(uid: string): Promise<HandsState> {
       const storedStyle = data["selectedHandStyle"] as string | undefined;
       return {
         coins: (data["coins"] as number | undefined) ?? 0,
+        claimedCollections: claimedFromDoc(data),
         ownedStyles:
           (data["ownedHandStyles"] as Record<string, true> | undefined) ?? {},
         selectedStyle:

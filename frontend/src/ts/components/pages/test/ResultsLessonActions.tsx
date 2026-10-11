@@ -11,6 +11,7 @@ import {
 import { getResultVisible } from "../../../states/test";
 import { StudentPageHeader } from "../../common/StudentPageHeader";
 import { LessonKeyHeatmap } from "./LessonKeyHeatmap";
+import { LessonPetCheer } from "./LessonPetCheer";
 
 export function ResultsLessonActions(): JSXElement {
   const [title, setTitle] = createSignal("Nice work!");
@@ -42,6 +43,7 @@ export function ResultsLessonActions(): JSXElement {
           title={title()}
           subtitle={subtitle()}
         />
+        <LessonPetCheer enabled={show()} />
         <Show when={keyStats()}>
           {(stats) => <LessonKeyHeatmap stats={stats()} />}
         </Show>

@@ -13,6 +13,7 @@ import { getUserId } from "../../states/core";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import { AnimatedModal } from "../common/AnimatedModal";
+import { BuyButton } from "../common/BuyButton";
 import { Fa } from "../common/Fa";
 import { PetSprite } from "../common/PetSprite";
 
@@ -26,7 +27,7 @@ export function PetShopModal(): JSXElement {
       if (uid === null) return { coins: 0, ownedPets: {}, storedPets: {} };
       return getPetState(uid);
     },
-    staleTime: 0,
+    staleTime: 60_000,
   }));
 
   const refresh = (): void => {
@@ -73,8 +74,6 @@ export function PetShopModal(): JSXElement {
             {(item) => {
               const owned = (): boolean => isOwned(item.id);
               const stored = (): boolean => isStored(item.id);
-              const canAfford = (): boolean =>
-                (stateQuery.data?.coins ?? 0) >= item.price;
               return (
                 <div
                   class={cn(
@@ -116,22 +115,15 @@ export function PetShopModal(): JSXElement {
                       </button>
                     }
                   >
-                    <button
-                      type="button"
-                      class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford() || pendingId() !== null}
-                      onClick={() =>
+                    <BuyButton
+                      price={item.price}
+                      coins={stateQuery.data?.coins ?? 0}
+                      busy={pendingId() === item.id}
+                      locked={pendingId() !== null}
+                      onBuy={() =>
                         void guardedBuy(item.id, async () => handleBuy(item))
                       }
-                    >
-                      <Show
-                        when={pendingId() !== item.id}
-                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
-                      >
-                        <Fa icon="fa-coins" size={0.7} />
-                      </Show>
-                      {canAfford() ? item.price : "Not enough coins"}
-                    </button>
+                    />
                   </Show>
                 </div>
               );

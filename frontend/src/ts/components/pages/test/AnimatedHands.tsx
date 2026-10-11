@@ -26,6 +26,10 @@ import { getBackdropState } from "../../../backdrops/backdrop-state";
 import { getConfig } from "../../../config/store";
 import { HandStyleId } from "../../../hands/hand-styles";
 import { getHandsState } from "../../../hands/hands-state";
+import {
+  KEYBOARD_SKIN_ITEMS,
+  KeyboardSkinItemId,
+} from "../../../keyboard-skins/keyboard-skin-items";
 import { KeypressEffectItemId } from "../../../keypress-effects/keypress-effect-items";
 import { getKeypressEffectState } from "../../../keypress-effects/keypress-effect-state";
 import { fingerForChar, Finger } from "../../../lessons/finger-map";
@@ -275,9 +279,6 @@ const RGB_KEYBOARD_SVGS: Record<RgbPaletteItemId, string> = Object.fromEntries(
   ]),
 ) as Record<RgbPaletteItemId, string>;
 
-const woodKeyboardSvgRaw = generateSkinKeyboardSvg("wood");
-const glassKeyboardSvgRaw = generateSkinKeyboardSvg("glass");
-
 type StyleConfig = {
   svgRaw: string;
   /** CSS aspect-ratio value matching the SVG viewBox */
@@ -340,22 +341,20 @@ const STYLE_CONFIG: Record<KeyboardStyle, StyleConfig> = {
     edcSt1Css: "",
     hands: { width: "82.06%", left: "4.95%", top: "-40.69%" },
   },
-  wood: {
-    svgRaw: woodKeyboardSvgRaw,
-    aspectRatio: "658 / 238",
-    activeKeySelector: RGB_SELECTOR,
-    fingerCss: RGB_FINGER_CSS,
-    edcSt1Css: "",
-    hands: { width: "82.06%", left: "4.95%", top: "-40.69%" },
-  },
-  glass: {
-    svgRaw: glassKeyboardSvgRaw,
-    aspectRatio: "658 / 238",
-    activeKeySelector: RGB_SELECTOR,
-    fingerCss: RGB_FINGER_CSS,
-    edcSt1Css: "",
-    hands: { width: "82.06%", left: "4.95%", top: "-40.69%" },
-  },
+  // Skins share the RGB board's geometry, just recolored.
+  ...(Object.fromEntries(
+    KEYBOARD_SKIN_ITEMS.map((skin) => [
+      skin.id,
+      {
+        svgRaw: generateSkinKeyboardSvg(skin.id),
+        aspectRatio: "658 / 238",
+        activeKeySelector: RGB_SELECTOR,
+        fingerCss: RGB_FINGER_CSS,
+        edcSt1Css: "",
+        hands: { width: "82.06%", left: "4.95%", top: "-40.69%" },
+      },
+    ]),
+  ) as Record<KeyboardSkinItemId, StyleConfig>),
 };
 
 // Pre-crop the hands SVG viewBox at module load time to remove empty whitespace.
@@ -397,6 +396,9 @@ const KEYPRESS_EFFECT_CSS = `
   .kp-burst-ripple{width:24px;height:24px;border-radius:50%;border:2px solid var(--main-color);animation:kp-ripple 450ms ease-out forwards;}
   @keyframes kp-confetti{0%{transform:translate(-50%,-50%) scale(1);opacity:1}100%{transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.3);opacity:0}}
   .kp-confetti-piece{position:absolute;width:5px;height:5px;border-radius:1px;animation:kp-confetti 500ms ease-out forwards;}
+  .kp-glyph-piece{position:absolute;font-size:12px;line-height:1;animation:kp-confetti 600ms ease-out forwards;}
+  @keyframes kp-bubble{0%{opacity:0.9;transform:translate(-50%,-50%) scale(0.4)}100%{opacity:0;transform:translate(-50%,-180%) scale(1.3)}}
+  .kp-burst-bubbles{width:16px;height:16px;border-radius:50%;border:2px solid var(--main-color);background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.7) 0%, transparent 45%);animation:kp-bubble 600ms ease-out forwards;}
 `;
 
 const CONFETTI_PARTICLES = [
@@ -406,6 +408,31 @@ const CONFETTI_PARTICLES = [
   { dx: -26, dy: 10, color: "#22c55e" },
   { dx: 0, dy: -28, color: "#3b82f6" },
 ];
+
+type Particle = { dx: number; dy: number; color: string; glyph?: string };
+
+/** Effects drawn as scattering pieces; the rest are one CSS burst class. */
+const PARTICLE_EFFECTS: Partial<Record<KeypressEffectItemId, Particle[]>> = {
+  confetti: CONFETTI_PARTICLES,
+  stars: [
+    { dx: 20, dy: -20, color: "#facc15", glyph: "★" },
+    { dx: -20, dy: -20, color: "#fde047", glyph: "★" },
+    { dx: 0, dy: -30, color: "#eab308", glyph: "★" },
+    { dx: 24, dy: 6, color: "#fde047", glyph: "✦" },
+    { dx: -24, dy: 6, color: "#facc15", glyph: "✦" },
+  ],
+  hearts: [
+    { dx: 14, dy: -26, color: "#ec4899", glyph: "♥" },
+    { dx: -14, dy: -26, color: "#f472b6", glyph: "♥" },
+    { dx: 0, dy: -34, color: "#ef4444", glyph: "♥" },
+  ],
+  snow: [
+    { dx: 18, dy: 22, color: "#e0f2fe", glyph: "❄" },
+    { dx: -18, dy: 22, color: "#bae6fd", glyph: "❄" },
+    { dx: 6, dy: 30, color: "#f0f9ff", glyph: "❅" },
+    { dx: -6, dy: -20, color: "#e0f2fe", glyph: "❆" },
+  ],
+};
 
 type Burst = {
   id: number;
@@ -570,7 +597,7 @@ export function AnimatedHands(): JSXElement {
     ]);
     setTimeout(() => {
       setBursts((prev) => prev.filter((b) => b.id !== id));
-    }, 550);
+    }, 650);
   });
 
   createEffect(() => {
@@ -744,21 +771,41 @@ export function AnimatedHands(): JSXElement {
                 }}
               >
                 <Show
-                  when={burst.effect === "confetti"}
+                  when={PARTICLE_EFFECTS[burst.effect]}
                   fallback={<div class={`kp-burst-${burst.effect}`}></div>}
                 >
-                  <For each={CONFETTI_PARTICLES}>
-                    {(p) => (
-                      <div
-                        class="kp-confetti-piece"
-                        style={{
-                          "--dx": `${p.dx}px`,
-                          "--dy": `${p.dy}px`,
-                          "background-color": p.color,
-                        }}
-                      ></div>
-                    )}
-                  </For>
+                  {(particles) => (
+                    <For each={particles()}>
+                      {(p) => (
+                        <Show
+                          when={p.glyph}
+                          fallback={
+                            <div
+                              class="kp-confetti-piece"
+                              style={{
+                                "--dx": `${p.dx}px`,
+                                "--dy": `${p.dy}px`,
+                                "background-color": p.color,
+                              }}
+                            ></div>
+                          }
+                        >
+                          {(glyph) => (
+                            <div
+                              class="kp-glyph-piece"
+                              style={{
+                                "--dx": `${p.dx}px`,
+                                "--dy": `${p.dy}px`,
+                                color: p.color,
+                              }}
+                            >
+                              {glyph()}
+                            </div>
+                          )}
+                        </Show>
+                      )}
+                    </For>
+                  )}
                 </Show>
               </div>
             )}

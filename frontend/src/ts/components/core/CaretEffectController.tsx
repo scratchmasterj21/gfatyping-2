@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/solid-query";
 import { createEffect, JSXElement } from "solid-js";
 
-import { CaretEffectItemId } from "../../caret-effects/caret-effect-items";
+import {
+  CARET_EFFECT_ITEMS,
+  CaretEffectItemId,
+} from "../../caret-effects/caret-effect-items";
 import { getCaretEffectState } from "../../caret-effects/caret-effect-state";
 import { getActivePage, getUserId } from "../../states/core";
 
-const FX_CLASSES = ["fx-glow", "fx-comet", "fx-sparkle"];
+const FX_CLASSES = CARET_EFFECT_ITEMS.filter((e) => e.id !== "none").map(
+  (e) => `fx-${e.id}`,
+);
 
 /**
  * Non-visual - just adds/removes a cosmetic class on the existing #caret

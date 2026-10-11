@@ -4,9 +4,11 @@ import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { KeyboardSkinItem } from "./keyboard-skin-items";
+import { claimedFromDoc } from "../utils/shop-collections";
 
 export type KeyboardSkinState = {
   coins: number;
+  claimedCollections?: Record<string, true>;
   ownedSkins: Record<string, true>;
 };
 
@@ -28,6 +30,7 @@ export async function getKeyboardSkinState(
       const data = snap.data();
       return {
         coins: (data["coins"] as number | undefined) ?? 0,
+        claimedCollections: claimedFromDoc(data),
         ownedSkins:
           (data["ownedKeyboardSkins"] as Record<string, true> | undefined) ??
           {},

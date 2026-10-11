@@ -46,6 +46,7 @@ type StoredUserDoc = {
   uid?: string;
   name?: string;
   avatarUrl?: string;
+  selectedTitle?: string;
   xp?: number;
   classId?: string;
   personalBests?: { time?: Record<string, StoredPersonalBest[]> };
@@ -130,6 +131,7 @@ function rankStudents(
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
         bestRaceWpm: d.raceBestWpm ?? 0,
         bestRaceAcc: d.raceBestWpmAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
@@ -151,6 +153,7 @@ function rankStudents(
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
         bestRaceWpm: d.raceBestAccWpm ?? 0,
         bestRaceAcc: d.raceBestAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
@@ -186,6 +189,7 @@ function rankStudents(
         consistency: x.best.consistency,
         timestamp: x.best.timestamp,
         avatarUrl: x.d.avatarUrl,
+        title: x.d.selectedTitle,
       }));
     const entries = competitionRank(ranked, (d) => d.wpm);
     return { count: entries.length, pageSize: entries.length, entries };
@@ -202,6 +206,7 @@ function rankStudents(
         timeTypedSeconds: 0,
         lastActivityTimestamp: d.streak?.lastResultTimestamp ?? 0,
         avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
       }));
     const entries = competitionRank(ranked, (d) => d.totalXp);
     return { count: entries.length, pageSize: entries.length, entries };
@@ -221,6 +226,7 @@ function rankStudents(
       timeTypedSeconds: 0,
       lastActivityTimestamp: d.weeklyPeriod?.lastActivityTimestamp ?? 0,
       avatarUrl: d.avatarUrl,
+      title: d.selectedTitle,
     }));
   const entries = competitionRank(ranked, (d) => d.totalXp);
   return { count: entries.length, pageSize: entries.length, entries };

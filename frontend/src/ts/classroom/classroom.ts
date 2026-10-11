@@ -36,6 +36,7 @@ export type RaceLeaderboardEntry = {
   uid: string;
   name: string;
   avatarUrl?: string;
+  title?: string;
   bestRaceWpm: number;
   bestRaceAcc: number;
   totalRaces: number;
@@ -83,6 +84,7 @@ export type StoredUserDoc = {
   name?: string;
   email?: string;
   avatarUrl?: string;
+  selectedTitle?: string;
   xp?: number;
   classId?: string;
   timeTyping?: number;
@@ -253,6 +255,7 @@ export async function getClassroomLeaderboard(options: {
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
         bestRaceWpm: d.raceBestWpm ?? 0,
         bestRaceAcc: d.raceBestWpmAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
@@ -277,6 +280,7 @@ export async function getClassroomLeaderboard(options: {
         uid: d.uid,
         name: d.name ?? "",
         avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
         bestRaceWpm: d.raceBestAccWpm ?? 0,
         bestRaceAcc: d.raceBestAcc ?? 0,
         totalRaces: d.raceTotalRaces ?? 0,
@@ -308,9 +312,12 @@ export async function getClassroomLeaderboard(options: {
         consistency: x.best.consistency,
         timestamp: x.best.timestamp,
         avatarUrl: x.d.avatarUrl,
+        title: x.d.selectedTitle,
       }));
-    const ranked: (LeaderboardEntry & { avatarUrl?: string })[] =
-      competitionRank(sorted, (entry) => entry.wpm);
+    const ranked: (LeaderboardEntry & {
+      avatarUrl?: string;
+      title?: string;
+    })[] = competitionRank(sorted, (entry) => entry.wpm);
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
@@ -325,9 +332,12 @@ export async function getClassroomLeaderboard(options: {
         timeTypedSeconds: 0,
         lastActivityTimestamp: d.streak?.lastResultTimestamp ?? 0,
         avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
       }));
-    const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] =
-      competitionRank(sorted, (entry) => entry.totalXp);
+    const ranked: (XpLeaderboardEntry & {
+      avatarUrl?: string;
+      title?: string;
+    })[] = competitionRank(sorted, (entry) => entry.totalXp);
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
@@ -345,9 +355,12 @@ export async function getClassroomLeaderboard(options: {
       timeTypedSeconds: 0,
       lastActivityTimestamp: d.weeklyPeriod?.lastActivityTimestamp ?? 0,
       avatarUrl: d.avatarUrl,
+      title: d.selectedTitle,
     }));
-  const ranked: (XpLeaderboardEntry & { avatarUrl?: string })[] =
-    competitionRank(sorted, (entry) => entry.totalXp);
+  const ranked: (XpLeaderboardEntry & {
+    avatarUrl?: string;
+    title?: string;
+  })[] = competitionRank(sorted, (entry) => entry.totalXp);
   return { count: ranked.length, pageSize: ranked.length, entries: ranked };
 }
 

@@ -1,4 +1,12 @@
-export type CaretEffectItemId = "none" | "glow" | "comet" | "sparkle";
+export type CaretEffectItemId =
+  | "none"
+  | "glow"
+  | "comet"
+  | "sparkle"
+  | "rainbow"
+  | "heartbeat"
+  | "fire"
+  | "sakura";
 
 export type CaretEffectItem = {
   id: CaretEffectItemId;
@@ -6,6 +14,8 @@ export type CaretEffectItem = {
   description: string;
   /** Coin price. Omitted for the free default. */
   price?: number;
+  /** Months (1-12, Japan time) it's sold in; always kept once owned. */
+  seasonMonths?: number[];
 };
 
 export const CARET_EFFECT_ITEMS: CaretEffectItem[] = [
@@ -31,6 +41,31 @@ export const CARET_EFFECT_ITEMS: CaretEffectItem[] = [
     name: "Sparkle",
     description: "A twinkling shimmer around your caret.",
     price: 40,
+  },
+  {
+    id: "rainbow",
+    name: "Rainbow",
+    description: "A glow that cycles through every color.",
+    price: 50,
+  },
+  {
+    id: "heartbeat",
+    name: "Heartbeat",
+    description: "Your caret's glow beats like a heart.",
+    price: 40,
+  },
+  {
+    id: "fire",
+    name: "Fire",
+    description: "A flickering orange flame on your caret.",
+    price: 50,
+  },
+  {
+    id: "sakura",
+    name: "Sakura",
+    description: "Pink petals drift off your caret. Spring only!",
+    price: 40,
+    seasonMonths: [3, 4],
   },
 ];
 

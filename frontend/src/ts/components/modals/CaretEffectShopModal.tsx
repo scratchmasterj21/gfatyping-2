@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/solid-query";
-import { For, JSXElement, Show } from "solid-js";
+import { JSXElement } from "solid-js";
 
 import {
   CARET_EFFECT_ITEMS,
@@ -11,25 +11,27 @@ import {
   getCaretEffectState,
   selectCaretEffect,
 } from "../../caret-effects/caret-effect-state";
-import { useBuyGuard } from "../../hooks/useBuyGuard";
 import { queryClient } from "../../queries";
 import { getUserId } from "../../states/core";
 import { showErrorNotification } from "../../states/notifications";
 import { FaSolidIcon } from "../../types/font-awesome";
-import { cn } from "../../utils/cn";
-import { AnimatedModal } from "../common/AnimatedModal";
-import { Fa } from "../common/Fa";
+import { CosmeticShop } from "../common/CosmeticShop";
+import { EffectDemo } from "../common/EffectDemo";
+import { EffectThumb } from "../common/EffectThumb";
+import { shopCollection } from "../../utils/shop-collections";
 
-const PREVIEW_ICONS: Record<CaretEffectItemId, FaSolidIcon> = {
+export const CARET_EFFECT_ICONS: Record<CaretEffectItemId, FaSolidIcon> = {
   none: "fa-ban",
   glow: "fa-sun",
   comet: "fa-meteor",
   sparkle: "fa-magic",
+  rainbow: "fa-rainbow",
+  heartbeat: "fa-heartbeat",
+  fire: "fa-fire",
+  sakura: "fa-spa",
 };
 
 export function CaretEffectShopModal(): JSXElement {
-  const { pendingId, guardedBuy } = useBuyGuard();
-
   const stateQuery = useQuery(() => ({
     queryKey: ["caretEffectState", getUserId()],
     queryFn: async () => {
@@ -39,28 +41,23 @@ export function CaretEffectShopModal(): JSXElement {
       }
       return getCaretEffectState(uid);
     },
-    staleTime: 0,
+    staleTime: 60 * 1000,
   }));
 
   const refresh = (): void => {
     void queryClient.invalidateQueries({ queryKey: ["caretEffectState"] });
   };
 
-  const isOwned = (id: CaretEffectItemId): boolean =>
-    id === "none" || stateQuery.data?.ownedEffects[id] === true;
-
-  const isSelected = (id: CaretEffectItemId): boolean =>
-    (stateQuery.data?.selectedEffect ?? "none") === id;
-
-  const handleBuy = async (item: CaretEffectItem): Promise<void> => {
+  const handleBuy = async (item: CaretEffectItem): Promise<boolean> => {
     const uid = getUserId();
-    if (uid === null) return;
+    if (uid === null) return false;
     const result = await buyCaretEffect(uid, item);
     if (!result.ok) {
       showErrorNotification(result.reason ?? "Couldn't buy that");
-      return;
+      return false;
     }
     refresh();
+    return true;
   };
 
   const handleSelect = async (id: CaretEffectItemId): Promise<void> => {
@@ -71,87 +68,36 @@ export function CaretEffectShopModal(): JSXElement {
   };
 
   return (
-    <AnimatedModal id="CaretEffectShop" title="Caret Effects">
-      <div class="grid gap-4">
-        <div class="flex items-center justify-center gap-2 text-lg font-bold text-main">
-          <Fa icon="fa-coins" />
-          {stateQuery.data?.coins ?? 0}
-        </div>
-
-        <p class="text-center text-em-xs text-sub">
-          Choose an effect. Buy it once, then select it whenever you want.
-        </p>
-
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <For each={CARET_EFFECT_ITEMS}>
-            {(item) => {
-              const owned = (): boolean => isOwned(item.id);
-              const selected = (): boolean => isSelected(item.id);
-              const canAfford = (): boolean =>
-                (stateQuery.data?.coins ?? 0) >= (item.price ?? 0);
-              return (
-                <div
-                  class={cn(
-                    "flex flex-col items-center gap-1.5 rounded p-3 shadow-sm",
-                    selected() ? "bg-main text-bg" : "bg-sub-alt text-text",
-                  )}
-                >
-                  <Fa icon={PREVIEW_ICONS[item.id]} size={1.5} />
-                  <span class="text-center text-sm font-medium">
-                    {item.name}
-                  </span>
-                  <span class="text-center text-em-xs opacity-80">
-                    {item.description}
-                  </span>
-                  <Show
-                    when={!owned()}
-                    fallback={
-                      <Show
-                        when={!selected()}
-                        fallback={
-                          <span class="flex items-center gap-1 text-em-xs">
-                            <Fa icon="fa-check" size={0.7} /> selected
-                          </span>
-                        }
-                      >
-                        <button
-                          type="button"
-                          class="rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={pendingId() !== null}
-                          onClick={() =>
-                            void guardedBuy(item.id, async () =>
-                              handleSelect(item.id),
-                            )
-                          }
-                        >
-                          select
-                        </button>
-                      </Show>
-                    }
-                  >
-                    <button
-                      type="button"
-                      class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canAfford() || pendingId() !== null}
-                      onClick={() =>
-                        void guardedBuy(item.id, async () => handleBuy(item))
-                      }
-                    >
-                      <Show
-                        when={pendingId() !== item.id}
-                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
-                      >
-                        <Fa icon="fa-coins" size={0.7} />
-                      </Show>
-                      {canAfford() ? item.price : "Not enough coins"}
-                    </button>
-                  </Show>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    </AnimatedModal>
+    <CosmeticShop
+      id="CaretEffectShop"
+      title="Caret Effects"
+      items={CARET_EFFECT_ITEMS}
+      coins={stateQuery.data?.coins ?? 0}
+      isOwned={(id) =>
+        id === "none" || stateQuery.data?.ownedEffects[id] === true
+      }
+      collection={shopCollection(
+        "caretEffect",
+        CARET_EFFECT_ITEMS,
+        (id) => id === "none" || stateQuery.data?.ownedEffects[id] === true,
+        stateQuery.data?.claimedCollections,
+      )}
+      isSelected={(id) => (stateQuery.data?.selectedEffect ?? "none") === id}
+      thumb={(item) => (
+        <EffectThumb
+          icon={CARET_EFFECT_ICONS[item.id]}
+          none={item.id === "none"}
+        />
+      )}
+      preview={(item) => (
+        <EffectDemo
+          icon={CARET_EFFECT_ICONS[item.id]}
+          none={item.id === "none"}
+        />
+      )}
+      onBuy={handleBuy}
+      onSelect={handleSelect}
+      cols="sm:grid-cols-4"
+    />
   );
 }

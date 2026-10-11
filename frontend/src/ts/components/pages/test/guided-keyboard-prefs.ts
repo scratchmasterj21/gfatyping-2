@@ -1,6 +1,9 @@
 import { createSignal } from "solid-js";
 
-import { KeyboardSkinItemId } from "../../../keyboard-skins/keyboard-skin-items";
+import {
+  isKeyboardSkinItemId,
+  KeyboardSkinItemId,
+} from "../../../keyboard-skins/keyboard-skin-items";
 
 export type GuidedKeyboardStyle =
   | "flat"
@@ -13,19 +16,23 @@ export type GuidedKeyboardStyle =
 type RgbMode = "wave" | "breathe" | "solid" | "static";
 type RgbBrightness = "low" | "med" | "high";
 
+export const FREE_KEYBOARD_STYLES: ReadonlySet<string> = new Set([
+  "flat",
+  "cartoon",
+  "modern",
+  "marble",
+  "rgb",
+]);
+
+export function isGuidedKeyboardStyle(
+  style: string,
+): style is GuidedKeyboardStyle {
+  return FREE_KEYBOARD_STYLES.has(style) || isKeyboardSkinItemId(style);
+}
+
 function loadKeyboardStyle(): GuidedKeyboardStyle {
   const stored = localStorage.getItem("keyboardGraphicStyle");
-  if (
-    stored === "cartoon" ||
-    stored === "modern" ||
-    stored === "marble" ||
-    stored === "rgb" ||
-    stored === "wood" ||
-    stored === "glass"
-  ) {
-    return stored;
-  }
-  return "marble";
+  return stored !== null && isGuidedKeyboardStyle(stored) ? stored : "marble";
 }
 
 export const [keyboardStyle, setKeyboardStyleSignal] =

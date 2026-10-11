@@ -14,9 +14,11 @@ import {
   CaretEffectItemId,
   isCaretEffectItemId,
 } from "./caret-effect-items";
+import { claimedFromDoc } from "../utils/shop-collections";
 
 export type CaretEffectState = {
   coins: number;
+  claimedCollections?: Record<string, true>;
   ownedEffects: Record<string, true>;
   selectedEffect: CaretEffectItemId;
 };
@@ -35,6 +37,7 @@ export async function getCaretEffectState(
       const stored = data["selectedCaretEffect"] as string | undefined;
       return {
         coins: (data["coins"] as number | undefined) ?? 0,
+        claimedCollections: claimedFromDoc(data),
         ownedEffects:
           (data["ownedCaretEffects"] as Record<string, true> | undefined) ?? {},
         selectedEffect:

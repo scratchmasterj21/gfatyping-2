@@ -1,4 +1,12 @@
-export type KeypressEffectItemId = "none" | "spark" | "ripple" | "confetti";
+export type KeypressEffectItemId =
+  | "none"
+  | "spark"
+  | "ripple"
+  | "confetti"
+  | "stars"
+  | "hearts"
+  | "bubbles"
+  | "snow";
 
 export type KeypressEffectItem = {
   id: KeypressEffectItemId;
@@ -6,6 +14,8 @@ export type KeypressEffectItem = {
   description: string;
   /** Coin price. Omitted for the free default. */
   price?: number;
+  /** Months (1-12, Japan time) it's sold in; always kept once owned. */
+  seasonMonths?: number[];
 };
 
 export const KEYPRESS_EFFECT_ITEMS: KeypressEffectItem[] = [
@@ -31,6 +41,31 @@ export const KEYPRESS_EFFECT_ITEMS: KeypressEffectItem[] = [
     name: "Confetti",
     description: "Tiny confetti pieces scatter from the next key.",
     price: 50,
+  },
+  {
+    id: "stars",
+    name: "Stars",
+    description: "Little gold stars pop out of the next key.",
+    price: 40,
+  },
+  {
+    id: "hearts",
+    name: "Hearts",
+    description: "Pink hearts float up from the next key.",
+    price: 40,
+  },
+  {
+    id: "bubbles",
+    name: "Bubbles",
+    description: "A bubble floats up from the next key.",
+    price: 40,
+  },
+  {
+    id: "snow",
+    name: "Snow",
+    description: "Snowflakes drift from the next key. Winter only!",
+    price: 40,
+    seasonMonths: [12, 1, 2],
   },
 ];
 

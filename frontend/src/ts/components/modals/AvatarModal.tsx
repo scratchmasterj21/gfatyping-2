@@ -50,6 +50,7 @@ import {
   saveOutfit,
   setAvatarShape,
   wearOutfit,
+  setTitle,
 } from "../../avatar/avatar-state";
 import { getAuthenticatedUser } from "../../firebase";
 import { useBuyGuard } from "../../hooks/useBuyGuard";
@@ -65,6 +66,7 @@ import { cn } from "../../utils/cn";
 import { AnimatedModal } from "../common/AnimatedModal";
 import { Avatar } from "../common/Avatar";
 import { Fa } from "../common/Fa";
+import { TitlePicker } from "../common/TitlePicker";
 
 type Tab = "style" | "animals";
 const SHAPES: { id: AvatarShape; label: string }[] = [
@@ -168,6 +170,11 @@ export function AvatarModal(): JSXElement {
         queryKey: ["avatarEquipped", uid],
       });
     }
+  };
+
+  const pickTitle = async (titleId: string | null): Promise<void> => {
+    await setTitle(titleId);
+    refresh();
   };
 
   const coins = (): number => stateQuery.data?.coins ?? 0;
@@ -660,6 +667,11 @@ export function AvatarModal(): JSXElement {
               )}
             </For>
           </div>
+          <TitlePicker
+            current={stateQuery.data?.title}
+            earned={earnedQuery.data}
+            onPick={pickTitle}
+          />
         </Show>
 
         <div class="flex gap-1 rounded bg-sub-alt p-1">

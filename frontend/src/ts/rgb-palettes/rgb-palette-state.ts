@@ -14,9 +14,11 @@ import {
   RgbPaletteItem,
   RgbPaletteItemId,
 } from "./rgb-palette-items";
+import { claimedFromDoc } from "../utils/shop-collections";
 
 export type RgbPaletteState = {
   coins: number;
+  claimedCollections?: Record<string, true>;
   ownedPalettes: Record<string, true>;
   selectedPalette: RgbPaletteItemId;
 };
@@ -35,6 +37,7 @@ export async function getRgbPaletteState(
       const stored = data["selectedRgbPalette"] as string | undefined;
       return {
         coins: (data["coins"] as number | undefined) ?? 0,
+        claimedCollections: claimedFromDoc(data),
         ownedPalettes:
           (data["ownedRgbPalettes"] as Record<string, true> | undefined) ?? {},
         selectedPalette:
