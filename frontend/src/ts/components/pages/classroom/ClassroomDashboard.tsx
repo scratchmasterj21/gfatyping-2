@@ -52,6 +52,10 @@ import {
   setClassGoal,
 } from "../../../classroom/class-goals";
 import { buildProgressCsv } from "../../../classroom/progress-csv";
+import {
+  displayChar,
+  formatWeakKeys,
+} from "../../../classroom/progress-format";
 import { awardCoins } from "../../../coins";
 import { CLASS_IDS, GRADES } from "../../../constants/classes";
 import { useLocalStorage } from "../../../hooks/useLocalStorage";
@@ -67,9 +71,9 @@ import {
 } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { download } from "../../../utils/misc";
+import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
 import { ClassGoalBar } from "../../common/ClassGoalBar";
-import { Avatar } from "../../common/Avatar";
 import { EmptyState } from "../../common/EmptyState";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
@@ -254,6 +258,18 @@ function ProgressTab(props: {
       list = list.filter(isStuck);
     }
     return list;
+  });
+
+  const classWeakKeys = createMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const row of props.rows) {
+      for (const [char, score] of Object.entries(row.weakKeys)) {
+        totals[char] = (totals[char] ?? 0) + score;
+      }
+    }
+    return Object.entries(totals)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
   });
 
   const weekly = createMemo(() => {
@@ -459,9 +475,15 @@ function ProgressTab(props: {
           lessonsCompleted: r.lessonsCompleted,
           lessonStars: r.lessonStars,
           avatar: r.avatar,
+          lessonMarks: r.lessonMarks,
         })),
     );
     window.open("/certificate?batch=1", "_blank");
+  };
+
+  const printThisWeek = (): void => {
+    applyRangePreset(7);
+    void downloadAllPdf();
   };
 
   const downloadAllPdf = async (): Promise<void> => {
@@ -596,7 +618,7 @@ function ProgressTab(props: {
             </span>
           </div>
         </div>
-        <div class="mb-4 grid gap-3 sm:grid-cols-3">
+        <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div class="min-w-0 rounded-xl bg-bg p-3">
             <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
               <Fa icon="fa-fire" class="mr-1.5 text-main" />
@@ -691,6 +713,25 @@ function ProgressTab(props: {
                 </div>
               </Show>
             </Show>
+          </div>
+          <div class="min-w-0 rounded-xl bg-bg p-3">
+            <div class="mb-1 text-xs font-semibold tracking-wide text-sub uppercase">
+              <Fa icon="fa-keyboard" class="mr-1.5 text-main" />
+              Trickiest keys
+            </div>
+            <Show
+              when={classWeakKeys().length > 0}
+              fallback={
+                <div class="text-sm text-sub">No weak keys tracked yet</div>
+              }
+            >
+              <div class="text-sm text-text">
+                {classWeakKeys()
+                  .map(([char]) => displayChar(char))
+                  .join(", ")}
+              </div>
+            </Show>
+            <div class="mt-1 text-xs text-sub">Worst keys across the class</div>
           </div>
         </div>
         <div class="mb-3 flex flex-wrap gap-2 text-sm text-sub">
@@ -810,6 +851,12 @@ function ProgressTab(props: {
             disabled={props.rows.length === 0 || downloadingAll()}
           />
           <Button
+            text="print this week"
+            fa={{ icon: "fa-print" }}
+            onClick={printThisWeek}
+            disabled={props.rows.length === 0 || downloadingAll()}
+          />
+          <Button
             text={
               selectedForCert().size > 0
                 ? `print certificates (${selectedForCert().size})`
@@ -893,6 +940,7 @@ function ProgressTab(props: {
                 <th class="p-2 text-right">lesson acc</th>
                 <th class="p-2 text-right">on task</th>
                 <th class="p-2 text-right">assignments</th>
+                <th class="p-2">weak keys</th>
                 <th class="p-2 text-right">last active</th>
                 <th class="p-2"></th>
               </tr>
@@ -952,6 +1000,9 @@ function ProgressTab(props: {
                       </td>
                       <td class="p-2 text-right">
                         {assignmentsDone(row)}/{assignmentTotal(row)}
+                      </td>
+                      <td class="max-w-[8rem] truncate p-2 text-sub">
+                        {formatWeakKeys(row.weakKeys, 3)}
                       </td>
                       <td
                         class={cn(
@@ -2327,46 +2378,48 @@ export function ClassroomDashboard(): JSXElement {
 
   const classroomOpen = (): boolean =>
     isCurrentUserAdmin() && getActivePage() === "classroom";
+  const tabOn = (...ids: Tab[]): boolean =>
+    classroomOpen() && ids.includes(tab());
 
   const progressQuery = useQuery(() => ({
     queryKey: ["classroom", "progress", selectedClass()],
     queryFn: async () => getClassProgress(selectedClass()),
-    enabled: classroomOpen(),
+    enabled: tabOn("progress", "assignments", "announcements"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const assignmentsQuery = useQuery(() => ({
     queryKey: ["classroom", "assignments"],
     queryFn: listAssignments,
-    enabled: classroomOpen(),
+    enabled: tabOn("progress", "assignments"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const wordListsQuery = useQuery(() => ({
     queryKey: ["classroom", "wordlists"],
     queryFn: listWordLists,
-    enabled: classroomOpen(),
+    enabled: tabOn("progress", "assignments", "wordlists"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const passagesQuery = useQuery(() => ({
     queryKey: ["classroom", "passages"],
     queryFn: listReadingPassages,
-    enabled: classroomOpen(),
+    enabled: tabOn("progress", "assignments", "passages"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const racesQuery = useQuery(() => ({
     queryKey: ["classroom", "races", selectedClass()],
     queryFn: async () => listHistoryForClass(selectedClass()),
-    enabled: classroomOpen(),
+    enabled: tabOn("races"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
   const announcementsQuery = useQuery(() => ({
     queryKey: ["classroom", "announcements"],
     queryFn: listAnnouncements,
-    enabled: classroomOpen(),
+    enabled: tabOn("announcements"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
@@ -2547,7 +2600,7 @@ export function ClassroomDashboard(): JSXElement {
                 assignments={assignments()}
                 wordLists={wordLists()}
                 passages={passages()}
-                loading={progressQuery.isLoading}
+                loading={progressQuery.isPending}
               />
             </div>
           </Show>
@@ -2577,7 +2630,7 @@ export function ClassroomDashboard(): JSXElement {
           </Show>
           <Show when={tab() === "races"}>
             <div class={panelClass}>
-              <RacesTab races={races()} loading={racesQuery.isLoading} />
+              <RacesTab races={races()} loading={racesQuery.isPending} />
             </div>
           </Show>
           <Show when={tab() === "images"}>

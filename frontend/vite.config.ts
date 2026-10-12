@@ -150,7 +150,24 @@ function getPlugins({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globIgnores: ["**/.*"],
-        globPatterns: [],
+        // Hashed js/css only. index.html stays network-first so a deploy
+        // isn't pinned on an iPad. Game and PDF chunks stay out so the
+        // first visit doesn't download them.
+        globPatterns: ["js/**/*.js", "css/**/*.css"],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        manifestTransforms: [
+          async (
+            entries: { url: string; revision: string | null; size: number }[],
+          ) => ({
+            manifest: entries.filter(
+              (entry) =>
+                !/phaser|jspdf|howler|Scene\.|progress-pdf|html2canvas/i.test(
+                  entry.url,
+                ),
+            ),
+            warnings: [],
+          }),
+        ],
         navigateFallback: "",
         runtimeCaching: [
           {

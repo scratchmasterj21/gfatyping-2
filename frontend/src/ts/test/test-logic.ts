@@ -1236,6 +1236,19 @@ async function saveResult(
 
   setAccountButtonSpinner(false);
 
+  if (response.status === 503) {
+    retrySaving.canRetry = true;
+    qs("#retrySavingResultButton")?.show();
+    if (!isRetrying) {
+      retrySaving.completedEvent = result;
+    }
+    showNoticeNotification(response.body.message, {
+      durationMs: 8000,
+      important: true,
+    });
+    return response;
+  }
+
   if (response.status !== 200) {
     //only allow retry if status is not in this list
     if (![460, 461, 463, 464, 465, 466].includes(response.status)) {

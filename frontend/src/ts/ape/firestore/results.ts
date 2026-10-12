@@ -10,8 +10,11 @@ import {
   query,
   updateDoc,
 } from "firebase/firestore";
-import { callApi } from "../../api-client";
-import { queuePendingResult } from "../../results/pending-results";
+import { ApiError, callApi } from "../../api-client";
+import {
+  forgetPendingResult,
+  queuePendingResult,
+} from "../../results/pending-results";
 import { triggerCelebration } from "../../states/celebration";
 import { db, Handler, HandlerError, ok, requireUid } from "./common";
 import {
@@ -58,16 +61,36 @@ export const add: Handler = async (ctx) => {
     response = await callApi<SubmitResultResponse>("/api/submit-result", {
       result,
     });
-  } catch {
-    await queuePendingResult(uid, result);
-    throw new HandlerError(
-      503,
-      "Saved on this device. It will upload automatically when the service recovers.",
-    );
+  } catch (error) {
+    const permanent =
+      error instanceof ApiError &&
+      error.status < 500 &&
+      ![401, 408, 429].includes(error.status);
+    if (permanent) {
+      throw new HandlerError(error.status, "Failed to save result");
+    }
+    try {
+      const { dropped } = await queuePendingResult(uid, result);
+      const droppedNote =
+        dropped > 0
+          ? " An older saved result on this device was dropped to make room."
+          : "";
+      throw new HandlerError(
+        503,
+        `Saved on this device. It will upload when you're back online.${droppedNote}`,
+      );
+    } catch (queueError) {
+      if (queueError instanceof HandlerError) throw queueError;
+      throw new HandlerError(
+        500,
+        "Couldn't save this result on this device. Stay on this page and tap retry when you have a connection.",
+      );
+    }
   }
   if (!response.ok || response.insertedId === undefined) {
     throw new HandlerError(500, response.reason ?? "Failed to save result");
   }
+  await forgetPendingResult(uid, result.timestamp).catch(() => undefined);
 
   for (const quest of response.newlyCompletedQuests ?? []) {
     triggerCelebration({

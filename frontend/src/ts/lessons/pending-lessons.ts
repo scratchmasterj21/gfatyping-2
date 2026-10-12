@@ -15,7 +15,32 @@ export type PendingLessonPayload = {
   incompleteTestSeconds: number;
   afkDuration: number;
   practiceRewardCategory?: string;
+  /** Captured at queue time so weak keys can update after a later upload. */
+  missedChars?: Record<string, number>;
+  correctChars?: Record<string, number>;
+  /** Stars already on the lesson when it was queued. Unset if that read failed. */
+  prevStars?: number;
 };
+
+export type PendingLessonSyncResult = {
+  ok: boolean;
+  stars?: number;
+  coinsAwarded?: number;
+  newlyCompletedQuests?: { name: string; coinReward: number }[];
+};
+
+type LessonSyncedHandler = (
+  uid: string,
+  payload: PendingLessonPayload,
+  result: PendingLessonSyncResult,
+) => void;
+
+let onLessonSynced: LessonSyncedHandler | undefined;
+
+/** Registered by lesson-progress so a later upload still updates streak and weak keys. */
+export function setOnLessonSynced(handler: LessonSyncedHandler): void {
+  onLessonSynced = handler;
+}
 
 type PendingLesson = {
   key: string;
@@ -60,7 +85,7 @@ export function isPermanentApiError(error: unknown): boolean {
 export async function queuePendingLesson(
   uid: string,
   payload: PendingLessonPayload,
-): Promise<void> {
+): Promise<{ dropped: number }> {
   const db = await getDbPromise();
   const tx = db.transaction("lessons", "readwrite");
   const store = tx.objectStore("lessons");
@@ -77,6 +102,7 @@ export async function queuePendingLesson(
     queuedAt,
   });
   await tx.done;
+  return { dropped: overflow.length };
 }
 
 /** One API call per queued lesson; no-op (no network) when the queue is empty. */
@@ -93,12 +119,15 @@ export async function syncPendingLessons(): Promise<void> {
 
     for (const item of pending) {
       try {
-        const res = await callApi<{ ok: boolean }>(
+        const res = await callApi<PendingLessonSyncResult>(
           "/api/complete-lesson",
           item.payload,
         );
         await db.delete("lessons", item.key);
-        if (res.ok) uploaded++;
+        if (res.ok) {
+          uploaded++;
+          onLessonSynced?.(user.uid, item.payload, res);
+        }
       } catch (error) {
         // 4xx is permanent (invalid result), so drop it; network/server
         // failures stay queued for the next reconnect.

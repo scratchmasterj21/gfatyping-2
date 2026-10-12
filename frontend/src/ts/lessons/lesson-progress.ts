@@ -18,7 +18,10 @@ import { findLesson, lessonGroups, lessonOrder } from "./lessons-data";
 import { invalidateCoinQueries } from "../queries/coins";
 import { queryClient } from "../queries";
 import { isAuthenticated } from "../states/core";
-import { showNoticeNotification } from "../states/notifications";
+import {
+  showErrorNotification,
+  showNoticeNotification,
+} from "../states/notifications";
 import { getSnapshot } from "../states/snapshot";
 import { triggerCelebration } from "../states/celebration";
 import {
@@ -32,6 +35,7 @@ import {
   isPermanentApiError,
   PendingLessonPayload,
   queuePendingLesson,
+  setOnLessonSynced,
   syncPendingLessons,
 } from "./pending-lessons";
 
@@ -243,6 +247,13 @@ export async function recordCompletion(
     incompleteTestSeconds: ce.incompleteTestSeconds,
     afkDuration: ce.afkDuration,
     practiceRewardCategory: activePracticeReward(),
+    ...(lastEventLog
+      ? {
+          missedChars: getMissedCharacters(lastEventLog),
+          correctChars: getCorrectCharacters(lastEventLog),
+        }
+      : {}),
+    ...(snap?.exists() === true ? { prevStars: prev.stars ?? 0 } : {}),
   };
 
   // Stars/completion/coins/quests are computed and written server-side (see
@@ -284,10 +295,26 @@ export async function recordCompletion(
     if (isPermanentApiError(e)) {
       return { ok: false, reason: "invalid" };
     }
-    await queuePendingLesson(uid, payload).catch(() => undefined);
-    showNoticeNotification(
-      "You're offline — progress will save when reconnected",
-    );
+    try {
+      const { dropped } = await queuePendingLesson(uid, payload);
+      showNoticeNotification(
+        "Saved on this device. It will upload when you're back online.",
+        { durationMs: 8000 },
+      );
+      if (dropped > 0) {
+        showNoticeNotification(
+          "An older saved lesson on this device was dropped to make room.",
+          { durationMs: 8000, important: true },
+        );
+      }
+    } catch (queueError) {
+      console.error("Failed to queue lesson progress:", queueError);
+      showErrorNotification(
+        "Couldn't save this lesson on this device. Retry when you have a connection.",
+        { durationMs: 8000, important: true },
+      );
+      return { ok: false, reason: "device" };
+    }
     return { ok: false, reason: "offline" };
   }
 }
@@ -759,6 +786,30 @@ export async function persistDailyChallengePick(
     console.error("Failed to persist daily challenge pick:", e);
   }
 }
+
+setOnLessonSynced((uid, payload, result) => {
+  if (payload.missedChars !== undefined || payload.correctChars !== undefined) {
+    void updateWeakKeys(
+      uid,
+      payload.missedChars ?? {},
+      payload.correctChars ?? {},
+    );
+  }
+  const newStars = result.stars ?? 0;
+  const wasFirst3Star =
+    payload.prevStars !== undefined && payload.prevStars < 3 && newStars === 3;
+  void updateEngagement(
+    uid,
+    payload.lessonId,
+    payload.wpm,
+    payload.acc,
+    wasFirst3Star,
+  );
+  if ((result.coinsAwarded ?? 0) > 0) invalidateCoinQueries();
+  void queryClient.invalidateQueries({ queryKey: ["lessonProgress"] });
+  void queryClient.invalidateQueries({ queryKey: ["userLessonStats"] });
+  celebrateCompletedQuests(result.newlyCompletedQuests ?? []);
+});
 
 // Clear the active lesson whenever the user leaves custom mode, so unrelated
 // custom tests are not recorded as lesson completions.

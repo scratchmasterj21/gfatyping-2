@@ -46,7 +46,7 @@ let syncing = false;
 export async function queuePendingResult(
   uid: string,
   result: CompletedEvent,
-): Promise<void> {
+): Promise<{ dropped: number }> {
   const db = await getDbPromise();
   const tx = db.transaction("results", "readwrite");
   const store = tx.objectStore("results");
@@ -62,6 +62,16 @@ export async function queuePendingResult(
     queuedAt: Date.now(),
   });
   await tx.done;
+  return { dropped: overflow.length };
+}
+
+/** Drop a queued copy after a later attempt saved it for real. */
+export async function forgetPendingResult(
+  uid: string,
+  timestamp: number,
+): Promise<void> {
+  const db = await getDbPromise();
+  await db.delete("results", `${uid}:${timestamp}`);
 }
 
 export async function syncPendingResults(): Promise<void> {

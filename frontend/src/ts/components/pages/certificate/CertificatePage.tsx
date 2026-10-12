@@ -13,6 +13,14 @@ import {
   StudentSummary,
 } from "../../../classroom/assignments";
 import { readCertificateBatch } from "../../../classroom/certificate-batch";
+import {
+  CERTIFICATE_LEVELS,
+  CertificateLevel,
+  earnedLevels,
+  nextLevel,
+  reachedOn,
+  stillNeeds,
+} from "../../../classroom/certificate-levels";
 import { getAuthenticatedUser } from "../../../firebase";
 import { getActivePage } from "../../../states/core";
 import { Avatar } from "../../common/Avatar";
@@ -124,16 +132,35 @@ function Divider(): JSXElement {
   );
 }
 
+function formatLongDate(at: number): string {
+  return new Date(at).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
 function CertificateCard(props: {
   id?: string;
   data: StudentSummary;
+  level?: CertificateLevel;
 }): JSXElement {
-  const today = (): string =>
-    new Date().toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  const today = (): string => formatLongDate(Date.now());
+  const reached = (): string | undefined => {
+    const level = props.level;
+    if (level === undefined) return undefined;
+    const at = reachedOn(level, props.data.lessonMarks);
+    return at === undefined ? undefined : formatLongDate(at);
+  };
+  const toward = (): CertificateLevel =>
+    nextLevel(props.data) ??
+    CERTIFICATE_LEVELS[0] ?? {
+      id: "bronze",
+      name: "Bronze",
+      lessons: 5,
+      stars: 5,
+      wpm: 8,
+    };
   return (
     <div
       id={props.id}
@@ -179,7 +206,9 @@ function CertificateCard(props: {
                 size={1.5}
               />
               <span class="text-2xl tracking-wider text-text">
-                Certificate of Achievement
+                {props.level !== undefined
+                  ? `${props.level.name} Certificate`
+                  : `Working toward ${toward().name}`}
               </span>
               <Fa
                 icon="fa-award"
@@ -217,23 +246,38 @@ function CertificateCard(props: {
               <div class="mt-1 text-em-sm text-sub">{props.data.classId}</div>
             </Show>
             <div class="mx-auto mt-4 max-w-xl text-sub">
-              has demonstrated typing proficiency, reaching a best speed of{" "}
-              <span class="font-semibold text-text">
-                {Math.round(props.data.bestWpm)} wpm
-              </span>{" "}
-              at{" "}
-              <span class="font-semibold text-text">
-                {Math.round(props.data.bestAcc)}%
-              </span>{" "}
-              accuracy, completing{" "}
-              <span class="font-semibold text-text">
-                {props.data.lessonsCompleted}
-              </span>{" "}
-              lesson(s) and earning{" "}
-              <span class="font-semibold text-text">
-                {props.data.lessonStars}
-              </span>{" "}
-              star(s).
+              <Show
+                when={props.level}
+                fallback={
+                  <>
+                    is working toward the {toward().name} certificate. Still
+                    needs {stillNeeds(toward(), props.data)}.
+                  </>
+                }
+              >
+                {(level) => (
+                  <>
+                    has earned the {level().name} certificate, with a best speed
+                    of{" "}
+                    <span class="font-semibold text-text">
+                      {Math.round(props.data.bestWpm)} wpm
+                    </span>{" "}
+                    at{" "}
+                    <span class="font-semibold text-text">
+                      {Math.round(props.data.bestAcc)}%
+                    </span>{" "}
+                    accuracy,{" "}
+                    <span class="font-semibold text-text">
+                      {props.data.lessonsCompleted}
+                    </span>{" "}
+                    lessons and{" "}
+                    <span class="font-semibold text-text">
+                      {props.data.lessonStars}
+                    </span>{" "}
+                    stars.
+                  </>
+                )}
+              </Show>
             </div>
           </div>
 
@@ -241,7 +285,9 @@ function CertificateCard(props: {
           <div>
             <Divider />
             <div class="mt-3 inline-block rounded border border-main/25 px-5 py-1 text-em-xs tracking-widest text-sub uppercase">
-              Issued {today()}
+              {reached() !== undefined
+                ? `Reached ${reached()}`
+                : `Issued ${today()}`}
             </div>
             <div class="mt-6 flex items-end justify-around gap-8 text-em-xs text-sub">
               <div class="flex-1 text-center">
@@ -286,6 +332,8 @@ export function CertificatePage(): JSXElement {
     () => search().get("uid") ?? getAuthenticatedUser()?.uid ?? "",
   );
 
+  const [pickedLevelId, setPickedLevelId] = createSignal<string | undefined>();
+
   const summary = useQuery(() => ({
     queryKey: ["certificate", uid()],
     queryFn: async () => getStudentSummary(uid()),
@@ -326,7 +374,12 @@ export function CertificatePage(): JSXElement {
                 }
               >
                 <For each={list()}>
-                  {(data) => <CertificateCard data={data} />}
+                  {(data) => (
+                    <CertificateCard
+                      data={data}
+                      level={earnedLevels(data).at(-1)}
+                    />
+                  )}
                 </For>
               </Show>
             </div>
@@ -347,7 +400,68 @@ export function CertificatePage(): JSXElement {
               </div>
             }
           >
-            {(data) => <CertificateCard id="gfaCertificate" data={data()} />}
+            {(data) => {
+              const earned = (): CertificateLevel[] => earnedLevels(data());
+              const shown = (): CertificateLevel | undefined =>
+                earned().find((level) => level.id === pickedLevelId()) ??
+                earned().at(-1);
+              const upcoming = (): CertificateLevel | undefined =>
+                nextLevel(data());
+              return (
+                <>
+                  <div class="grid gap-3 print:hidden">
+                    <div class="text-center text-sm text-sub">
+                      Your certificates
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <For each={CERTIFICATE_LEVELS}>
+                        {(level) => {
+                          const have = (): boolean =>
+                            earned().some((item) => item.id === level.id);
+                          const at = (): number | undefined =>
+                            reachedOn(level, data().lessonMarks);
+                          return (
+                            <button
+                              type="button"
+                              class="rounded-lg bg-sub-alt p-3 text-left disabled:opacity-50"
+                              disabled={!have()}
+                              onClick={() => setPickedLevelId(level.id)}
+                            >
+                              <div class="font-bold text-text">
+                                {level.name}
+                              </div>
+                              <div class="text-xs text-sub">
+                                <Show
+                                  when={have()}
+                                  fallback={stillNeeds(level, data())}
+                                >
+                                  {at() !== undefined
+                                    ? formatLongDate(at() ?? 0)
+                                    : "Earned"}
+                                </Show>
+                              </div>
+                            </button>
+                          );
+                        }}
+                      </For>
+                    </div>
+                    <Show when={upcoming()}>
+                      {(level) => (
+                        <div class="text-center text-sm text-sub">
+                          Next certificate: {level().name}.{" "}
+                          {stillNeeds(level(), data())}.
+                        </div>
+                      )}
+                    </Show>
+                  </div>
+                  <CertificateCard
+                    id="gfaCertificate"
+                    data={data()}
+                    level={shown()}
+                  />
+                </>
+              );
+            }}
           </Show>
         </Show>
       </div>

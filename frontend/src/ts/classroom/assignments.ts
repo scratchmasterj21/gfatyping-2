@@ -16,6 +16,7 @@ import { gradeOf } from "../constants/classes";
 import { getAuthenticatedUser, getDb } from "../firebase";
 import { findLesson, lessonOrder } from "../lessons/lessons-data";
 import { bestWpm, StoredUserDoc } from "./classroom";
+import { LessonMark } from "./certificate-levels";
 
 export type ContentScope = "class" | "grade" | "school";
 /** Assignments (unlike word lists/passages) can also target a single student. */
@@ -410,6 +411,8 @@ export type StudentProgressRow = {
   lessonStars: number;
   classId?: string;
   avatar?: EquippedAvatar;
+  /** Completed curriculum lessons, used to date certificate levels. */
+  lessonMarks: LessonMark[];
 };
 
 export const STUCK_ATTEMPTS = 5;
@@ -485,6 +488,7 @@ export async function getClassProgress(
       let accCount = 0;
       let lessonsThisWeek = 0;
       const stuckLessons: StudentProgressRow["stuckLessons"] = [];
+      const lessonMarks: LessonMark[] = [];
       const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       for (const [key, p] of progress) {
         if (!isCurriculumKey(key)) continue;
@@ -496,7 +500,10 @@ export async function getClassProgress(
             attempts: p.attempts ?? 0,
           });
         }
-        if (p.completed === true) lessonsCompleted++;
+        if (p.completed === true) {
+          lessonsCompleted++;
+          lessonMarks.push({ at: p.lastAt ?? 0, stars: p.stars ?? 0 });
+        }
         lessonAttempts += p.attempts ?? 0;
         lessonTime += p.timeSpent ?? 0;
         if ((p.attempts ?? 0) > 0 || p.bestAcc !== undefined) {
@@ -549,6 +556,7 @@ export async function getClassProgress(
         lessonStars: d.lessonStars ?? 0,
         classId,
         avatar: equippedFromDoc(d as Record<string, unknown>),
+        lessonMarks,
       };
       return row;
     }),
@@ -590,6 +598,7 @@ export type StudentSummary = {
   lessonsCompleted: number;
   lessonStars: number;
   avatar?: EquippedAvatar;
+  lessonMarks?: LessonMark[];
 };
 
 /** Single-student summary used by the certificate page (admin path). */
@@ -602,13 +611,12 @@ export async function getStudentSummary(
 
   const progress = await readLessonProgress(uid);
   let lessonsCompleted = 0;
+  const lessonMarks: LessonMark[] = [];
   for (const [key, p] of progress) {
     if (p.completed !== true) continue;
-    if (key.startsWith(ASSIGNMENT_PREFIX)) continue;
-    if (key.startsWith(WORDLIST_PREFIX)) continue;
-    if (key.startsWith(PASSAGE_PREFIX)) continue;
-    if (key.startsWith("jp-")) continue;
+    if (!isCurriculumKey(key)) continue;
     lessonsCompleted++;
+    lessonMarks.push({ at: p.lastAt ?? 0, stars: p.stars ?? 0 });
   }
 
   const best = bestWpm(data);
@@ -621,5 +629,6 @@ export async function getStudentSummary(
     lessonsCompleted,
     lessonStars: data.lessonStars ?? 0,
     avatar: equippedFromDoc(data as Record<string, unknown>),
+    lessonMarks,
   };
 }

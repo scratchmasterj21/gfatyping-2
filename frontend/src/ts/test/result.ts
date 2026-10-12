@@ -959,9 +959,19 @@ async function updateLessonGate(
   if (completionPromise !== undefined) {
     el.removeClass("pass")
       .removeClass("fail")
+      .removeClass("queued")
       .setHtml(`<i class="fas fa-spinner fa-spin"></i> Saving lesson…`)
       .show();
     const outcome = await awaitLessonCompletion(completionPromise);
+    if (outcome?.reason === "offline") {
+      syncLessonResultHeader("neutral");
+      el.addClass("queued")
+        .setHtml(
+          `<i class="fas fa-cloud"></i> Saved on this device. It will upload when you're back online.`,
+        )
+        .show();
+      return;
+    }
     if (outcome?.ok !== true) {
       syncLessonResultHeader("fail");
       el.addClass("fail")
