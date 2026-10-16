@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  increment,
   setDoc,
 } from "firebase/firestore";
 import { createSignal } from "solid-js";
@@ -13,7 +12,6 @@ import { createSignal } from "solid-js";
 import { callApi } from "../api-client";
 import { configEvent } from "../events/config";
 import { getAuthenticatedUser, getDb } from "../firebase";
-import { LESSON_CHECKPOINT_COMPLETE_WAVE } from "./lesson-checkpoints";
 import { findLesson, lessonGroups, lessonOrder } from "./lessons-data";
 import { invalidateCoinQueries } from "../queries/coins";
 import { queryClient } from "../queries";
@@ -22,7 +20,6 @@ import {
   showErrorNotification,
   showNoticeNotification,
 } from "../states/notifications";
-import { getSnapshot } from "../states/snapshot";
 import { triggerCelebration } from "../states/celebration";
 import {
   getCorrectCharacters,
@@ -408,30 +405,6 @@ async function updateEngagement(
     { merge: true },
   );
 
-  // Update class member stats so classmates can see this student's stars.
-  // classId can be stored as null in Firestore (see setStudentClass) for an
-  // unassigned student - the field is typed string|undefined but that's not
-  // enforced at the data layer, so a plain !== undefined check let a literal
-  // null through into a Firestore path segment and crashed the SDK.
-  const classId = getSnapshot()?.classId;
-  if (classId !== undefined && classId !== null) {
-    const snap = getSnapshot();
-    const memberRef = doc(
-      collection(getDb(), "classrooms", classId, "memberStats"),
-      uid,
-    );
-    await setDoc(
-      memberRef,
-      {
-        uid,
-        name: snap?.name ?? "Student",
-        avatarUrl: snap?.avatarUrl ?? null,
-        lessonStars: totalStars,
-      },
-      { merge: true },
-    );
-  }
-
   // Trigger celebration: achievement takes priority over 3-star.
   const firstAchievement = newAchievements[0];
   if (firstAchievement !== undefined) {
@@ -601,34 +574,26 @@ export async function recordGameResult(
   const uid = getAuthenticatedUser()?.uid;
   if (uid === undefined) return;
 
-  const ref = doc(progressCol(uid), key);
-  const snap = await getDoc(ref);
-  const prev = snap.exists() ? (snap.data() as Partial<LessonProgress>) : {};
-
-  const bestScore = Math.max(prev.bestScore ?? 0, score);
-  const completed =
-    prev.completed === true ||
-    wave > LESSON_CHECKPOINT_COMPLETE_WAVE ||
-    options?.cleared === true;
-
   try {
-    await setDoc(
-      ref,
+    const result = await callApi<{ ok: boolean; reason?: string }>(
+      "/api/save-game-result",
       {
-        lessonId: key,
-        bestWpm: 0,
-        bestAcc: 0,
-        stars: completed ? 1 : 0,
-        completed,
-        attempts: increment(1),
-        timeSpent: 0,
-        lastAt: Date.now(),
-        bestScore,
+        key,
+        score,
+        wave,
+        cleared: options?.cleared === true,
       },
-      { merge: true },
     );
+    if (!result.ok) {
+      throw new Error(result.reason ?? "Failed to save game result");
+    }
+    void queryClient.invalidateQueries({ queryKey: ["lessonProgress"] });
   } catch (e) {
     console.error("Failed to save game result:", e);
+    showNoticeNotification(
+      "Couldn't save this game. Check your connection and try again.",
+      { durationMs: 8000 },
+    );
   }
 }
 
