@@ -79,6 +79,262 @@
   }
 }
 
+/* Fixed, bright palette for the kid mini-game scenes (same in every theme). */
+@theme static {
+  --color-game-ink: #2b2140;
+  --color-game-cream: #fff8ec;
+  --color-game-sky: #8fd8ff;
+  --color-game-sky-top: #4fb3f6;
+  --color-game-sunset: #ffb37a;
+  --color-game-dusk: #b07ad8;
+  --color-game-night: #241a52;
+  --color-game-cloud: #ffffff;
+  --color-game-grass: #7bdc6b;
+  --color-game-grass-dark: #4fb04a;
+  --color-game-pink: #ff7eb6;
+  --color-game-yellow: #ffd23f;
+  --color-game-green: #5ed37a;
+  --color-game-blue: #5aa9ff;
+  --color-game-purple: #a77bff;
+  --color-game-orange: #ff9a4d;
+  --color-game-red: #ff5a5f;
+  --color-game-gold: #ffc61a;
+  --color-game-brown: #b9774a;
+  --color-game-brown-dark: #7d4b2c;
+  --color-game-tan: #f2d2a9;
+  --color-game-blush: #ffb3c7;
+  --color-game-grey: #9aa3b5;
+  --color-game-navy: #33406b;
+  --color-game-frog: #6cc96a;
+  --color-game-mint: #c8f2dc;
+
+  --animate-game-pop: game-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-game-shake: game-shake 0.4s ease-in-out;
+  --animate-game-float-up: game-float-up 0.9s ease-out forwards;
+  --animate-game-hop: game-hop 0.38s ease-out;
+  --animate-game-drift: game-drift 40s linear infinite;
+  --animate-game-twinkle: game-twinkle 2.2s ease-in-out infinite;
+  --animate-game-confetti: game-confetti 2.6s ease-in forwards;
+  --animate-game-sparkle: game-sparkle 0.7s ease-out forwards;
+  --animate-game-wave: game-wave 1.6s ease-in-out infinite;
+
+  @keyframes game-pop {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes game-shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-8px) rotate(-1deg);
+    }
+    40% {
+      transform: translateX(7px) rotate(1deg);
+    }
+    60% {
+      transform: translateX(-5px);
+    }
+    80% {
+      transform: translateX(3px);
+    }
+  }
+  @keyframes game-float-up {
+    0% {
+      transform: translateY(0) scale(0.8);
+      opacity: 0;
+    }
+    20% {
+      transform: translateY(-10px) scale(1.1);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-60px) scale(1);
+      opacity: 0;
+    }
+  }
+  @keyframes game-hop {
+    0% {
+      transform: translateY(0) scale(1.15, 0.85);
+    }
+    40% {
+      transform: translateY(-34px) scale(0.92, 1.1);
+    }
+    80% {
+      transform: translateY(0) scale(1.1, 0.9);
+    }
+    100% {
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes game-drift {
+    0% {
+      transform: translateX(-30%);
+    }
+    100% {
+      transform: translateX(130%);
+    }
+  }
+  @keyframes game-twinkle {
+    0%,
+    100% {
+      opacity: 0.3;
+      transform: scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  }
+  @keyframes game-confetti {
+    0% {
+      transform: translateY(-10vh) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100vh) rotate(720deg);
+      opacity: 0.8;
+    }
+  }
+  @keyframes game-sparkle {
+    0% {
+      transform: translate(0, 0) scale(0.4);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--dx), var(--dy)) scale(1.1);
+      opacity: 0;
+    }
+  }
+  --animate-game-enter: game-enter 0.55s ease-out both;
+  --animate-game-exit-left: game-exit-left 0.6s ease-in forwards;
+  --animate-game-exit-right: game-exit-right 0.6s ease-in forwards;
+  --animate-game-pulse: game-pulse 0.9s ease-in-out infinite;
+
+  @keyframes game-enter {
+    0% {
+      transform: translateX(120%);
+    }
+    25% {
+      transform: translateX(80%) translateY(-8px);
+    }
+    50% {
+      transform: translateX(40%);
+    }
+    75% {
+      transform: translateX(12%) translateY(-6px);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+  @keyframes game-exit-left {
+    0% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(-140%) translateY(-10px);
+      opacity: 0;
+    }
+  }
+  @keyframes game-exit-right {
+    0% {
+      transform: translateX(0) rotate(0deg);
+      opacity: 1;
+    }
+    30% {
+      transform: translateX(-6%) rotate(-4deg);
+    }
+    100% {
+      transform: translateX(140%) rotate(6deg);
+      opacity: 0;
+    }
+  }
+  @keyframes game-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.08);
+    }
+  }
+  --animate-game-ripple: game-ripple 0.6s ease-out forwards;
+  --animate-game-sweep: game-sweep 0.5s ease-in-out;
+
+  @keyframes game-ripple {
+    0% {
+      transform: scale(1);
+      opacity: 0.85;
+    }
+    100% {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+  @keyframes game-sweep {
+    0%,
+    100% {
+      transform: translateY(0);
+      filter: brightness(1);
+    }
+    50% {
+      transform: translateY(-6px);
+      filter: brightness(1.35);
+    }
+  }
+  --animate-game-fall: game-fall 0.8s ease-in forwards;
+  --animate-game-drop: game-drop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-game-bob: game-bob 1.8s ease-in-out infinite;
+
+  @keyframes game-fall {
+    0% {
+      transform: translateY(0) rotate(0deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(260px) rotate(var(--spin, 25deg));
+      opacity: 0;
+    }
+  }
+  @keyframes game-drop {
+    0% {
+      transform: translateY(-40px);
+      opacity: 0.4;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  @keyframes game-bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  @keyframes game-wave {
+    0%,
+    100% {
+      transform: rotate(-6deg);
+    }
+    50% {
+      transform: rotate(6deg);
+    }
+  }
+}
+
 @utility rounded-double {
   border-radius: calc(var(--roundness) * 2);
 }

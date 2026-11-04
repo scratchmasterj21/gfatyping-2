@@ -37,9 +37,6 @@ export const MAX_STRIKES = 3;
 /** Serving this many in a row starts rush hour (double points). */
 export const RUSH_AFTER = 3;
 
-export const CUSTOMERS = ["🐻", "🐰", "🦊", "🐼", "🐸", "🐯", "🐨", "🐵", "🐧"];
-export const SNACKS = ["🍩", "🍪", "🧁", "🍓", "🍌", "🥨", "🍉", "🍦", "🥐"];
-
 export type Rng = () => number;
 
 const pick = <T>(arr: readonly T[], rng: Rng): T =>
@@ -96,6 +93,10 @@ export function snackOnServe(
 export function snackOnMiss(s: SnackState): SnackState {
   return { ...s, strikes: s.strikes + 1, combo: 0 };
 }
+
+/** 1-3 stars from customers served in one shift. */
+export const snackStars = (served: number): number =>
+  served >= 15 ? 3 : served >= 8 ? 2 : served > 0 ? 1 : 0;
 
 export const snackIsOver = (s: SnackState): boolean => s.strikes >= MAX_STRIKES;
 

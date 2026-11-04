@@ -81,3 +81,7 @@ export function echoOnMistake(s: EchoState): EchoState {
 }
 
 export const echoIsOver = (s: EchoState): boolean => s.lives <= 0;
+
+/** 1-3 stars from the longest pattern repeated. */
+export const echoStars = (longest: number): number =>
+  longest >= 8 ? 3 : longest >= 5 ? 2 : longest > 0 ? 1 : 0;

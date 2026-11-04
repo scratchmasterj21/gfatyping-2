@@ -80,3 +80,11 @@ export function towerScore(s: TowerState): number {
   const accuracy = s.words === 0 ? 0 : s.words / (s.words + s.typos);
   return s.highest * 10 + Math.round(accuracy * s.words * 2);
 }
+
+/** 1-3 stars from the highest floor, scaled to the round length. */
+export function towerStars(highest: number, seconds: number): number {
+  if (highest <= 0) return 0;
+  if (highest >= Math.round(seconds / 4)) return 3;
+  if (highest >= Math.round(seconds / 8)) return 2;
+  return 1;
+}

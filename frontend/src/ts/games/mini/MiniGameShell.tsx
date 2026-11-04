@@ -28,6 +28,8 @@ import {
   getWordListOptions,
   WordListOption,
 } from "../word-defender/systems/vocab-pool";
+import { CoinCountUp } from "./CoinCountUp";
+import { Confetti } from "./Confetti";
 import {
   claimMiniGameReward,
   MiniGameClaim,
@@ -35,6 +37,9 @@ import {
   MINI_GAME_MAX_COINS_PER_RUN,
   MINI_GAME_PAID_RUNS_PER_DAY,
 } from "./mini-game-reward";
+import { sfx } from "./mini-sounds";
+import { MuteButton } from "./MuteButton";
+import { StarRating } from "./StarRating";
 
 const OPTIONS = getWordListOptions();
 const GROUPS = groupWordListOptions(OPTIONS);
@@ -45,6 +50,8 @@ export type MiniGameResult = {
   wave: number;
   stats: { label: string; value: string }[];
   headline: string;
+  /** 0-3 stars for the result screen; omit to hide stars. */
+  stars?: number;
 };
 
 export type MiniGamePlayProps<D> = {
@@ -104,6 +111,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   const finish = (r: MiniGameResult): void => {
     setResult(r);
     setPhase("result");
+    if (r.score > 0) sfx.finish();
     props.onResult?.(r.score, Math.max(1, r.wave));
     setClaim("pending");
     void claimMiniGameReward(props.gameId, r.score).then(setClaim);
@@ -114,7 +122,12 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
       <GameModalFrame
         layout={phase() === "playing" ? "playing" : "pick"}
         onClose={() => props.onClose()}
+        // typed with the on-screen keyboard too, so no "connect a keyboard" hint
+        needsKeyboard={false}
       >
+        <Show when={phase() === "playing"}>
+          <MuteButton class="absolute top-3 left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-sub-alt text-text hover:bg-text hover:text-bg" />
+        </Show>
         <Switch>
           <Match when={phase() === "pick"}>
             <GamePickLayout
@@ -184,9 +197,19 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
           <Match when={phase() === "result"}>
             <Show when={result()} keyed>
               {(r) => (
-                <div class="grid justify-items-center gap-4 p-6 text-center font-kid">
-                  <Mascot mood={r.score > 0 ? "cheer" : "thinking"} size={96} />
+                <div class="relative grid justify-items-center gap-4 overflow-hidden p-6 text-center font-kid">
+                  <Show when={(r.stars ?? 0) >= 2}>
+                    <Confetti />
+                  </Show>
+                  <Mascot
+                    mood={r.score > 0 ? "cheer" : "thinking"}
+                    size={96}
+                    class="animate-game-pop motion-reduce:animate-none"
+                  />
                   <div class="text-2xl font-bold text-text">{r.headline}</div>
+                  <Show when={r.stars !== undefined}>
+                    <StarRating stars={r.stars ?? 0} />
+                  </Show>
                   <div class="text-5xl font-bold text-main">{r.score}</div>
                   <div class="text-sm text-sub">points</div>
                   <div class="grid w-full grid-cols-2 gap-2">
@@ -217,12 +240,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                             : false;
                         })()}
                       >
-                        {(c) => (
-                          <span class="text-main">
-                            <Fa icon="fa-coins" class="mr-1.5" />+{c().coins}{" "}
-                            coins!
-                          </span>
-                        )}
+                        {(c) => <CoinCountUp coins={c().coins} />}
                       </Match>
                       <Match
                         when={(() => {

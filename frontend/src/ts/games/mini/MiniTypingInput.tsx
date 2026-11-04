@@ -32,10 +32,10 @@ export function MiniTypingInput(props: {
       autocorrect="off"
       spellcheck={false}
       class={cn(
-        "w-full max-w-md rounded-double border-4 bg-sub-alt px-5 py-3 text-center font-mono text-2xl text-text outline-none",
+        "pointer-events-auto w-full max-w-md rounded-double border-4 bg-game-cream px-5 py-3 text-center font-mono text-2xl font-bold text-game-ink shadow-[0_6px_0_rgb(43_33_64/0.25)] outline-none placeholder:text-game-ink/35",
         props.wrong === true
-          ? "border-error"
-          : "border-main/60 focus:border-main",
+          ? "animate-game-shake border-game-red motion-reduce:animate-none"
+          : "border-game-ink/15 focus:border-game-blue",
       )}
       onInput={(e) => props.onInput(e.currentTarget.value)}
       onKeyDown={(e) => {

@@ -4,6 +4,7 @@ import {
   echoIsOver,
   echoOnMistake,
   echoOnRoundWin,
+  echoStars,
   initialEcho,
   makeSequence,
 } from "../../src/ts/games/echo-keys/echo-rules";
@@ -14,6 +15,7 @@ import {
   snackIsOver,
   snackOnMiss,
   snackOnServe,
+  snackStars,
 } from "../../src/ts/games/snack-shop/snack-rules";
 import {
   initialTower,
@@ -21,6 +23,7 @@ import {
   towerOnTypo,
   towerOnWord,
   towerScore,
+  towerStars,
 } from "../../src/ts/games/tower-climb/tower-rules";
 
 /** Deterministic rng cycling through the given values. */
@@ -53,9 +56,21 @@ describe("tower climb", () => {
     expect(s.streak).toBe(0);
     expect(towerScore({ ...s, highest: 10, words: 10, typos: 0 })).toBe(120);
   });
+
+  it("gives stars scaled to the round length", () => {
+    expect(towerStars(0, 60)).toBe(0);
+    expect(towerStars(3, 60)).toBe(1);
+    expect(towerStars(8, 60)).toBe(2);
+    expect(towerStars(15, 60)).toBe(3);
+    expect(towerStars(11, 45)).toBe(3);
+  });
 });
 
 describe("snack shop", () => {
+  it("gives stars for customers served", () => {
+    expect([0, 1, 8, 15].map(snackStars)).toEqual([0, 1, 2, 3]);
+  });
+
   it("builds orders from the word list", () => {
     expect(makeOrder(["cat", "dog"], 1, seq(0))).toBe("cat");
     expect(makeOrder(["cat", "dog", "sun"], 3, seq(0.99, 0, 0.5, 0.99))).toBe(
@@ -80,6 +95,10 @@ describe("snack shop", () => {
 });
 
 describe("echo keys", () => {
+  it("gives stars for the longest pattern", () => {
+    expect([0, 3, 5, 8].map(echoStars)).toEqual([0, 1, 2, 3]);
+  });
+
   it("never repeats a key twice in a row", () => {
     const keys = ["a", "s", "d"];
     const out = makeSequence(keys, 6, seq(0, 0, 0, 0, 0, 0));
