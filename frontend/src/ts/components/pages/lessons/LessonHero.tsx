@@ -54,6 +54,8 @@ export function LessonHero(props: {
   avatar?: AvatarProps;
   weeklyQuestProgress?: Record<string, number>;
   weeklyQuestClaimed?: string[];
+  /** Shown as a pill in the welcome card so kids always see their coins. */
+  coins?: number;
 }): JSXElement {
   const tip = tipOfTheDay();
   const [showFreezeInfo, setShowFreezeInfo] = createSignal(false);
@@ -105,6 +107,15 @@ export function LessonHero(props: {
         </div>
         <Show when={props.signedIn}>
           <DailyGoalRing class="bg-bg" />
+        </Show>
+        <Show when={props.signedIn && props.coins !== undefined}>
+          <div
+            class="flex items-center gap-2 rounded-full bg-bg px-4 py-2.5 text-lg font-bold text-main"
+            aria-label={`${props.coins ?? 0} coins`}
+          >
+            <Fa icon="fa-coins" />
+            {props.coins}
+          </div>
         </Show>
         <Show when={props.streakDays > 0}>
           <div class="flex items-center gap-2 rounded-2xl bg-bg px-4 py-3 text-main">
@@ -226,12 +237,13 @@ export function LessonHero(props: {
                       class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-4 py-2 text-sm font-semibold text-text hover:bg-text hover:text-bg"
                       onClick={props.onDailyChallenge}
                     >
-                      start
+                      <Fa icon="fa-arrow-right" />
+                      <span class="ml-1.5">Start</span>
                     </button>
                   }
                 >
                   <span class="flex items-center gap-1.5 text-sm font-semibold text-main">
-                    <Fa icon="fa-check-circle" /> done
+                    <Fa icon="fa-check-circle" /> Done today
                   </span>
                 </Show>
               </div>
@@ -249,24 +261,31 @@ export function LessonHero(props: {
                     {props.practiceRewardLabel("adaptive")}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-4 py-2 text-sm font-semibold text-text hover:bg-text hover:text-bg"
-                  onClick={props.onAdaptiveReview}
-                  disabled={props.adaptiveLoading}
-                >
-                  <Fa
-                    icon={
-                      props.adaptiveLoading
-                        ? "fa-circle-notch"
-                        : "fa-arrow-right"
-                    }
-                    class={cn(props.adaptiveLoading ? "fa-spin" : "")}
-                  />
-                  <span class="ml-1.5">
-                    {props.adaptiveDoneToday ? "Practice again" : "Start"}
-                  </span>
-                </button>
+                <div class="grid shrink-0 justify-items-end gap-1">
+                  <Show when={props.adaptiveDoneToday}>
+                    <span class="flex items-center gap-1.5 text-sm font-semibold text-main">
+                      <Fa icon="fa-check-circle" /> Done today
+                    </span>
+                  </Show>
+                  <button
+                    type="button"
+                    class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-4 py-2 text-sm font-semibold text-text hover:bg-text hover:text-bg"
+                    onClick={props.onAdaptiveReview}
+                    disabled={props.adaptiveLoading}
+                  >
+                    <Fa
+                      icon={
+                        props.adaptiveLoading
+                          ? "fa-circle-notch"
+                          : "fa-arrow-right"
+                      }
+                      class={cn(props.adaptiveLoading ? "fa-spin" : "")}
+                    />
+                    <span class="ml-1.5">
+                      {props.adaptiveDoneToday ? "Practice again" : "Start"}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
 

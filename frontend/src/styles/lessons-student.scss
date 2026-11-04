@@ -13,10 +13,32 @@
   h3,
   .lesson-card-title,
   .lesson-hero-heading {
-    font-family: "Lexend Deca", sans-serif;
+    // Students get the kid font (set on body.kid-theme); teachers keep Lexend.
+    font-family: var(--kid-font, "Lexend Deca"), sans-serif;
   }
 
   .lesson-card-next {
     animation: lessons-ring-flash 1.5s ease-in-out infinite;
+  }
+
+  .lesson-next-badge {
+    animation: lessons-badge-bob 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes lessons-badge-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion) {
+  .lessons-student-ui .lesson-card-next,
+  .lessons-student-ui .lesson-next-badge {
+    animation: none;
   }
 }

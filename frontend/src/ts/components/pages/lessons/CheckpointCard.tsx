@@ -9,6 +9,7 @@ import { LessonGroup } from "../../../lessons/lessons-data";
 import { showNoticeNotification } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
+import { Mascot } from "../../common/Mascot";
 import { LessonStars } from "./LessonStars";
 
 function checkpointSubtitle(checkpoint: HomeRowCheckpoint): string {
@@ -51,7 +52,7 @@ export function CheckpointCard(props: {
       class={cn(
         "relative grid min-h-48 grid-rows-[auto_1fr_auto] overflow-hidden rounded-2xl border border-sub-alt bg-sub-alt text-left shadow-md transition-all",
         locked()
-          ? "cursor-not-allowed text-sub opacity-55"
+          ? "cursor-not-allowed border-dashed text-sub opacity-75"
           : "cursor-pointer text-text hover:-translate-y-0.5 hover:border-main hover:shadow-lg",
         isNext() ? "lesson-card-next ring-2 ring-main" : "",
       )}
@@ -80,11 +81,12 @@ export function CheckpointCard(props: {
       </div>
       <div class="flex flex-col items-center justify-center gap-3 px-3 py-2">
         <div class="relative">
-          <Fa
-            icon={locked() ? "fa-lock" : props.checkpoint.icon}
-            class={locked() ? "text-sub" : "text-main"}
-            size={2.35}
-          />
+          <Show
+            when={!locked()}
+            fallback={<Mascot mood="sleepy" size={56} animate={false} />}
+          >
+            <Fa icon={props.checkpoint.icon} class="text-main" size={2.35} />
+          </Show>
           <Show when={!locked() && !done()}>
             <span class="absolute -top-1 -right-2 rounded-full bg-main px-1.5 py-0.5 text-[0.55rem] font-bold text-bg">
               game
@@ -95,7 +97,7 @@ export function CheckpointCard(props: {
           <LessonStars count={3} />
         </Show>
         <Show when={isNext()}>
-          <span class="rounded-full bg-main px-3 py-1 text-em-xs font-bold text-bg">
+          <span class="lesson-next-badge rounded-full bg-main px-3 py-1 text-sm font-bold text-bg">
             Do this next
           </span>
         </Show>
@@ -107,9 +109,15 @@ export function CheckpointCard(props: {
         >
           {props.checkpoint.label}
         </div>
-        <div class="mt-0.5 text-em-xs text-sub">
-          <Show when={done()} fallback={checkpointSubtitle(props.checkpoint)}>
-            best {props.progressFor(key())?.bestScore ?? 0}
+        <div class="mt-0.5 text-sm text-sub">
+          <Show when={locked()}>
+            <Fa icon="fa-lock" class="mr-1" size={0.8} />
+            Finish the lessons above first
+          </Show>
+          <Show when={!locked()}>
+            <Show when={done()} fallback={checkpointSubtitle(props.checkpoint)}>
+              best {props.progressFor(key())?.bestScore ?? 0}
+            </Show>
           </Show>
         </div>
       </div>

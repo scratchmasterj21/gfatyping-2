@@ -6,6 +6,7 @@ import { Lesson } from "../../../lessons/lessons-data";
 import { showNoticeNotification } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
+import { Mascot } from "../../common/Mascot";
 import { LessonStars } from "./LessonStars";
 
 function LessonStatus(props: { done: boolean }): JSXElement {
@@ -55,7 +56,7 @@ export function LessonCard(props: {
       class={cn(
         "group relative grid min-h-48 grid-rows-[auto_1fr_auto] overflow-hidden rounded-2xl border border-sub-alt bg-sub-alt text-left shadow-md transition-all",
         locked()
-          ? "cursor-not-allowed text-sub opacity-55"
+          ? "cursor-not-allowed border-dashed text-sub opacity-75"
           : needsImprovement()
             ? "cursor-pointer text-text ring-2 ring-main/50 hover:-translate-y-0.5 hover:shadow-lg"
             : done()
@@ -79,11 +80,12 @@ export function LessonCard(props: {
         <Show
           when={props.lesson.newKeys}
           fallback={
-            <Fa
-              icon={locked() ? "fa-lock" : "fa-keyboard"}
-              class={locked() ? "text-sub" : "text-main"}
-              size={2.35}
-            />
+            <Show
+              when={!locked()}
+              fallback={<Mascot mood="sleepy" size={56} animate={false} />}
+            >
+              <Fa icon="fa-keyboard" class="text-main" size={2.35} />
+            </Show>
           }
         >
           {(keys) => (
@@ -96,7 +98,7 @@ export function LessonCard(props: {
           <LessonStars count={props.progress?.stars ?? 1} />
         </Show>
         <Show when={isNext()}>
-          <span class="rounded-full bg-main px-3 py-1 text-em-xs font-bold text-bg">
+          <span class="lesson-next-badge rounded-full bg-main px-3 py-1 text-sm font-bold text-bg">
             Start here
           </span>
         </Show>
@@ -109,8 +111,14 @@ export function LessonCard(props: {
           {props.lesson.name}
         </div>
         <Show when={props.progress !== undefined}>
-          <div class="mt-0.5 text-em-xs text-sub">
+          <div class="mt-0.5 text-sm text-sub">
             {speedLabel(props.progress?.bestWpm ?? 0, props.grade)}
+          </div>
+        </Show>
+        <Show when={locked()}>
+          <div class="mt-0.5 text-xs text-sub">
+            <Fa icon="fa-lock" class="mr-1" size={0.8} />
+            {props.lockedMessage ?? "Finish the lesson before this one"}
           </div>
         </Show>
       </div>

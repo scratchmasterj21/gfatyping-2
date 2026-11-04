@@ -268,6 +268,18 @@ function ProgressSummary(props: {
     return Math.round(recentAvg - earlyAvg);
   });
 
+  // Best speed across curriculum lessons - shown instead of a negative
+  // trend (later lessons are harder, so a dip is normal, not a setback).
+  const bestLessonWpm = createMemo((): number => {
+    const p = props.progress;
+    if (p === undefined) return 0;
+    let best = 0;
+    for (const [id, lp] of p.entries()) {
+      if (isCurriculumLesson(id) && lp.bestWpm > best) best = lp.bestWpm;
+    }
+    return Math.round(best);
+  });
+
   const checkpointsDone = createMemo(() => {
     const p = props.progress;
     return allCheckpoints.filter(
@@ -338,11 +350,27 @@ function ProgressSummary(props: {
             subClass={needsImprovementCount() > 0 ? "text-main" : "text-sub"}
           />
           <Show when={wpmTrend() !== undefined}>
-            <StatCard
-              icon="fa-chart-line"
-              label="since you started"
-              value={`${(wpmTrend() ?? 0) >= 0 ? "+" : ""}${wpmTrend()} wpm`}
-            />
+            <Show
+              when={(wpmTrend() ?? 0) > 0}
+              fallback={
+                <Show when={bestLessonWpm() > 0}>
+                  <StatCard
+                    icon="fa-bolt"
+                    label="your best speed"
+                    value={`${bestLessonWpm()} wpm`}
+                    sub="Harder lessons take time - keep going!"
+                  />
+                </Show>
+              }
+            >
+              <StatCard
+                icon="fa-chart-line"
+                label="since you started"
+                value={`+${wpmTrend()} wpm`}
+                sub="You're getting faster!"
+                subClass="text-main"
+              />
+            </Show>
           </Show>
           <Show when={allCheckpoints.length > 0}>
             <StatCard
@@ -1474,9 +1502,6 @@ export function LessonsPage(): JSXElement {
     const idx = lessonGroups.findIndex((group) => group.id === id);
     return idx === -1 ? 0 : idx;
   });
-  const currentGroup = createMemo(
-    (): LessonGroup | undefined => lessonGroups[currentGroupIndex()],
-  );
 
   return (
     <Page id="lessons">
@@ -1533,6 +1558,7 @@ export function LessonsPage(): JSXElement {
           primaryLoading={reviewLoading() || lessonGameLoading()}
           weeklyQuestProgress={weeklyQuestQuery.data?.progress}
           weeklyQuestClaimed={weeklyQuestQuery.data?.claimed}
+          coins={avatarStateQuery.data?.coins}
           avatar={
             isAuthenticated()
               ? {
@@ -1550,46 +1576,6 @@ export function LessonsPage(): JSXElement {
           }
         />
 
-        <Show when={isAuthenticated() && progress.data !== undefined}>
-          <section class="grid gap-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <h2 class="flex items-center gap-2 text-lg font-bold text-text">
-                <Fa icon="fa-map" class="text-main" />
-                {currentGroup()?.name ?? "Adventure Map"}
-              </h2>
-              <Button
-                variant="text"
-                class="text-sm"
-                fa={{ icon: mapHidden() ? "fa-map" : "fa-eye-slash" }}
-                text={mapHidden() ? "Show map" : "Hide map"}
-                onClick={toggleMap}
-              />
-            </div>
-            <Show when={!mapHidden() && currentGroup() !== undefined}>
-              <AdventureMap
-                groups={[currentGroup() as LessonGroup]}
-                stateFor={mapStopState}
-                starsFor={groupStars}
-                onSelect={goToGroup}
-                avatar={
-                  <Avatar
-                    color={equippedAvatarColor()}
-                    shape={avatarStateQuery.data?.shape}
-                    hair={avatarStateQuery.data?.equipped.hair}
-                    hat={avatarStateQuery.data?.equipped.hat}
-                    accessory={avatarStateQuery.data?.equipped.accessory}
-                    face={avatarStateQuery.data?.equipped.face}
-                    background={avatarStateQuery.data?.equipped.background}
-                    highlightColor={equippedAvatarHighlight()}
-                    size={28}
-                    animalImage={animalAvatarQuery.data?.animalImage}
-                  />
-                }
-              />
-            </Show>
-          </section>
-        </Show>
-
         <Show when={classGoal()} keyed>
           {(g) => (
             <ClassGoalBar
@@ -1600,6 +1586,95 @@ export function LessonsPage(): JSXElement {
             />
           )}
         </Show>
+
+        {/* 5. Typing Lessons — main section wrapping all lesson groups */}
+        <section>
+          <LessonsCollapsibleHeader
+            sectionId="typing-lessons"
+            text="Typing Lessons"
+            icon="fa-graduation-cap"
+            collapsed={collapsed}
+            onToggle={toggle}
+          />
+          <Show when={!collapsed().has("typing-lessons")}>
+            <div id="lessons-section-typing-lessons">
+              <p class="mb-2 text-sm font-medium text-main">
+                Start with the lesson marked Next and complete lessons in order.
+              </p>
+              <div class="mb-4 grid gap-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h3 class="flex items-center gap-2 text-sm font-bold text-text">
+                    <Fa icon="fa-map" class="text-main" />
+                    Adventure map
+                  </h3>
+                  <Button
+                    variant="text"
+                    class="text-sm"
+                    fa={{ icon: mapHidden() ? "fa-map" : "fa-eye-slash" }}
+                    text={mapHidden() ? "Show map" : "Hide map"}
+                    onClick={toggleMap}
+                  />
+                </div>
+                <Show when={!mapHidden()}>
+                  <AdventureMap
+                    groups={lessonGroups}
+                    stateFor={mapStopState}
+                    starsFor={groupStars}
+                    onSelect={goToGroup}
+                    avatar={
+                      <Avatar
+                        color={equippedAvatarColor()}
+                        shape={avatarStateQuery.data?.shape}
+                        hair={avatarStateQuery.data?.equipped.hair}
+                        hat={avatarStateQuery.data?.equipped.hat}
+                        accessory={avatarStateQuery.data?.equipped.accessory}
+                        face={avatarStateQuery.data?.equipped.face}
+                        background={avatarStateQuery.data?.equipped.background}
+                        highlightColor={equippedAvatarHighlight()}
+                        size={28}
+                        animalImage={animalAvatarQuery.data?.animalImage}
+                      />
+                    }
+                  />
+                </Show>
+              </div>
+              <Show when={progress.isLoading && progress.data === undefined}>
+                <div class="mb-4 grid gap-3" aria-hidden="true">
+                  <div class="h-8 w-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
+                  </div>
+                </div>
+              </Show>
+              <div class="grid gap-1">
+                <For each={lessonGroups}>
+                  {(group, index) => (
+                    <LessonGroupSection
+                      group={group}
+                      collapsed={collapsed().has(group.id)}
+                      onToggle={() => toggle(group.id)}
+                      isCurrent={group.id === currentGroupId()}
+                      isFuture={index() > currentGroupIndex()}
+                      isComplete={isGroupComplete(group)}
+                      progressFor={progressFor}
+                      isLessonLocked={isLessonLocked}
+                      getLessonLockMessage={getLessonLockMessage}
+                      frontierLessonId={frontierLessonId()}
+                      frontierCheckpointTarget={frontierCheckpointTarget()}
+                      lessonGameLoading={lessonGameLoading()}
+                      onCheckpointPlay={(g, c) => void openCheckpointGame(g, c)}
+                      onGroupGame={(g, type) => void openLessonGame(g, type)}
+                      grade={grade()}
+                      isGroupComplete={isGroupComplete}
+                    />
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
+        </section>
 
         <Show when={isAuthenticated()}>
           <section class="rounded-double bg-sub-alt font-kid">
@@ -1728,81 +1803,6 @@ export function LessonsPage(): JSXElement {
             />
           </div>
         </Show>
-
-        {/* 5. Typing Lessons — main section wrapping all lesson groups */}
-        <section>
-          <LessonsCollapsibleHeader
-            sectionId="typing-lessons"
-            text="Typing Lessons"
-            icon="fa-graduation-cap"
-            collapsed={collapsed}
-            onToggle={toggle}
-          />
-          <Show when={!collapsed().has("typing-lessons")}>
-            <div id="lessons-section-typing-lessons">
-              <p class="mb-2 text-sm font-medium text-main">
-                Start with the lesson marked Next and complete lessons in order.
-              </p>
-              <div class="mb-4 grid gap-2">
-                <h3 class="text-sm font-bold text-text">All groups</h3>
-                <AdventureMap
-                  groups={lessonGroups}
-                  stateFor={mapStopState}
-                  starsFor={groupStars}
-                  onSelect={goToGroup}
-                  avatar={
-                    <Avatar
-                      color={equippedAvatarColor()}
-                      shape={avatarStateQuery.data?.shape}
-                      hair={avatarStateQuery.data?.equipped.hair}
-                      hat={avatarStateQuery.data?.equipped.hat}
-                      accessory={avatarStateQuery.data?.equipped.accessory}
-                      face={avatarStateQuery.data?.equipped.face}
-                      background={avatarStateQuery.data?.equipped.background}
-                      highlightColor={equippedAvatarHighlight()}
-                      size={28}
-                      animalImage={animalAvatarQuery.data?.animalImage}
-                    />
-                  }
-                />
-              </div>
-              <Show when={progress.isLoading && progress.data === undefined}>
-                <div class="mb-4 grid gap-3" aria-hidden="true">
-                  <div class="h-8 w-48 animate-pulse rounded-2xl bg-sub-alt"></div>
-                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
-                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
-                    <div class="h-48 animate-pulse rounded-2xl bg-sub-alt"></div>
-                  </div>
-                </div>
-              </Show>
-              <div class="grid gap-1">
-                <For each={lessonGroups}>
-                  {(group, index) => (
-                    <LessonGroupSection
-                      group={group}
-                      collapsed={collapsed().has(group.id)}
-                      onToggle={() => toggle(group.id)}
-                      isCurrent={group.id === currentGroupId()}
-                      isFuture={index() > currentGroupIndex()}
-                      isComplete={isGroupComplete(group)}
-                      progressFor={progressFor}
-                      isLessonLocked={isLessonLocked}
-                      getLessonLockMessage={getLessonLockMessage}
-                      frontierLessonId={frontierLessonId()}
-                      frontierCheckpointTarget={frontierCheckpointTarget()}
-                      lessonGameLoading={lessonGameLoading()}
-                      onCheckpointPlay={(g, c) => void openCheckpointGame(g, c)}
-                      onGroupGame={(g, type) => void openLessonGame(g, type)}
-                      grade={grade()}
-                      isGroupComplete={isGroupComplete}
-                    />
-                  )}
-                </For>
-              </div>
-            </div>
-          </Show>
-        </section>
 
         {/* 6. Class Practice */}
         <Show
