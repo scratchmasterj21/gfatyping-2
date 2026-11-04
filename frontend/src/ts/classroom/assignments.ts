@@ -14,7 +14,8 @@ import type { EquippedAvatar } from "../avatar/avatar-state";
 import { equippedFromDoc } from "../avatar/equipped-from-doc";
 import { gradeOf } from "../constants/classes";
 import { getAuthenticatedUser, getDb } from "../firebase";
-import { findLesson, lessonOrder } from "../lessons/lessons-data";
+import { lessonDisplayName } from "../lessons/lesson-display-name";
+import { lessonOrder } from "../lessons/lessons-data";
 import { bestWpm, StoredUserDoc } from "./classroom";
 import { LessonMark } from "./certificate-levels";
 
@@ -496,7 +497,7 @@ export async function getClassProgress(
         if (p.completed !== true && (p.attempts ?? 0) >= STUCK_ATTEMPTS) {
           stuckLessons.push({
             lessonId: key,
-            name: findLesson(key)?.name ?? key,
+            name: lessonDisplayName(key),
             attempts: p.attempts ?? 0,
           });
         }
@@ -577,7 +578,7 @@ export async function getStudentLessonDetails(
     const p = progress.get(lessonId);
     return {
       lessonId,
-      name: findLesson(lessonId)?.name ?? lessonId,
+      name: lessonDisplayName(lessonId),
       completed: p?.completed === true,
       stars: p?.stars ?? 0,
       bestWpm: p?.bestWpm ?? 0,

@@ -17,6 +17,7 @@ import {
   SideImageSet,
 } from "../../../classroom/side-images";
 import { getDb } from "../../../firebase";
+import { createEffectOn } from "../../../hooks/effects";
 import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
 import { H3 } from "../../common/Headers";
@@ -26,14 +27,30 @@ const inputClass =
 
 function ImagePreview(props: { url: string | null }): JSXElement {
   const [failed, setFailed] = createSignal(false);
+  // a new link gets a fresh chance to load
+  createEffectOn(
+    () => props.url,
+    () => setFailed(false),
+  );
   return (
-    <Show when={props.url !== null && props.url !== "" && !failed()}>
-      <img
-        src={props.url ?? ""}
-        alt="preview"
-        class="mt-1 h-28 w-full rounded object-contain"
-        onError={() => setFailed(true)}
-      />
+    <Show when={props.url !== null && props.url !== ""}>
+      <Show
+        when={!failed()}
+        fallback={
+          <div class="mt-1 flex h-28 w-full flex-col items-center justify-center gap-1 rounded border border-dashed border-error p-2 text-center text-xs text-error">
+            <Fa icon="fa-exclamation-triangle" />
+            This image didn&apos;t load. Check the link, or the site may have
+            removed it.
+          </div>
+        }
+      >
+        <img
+          src={props.url ?? ""}
+          alt="preview"
+          class="mt-1 h-28 w-full rounded object-contain"
+          onError={() => setFailed(true)}
+        />
+      </Show>
     </Show>
   );
 }

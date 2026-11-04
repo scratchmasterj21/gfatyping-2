@@ -82,9 +82,9 @@ import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
 
 const inputClass =
-  "w-full rounded bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
+  "w-full rounded border border-sub-alt bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
 const selectClass =
-  "rounded bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
+  "rounded border border-sub-alt bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
 const panelClass = "rounded-2xl bg-sub-alt p-4";
 
 function LoadingBars(): JSXElement {
@@ -244,9 +244,84 @@ function ProgressTab(props: {
     });
   };
 
+  type SortKey =
+    | "name"
+    | "bestWpm"
+    | "bestAcc"
+    | "xp"
+    | "lessons"
+    | "tries"
+    | "lessonAcc"
+    | "onTask"
+    | "assignments"
+    | "lastActive";
+  const [sortKey, setSortKey] = createSignal<SortKey>("lastActive");
+  const [sortDesc, setSortDesc] = createSignal(true);
+  const [search, setSearch] = createSignal("");
+  const [openPanel, setOpenPanel] = createSignal<"rewards" | "reports" | null>(
+    null,
+  );
+  const togglePanel = (panel: "rewards" | "reports"): void => {
+    setOpenPanel((cur) => (cur === panel ? null : panel));
+  };
+  const [allColumns, setAllColumns] = createSignal(false);
+  /** Secondary columns hide below lg (iPad) unless "More columns" is on. */
+  const extraCol = (): string => (allColumns() ? "" : "hidden lg:table-cell");
+
+  const sortValue = (
+    row: StudentProgressRow,
+    key: SortKey,
+  ): number | string => {
+    switch (key) {
+      case "name":
+        return row.name.toLowerCase();
+      case "bestWpm":
+        return row.bestWpm;
+      case "bestAcc":
+        return row.bestAcc;
+      case "xp":
+        return row.xp;
+      case "lessons":
+        return row.lessonsCompleted;
+      case "tries":
+        return row.lessonAttempts;
+      case "lessonAcc":
+        return row.lessonAvgAcc;
+      case "onTask":
+        return row.lessonTime;
+      case "assignments": {
+        const total = assignmentTotal(row);
+        return total === 0 ? -1 : assignmentsDone(row) / total;
+      }
+      case "lastActive":
+        return row.lastActive;
+    }
+  };
+  const sortBy = (key: SortKey): void => {
+    if (sortKey() === key) {
+      setSortDesc((d) => !d);
+    } else {
+      setSortKey(key);
+      // names read best A-Z; numbers best highest-first
+      setSortDesc(key !== "name");
+    }
+  };
+
   const filteredRows = createMemo(() => {
     let list = props.rows.slice();
-    list.sort((a, b) => b.lastActive - a.lastActive);
+    const key = sortKey();
+    const dir = sortDesc() ? -1 : 1;
+    list.sort((a, b) => {
+      const va = sortValue(a, key);
+      const vb = sortValue(b, key);
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return b.lastActive - a.lastActive;
+    });
+    const q = search().trim().toLowerCase();
+    if (q.length > 0) {
+      list = list.filter((r) => r.name.toLowerCase().includes(q));
+    }
     const f = progressFilter();
     if (f === "quiet") {
       list = list.filter(isGoneQuiet);
@@ -552,6 +627,41 @@ function ProgressTab(props: {
     }
   };
 
+  const sortHeader = (
+    key: SortKey,
+    label: string,
+    opts: { right?: boolean; extra?: boolean; short?: string } = {},
+  ): JSXElement => (
+    <th
+      class={cn(
+        "p-2",
+        opts.right === true && "text-right",
+        opts.extra === true && extraCol(),
+      )}
+      aria-sort={
+        sortKey() === key ? (sortDesc() ? "descending" : "ascending") : "none"
+      }
+    >
+      <button
+        type="button"
+        class={cn(
+          "inline-flex cursor-pointer items-center gap-1 whitespace-nowrap hover:text-text",
+          sortKey() === key && "text-main",
+        )}
+        onClick={() => sortBy(key)}
+        aria-label={`Sort by ${label}`}
+      >
+        <Show when={opts.short !== undefined} fallback={label}>
+          <span class="lg:hidden">{opts.short}</span>
+          <span class="hidden lg:inline">{label}</span>
+        </Show>
+        <Show when={sortKey() === key}>
+          <Fa icon={sortDesc() ? "fa-caret-down" : "fa-caret-up"} />
+        </Show>
+      </button>
+    </th>
+  );
+
   return (
     <Show when={!props.loading} fallback={<LoadingBars />}>
       <Show
@@ -576,47 +686,6 @@ function ProgressTab(props: {
               />
             )}
           </Show>
-          <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
-            <Fa icon="fa-flag-checkered" />
-            <span>Class goal:</span>
-            <input
-              type="number"
-              min="1"
-              class={cn(selectClass, "w-24")}
-              aria-label="Goal stars"
-              value={goalStars()}
-              onChange={(e) =>
-                setGoalStars(Math.max(1, Number(e.currentTarget.value) || 1))
-              }
-            />
-            <span>stars, reward</span>
-            <input
-              type="text"
-              maxLength={60}
-              placeholder="e.g. class party"
-              class={cn(selectClass, "w-48")}
-              aria-label="Goal reward"
-              value={goalReward()}
-              onInput={(e) => setGoalReward(e.currentTarget.value)}
-            />
-            <Button
-              text={currentGoal() === undefined ? "set goal" : "update goal"}
-              disabled={savingGoal()}
-              onClick={() => void saveGoal(false)}
-            />
-            <Show when={currentGoal() !== undefined}>
-              <Button
-                variant="text"
-                text="remove"
-                disabled={savingGoal()}
-                onClick={() => void saveGoal(true)}
-              />
-            </Show>
-            <span class="text-xs">
-              (class has {classStars()} stars now · students see the bar on
-              their lessons page)
-            </span>
-          </div>
         </div>
         <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div class="min-w-0 rounded-xl bg-bg p-3">
@@ -757,7 +826,7 @@ function ProgressTab(props: {
             </span>
           </Show>
         </div>
-        <div class="mb-3 flex flex-wrap gap-2">
+        <div class="mb-3 flex flex-wrap items-center gap-2">
           <Button
             variant="text"
             text="All"
@@ -788,96 +857,29 @@ function ProgressTab(props: {
             active={progressFilter() === "stuck"}
             onClick={() => setProgressFilter("stuck")}
           />
-        </div>
-        <div class="mb-3 flex flex-wrap items-center justify-end gap-3">
-          <div class="flex items-center gap-1.5 text-sm text-sub">
-            <Fa icon="fa-coins" />
-            <span>coins to give:</span>
-            <input
-              type="number"
-              min="1"
-              class={cn(selectClass, "w-20")}
-              value={coinAmount()}
-              onChange={(e) =>
-                setCoinAmount(Math.max(1, Number(e.currentTarget.value) || 1))
-              }
-            />
-          </div>
-          <div class="flex items-center gap-1.5 text-sm text-sub">
-            <span>PDF period:</span>
-            <input
-              type="date"
-              class={selectClass}
-              value={rangeStart()}
-              max={rangeEnd()}
-              onChange={(e) => setRangeStart(e.currentTarget.value)}
-            />
-            <span>to</span>
-            <input
-              type="date"
-              class={selectClass}
-              value={rangeEnd()}
-              min={rangeStart()}
-              onChange={(e) => setRangeEnd(e.currentTarget.value)}
-            />
-            <Button
-              variant="text"
-              text="7d"
-              onClick={() => applyRangePreset(7)}
-            />
-            <Button
-              variant="text"
-              text="30d"
-              onClick={() => applyRangePreset(30)}
-            />
-            <Button
-              variant="text"
-              text="90d"
-              onClick={() => applyRangePreset(90)}
-            />
-          </div>
-          <Button
-            text={previewingAll() ? "opening…" : "preview all (pdf)"}
-            fa={{ icon: "fa-eye" }}
-            onClick={() => void previewAllPdf()}
-            disabled={
-              props.rows.length === 0 || previewingAll() || downloadingAll()
-            }
+          <div class="grow"></div>
+          <input
+            type="search"
+            placeholder="Search name…"
+            aria-label="Search students by name"
+            class={cn(selectClass, "w-44")}
+            value={search()}
+            onInput={(e) => setSearch(e.currentTarget.value)}
           />
           <Button
-            text={downloadingAll() ? "building…" : "download all (pdf)"}
-            fa={{ icon: "fa-file-pdf" }}
-            onClick={() => void downloadAllPdf()}
-            disabled={props.rows.length === 0 || downloadingAll()}
+            text="Rewards"
+            fa={{ icon: "fa-gift" }}
+            active={openPanel() === "rewards"}
+            aria-expanded={openPanel() === "rewards"}
+            onClick={() => togglePanel("rewards")}
           />
           <Button
-            text="print this week"
-            fa={{ icon: "fa-print" }}
-            onClick={printThisWeek}
-            disabled={props.rows.length === 0 || downloadingAll()}
+            text="Reports"
+            fa={{ icon: "fa-file-alt" }}
+            active={openPanel() === "reports"}
+            aria-expanded={openPanel() === "reports"}
+            onClick={() => togglePanel("reports")}
           />
-          <Button
-            text={
-              selectedForCert().size > 0
-                ? `print certificates (${selectedForCert().size})`
-                : "print certificates"
-            }
-            fa={{ icon: "fa-certificate" }}
-            onClick={openCertificatesForSelected}
-            disabled={selectedForCert().size === 0}
-          />
-          <Button
-            text="export csv"
-            fa={{ icon: "fa-file-csv" }}
-            onClick={exportCsv}
-            disabled={props.rows.length === 0}
-          />
-        </div>
-        <p class="mb-2 text-xs text-sub">
-          PDF date range affects practice stats only; use preview then Print →
-          Save as PDF for conferences.
-        </p>
-        <div class="mb-2 flex justify-end">
           <Button
             variant="text"
             class="text-sm"
@@ -886,6 +888,152 @@ function ProgressTab(props: {
             onClick={() => setShowAvatarWall((v) => !v)}
           />
         </div>
+        <Show when={openPanel() === "rewards"}>
+          <div class="mb-3 grid gap-3 rounded-xl bg-bg p-3">
+            <div class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Rewards
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+              <Fa icon="fa-flag-checkered" />
+              <span>Class goal:</span>
+              <input
+                type="number"
+                min="1"
+                class={cn(selectClass, "w-24")}
+                aria-label="Goal stars"
+                value={goalStars()}
+                onChange={(e) =>
+                  setGoalStars(Math.max(1, Number(e.currentTarget.value) || 1))
+                }
+              />
+              <span>stars, reward</span>
+              <input
+                type="text"
+                maxLength={60}
+                placeholder="e.g. class party"
+                class={cn(selectClass, "w-48")}
+                aria-label="Goal reward"
+                value={goalReward()}
+                onInput={(e) => setGoalReward(e.currentTarget.value)}
+              />
+              <Button
+                text={currentGoal() === undefined ? "set goal" : "update goal"}
+                disabled={savingGoal()}
+                onClick={() => void saveGoal(false)}
+              />
+              <Show when={currentGoal() !== undefined}>
+                <Button
+                  variant="text"
+                  text="remove"
+                  disabled={savingGoal()}
+                  onClick={() => void saveGoal(true)}
+                />
+              </Show>
+              <span class="text-xs">
+                (class has {classStars()} stars now · students see the bar on
+                their lessons page)
+              </span>
+            </div>
+            <div class="flex items-center gap-1.5 text-sm text-sub">
+              <Fa icon="fa-coins" />
+              <span>coins to give:</span>
+              <input
+                type="number"
+                min="1"
+                class={cn(selectClass, "w-20")}
+                value={coinAmount()}
+                onChange={(e) =>
+                  setCoinAmount(Math.max(1, Number(e.currentTarget.value) || 1))
+                }
+              />
+            </div>
+            <p class="text-xs text-sub">
+              Give coins to one student with the coin button on their row.
+            </p>
+          </div>
+        </Show>
+        <Show when={openPanel() === "reports"}>
+          <div class="mb-3 grid gap-3 rounded-xl bg-bg p-3">
+            <div class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Reports
+            </div>
+            <div class="flex items-center gap-1.5 text-sm text-sub">
+              <span>PDF period:</span>
+              <input
+                type="date"
+                class={selectClass}
+                value={rangeStart()}
+                max={rangeEnd()}
+                onChange={(e) => setRangeStart(e.currentTarget.value)}
+              />
+              <span>to</span>
+              <input
+                type="date"
+                class={selectClass}
+                value={rangeEnd()}
+                min={rangeStart()}
+                onChange={(e) => setRangeEnd(e.currentTarget.value)}
+              />
+              <Button
+                variant="text"
+                text="7d"
+                onClick={() => applyRangePreset(7)}
+              />
+              <Button
+                variant="text"
+                text="30d"
+                onClick={() => applyRangePreset(30)}
+              />
+              <Button
+                variant="text"
+                text="90d"
+                onClick={() => applyRangePreset(90)}
+              />
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button
+                text={previewingAll() ? "opening…" : "preview all (pdf)"}
+                fa={{ icon: "fa-eye" }}
+                onClick={() => void previewAllPdf()}
+                disabled={
+                  props.rows.length === 0 || previewingAll() || downloadingAll()
+                }
+              />
+              <Button
+                text={downloadingAll() ? "building…" : "download all (pdf)"}
+                fa={{ icon: "fa-file-pdf" }}
+                onClick={() => void downloadAllPdf()}
+                disabled={props.rows.length === 0 || downloadingAll()}
+              />
+              <Button
+                text="print this week"
+                fa={{ icon: "fa-print" }}
+                onClick={printThisWeek}
+                disabled={props.rows.length === 0 || downloadingAll()}
+              />
+              <Button
+                text={
+                  selectedForCert().size > 0
+                    ? `print certificates (${selectedForCert().size})`
+                    : "print certificates"
+                }
+                fa={{ icon: "fa-certificate" }}
+                onClick={openCertificatesForSelected}
+                disabled={selectedForCert().size === 0}
+              />
+              <Button
+                text="export csv"
+                fa={{ icon: "fa-file-csv" }}
+                onClick={exportCsv}
+                disabled={props.rows.length === 0}
+              />
+            </div>
+            <p class="mb-2 text-xs text-sub">
+              PDF date range affects practice stats only; use preview then Print
+              → Save as PDF for conferences.
+            </p>
+          </div>
+        </Show>
         <Show when={showAvatarWall()}>
           <div class="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-8">
             <For each={filteredRows()}>
@@ -915,8 +1063,25 @@ function ProgressTab(props: {
             </For>
           </div>
         </Show>
+        <div
+          class={cn(
+            "mb-2 flex items-center justify-between gap-2 text-sm text-sub",
+            showAvatarWall() && "hidden",
+          )}
+        >
+          <span>
+            {filteredRows().length} of {props.rows.length} students
+          </span>
+          <Button
+            variant="text"
+            class="text-sm lg:hidden"
+            fa={{ icon: allColumns() ? "fa-compress-alt" : "fa-expand-alt" }}
+            text={allColumns() ? "Fewer columns" : "More columns"}
+            onClick={() => setAllColumns((v) => !v)}
+          />
+        </div>
         <div class={cn("overflow-x-auto", showAvatarWall() ? "hidden" : "")}>
-          <table class="w-full text-left text-sm">
+          <table class="w-full text-left text-sm [&_td]:px-1.5 lg:[&_td]:px-2 [&_th]:px-1.5 lg:[&_th]:px-2">
             <thead class="text-sub [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-bg">
               <tr>
                 <th class="w-8 p-2">
@@ -931,18 +1096,32 @@ function ProgressTab(props: {
                     onChange={selectAllForCert}
                   />
                 </th>
-                <th class="p-2">name</th>
-                <th class="p-2 text-right">best wpm</th>
-                <th class="p-2 text-right">acc</th>
-                <th class="p-2 text-right">xp</th>
-                <th class="p-2 text-right">lessons</th>
-                <th class="p-2 text-right">tries</th>
-                <th class="p-2 text-right">lesson acc</th>
-                <th class="p-2 text-right">on task</th>
-                <th class="p-2 text-right">assignments</th>
-                <th class="p-2">weak keys</th>
-                <th class="p-2 text-right">last active</th>
-                <th class="p-2"></th>
+                {sortHeader("name", "name")}
+                {sortHeader("bestWpm", "best wpm", {
+                  right: true,
+                  short: "wpm",
+                })}
+                {sortHeader("bestAcc", "acc", { right: true })}
+                {sortHeader("xp", "xp", { right: true, extra: true })}
+                {sortHeader("lessons", "lessons", { right: true })}
+                {sortHeader("tries", "tries", { right: true, extra: true })}
+                {sortHeader("lessonAcc", "lesson acc", {
+                  right: true,
+                  extra: true,
+                })}
+                {sortHeader("onTask", "on task", { right: true, extra: true })}
+                {sortHeader("assignments", "assignments", {
+                  right: true,
+                  short: "tasks",
+                })}
+                <th class={cn("p-2", extraCol())}>weak keys</th>
+                {sortHeader("lastActive", "last active", {
+                  right: true,
+                  short: "active",
+                })}
+                <th class="p-2">
+                  <span class="sr-only">actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -961,7 +1140,7 @@ function ProgressTab(props: {
                           onChange={() => toggleCertSelect(row.uid)}
                         />
                       </td>
-                      <td class="max-w-[12rem] p-2 text-text">
+                      <td class="max-w-[8.5rem] p-2 text-text lg:max-w-[14rem]">
                         <span class="flex min-w-0 items-center gap-2">
                           <Fa
                             icon={
@@ -987,21 +1166,28 @@ function ProgressTab(props: {
                       </td>
                       <td class="p-2 text-right">{Math.round(row.bestWpm)}</td>
                       <td class="p-2 text-right">{Math.round(row.bestAcc)}%</td>
-                      <td class="p-2 text-right">{row.xp}</td>
+                      <td class={cn("p-2 text-right", extraCol())}>{row.xp}</td>
                       <td class="p-2 text-right">{row.lessonsCompleted}</td>
-                      <td class="p-2 text-right">{row.lessonAttempts}</td>
-                      <td class="p-2 text-right">
+                      <td class={cn("p-2 text-right", extraCol())}>
+                        {row.lessonAttempts}
+                      </td>
+                      <td class={cn("p-2 text-right", extraCol())}>
                         {row.lessonAvgAcc > 0
                           ? `${Math.round(row.lessonAvgAcc)}%`
                           : "-"}
                       </td>
-                      <td class="p-2 text-right">
+                      <td class={cn("p-2 text-right", extraCol())}>
                         {formatMinutes(row.lessonTime)}
                       </td>
                       <td class="p-2 text-right">
                         {assignmentsDone(row)}/{assignmentTotal(row)}
                       </td>
-                      <td class="max-w-[8rem] truncate p-2 text-sub">
+                      <td
+                        class={cn(
+                          "max-w-[8rem] truncate p-2 text-sub",
+                          extraCol(),
+                        )}
+                      >
                         {formatWeakKeys(row.weakKeys, 3)}
                       </td>
                       <td
@@ -1015,9 +1201,10 @@ function ProgressTab(props: {
                       >
                         {formatDate(row.lastActive)}
                       </td>
-                      <td class="p-2 text-right whitespace-nowrap">
+                      <td class="p-1 text-right whitespace-nowrap lg:p-2">
                         <Button
                           variant="text"
+                          class="p-1.5 lg:p-[0.5em]"
                           fa={{ icon: "fa-coins" }}
                           balloon={{
                             text: `give ${coinAmount()} coins`,
@@ -1031,6 +1218,7 @@ function ProgressTab(props: {
                         />
                         <Button
                           variant="text"
+                          class="p-1.5 lg:p-[0.5em]"
                           fa={{ icon: "fa-eye" }}
                           balloon={{
                             text: "preview progress report (pdf)",
@@ -1047,6 +1235,7 @@ function ProgressTab(props: {
                         />
                         <Button
                           variant="text"
+                          class="p-1.5 lg:p-[0.5em]"
                           fa={{ icon: "fa-file-pdf" }}
                           balloon={{
                             text: "download progress report (pdf)",
@@ -1060,6 +1249,7 @@ function ProgressTab(props: {
                         />
                         <Button
                           variant="text"
+                          class="hidden p-1.5 lg:inline-flex lg:p-[0.5em]"
                           fa={{ icon: "fa-certificate" }}
                           balloon={{
                             text: "print certificate",
@@ -1400,93 +1590,135 @@ function AssignmentsTab(props: {
 
   return (
     <div class="grid gap-4">
-      <div class="grid gap-2 rounded bg-bg p-3">
-        <input
-          type="text"
-          class={inputClass}
-          placeholder="assignment title..."
-          value={title()}
-          onInput={(e) => setTitle(e.currentTarget.value)}
-        />
-        <div class="flex flex-wrap items-center gap-2">
-          <select
-            class={selectClass}
-            value={scope()}
-            onChange={(e) => setScope(e.currentTarget.value as AssignmentScope)}
-          >
-            <option value="class">a class</option>
-            <option value="grade">a grade</option>
-            <option value="school">whole school</option>
-            <option value="student">one student</option>
-          </select>
-          <ScopeFields
-            scope={scope()}
-            classId={classId()}
-            grade={grade()}
-            onClassId={setClassId}
-            onGrade={setGrade}
-            studentUid={studentUid()}
-            students={props.rows}
-            onStudentUid={setStudentUid}
-          />
-          <select
-            class={selectClass}
-            value={contentType()}
-            onChange={(e) =>
-              setContentType(e.currentTarget.value as ContentType)
-            }
-          >
-            <option value="lesson">built-in lesson</option>
-            <option value="wordlist">word list</option>
-            <option value="passage">reading passage</option>
-          </select>
-          <Show when={contentType() === "lesson"}>
-            <select
-              class={selectClass}
-              value={lessonId()}
-              onChange={(e) => setLessonId(e.currentTarget.value)}
-            >
-              <For each={lessonGroups}>
-                {(group) => (
-                  <optgroup label={group.name}>
-                    <For each={group.lessons}>
-                      {(l) => <option value={l.id}>{l.name}</option>}
-                    </For>
-                  </optgroup>
-                )}
-              </For>
-            </select>
-          </Show>
-          <Show when={contentType() === "wordlist"}>
-            <select
-              class={selectClass}
-              value={wordListId()}
-              onChange={(e) => setWordListId(e.currentTarget.value)}
-            >
-              <option value="">select word list...</option>
-              <For each={props.wordLists}>
-                {(wl) => <option value={wl.id}>{wl.title}</option>}
-              </For>
-            </select>
-          </Show>
-          <Show when={contentType() === "passage"}>
-            <select
-              class={selectClass}
-              value={passageId()}
-              onChange={(e) => setPassageId(e.currentTarget.value)}
-            >
-              <option value="">select passage...</option>
-              <For each={props.passages}>
-                {(p) => <option value={p.id}>{p.title}</option>}
-              </For>
-            </select>
-          </Show>
+      <div class="grid gap-3 rounded-xl bg-bg p-4">
+        <div class="text-sm font-semibold text-text">
+          <Fa icon="fa-plus-circle" class="mr-1.5 text-main" />
+          New assignment
+        </div>
+        <label class="grid min-w-0 gap-1">
+          <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+            Title
+          </span>
           <input
-            type="date"
-            class={selectClass}
-            value={due()}
-            onInput={(e) => setDue(e.currentTarget.value)}
+            type="text"
+            class={inputClass}
+            placeholder="assignment title..."
+            value={title()}
+            onInput={(e) => setTitle(e.currentTarget.value)}
           />
+        </label>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 [&_select]:w-full [&_select]:min-w-0">
+          <label class="grid min-w-0 gap-1">
+            <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Assign to
+            </span>
+            <select
+              class={selectClass}
+              value={scope()}
+              onChange={(e) =>
+                setScope(e.currentTarget.value as AssignmentScope)
+              }
+            >
+              <option value="class">a class</option>
+              <option value="grade">a grade</option>
+              <option value="school">whole school</option>
+              <option value="student">one student</option>
+            </select>
+          </label>
+          <Show when={scope() !== "school"}>
+            <div class="grid min-w-0 gap-1">
+              <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+                Who
+              </span>
+              <div class="flex flex-wrap gap-2">
+                <ScopeFields
+                  scope={scope()}
+                  classId={classId()}
+                  grade={grade()}
+                  onClassId={setClassId}
+                  onGrade={setGrade}
+                  studentUid={studentUid()}
+                  students={props.rows}
+                  onStudentUid={setStudentUid}
+                />
+              </div>
+            </div>
+          </Show>
+          <label class="grid min-w-0 gap-1">
+            <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Type
+            </span>
+            <select
+              class={selectClass}
+              value={contentType()}
+              onChange={(e) =>
+                setContentType(e.currentTarget.value as ContentType)
+              }
+            >
+              <option value="lesson">built-in lesson</option>
+              <option value="wordlist">word list</option>
+              <option value="passage">reading passage</option>
+            </select>
+          </label>
+          <label class="grid min-w-0 gap-1">
+            <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Content
+            </span>
+            <Show when={contentType() === "lesson"}>
+              <select
+                class={selectClass}
+                value={lessonId()}
+                onChange={(e) => setLessonId(e.currentTarget.value)}
+              >
+                <For each={lessonGroups}>
+                  {(group) => (
+                    <optgroup label={group.name}>
+                      <For each={group.lessons}>
+                        {(l) => <option value={l.id}>{l.name}</option>}
+                      </For>
+                    </optgroup>
+                  )}
+                </For>
+              </select>
+            </Show>
+            <Show when={contentType() === "wordlist"}>
+              <select
+                class={selectClass}
+                value={wordListId()}
+                onChange={(e) => setWordListId(e.currentTarget.value)}
+              >
+                <option value="">select word list...</option>
+                <For each={props.wordLists}>
+                  {(wl) => <option value={wl.id}>{wl.title}</option>}
+                </For>
+              </select>
+            </Show>
+            <Show when={contentType() === "passage"}>
+              <select
+                class={selectClass}
+                value={passageId()}
+                onChange={(e) => setPassageId(e.currentTarget.value)}
+              >
+                <option value="">select passage...</option>
+                <For each={props.passages}>
+                  {(p) => <option value={p.id}>{p.title}</option>}
+                </For>
+              </select>
+            </Show>
+          </label>
+        </div>
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <label class="grid min-w-0 gap-1">
+            <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Due date (optional)
+            </span>
+            <input
+              type="date"
+              class={selectClass}
+              value={due()}
+              onInput={(e) => setDue(e.currentTarget.value)}
+            />
+          </label>
           <Button
             text={busy() ? "creating..." : "create"}
             fa={{ icon: "fa-plus" }}
@@ -1546,11 +1778,13 @@ function AssignmentsTab(props: {
                       <Button
                         variant="text"
                         fa={{ icon: "fa-pen" }}
+                        aria-label={`Edit ${a.title}`}
                         onClick={() => startEdit(a)}
                       />
                       <Button
                         variant="text"
                         fa={{ icon: "fa-trash" }}
+                        aria-label={`Delete ${a.title}`}
                         danger
                         onClick={() => void remove(a.id)}
                       />
@@ -1762,45 +1996,76 @@ function AnnouncementsTab(props: {
 
   return (
     <div class="grid gap-4">
-      <div class="grid gap-2 rounded bg-bg p-3">
-        <input
-          type="text"
-          class={inputClass}
-          placeholder="announcement title..."
-          value={title()}
-          onInput={(e) => setTitle(e.currentTarget.value)}
-        />
-        <textarea
-          class={inputClass}
-          placeholder="message..."
-          rows={3}
-          value={message()}
-          onInput={(e) => setMessage(e.currentTarget.value)}
-        ></textarea>
-        <div class="flex flex-wrap items-center gap-2">
-          <select
-            class={selectClass}
-            value={scope()}
-            onChange={(e) => setScope(e.currentTarget.value as AssignmentScope)}
-          >
-            <option value="class">a class</option>
-            <option value="grade">a grade</option>
-            <option value="school">whole school</option>
-            <option value="student">one student</option>
-          </select>
-          <ScopeFields
-            scope={scope()}
-            classId={classId()}
-            grade={grade()}
-            onClassId={setClassId}
-            onGrade={setGrade}
-            studentUid={studentUid()}
-            students={props.rows}
-            onStudentUid={setStudentUid}
+      <div class="grid gap-3 rounded-xl bg-bg p-4">
+        <div class="text-sm font-semibold text-text">
+          <Fa icon="fa-bullhorn" class="mr-1.5 text-main" />
+          New announcement
+        </div>
+        <label class="grid min-w-0 gap-1">
+          <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+            Title
+          </span>
+          <input
+            type="text"
+            class={inputClass}
+            placeholder="announcement title..."
+            value={title()}
+            onInput={(e) => setTitle(e.currentTarget.value)}
           />
+        </label>
+        <label class="grid min-w-0 gap-1">
+          <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+            Message
+          </span>
+          <textarea
+            class={inputClass}
+            placeholder="message..."
+            rows={3}
+            value={message()}
+            onInput={(e) => setMessage(e.currentTarget.value)}
+          ></textarea>
+        </label>
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="grid min-w-0 gap-1">
+            <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+              Send to
+            </span>
+            <select
+              class={selectClass}
+              value={scope()}
+              onChange={(e) =>
+                setScope(e.currentTarget.value as AssignmentScope)
+              }
+            >
+              <option value="class">a class</option>
+              <option value="grade">a grade</option>
+              <option value="school">whole school</option>
+              <option value="student">one student</option>
+            </select>
+          </label>
+          <Show when={scope() !== "school"}>
+            <div class="grid min-w-0 gap-1">
+              <span class="text-xs font-semibold tracking-wide text-sub uppercase">
+                Who
+              </span>
+              <div class="flex flex-wrap gap-2">
+                <ScopeFields
+                  scope={scope()}
+                  classId={classId()}
+                  grade={grade()}
+                  onClassId={setClassId}
+                  onGrade={setGrade}
+                  studentUid={studentUid()}
+                  students={props.rows}
+                  onStudentUid={setStudentUid}
+                />
+              </div>
+            </div>
+          </Show>
+          <div class="grow"></div>
           <Button
             text={busy() ? "sending..." : "send"}
-            fa={{ icon: "fa-bullhorn" }}
+            fa={{ icon: "fa-paper-plane" }}
             onClick={() => void submit()}
             disabled={busy()}
           />
@@ -2298,6 +2563,22 @@ function RacesTab(props: {
   return (
     <Show when={!props.loading} fallback={<LoadingBars />}>
       <div class="grid gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-bg p-4">
+          <div>
+            <div class="font-semibold text-text">Class race</div>
+            <div class="text-sm text-sub">
+              Start a live race students join from their Race tab. Results are
+              saved below.
+            </div>
+          </div>
+          <Button
+            href="/racehost"
+            router-link
+            active
+            fa={{ icon: "fa-stopwatch" }}
+            text="Host a race"
+          />
+        </div>
         <For
           each={props.races}
           fallback={
@@ -2491,17 +2772,20 @@ export function ClassroomDashboard(): JSXElement {
       text={text}
       fa={{ ...fa, fixedWidth: true }}
       active={tab() === id}
-      class={tab() === id ? "bg-bg hover:bg-bg" : undefined}
+      class={cn(
+        "min-h-10 shrink-0 whitespace-nowrap",
+        tab() === id && "bg-bg hover:bg-bg",
+      )}
       onClick={() => setTab(id)}
     />
   );
 
   const tabGroup = (label: string, buttons: JSXElement): JSXElement => (
-    <div class="grid gap-1 rounded bg-sub-alt p-2">
+    <div class="grid shrink-0 gap-1 rounded-xl bg-sub-alt p-2">
       <div class="px-2 text-xs font-semibold tracking-wide text-sub uppercase">
         {label}
       </div>
-      <div class="flex flex-wrap gap-1">{buttons}</div>
+      <div class="flex gap-1">{buttons}</div>
     </div>
   );
 
@@ -2534,24 +2818,10 @@ export function ClassroomDashboard(): JSXElement {
                 disabled={refreshing()}
                 onClick={() => void refreshAll()}
               />
-              <Show when={CLASS_TABS.has(tab())}>
-                <label class="flex items-center gap-2 text-sm text-sub">
-                  Class
-                  <select
-                    class={selectClass}
-                    value={selectedClass()}
-                    onChange={(e) => setSelectedClass(e.currentTarget.value)}
-                  >
-                    <For each={CLASS_IDS}>
-                      {(c) => <option value={c}>{c}</option>}
-                    </For>
-                  </select>
-                </label>
-              </Show>
             </div>
           </div>
 
-          <div class="flex flex-wrap gap-2 border-b border-sub-alt pb-3">
+          <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] lg:flex-wrap lg:overflow-visible [&::-webkit-scrollbar]:hidden">
             {tabGroup(
               "Students",
               <>
@@ -2586,6 +2856,28 @@ export function ClassroomDashboard(): JSXElement {
               </>,
             )}
           </div>
+
+          <Show when={CLASS_TABS.has(tab())}>
+            <div
+              class="-mx-1 flex items-center gap-2 overflow-x-auto border-b border-sub-alt px-1 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              role="group"
+              aria-label="Choose a class"
+            >
+              <span class="shrink-0 text-xs font-semibold tracking-wide text-sub uppercase">
+                Class
+              </span>
+              <For each={CLASS_IDS}>
+                {(c) => (
+                  <Button
+                    text={c}
+                    active={selectedClass() === c}
+                    class="min-h-9 shrink-0 rounded-full px-3 text-sm"
+                    onClick={() => setSelectedClass(c)}
+                  />
+                )}
+              </For>
+            </div>
+          </Show>
 
           <Show when={tab() === "students"}>
             <div class={panelClass}>
