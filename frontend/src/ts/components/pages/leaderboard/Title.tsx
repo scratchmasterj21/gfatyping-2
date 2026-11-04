@@ -146,15 +146,16 @@ export function Title(props: {
   });
 
   return (
-    <header class="grid gap-2">
-      <p class="text-sm font-semibold tracking-wide text-main uppercase">
-        {eyebrow()}
-      </p>
+    <header class="grid gap-2 font-kid">
       <H2
         text={title()}
+        fa={{ icon: "fa-trophy" }}
         class="rankings-heading p-0 text-2xl text-text md:text-3xl"
       />
-      <p class="max-w-2xl text-sub">{description()}</p>
+      <p class="max-w-2xl text-base text-sub">
+        <span class="sr-only">{eyebrow()}: </span>
+        {description()}
+      </p>
       <Show when={isWpmMetric()}>
         <p class="text-sm text-sub">
           Uses {(props.selection as ClassroomSelectionType).mode2 ?? "30"}{" "}
@@ -166,7 +167,7 @@ export function Title(props: {
           {(type) => (
             <NextUpdate
               type={type()}
-              class="rounded-full bg-sub-alt px-3 py-1 text-sm text-sub"
+              class="rounded-full bg-sub-alt px-4 py-1.5 text-sm font-semibold text-text"
             />
           )}
         </Show>

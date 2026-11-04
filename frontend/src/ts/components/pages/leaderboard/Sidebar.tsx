@@ -15,6 +15,7 @@ import {
 } from "../../../states/leaderboard-selection";
 import { getSnapshot } from "../../../states/snapshot";
 import { FaSolidIcon } from "../../../types/font-awesome";
+import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
 
 type GroupItem<T> = {
@@ -86,34 +87,47 @@ export function Sidebar(props: {
   };
 
   return (
-    <div class="grid gap-3">
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+    <div class="grid gap-4 rounded-double bg-sub-alt p-3 font-kid sm:p-4">
+      <div
+        class="grid grid-cols-2 gap-1 rounded-full bg-bg p-1"
+        role="group"
+        aria-label="School or global"
+      >
         <Button
-          class="min-h-14 justify-start px-4 text-base"
+          class={cn(
+            "min-h-11 rounded-full px-4 text-base font-semibold",
+            !isClassroom() && "[--themable-button-bg:transparent]",
+          )}
           active={isClassroom()}
           fa={{ icon: "fa-school", fixedWidth: true }}
-          text="School rankings"
+          text="School"
+          aria-label="School rankings"
           onClick={openSchoolRankings}
         />
         <Button
-          class="min-h-14 justify-start px-4 text-base"
+          class={cn(
+            "min-h-11 rounded-full px-4 text-base font-semibold",
+            isClassroom() && "[--themable-button-bg:transparent]",
+          )}
           active={!isClassroom()}
           fa={{ icon: "fa-globe-americas", fixedWidth: true }}
-          text="Global rankings"
+          text="Global"
+          aria-label="Global rankings"
           onClick={() => selectType("allTime")}
         />
       </div>
 
       <Show when={isClassroom() && isAuthenticated()}>
         <Show when={!isCurrentUserAdmin() && !hasClass()}>
-          <div class="rounded bg-sub-alt p-4 text-sm text-sub">
+          <div class="rounded-xl bg-bg p-3 text-sm text-sub">
             <div class="font-semibold text-text">Class setup in progress</div>
             Your class and grade rankings will appear after your teacher assigns
             you. You can view the whole-school ranking now.
           </div>
         </Show>
         <Group
-          title="Who do you want to compare?"
+          title="Compare with"
+          inlineDescription
           selected={props.selection().type}
           onSelect={selectType}
           items={[
@@ -150,7 +164,7 @@ export function Sidebar(props: {
           ]}
         />
         <Group
-          title="What do you want to rank?"
+          title="Rank by"
           selected={classroom().metric ?? "xp"}
           onSelect={selectMetric}
           items={[
@@ -255,7 +269,7 @@ export function Sidebar(props: {
 
       <Show when={!isClassroom()}>
         <Group
-          title="Choose a global board"
+          title="Board"
           selected={props.selection().type}
           onSelect={selectType}
           items={[
@@ -310,7 +324,7 @@ export function Sidebar(props: {
       </Show>
 
       <Show when={props.canHideAdmin === true}>
-        <label class="flex items-center gap-2 rounded-lg border border-sub-alt bg-bg px-3 py-2 text-sm text-sub">
+        <label class="flex min-h-11 items-center gap-2 rounded-xl bg-bg px-3 py-2 text-sm text-sub">
           <input
             type="checkbox"
             checked={props.hideAdmin ?? false}
@@ -328,32 +342,51 @@ function Group<T>(props: {
   items: GroupItem<T>[];
   selected: T | undefined;
   onSelect: (selected: T) => void;
+  /** Show item descriptions next to the label (short ones like "6A"). */
+  inlineDescription?: boolean;
 }): JSXElement {
   const isEqual = (a: unknown, b: unknown): boolean =>
     typeof a === "object" ? JSON.stringify(a) === JSON.stringify(b) : a === b;
 
   return (
-    <div class="grid gap-2 rounded-xl bg-sub-alt p-3">
-      <div class="text-sm font-semibold text-sub">{props.title}</div>
-      <div class="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
+    <div class="grid gap-1.5" role="group" aria-label={props.title}>
+      <div class="text-xs font-bold tracking-wide text-sub uppercase">
+        {props.title}
+      </div>
+      <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pt-0.5 pb-1.5 [-ms-overflow-style:none] [scrollbar-width:none] md:flex-wrap md:overflow-visible [&::-webkit-scrollbar]:hidden">
         <For each={props.items}>
-          {(item) => (
-            <Button
-              onClick={() => props.onSelect(item.id)}
-              fa={{ icon: item.icon, fixedWidth: true }}
-              class="min-h-11 shrink-0 justify-start px-3 sm:shrink"
-              active={isEqual(item.id, props.selected)}
-            >
-              <span class="grid text-left">
-                <span class="whitespace-nowrap">{item.text}</span>
-                <Show when={item.description !== undefined}>
-                  <span class="text-xs font-normal opacity-70">
+          {(item) => {
+            const active = (): boolean => isEqual(item.id, props.selected);
+            return (
+              <Button
+                onClick={() => props.onSelect(item.id)}
+                fa={{ icon: item.icon, fixedWidth: true }}
+                chunky
+                class={cn(
+                  "min-h-11 shrink-0 rounded-full px-4 whitespace-nowrap",
+                  !active() && "[--themable-button-bg:var(--bg-color)]",
+                )}
+                active={active()}
+                aria-label={
+                  item.description === undefined
+                    ? item.text
+                    : `${item.text} - ${item.description}`
+                }
+              >
+                <span>{item.text}</span>
+                <Show
+                  when={
+                    props.inlineDescription === true &&
+                    item.description !== undefined
+                  }
+                >
+                  <span class="text-sm font-normal opacity-70">
                     {item.description}
                   </span>
                 </Show>
-              </span>
-            </Button>
-          )}
+              </Button>
+            );
+          }}
         </For>
       </div>
     </div>

@@ -11,6 +11,7 @@ import type { TableEntry } from "./table-entry";
 
 import { RaceLeaderboardEntry } from "../../../classroom/classroom";
 import { hasConnection } from "../../../collections/connections";
+import { isKidThemeActive } from "../../../controllers/kid-theme-controller";
 import { createEffectOn } from "../../../hooks/effects";
 import { bp, BreakpointKey } from "../../../states/breakpoints";
 import { getFormatting, getUserId } from "../../../states/core";
@@ -20,6 +21,7 @@ import { qs } from "../../../utils/dom";
 import { Formatting } from "../../../utils/format";
 import { abbreviateNumber } from "../../../utils/numbers";
 import { Fa } from "../../common/Fa";
+import { Mascot } from "../../common/Mascot";
 import { User } from "../../common/User";
 import { DataTable, DataTableColumnDef } from "../../ui/table/DataTable";
 import { RankList } from "./RankList";
@@ -99,8 +101,10 @@ export function Table(
     getRaceAccColumns({ userOverride: props.userOverride }),
   );
 
+  // Students always get the friendly card list; the wide data table stays
+  // for teachers on large screens.
   const useCardList = (): boolean =>
-    props.userOverride === undefined && !bp().xl;
+    props.userOverride === undefined && (!bp().xl || isKidThemeActive());
 
   const skipTop = (): number =>
     props.showPodium === true && (props.currentPage ?? 0) === 0 ? 3 : 0;
@@ -130,7 +134,7 @@ export function Table(
             <DataTable
               {...commonProps()}
               columns={xpColumns()}
-              data={props.entries as XpLeaderboardEntry[]}
+              data={props.entries.slice(skipTop()) as XpLeaderboardEntry[]}
               noDataRow={{ content: <NoEntriesFound type="xp" /> }}
             />
           }
@@ -138,7 +142,7 @@ export function Table(
           <DataTable
             {...commonProps()}
             columns={speedColumns()}
-            data={props.entries as LeaderboardEntry[]}
+            data={props.entries.slice(skipTop()) as LeaderboardEntry[]}
             noDataRow={{ content: <NoEntriesFound type="speed" /> }}
           />
         </Show>
@@ -147,7 +151,7 @@ export function Table(
       <DataTable
         {...commonProps()}
         columns={props.type === "raceacc" ? raceAccColumns() : raceColumns()}
-        data={props.entries as RaceLeaderboardEntry[]}
+        data={props.entries.slice(skipTop()) as RaceLeaderboardEntry[]}
         noDataRow={{ content: <NoEntriesFound type={props.type} /> }}
       />
     </Show>
@@ -182,8 +186,10 @@ function NoEntriesFound(props: {
         ? "No XP has been earned for this ranking period yet."
         : "No race results yet. Finish a class race to join.";
   return (
-    <div class="flex flex-row items-center justify-center rounded bg-sub-alt p-4 text-text">
-      <div>{message()}</div>
+    <div class="flex flex-col items-center justify-center gap-2 rounded-double bg-sub-alt p-6 text-center font-kid text-text">
+      <Mascot mood="thinking" size={72} />
+      <div class="text-lg font-semibold">Nobody here yet - be the first!</div>
+      <div class="text-sm text-sub">{message()}</div>
     </div>
   );
 }

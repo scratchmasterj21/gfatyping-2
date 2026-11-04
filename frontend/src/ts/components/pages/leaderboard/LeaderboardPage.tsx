@@ -29,14 +29,13 @@ import {
   setSelection,
   updateGetParameters,
 } from "../../../states/leaderboard-selection";
-import { cn } from "../../../utils/cn";
 import { abbreviateNumber } from "../../../utils/numbers";
 import AsyncContent from "../../common/AsyncContent";
-import { Fa } from "../../common/Fa";
 import { LoadingCircle } from "../../common/LoadingCircle";
 import { Page } from "../../common/Page";
 import { GameScoresSection } from "./GameScoresSection";
 import { Navigation } from "./Navigation";
+import { gapToNextLabel } from "./rank-gap";
 import { SelfSummaryCard } from "./SelfSummaryCard";
 import { Sidebar } from "./Sidebar";
 import { Table, TableEntry } from "./Table";
@@ -49,7 +48,6 @@ export function LeaderboardPage(): JSXElement {
   const isOpen = () => getActivePage() === pageName;
 
   const [scrollToUser, setScrollToUser] = createSignal(false);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = createSignal(false);
 
   const classroomSelfStat = (
     entry: TableEntry | undefined,
@@ -267,28 +265,9 @@ export function LeaderboardPage(): JSXElement {
   return (
     <Page id="leaderboards">
       <div class="rankings-student-ui content-grid">
-        <div class="grid gap-6 lg:grid-cols-[minmax(17.5rem,20rem)_1fr] lg:items-start">
-          <aside class="lg:sticky lg:top-4 lg:self-start">
-            <div class="mb-2 lg:hidden">
-              <button
-                type="button"
-                class="flex w-full items-center justify-between rounded-lg bg-sub-alt px-4 py-3 text-left font-semibold text-text"
-                aria-expanded={mobileFiltersOpen()}
-                onClick={() => setMobileFiltersOpen((open) => !open)}
-              >
-                Choose ranking
-                <Fa
-                  icon="fa-chevron-down"
-                  class={cn(
-                    "transition-transform",
-                    mobileFiltersOpen() ? "rotate-180" : "",
-                  )}
-                />
-              </button>
-            </div>
-            <div
-              class={cn("grid gap-3", !mobileFiltersOpen() && "hidden lg:grid")}
-            >
+        <div class="mx-auto grid w-full max-w-4xl gap-5">
+          <aside aria-label="Choose a ranking">
+            <div class="grid gap-3">
               <AsyncContent queries={{ serverConfigurationQuery }}>
                 {({ serverConfigurationQueryData }) =>
                   sidebarContent(
@@ -362,7 +341,9 @@ export function LeaderboardPage(): JSXElement {
                           data={
                             isClassroom()
                               ? (selfEntry() ?? null)
-                              : (rankQueryData?.() ?? null)
+                              : // fall back to the loaded row if the
+                                // separate rank lookup is empty/failed
+                                (rankQueryData?.() ?? selfEntry() ?? null)
                           }
                           classroomRank={selfEntry()?.rank}
                           classroomPrimaryLabel={classroomSelfStat(selfEntry())}
@@ -389,6 +370,16 @@ export function LeaderboardPage(): JSXElement {
                           loading={
                             entriesQuery().isLoading ||
                             (!isClassroom() && rankQuery.isLoading)
+                          }
+                          gapLabel={gapToNextLabel(
+                            entries(),
+                            selfEntry(),
+                            tableType(),
+                          )}
+                          onFindMe={
+                            selfEntry() !== undefined
+                              ? () => setScrollToUser(true)
+                              : undefined
                           }
                         />
                       </Show>

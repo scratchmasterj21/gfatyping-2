@@ -31,7 +31,7 @@ export function RankList(props: {
   };
 
   return (
-    <div class={cn("grid gap-1", props.class)}>
+    <div class={cn("grid gap-2", props.class)}>
       <For each={rows()}>
         {(entry, i) => (
           <RankRow

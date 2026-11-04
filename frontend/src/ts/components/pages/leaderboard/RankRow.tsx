@@ -27,6 +27,55 @@ export type RankRowVariant =
       compactXp?: boolean;
     };
 
+export type RankRowStats = { primary: string; secondary?: string };
+
+/** Primary (big) and secondary (small) stat text for a ranking row. */
+export function rankRowStats(v: RankRowVariant): RankRowStats {
+  const format = getFormatting();
+  if (v.kind === "lessonStars") {
+    return { primary: `${v.lessonStars} ★` };
+  }
+  if (v.kind === "gameScore") {
+    return { primary: String(v.score) };
+  }
+  const entry = v.entry;
+  if (v.type === "speed") {
+    const e = entry as LeaderboardEntry;
+    return {
+      primary: format.typingSpeed(e.wpm, { showDecimalPlaces: true }),
+      secondary: format.percentage(e.acc, { showDecimalPlaces: true }),
+    };
+  }
+  if (v.type === "xp") {
+    const e = entry as XpLeaderboardEntry;
+    const xp =
+      e.totalXp < 1000 ? e.totalXp.toFixed(0) : abbreviateNumber(e.totalXp);
+    if (v.compactXp === true) {
+      return { primary: `${xp} XP` };
+    }
+    return {
+      primary: `${xp} XP`,
+      secondary: secondsToString(
+        Math.round(e.timeTypedSeconds),
+        true,
+        true,
+        ":",
+      ),
+    };
+  }
+  const e = entry as RaceLeaderboardEntry;
+  if (v.type === "raceacc") {
+    return {
+      primary: `${Math.round(e.bestRaceAcc)}%`,
+      secondary: `${Math.round(e.bestRaceWpm)} WPM`,
+    };
+  }
+  return {
+    primary: `${Math.round(e.bestRaceWpm)} WPM`,
+    secondary: `${Math.round(e.bestRaceAcc)}%`,
+  };
+}
+
 export function RankRow(props: {
   rank: number;
   variant: RankRowVariant;
@@ -55,60 +104,15 @@ export function RankRow(props: {
     );
   };
 
-  const primarySecondary = (): { primary: string; secondary?: string } => {
-    const format = getFormatting();
-    const v = props.variant;
-    if (v.kind === "lessonStars") {
-      return { primary: `${v.lessonStars} ★` };
-    }
-    if (v.kind === "gameScore") {
-      return { primary: String(v.score) };
-    }
-    const entry = v.entry;
-    if (v.type === "speed") {
-      const e = entry as LeaderboardEntry;
-      return {
-        primary: format.typingSpeed(e.wpm, { showDecimalPlaces: true }),
-        secondary: format.percentage(e.acc, { showDecimalPlaces: true }),
-      };
-    }
-    if (v.type === "xp") {
-      const e = entry as XpLeaderboardEntry;
-      const xp =
-        e.totalXp < 1000 ? e.totalXp.toFixed(0) : abbreviateNumber(e.totalXp);
-      if (v.compactXp === true) {
-        return { primary: `${xp} XP` };
-      }
-      return {
-        primary: `${xp} XP`,
-        secondary: secondsToString(
-          Math.round(e.timeTypedSeconds),
-          true,
-          true,
-          ":",
-        ),
-      };
-    }
-    const e = entry as RaceLeaderboardEntry;
-    if (v.type === "raceacc") {
-      return {
-        primary: `${Math.round(e.bestRaceAcc)}%`,
-        secondary: `${Math.round(e.bestRaceWpm)} WPM`,
-      };
-    }
-    return {
-      primary: `${Math.round(e.bestRaceWpm)} WPM`,
-      secondary: `${Math.round(e.bestRaceAcc)}%`,
-    };
-  };
-
-  const stats = () => primarySecondary();
+  const stats = () => rankRowStats(props.variant);
 
   return (
     <div
       class={cn(
-        "flex min-w-0 items-center gap-3 rounded-lg px-3 py-2.5",
-        isSelf() ? "rank-row-self bg-main/10" : "bg-sub-alt/60",
+        "flex min-h-14 min-w-0 items-center gap-3 rounded-xl px-4 py-2.5 font-kid",
+        isSelf()
+          ? "rank-row-self bg-main/15 outline-2 outline-main"
+          : "bg-sub-alt/60",
         props.class,
       )}
       data-rank-user={isSelf() ? "" : undefined}
@@ -121,7 +125,7 @@ export function RankRow(props: {
             }
       }
     >
-      <span class="w-8 shrink-0 text-center font-semibold text-sub">
+      <span class="w-9 shrink-0 text-center text-lg font-bold text-sub">
         <RankDisplay rank={props.rank} />
       </span>
       <Show
@@ -151,9 +155,9 @@ export function RankRow(props: {
       </Show>
       <TitleBadge titleId={titleId()} class="hidden sm:inline-flex" />
       <div class="shrink-0 text-right">
-        <div class="font-semibold text-text">{stats().primary}</div>
+        <div class="text-lg font-bold text-text">{stats().primary}</div>
         <Show when={stats().secondary !== undefined}>
-          <div class="text-em-xs text-sub">{stats().secondary}</div>
+          <div class="text-sm text-sub">{stats().secondary}</div>
         </Show>
       </div>
     </div>
