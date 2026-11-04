@@ -28,6 +28,18 @@ export const FINGER_LABEL: Record<Finger, string> = {
   thumb: "thumb",
 };
 
+/** Finger palette - mirrors $finger-colors in keymap.scss. */
+export const FINGER_COLORS: Record<Exclude<Finger, "thumb">, string> = {
+  lp: "#ef4444",
+  lr: "#f97316",
+  lm: "#eab308",
+  li: "#22c55e",
+  ri: "#14b8a6",
+  rm: "#3b82f6",
+  rr: "#8b5cf6",
+  rp: "#ec4899",
+};
+
 /** Order used by the on-screen legend (left hand, then right hand). */
 export const FINGER_ORDER: Finger[] = [
   "lp",

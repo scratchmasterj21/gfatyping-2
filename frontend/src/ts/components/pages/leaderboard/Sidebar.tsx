@@ -231,6 +231,9 @@ export function Sidebar(props: {
             { id: "ghost-hunter", text: "ghost hunter", icon: "fa-ghost" },
             { id: "fruit-ninja", text: "fruit ninja", icon: "fa-leaf" },
             { id: "type-toss", text: "type toss", icon: "fa-basketball-ball" },
+            { id: "tower-climb", text: "tower climb", icon: "fa-building" },
+            { id: "snack-shop", text: "snack shop", icon: "fa-cookie-bite" },
+            { id: "echo-keys", text: "echo keys", icon: "fa-lightbulb" },
           ]}
         />
       </Show>

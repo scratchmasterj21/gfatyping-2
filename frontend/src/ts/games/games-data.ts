@@ -19,7 +19,10 @@ export type BuiltinGame = {
     | "ghost-hunter"
     | "fruit-ninja"
     | "type-toss"
-    | "typing-rpg";
+    | "typing-rpg"
+    | "tower-climb"
+    | "snack-shop"
+    | "echo-keys";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -33,6 +36,28 @@ export type Game = FunboxGame | BuiltinGame;
  * with `nosave` so they never persist across reloads.
  */
 export const games: Game[] = [
+  {
+    type: "builtin",
+    id: "tower-climb",
+    name: "Tappy's Tower Climb",
+    description:
+      "Type each word to help Tappy climb - careful typing earns double jumps!",
+    icon: "fa-building",
+  },
+  {
+    type: "builtin",
+    id: "snack-shop",
+    name: "Snack Shop",
+    description: "Type customers' orders before they get tired of waiting!",
+    icon: "fa-cookie-bite",
+  },
+  {
+    type: "builtin",
+    id: "echo-keys",
+    name: "Echo Keys",
+    description: "Watch Tappy's key pattern, then repeat it from memory!",
+    icon: "fa-lightbulb",
+  },
   {
     type: "builtin",
     id: "typing-rpg",

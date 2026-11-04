@@ -40,11 +40,14 @@ import { getWeeklyQuestState } from "../../../coins";
 import { gradeOf } from "../../../constants/classes";
 import { getAuthenticatedUser } from "../../../firebase";
 import { BalloonPopModal } from "../../../games/balloon-pop/BalloonPopModal";
+import { EchoKeysModal } from "../../../games/echo-keys/EchoKeysModal";
 import { FruitNinjaModal } from "../../../games/fruit-ninja/FruitNinjaModal";
 import { scaleGameScore } from "../../../games/game-difficulty-multiplier";
 import { startGame } from "../../../games/game-launcher";
 import { games } from "../../../games/games-data";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
+import { SnackShopModal } from "../../../games/snack-shop/SnackShopModal";
+import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
 import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
 import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
@@ -623,6 +626,9 @@ export function LessonsPage(): JSXElement {
   const [reviewLoading, setReviewLoading] = createSignal(false);
   const [defenderOpen, setDefenderOpen] = createSignal(false);
   const [balloonOpen, setBalloonOpen] = createSignal(false);
+  const [towerOpen, setTowerOpen] = createSignal(false);
+  const [snackOpen, setSnackOpen] = createSignal(false);
+  const [echoOpen, setEchoOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1364,6 +1370,9 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "fruit-ninja") setFruitNinjaOpen(true);
     else if (gameId === "type-toss") setTypeTossOpen(true);
     else if (gameId === "typing-rpg") setRpgOpen(true);
+    else if (gameId === "tower-climb") setTowerOpen(true);
+    else if (gameId === "snack-shop") setSnackOpen(true);
+    else if (gameId === "echo-keys") setEchoOpen(true);
   };
 
   const launchGame = (
@@ -2131,6 +2140,39 @@ export function LessonsPage(): JSXElement {
               scaleGameScore(score, difficultyLabel, wordListGroup),
             );
             claimRecommendedGame("word-defender", score, wave);
+          }}
+        />
+        <TowerClimbModal
+          open={towerOpen()}
+          onClose={() => {
+            setTowerOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score, wave) => {
+            void recordGameScore("tower-climb", score);
+            claimRecommendedGame("tower-climb", score, wave);
+          }}
+        />
+        <SnackShopModal
+          open={snackOpen()}
+          onClose={() => {
+            setSnackOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score, wave) => {
+            void recordGameScore("snack-shop", score);
+            claimRecommendedGame("snack-shop", score, wave);
+          }}
+        />
+        <EchoKeysModal
+          open={echoOpen()}
+          onClose={() => {
+            setEchoOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score, wave) => {
+            void recordGameScore("echo-keys", score);
+            claimRecommendedGame("echo-keys", score, wave);
           }}
         />
         <BalloonPopModal

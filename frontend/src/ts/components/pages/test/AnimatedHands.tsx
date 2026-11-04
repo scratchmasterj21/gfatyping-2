@@ -32,7 +32,11 @@ import {
 } from "../../../keyboard-skins/keyboard-skin-items";
 import { KeypressEffectItemId } from "../../../keypress-effects/keypress-effect-items";
 import { getKeypressEffectState } from "../../../keypress-effects/keypress-effect-state";
-import { fingerForChar, Finger } from "../../../lessons/finger-map";
+import {
+  FINGER_COLORS as SHARED_FINGER_COLORS,
+  fingerForChar,
+  Finger,
+} from "../../../lessons/finger-map";
 import {
   RGB_PALETTE_HUES,
   RgbPaletteItemId,
@@ -228,17 +232,8 @@ const KEY_TO_SVG_ID: Record<string, string> = {
   " ": "space",
 };
 
-// Finger palette — mirrors $finger-colors in keymap.scss
-const FINGER_COLORS: Record<string, string> = {
-  lp: "#ef4444",
-  lr: "#f97316",
-  lm: "#eab308",
-  li: "#22c55e",
-  ri: "#14b8a6",
-  rm: "#3b82f6",
-  rr: "#8b5cf6",
-  rp: "#ec4899",
-};
+// Finger palette lives in lessons/finger-map.ts (mirrors keymap.scss).
+const FINGER_COLORS: Record<string, string> = SHARED_FINGER_COLORS;
 
 function buildFingerCss(selector: (svgId: string) => string): string {
   const rules: string[] = [];

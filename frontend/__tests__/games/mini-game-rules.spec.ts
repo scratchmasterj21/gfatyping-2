@@ -1,0 +1,95 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  echoIsOver,
+  echoOnMistake,
+  echoOnRoundWin,
+  initialEcho,
+  makeSequence,
+} from "../../src/ts/games/echo-keys/echo-rules";
+import {
+  initialSnack,
+  isRushHour,
+  makeOrder,
+  snackIsOver,
+  snackOnMiss,
+  snackOnServe,
+} from "../../src/ts/games/snack-shop/snack-rules";
+import {
+  initialTower,
+  STREAK_FOR_DOUBLE,
+  towerOnTypo,
+  towerOnWord,
+  towerScore,
+} from "../../src/ts/games/tower-climb/tower-rules";
+
+/** Deterministic rng cycling through the given values. */
+const seq = (...values: number[]): (() => number) => {
+  let i = 0;
+  return () => values[i++ % values.length] as number;
+};
+
+describe("tower climb", () => {
+  it("climbs one floor per word and double-jumps on a clean streak", () => {
+    let s = initialTower();
+    for (let i = 0; i < STREAK_FOR_DOUBLE; i++) s = towerOnWord(s, true);
+    expect(s.floor).toBe(STREAK_FOR_DOUBLE + 1);
+    expect(s.doubleJumps).toBe(1);
+  });
+
+  it("slides after three cracks but never below the ground", () => {
+    let s = towerOnWord(initialTower(), true);
+    s = towerOnTypo(s, 2).state;
+    s = towerOnTypo(s, 2).state;
+    const third = towerOnTypo(s, 2);
+    expect(third.slid).toBe(true);
+    expect(third.state.floor).toBe(0);
+    expect(third.state.cracks).toBe(0);
+    expect(third.state.highest).toBe(1);
+  });
+
+  it("a typo resets the streak and the score rewards height", () => {
+    const s = towerOnTypo(towerOnWord(initialTower(), true), 1).state;
+    expect(s.streak).toBe(0);
+    expect(towerScore({ ...s, highest: 10, words: 10, typos: 0 })).toBe(120);
+  });
+});
+
+describe("snack shop", () => {
+  it("builds orders from the word list", () => {
+    expect(makeOrder(["cat", "dog"], 1, seq(0))).toBe("cat");
+    expect(makeOrder(["cat", "dog", "sun"], 3, seq(0.99, 0, 0.5, 0.99))).toBe(
+      "cat dog sun",
+    );
+    expect(makeOrder([], 2, seq(0))).toBe("snack");
+  });
+
+  it("scores serves, doubles in rush hour, and ends after 3 misses", () => {
+    let s = initialSnack();
+    s = snackOnServe(s, "cat", 1); // 6 + 10
+    expect(s.score).toBe(16);
+    s = snackOnServe(snackOnServe(s, "cat", 0), "cat", 0);
+    expect(isRushHour(s)).toBe(true);
+    const before = s.score;
+    s = snackOnServe(s, "cat", 0);
+    expect(s.score - before).toBe(12);
+    s = snackOnMiss(snackOnMiss(snackOnMiss(s)));
+    expect(s.combo).toBe(0);
+    expect(snackIsOver(s)).toBe(true);
+  });
+});
+
+describe("echo keys", () => {
+  it("never repeats a key twice in a row", () => {
+    const keys = ["a", "s", "d"];
+    const out = makeSequence(keys, 6, seq(0, 0, 0, 0, 0, 0));
+    for (let i = 1; i < out.length; i++) expect(out[i]).not.toBe(out[i - 1]);
+  });
+
+  it("grows the pattern on a win and ends when lives run out", () => {
+    let s = echoOnRoundWin(initialEcho());
+    expect(s).toMatchObject({ length: 4, score: 30, rounds: 1, longest: 3 });
+    s = echoOnMistake(echoOnMistake(echoOnMistake(s)));
+    expect(echoIsOver(s)).toBe(true);
+  });
+});

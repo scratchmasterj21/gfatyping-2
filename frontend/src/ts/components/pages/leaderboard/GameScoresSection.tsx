@@ -19,6 +19,9 @@ export const GAME_LABELS: Record<string, string> = {
   "fruit-ninja": "Fruit Ninja",
   "type-toss": "Type Toss",
   "typing-rpg": "Typing Quest",
+  "tower-climb": "Tappy's Tower Climb",
+  "snack-shop": "Snack Shop",
+  "echo-keys": "Echo Keys",
 };
 
 const GAME_ORDER = [
@@ -29,6 +32,9 @@ const GAME_ORDER = [
   "fruit-ninja",
   "type-toss",
   "typing-rpg",
+  "tower-climb",
+  "snack-shop",
+  "echo-keys",
 ];
 
 function ScoreBoard(props: {

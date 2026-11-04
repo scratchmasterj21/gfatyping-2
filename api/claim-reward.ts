@@ -5,6 +5,13 @@ import admin from "firebase-admin";
 import { getAdminApp } from "./_lib/admin.js";
 import { isAdminEmail, verifyStudent } from "./_lib/auth.js";
 import { CATALOGS, OWNED_FIELD, ShopId } from "./_lib/catalogs.js";
+import {
+  applyMiniGameClaim,
+  isMiniGameId,
+  MINI_GAME_MAX_SCORE,
+  type MiniGameId,
+  type MiniGameRewardState,
+} from "./_lib/mini-game-reward.js";
 import { tokyoDateString } from "./_lib/time.js";
 import {
   typingQuestDepthPayout,
@@ -26,6 +33,9 @@ const RECOMMENDED_GAME_IDS = new Set([
   "fruit-ninja",
   "type-toss",
   "typing-rpg",
+  "tower-climb",
+  "snack-shop",
+  "echo-keys",
 ]);
 
 /** Mirrors frontend COLLECTION_CATEGORIES / COLLECTION_REWARD in avatar-items.ts. */
@@ -88,6 +98,51 @@ async function claimCollection(
 }
 
 /**
+ * Per-run coins for the solo mini games, capped to a few paid runs per game
+ * per Tokyo day (see _lib/mini-game-reward.ts). One read + one write.
+ */
+async function claimMiniGame(
+  uid: string,
+  gameId: MiniGameId,
+  score: number,
+  res: VercelResponse,
+): Promise<void> {
+  const userRef = getAdminApp().firestore().collection("users").doc(uid);
+  try {
+    let coins = 0;
+    let capped = false;
+    await getAdminApp()
+      .firestore()
+      .runTransaction(async (tx: admin.firestore.Transaction) => {
+        const data = (await tx.get(userRef)).data() ?? {};
+        const result = applyMiniGameClaim(
+          data["miniGameRewards"] as MiniGameRewardState | undefined,
+          tokyoDateString(),
+          gameId,
+          score,
+        );
+        coins = result.coins;
+        capped = result.capped;
+        if (coins === 0) return;
+        // mergeFields replaces miniGameRewards whole, so yesterday's
+        // run counts don't linger after the date rolls over.
+        tx.set(
+          userRef,
+          {
+            miniGameRewards: result.next,
+            coins: admin.firestore.FieldValue.increment(coins),
+          },
+          { mergeFields: ["miniGameRewards", "coins"] },
+        );
+      });
+    res.status(200).json({ claimed: coins > 0, coins, capped });
+  } catch (e) {
+    console.error("claim-reward (miniGame) failed:", e);
+    res.status(500).json({ claimed: false, coins: 0, capped: false });
+  }
+}
+
+/**
  * Standalone rewards not tied to a completed typing test: the house greeting
  * a transaction-capped recommended-game bonus, and Typing Quest clears.
  */
@@ -134,6 +189,20 @@ export default async function handler(
       )
       .map(([id]) => id);
     await claimCollection(auth.uid, category, "ownedCostumes", required, res);
+    return;
+  }
+  if (body.type === "miniGame") {
+    const score = Number(body.score);
+    if (
+      !isMiniGameId(body.gameId) ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > MINI_GAME_MAX_SCORE
+    ) {
+      res.status(400).json({ claimed: false, coins: 0, capped: false });
+      return;
+    }
+    await claimMiniGame(auth.uid, body.gameId, Math.floor(score), res);
     return;
   }
   if (body.type === "shopCollection") {
