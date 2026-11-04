@@ -7,7 +7,6 @@ import {
 import { getCustomTextIndicator } from "../../../states/core";
 import { getFocus, getResultVisible } from "../../../states/test";
 import { nextTest } from "../../../test/test-logic";
-import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 
@@ -24,27 +23,23 @@ export function LessonTestNav(): JSXElement {
   const idle = (): boolean => !getFocus() && !getResultVisible();
 
   return (
-    <Show when={showBar()}>
+    <Show when={showBar() && idle()}>
       <div
-        class={cn(
-          "mx-auto mb-4 flex max-w-xl flex-wrap items-center justify-center gap-2 px-2 text-sm",
-          !idle() && "pointer-events-none opacity-60",
-        )}
+        class="mx-auto mb-4 flex max-w-xl flex-wrap items-center justify-center gap-3 px-2"
         data-ui-element="lessonTestNav"
       >
         <Button
           variant="text"
           href="/"
           router-link
-          class="rounded-lg border border-sub-alt bg-sub-alt px-3 py-1.5 font-medium text-text"
+          class="min-h-12 rounded-lg border border-sub-alt bg-sub-alt px-4 text-base font-semibold text-text"
           fa={{ icon: "fa-graduation-cap", fixedWidth: true }}
           text="Back to lessons"
         />
         <Show when={showNextLesson()}>
           <button
             type="button"
-            class="cursor-pointer rounded-lg bg-main px-3 py-1.5 font-medium text-bg transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!idle()}
+            class="min-h-12 cursor-pointer rounded-lg bg-main px-5 text-base font-semibold text-bg transition-opacity hover:opacity-80"
             onClick={() => void nextTest()}
           >
             <Fa icon="fa-arrow-right" class="mr-1.5" />

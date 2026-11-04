@@ -20,6 +20,11 @@ import { configEvent } from "../events/config";
 import * as Hangul from "hangul-js";
 import * as ResultWordHighlight from "../elements/result-word-highlight";
 import { getActivePage } from "../states/core";
+import {
+  clearLessonFingerHint,
+  syncLessonFingerHint,
+} from "../lessons/lesson-finger-hint";
+import { getActiveLesson } from "../lessons/lesson-progress";
 import Format from "../singletons/format";
 import { TimerColor, TimerOpacity } from "@monkeytype/schemas/configs";
 import { convertRemToPixels } from "../utils/numbers";
@@ -506,6 +511,27 @@ function updateWordWrapperClasses(): void {
   }
 }
 
+function refreshLessonFingerHint(): void {
+  if (getActiveLesson() === null) {
+    clearLessonFingerHint();
+    return;
+  }
+  const word = TestWords.words.getCurrentText();
+  const typed = getCurrentInput().length;
+  let next = word.charAt(typed);
+  // A space between words is not stored on the word, so the hint used to
+  // vanish here and the words jumped up until the next letter.
+  if (
+    next === "" &&
+    word.length > 0 &&
+    typed >= word.length &&
+    TestState.activeWordIndex < TestWords.words.length - 1
+  ) {
+    next = " ";
+  }
+  syncLessonFingerHint(next);
+}
+
 function showWords(): void {
   wordsEl.setHtml("");
 
@@ -526,6 +552,7 @@ function showWords(): void {
   });
   updateWordWrapperClasses();
   PaceCaret.resetCaretPosition();
+  refreshLessonFingerHint();
 }
 
 export function appendEmptyWordElement(index: number): void {
@@ -1786,6 +1813,7 @@ function afterAnyTestInput(
       TestWords.words.getCurrentText().charAt(getCurrentInput().length),
     );
   }
+  refreshLessonFingerHint();
 
   Focus.set(true);
   Caret.stopAnimation();
@@ -1956,6 +1984,7 @@ export function onTestRestart(source: "testPage" | "resultPage"): void {
 }
 
 export function onTestFinish(): void {
+  clearLessonFingerHint();
   Caret.hide();
   LiveSpeed.hide();
   LiveAcc.hide();

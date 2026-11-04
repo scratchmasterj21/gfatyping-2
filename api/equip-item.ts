@@ -32,6 +32,7 @@ const HOUSE_THEME_IDS = new Set([
   "candy",
   "meadow",
 ]);
+const GARDEN_THEME_IDS = new Set(["grass", "garden-sunset", "garden-night"]);
 
 /** Shops whose pick a saved setup / surprise covers. */
 const SETUP_SHOPS = [
@@ -148,7 +149,7 @@ export default async function handler(
           setup["keyboardStyle"] = body.itemId;
         }
         for (const shop of SETUP_SHOPS) {
-          const picked = data[setupField(shop)];
+          const picked: unknown = data[setupField(shop)];
           if (ownsShopItem(data, shop, picked)) setup[shop] = picked;
         }
         tx.update(userRef, { [`savedSetups.${body.slot}`]: setup });
@@ -361,6 +362,22 @@ export default async function handler(
           throw new Error("Item not owned");
         }
         tx.set(userRef, { houseTheme: body.itemId }, { merge: true });
+        return {};
+      }
+
+      if (body.target === "gardenTheme") {
+        if (
+          typeof body.itemId !== "string" ||
+          !GARDEN_THEME_IDS.has(body.itemId)
+        ) {
+          throw new Error("Invalid garden theme");
+        }
+        const owned =
+          (data["ownedGardenItems"] as Record<string, true> | undefined) ?? {};
+        if (body.itemId !== "grass" && owned[body.itemId] !== true) {
+          throw new Error("Item not owned");
+        }
+        tx.set(userRef, { gardenTheme: body.itemId }, { merge: true });
         return {};
       }
 

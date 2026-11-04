@@ -3,6 +3,7 @@ import { createSignal, For, JSXElement, Show } from "solid-js";
 import { useBuyGuard } from "../../hooks/useBuyGuard";
 import { ModalId } from "../../states/modals";
 import { cn } from "../../utils/cn";
+import { CosmeticCollection } from "../../utils/shop-collections";
 import {
   currentJapanMonth,
   MONTH_SHORT,
@@ -12,7 +13,6 @@ import {
 } from "../../utils/shop-rarity";
 import { AnimatedModal } from "./AnimatedModal";
 import { Fa } from "./Fa";
-import { CosmeticCollection } from "../../utils/shop-collections";
 
 export type CosmeticItem = {
   id: string;
@@ -69,42 +69,44 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
 
   return (
     <AnimatedModal id={props.id} title={props.title}>
-      <div class="grid gap-4">
-        <div class="flex items-center justify-center gap-2 text-lg font-bold text-main">
-          <Fa icon="fa-coins" />
-          {props.coins}
+      <div class="grid gap-4 font-kid">
+        <div class="flex justify-center">
+          <span class="flex items-center gap-2 rounded-full bg-sub-alt px-5 py-2 text-xl font-bold text-main">
+            <Fa icon="fa-coins" />
+            {props.coins}
+          </span>
         </div>
 
         <Show
           when={trying()}
           keyed
           fallback={
-            <p class="text-center text-em-xs text-sub">
+            <p class="text-center text-sm text-sub">
               Tap something you own to use it. Tap anything else to try it
               first.
             </p>
           }
         >
           {(item) => (
-            <div class="grid gap-2 rounded bg-sub-alt p-3 text-center">
+            <div class="grid gap-2 rounded-double border-2 border-main bg-[color-mix(in_srgb,var(--main-color)_12%,var(--sub-alt-color))] p-4 text-center">
               <div class="flex justify-center">
                 {(props.preview ?? props.thumb)(item)}
               </div>
-              <span class="text-sm text-sub">
+              <span class="text-base text-sub">
                 Trying <span class="font-bold text-text">{item.name}</span>
               </span>
-              <span class="text-em-xs text-sub">{item.description}</span>
+              <span class="text-sm text-sub">{item.description}</span>
               <Show when={coinsNeeded(item) > 0}>
-                <span class="text-em-xs text-sub">
+                <span class="text-sm font-semibold text-sub">
                   You need {coinsNeeded(item)} more coins. Finish lessons to
                   earn them!
                 </span>
               </Show>
-              <div class="flex justify-center gap-2">
+              <div class="mt-1 flex justify-center gap-3">
                 <Show when={coinsNeeded(item) === 0}>
                   <button
                     type="button"
-                    class="cursor-pointer rounded bg-main px-4 py-1.5 font-medium text-bg hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="press-3d min-h-12 cursor-pointer rounded-xl bg-main px-5 py-2 font-semibold text-bg [--press-color:color-mix(in_srgb,var(--main-color)_60%,black)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={pendingId() !== null}
                     onClick={() => {
                       const onBuy = props.onBuy;
@@ -124,7 +126,7 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
                 </Show>
                 <button
                   type="button"
-                  class="cursor-pointer rounded bg-bg px-4 py-1.5 text-text hover:bg-text hover:text-bg"
+                  class="press-3d min-h-12 cursor-pointer rounded-xl bg-bg px-5 py-2 font-semibold text-text hover:bg-text hover:text-bg"
                   onClick={() => setTrying(undefined)}
                 >
                   Not now
@@ -137,7 +139,7 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
         <div class="flex flex-wrap items-center gap-3">
           <Show when={props.collection}>
             {(c) => (
-              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded bg-sub-alt px-3 py-2 text-em-xs">
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 rounded-xl bg-sub-alt px-3 py-2 text-sm">
                 <span class="font-medium text-text">
                   <Fa icon="fa-layer-group" class="mr-1.5 text-main" />
                   Collection {c().owned}/{c().total}
@@ -169,7 +171,7 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
                   >
                     <button
                       type="button"
-                      class="cursor-pointer rounded bg-main px-3 py-1 font-bold text-bg hover:opacity-80 disabled:opacity-50"
+                      class="press-3d min-h-10 cursor-pointer rounded-xl bg-main px-4 py-1.5 font-bold text-bg [--press-color:color-mix(in_srgb,var(--main-color)_60%,black)] hover:opacity-90 disabled:opacity-50"
                       disabled={pendingId() !== null}
                       onClick={() =>
                         void guardedBuy("__collection__", c().onClaim)
@@ -182,9 +184,10 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
               </div>
             )}
           </Show>
-          <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-em-xs text-sub pointer-coarse:min-h-10 pointer-coarse:text-sm">
+          <label class="ml-auto flex min-h-10 cursor-pointer items-center gap-2 text-sm font-semibold text-sub">
             <input
               type="checkbox"
+              class="h-5 w-5 accent-(--main-color)"
               checked={onlyMine()}
               onChange={(e) => {
                 setOnlyMine(e.currentTarget.checked);
@@ -209,11 +212,11 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
                 <button
                   type="button"
                   class={cn(
-                    "relative flex cursor-pointer flex-col items-center gap-1.5 rounded p-3 shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    "press-3d relative flex cursor-pointer flex-col items-center gap-1.5 rounded-double p-3 outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
                     selected()
-                      ? "bg-main text-bg"
+                      ? "bg-main text-bg [--press-color:color-mix(in_srgb,var(--main-color)_60%,black)]"
                       : "bg-sub-alt text-text hover:bg-text hover:text-bg",
-                    isTrying() ? "ring-2 ring-main" : "",
+                    isTrying() ? "outline-3 outline-main" : "",
                   )}
                   aria-pressed={selected() || isTrying()}
                   disabled={pendingId() !== null}
@@ -230,8 +233,8 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
                   }}
                 >
                   <Show when={selected()}>
-                    <span class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-main ring-2 ring-main">
-                      <Fa icon="fa-check" size={0.6} />
+                    <span class="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-bg text-main ring-2 ring-main">
+                      <Fa icon="fa-check" size={0.8} />
                     </span>
                   </Show>
                   <Show when={item.seasonMonths}>
@@ -245,7 +248,7 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
                     )}
                   </Show>
                   {props.thumb(item)}
-                  <span class="text-center text-sm font-medium">
+                  <span class="text-center text-base font-semibold">
                     {item.name}
                   </span>
                   <Show
@@ -260,7 +263,7 @@ export function CosmeticShop<T extends CosmeticItem>(props: {
                       {RARITY_LABELS[rarity()]}
                     </span>
                   </Show>
-                  <span class="flex items-center gap-1 text-em-xs">
+                  <span class="flex items-center gap-1 text-sm font-semibold">
                     <Show
                       when={pendingId() !== item.id}
                       fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}

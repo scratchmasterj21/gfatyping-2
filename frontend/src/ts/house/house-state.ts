@@ -9,7 +9,28 @@ import {
 import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
+import { DEFAULT_GARDEN_THEME_ID } from "./garden-themes";
+import { HouseScene } from "./house-scene";
 import { DEFAULT_HOUSE_THEME_ID } from "./house-themes";
+
+const SCENE_FIELDS = {
+  room: {
+    layout: "houseLayout",
+    scale: "houseScale",
+    stored: "storedHouseItems",
+    touch: "houseTouchOrder",
+    shop: "house",
+    themeTarget: "houseTheme",
+  },
+  garden: {
+    layout: "gardenLayout",
+    scale: "gardenScale",
+    stored: "storedGardenItems",
+    touch: "gardenTouchOrder",
+    shop: "garden",
+    themeTarget: "gardenTheme",
+  },
+} as const;
 
 function userRef(uid: string): DocumentReference {
   return doc(collection(getDb(), "users"), uid);
@@ -30,7 +51,32 @@ export type HouseState = {
   touchOrder: string[];
   /** Selected wall/floor finish - see house-themes.ts. */
   themeId: string;
+  /** Bought garden decorations. The free flower is not stored here. */
+  gardenOwned: Record<string, true>;
+  gardenLayout: Record<string, HouseItemPosition>;
+  gardenScale: Record<string, number>;
+  gardenStored: Record<string, true>;
+  gardenTouchOrder: string[];
+  gardenThemeId: string;
 };
+
+export function emptyHouseState(): HouseState {
+  return {
+    coins: 0,
+    ownedItems: {},
+    layout: {},
+    scale: {},
+    storedItems: {},
+    touchOrder: [],
+    themeId: DEFAULT_HOUSE_THEME_ID,
+    gardenOwned: {},
+    gardenLayout: {},
+    gardenScale: {},
+    gardenStored: {},
+    gardenTouchOrder: [],
+    gardenThemeId: DEFAULT_GARDEN_THEME_ID,
+  };
+}
 
 export async function getHouseState(uid: string): Promise<HouseState> {
   const snap = await getDoc(userRef(uid));
@@ -49,6 +95,20 @@ export async function getHouseState(uid: string): Promise<HouseState> {
     touchOrder: (data?.["houseTouchOrder"] as string[] | undefined) ?? [],
     themeId:
       (data?.["houseTheme"] as string | undefined) ?? DEFAULT_HOUSE_THEME_ID,
+    gardenOwned:
+      (data?.["ownedGardenItems"] as Record<string, true> | undefined) ?? {},
+    gardenLayout:
+      (data?.["gardenLayout"] as
+        | Record<string, HouseItemPosition>
+        | undefined) ?? {},
+    gardenScale:
+      (data?.["gardenScale"] as Record<string, number> | undefined) ?? {},
+    gardenStored:
+      (data?.["storedGardenItems"] as Record<string, true> | undefined) ?? {},
+    gardenTouchOrder:
+      (data?.["gardenTouchOrder"] as string[] | undefined) ?? [],
+    gardenThemeId:
+      (data?.["gardenTheme"] as string | undefined) ?? DEFAULT_GARDEN_THEME_ID,
   };
 }
 
@@ -56,9 +116,10 @@ export async function getHouseState(uid: string): Promise<HouseState> {
 export async function selectHouseTheme(
   _uid: string,
   themeId: string,
+  scene: HouseScene = "room",
 ): Promise<void> {
   await callApi("/api/equip-item", {
-    target: "houseTheme",
+    target: SCENE_FIELDS[scene].themeTarget,
     itemId: themeId,
   });
 }
@@ -68,10 +129,15 @@ export async function setItemStored(
   uid: string,
   itemId: string,
   stored: boolean,
+  scene: HouseScene = "room",
 ): Promise<void> {
   await setDoc(
     userRef(uid),
-    { storedHouseItems: { [itemId]: stored ? true : deleteField() } },
+    {
+      [SCENE_FIELDS[scene].stored]: {
+        [itemId]: stored ? true : deleteField(),
+      },
+    },
     { merge: true },
   );
 }
@@ -81,10 +147,11 @@ export async function saveItemPosition(
   uid: string,
   itemId: string,
   position: HouseItemPosition,
+  scene: HouseScene = "room",
 ): Promise<void> {
   await setDoc(
     userRef(uid),
-    { houseLayout: { [itemId]: position } },
+    { [SCENE_FIELDS[scene].layout]: { [itemId]: position } },
     { merge: true },
   );
 }
@@ -94,10 +161,11 @@ export async function saveItemScale(
   uid: string,
   itemId: string,
   scale: number,
+  scene: HouseScene = "room",
 ): Promise<void> {
   await setDoc(
     userRef(uid),
-    { houseScale: { [itemId]: scale } },
+    { [SCENE_FIELDS[scene].scale]: { [itemId]: scale } },
     { merge: true },
   );
 }
@@ -106,19 +174,25 @@ export async function saveItemScale(
 export async function saveTouchOrder(
   uid: string,
   order: string[],
+  scene: HouseScene = "room",
 ): Promise<void> {
-  await setDoc(userRef(uid), { houseTouchOrder: order }, { merge: true });
+  await setDoc(
+    userRef(uid),
+    { [SCENE_FIELDS[scene].touch]: order },
+    { merge: true },
+  );
 }
 
 /** Buys one house item (emoji, sprite furniture, or small decor - anything in the "house" shop) - price/ownership validated server-side, see api/buy-item.ts. */
 export async function buyHouseItem(
   _uid: string,
   item: { id: string },
+  scene: HouseScene = "room",
 ): Promise<{ ok: boolean; reason?: string }> {
   try {
     const result = await callApi<{ ok: boolean; reason?: string }>(
       "/api/buy-item",
-      { shop: "house", itemId: item.id },
+      { shop: SCENE_FIELDS[scene].shop, itemId: item.id },
     );
     if (result.ok) invalidateCoinQueries();
     return result;

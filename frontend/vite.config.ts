@@ -179,6 +179,18 @@ function getPlugins({
             options: {},
           },
           {
+            // Kid UI font (Fredoka) - keep it for offline use.
+            urlPattern: (options) =>
+              options.url.hostname === "fonts.googleapis.com" ||
+              options.url.hostname === "fonts.gstatic.com",
+            handler: "CacheFirst",
+            options: {
+              cacheName: "google-fonts",
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: (options) => {
               //disable caching for version.json
               return options.url.pathname === "/version.json";

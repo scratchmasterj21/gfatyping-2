@@ -14,7 +14,7 @@ export function GameSetupPrimaryAction(props: {
     <button
       type="button"
       class={cn(
-        "w-full cursor-pointer rounded-xl bg-main py-3 text-base font-bold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
+        "press-3d min-h-14 w-full cursor-pointer rounded-double bg-main py-3 text-lg font-bold text-bg [--press-color:color-mix(in_srgb,var(--main-color)_60%,black)] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50",
         props.class,
       )}
       disabled={props.disabled}

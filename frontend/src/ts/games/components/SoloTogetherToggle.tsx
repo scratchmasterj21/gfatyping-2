@@ -19,7 +19,7 @@ export function SoloTogetherToggle(props: {
         <button
           type="button"
           class={cn(
-            "rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+            "press-3d min-h-12 rounded-xl px-3 py-2 text-base font-semibold",
             props.mode === "solo"
               ? "bg-main text-bg"
               : "bg-sub-alt text-sub hover:text-text",
@@ -31,7 +31,7 @@ export function SoloTogetherToggle(props: {
         <button
           type="button"
           class={cn(
-            "flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+            "press-3d flex min-h-12 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-base font-semibold",
             props.mode === "together"
               ? "bg-main text-bg"
               : "bg-sub-alt text-sub hover:text-text",
@@ -49,7 +49,7 @@ export function SoloTogetherToggle(props: {
         </button>
       </div>
       <Show when={!props.multiplayerUnlocked}>
-        <p class="text-center text-em-xs text-sub">{props.unlockHint}</p>
+        <p class="text-center text-sm text-sub">{props.unlockHint}</p>
       </Show>
     </>
   );

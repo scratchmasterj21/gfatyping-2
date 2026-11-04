@@ -4,6 +4,7 @@ import { getIsScreenshotting } from "../../../states/core";
 import { getFocus } from "../../../states/test";
 import { cn } from "../../../utils/cn";
 import { GuidedKeyboardControls } from "../../pages/test/GuidedKeyboardControls";
+import { KidTabBar } from "../header/KidTabBar";
 import { Keytips } from "./Keytips";
 import { ThemeIndicator } from "./ThemeIndicator";
 import { VersionButton } from "./VersionButton";
@@ -29,6 +30,7 @@ export function Footer(): JSXElement {
           <VersionButton />
         </div>
       </div>
+      <KidTabBar />
     </footer>
   );
 }

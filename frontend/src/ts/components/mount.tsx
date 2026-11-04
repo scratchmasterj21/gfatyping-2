@@ -31,6 +31,8 @@ import { RacePage } from "./pages/race/RacePage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { AnimatedHands } from "./pages/test/AnimatedHands";
 import { FingerLegend } from "./pages/test/FingerLegend";
+import { KidResultHero } from "./pages/test/KidResultHero";
+import { LessonFingerHint } from "./pages/test/LessonFingerHint";
 import { TestModesNotice } from "./pages/test/modes-notice/TestModesNotice";
 import { ResultsLessonActions } from "./pages/test/ResultsLessonActions";
 import { SideImagePanels } from "./pages/test/SideImagePanels";
@@ -64,9 +66,11 @@ const components: Record<string, () => JSXElement> = {
   devtools: () => <DevTools />,
   testconfig: () => <TestConfig />,
   resultslessonactions: () => <ResultsLessonActions />,
+  kidresulthero: () => <KidResultHero />,
   commandlinehotkey: () => <CommandlineHotkey />,
   testmodesnotice: () => <TestModesNotice />,
   fingerlegend: () => <FingerLegend />,
+  lessonfingerhint: () => <LessonFingerHint />,
   animatedhands: () => <AnimatedHands />,
   friendspage: () => <FriendsPage />,
   blockedusers: () => <BlockedUsers />,

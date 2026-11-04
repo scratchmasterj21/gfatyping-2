@@ -20,6 +20,10 @@ type BaseProps = {
   active?: boolean;
   "aria-label"?: string;
   "aria-current"?: "page";
+  /** Bigger, touch-friendly sizes (kid UI). Default keeps the classic size. */
+  size?: "lg" | "xl";
+  /** Rounded, bold "pressable" look with a ledge underneath (kid UI). */
+  chunky?: boolean;
 };
 
 export type ButtonProps = BaseProps & {
@@ -77,6 +81,13 @@ export function Button(props: ButtonProps | AnchorProps): JSXElement {
       {
         "pointer-events-none opacity-[0.33]": props.disabled,
       },
+      props.size === "lg" && "min-h-12 px-[1em] text-lg",
+      props.size === "xl" && "min-h-16 px-[1.25em] text-2xl",
+      props.chunky === true && "press-3d rounded-double font-kid font-semibold",
+      props.chunky === true &&
+        isActive() &&
+        variant() === "button" &&
+        "[--press-color:color-mix(in_srgb,var(--main-color)_60%,black)]",
       {
         [props.class ?? ""]: props.class !== undefined,
       },

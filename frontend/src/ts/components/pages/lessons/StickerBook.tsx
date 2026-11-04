@@ -15,13 +15,16 @@ export function StickerBook(props: {
     props.groups.filter((g) => props.isGroupComplete(g)).length;
 
   return (
-    <section class="rounded-2xl bg-sub-alt p-4" data-ui-element="stickerBook">
+    <section
+      class="rounded-double bg-sub-alt p-4 font-kid"
+      data-ui-element="stickerBook"
+    >
       <div class="mb-3 flex items-center justify-between gap-2">
-        <span class="flex items-center gap-2 font-bold text-text">
+        <span class="flex items-center gap-2 text-lg font-bold text-text">
           <Fa icon="fa-book-open" class="text-main" />
           My Sticker Book
         </span>
-        <span class="rounded bg-bg px-2 py-0.5 text-em-xs font-bold text-main">
+        <span class="rounded-full bg-bg px-3 py-1 text-sm font-bold text-main">
           {earned()}/{props.groups.length}
         </span>
       </div>

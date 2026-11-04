@@ -12,7 +12,7 @@ export function GameSetupSection(props: {
     <section class={cn("mb-4 grid gap-2", props.class)}>
       <p
         class={cn(
-          "text-em-xs font-semibold tracking-wider uppercase",
+          "text-sm font-bold tracking-wide uppercase",
           props.accent === true ? "text-main" : "text-sub",
         )}
       >

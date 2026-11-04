@@ -8,6 +8,7 @@ import { cn } from "../../../utils/cn";
 import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
+import { Mascot } from "../../common/Mascot";
 import { DailyGoalRing } from "./DailyGoalRing";
 import { WeeklyQuests } from "./WeeklyQuests";
 
@@ -58,14 +59,10 @@ export function LessonHero(props: {
   const [showFreezeInfo, setShowFreezeInfo] = createSignal(false);
   return (
     <>
-      <section class="flex flex-wrap items-center gap-3 rounded-2xl bg-sub-alt px-4 py-3">
+      <section class="flex flex-wrap items-center gap-3 rounded-double border-2 border-[color-mix(in_srgb,var(--sub-color)_35%,transparent)] bg-sub-alt px-4 py-3 font-kid">
         <Show
           when={props.signedIn && props.avatar !== undefined}
-          fallback={
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-bg">
-              <Fa icon="fa-graduation-cap" class="text-main" size={1.4} />
-            </div>
-          }
+          fallback={<Mascot mood="happy" size={72} />}
         >
           <div class="shrink-0">
             <Avatar
@@ -83,15 +80,16 @@ export function LessonHero(props: {
           </div>
         </Show>
         <div class="min-w-0 flex-1 basis-48">
-          <p class="lesson-hero-heading text-lg font-bold text-text">
+          <p class="lesson-hero-heading text-xl font-bold text-text">
             {props.isNewStudent
               ? "Welcome to your typing lessons!"
               : "Welcome back!"}
           </p>
           <Show when={props.isNewStudent}>
             <p class="mt-1 text-base text-sub">
-              Tap the big yellow button to see what to do next. Finish
-              checkpoint games when they show up — they unlock the next lesson.
+              Tap the big &ldquo;Your next step&rdquo; button to see what to do
+              next. Finish checkpoint games when they show up — they unlock the
+              next lesson.
             </p>
           </Show>
           <Show when={props.signedIn}>
@@ -132,7 +130,7 @@ export function LessonHero(props: {
       </section>
 
       <Show when={!props.signedIn}>
-        <section class="rounded-2xl bg-sub-alt p-4 text-center text-sub">
+        <section class="rounded-double bg-sub-alt p-4 text-center text-base text-sub">
           <Fa icon="fa-info-circle" class="mr-2" />
           Sign in to save your lesson progress across devices.
         </section>
@@ -155,79 +153,68 @@ export function LessonHero(props: {
         {(recommendation) => (
           <section class="grid gap-2" aria-labelledby="today-practice-title">
             <div class="flex items-end justify-between gap-3">
-              <div>
-                <h1
-                  id="today-practice-title"
-                  class="lesson-hero-heading text-[1.65em] font-bold text-text sm:text-[1.85em]"
-                >
-                  Your next step
-                </h1>
-                <p class="text-sm text-sub">
-                  Daily extras and weekly quests are below; the map and lesson
-                  list are further down.
-                </p>
-              </div>
+              <h1
+                id="today-practice-title"
+                class="lesson-hero-heading text-[1.65em] font-bold text-text sm:text-[1.85em]"
+              >
+                Your next step
+              </h1>
               <span class="shrink-0 rounded bg-sub-alt px-3 py-1 text-sm font-bold text-main">
                 {props.todayPracticeDone}/3 done
               </span>
             </div>
-            <div class="grid gap-3 rounded-2xl bg-sub-alt p-4 sm:grid-cols-[1fr_auto] sm:items-center">
-              <div class="grid gap-2">
-                <div class="flex items-center gap-2 text-em-xs font-medium text-main">
-                  <Fa icon={recommendation.icon} />
-                  {recommendation.eyebrow}
-                </div>
-                <div class="text-xl font-bold text-text">
-                  {recommendation.title}
-                </div>
-                <p class="max-w-2xl text-base text-sub">
-                  {recommendation.description}
-                </p>
-                <div class="text-em-xs text-sub">
-                  <Fa icon="fa-clock" class="mr-1.5" /> about 3–5 minutes
-                  <span class="ml-3 text-main">
-                    {props.practiceRewardLabel("recommendation")}
-                  </span>
-                </div>
-                <div class="flex items-center gap-2 rounded-lg bg-bg px-3 py-1.5 text-em-xs text-text">
-                  <Fa icon="fa-lightbulb" class="text-main" />
-                  Tip: {tip.text}
-                </div>
-              </div>
-              <div class="flex flex-col gap-2 sm:items-stretch">
+            <button
+              type="button"
+              class="press-3d grid min-h-24 cursor-pointer gap-1 rounded-double bg-main px-5 py-4 text-left font-kid text-bg [--press-color:color-mix(in_srgb,var(--main-color)_60%,black)] [--press-depth:0.375rem] hover:opacity-95 disabled:opacity-50"
+              onClick={recommendation.onStart}
+              disabled={props.primaryLoading}
+            >
+              <span class="flex items-center gap-2 text-sm font-semibold">
+                <Fa icon={recommendation.icon} />
+                {recommendation.eyebrow}
+              </span>
+              <span class="flex items-center justify-between gap-3 text-2xl font-bold">
+                {recommendation.title}
+                <Fa icon="fa-arrow-right" />
+              </span>
+              <span class="text-sm opacity-90">
+                {recommendation.description}
+              </span>
+            </button>
+            <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-sub">
+              <span>
+                <Fa icon="fa-clock" class="mr-1.5" />
+                about 3–5 minutes
+                <span class="ml-3 text-main">
+                  {props.practiceRewardLabel("recommendation")}
+                </span>
+              </span>
+              <Show when={recommendation.onScrollToTarget !== undefined}>
                 <button
                   type="button"
-                  class="cursor-pointer rounded-xl bg-main px-6 py-4 text-lg font-bold text-bg transition-opacity hover:opacity-80 disabled:opacity-50"
-                  onClick={recommendation.onStart}
-                  disabled={props.primaryLoading}
+                  class="min-h-10 cursor-pointer font-semibold text-text hover:text-main"
+                  onClick={() => recommendation.onScrollToTarget?.()}
                 >
-                  {recommendation.action}
-                  <Fa icon="fa-arrow-right" class="ml-2" />
+                  Show on lesson list
                 </button>
-                <Show when={recommendation.onScrollToTarget !== undefined}>
-                  <button
-                    type="button"
-                    class="cursor-pointer rounded-lg border border-sub-alt bg-bg px-4 py-2 text-sm font-medium text-text transition-colors hover:border-main"
-                    onClick={() => recommendation.onScrollToTarget?.()}
-                  >
-                    <Fa icon="fa-map-marker-alt" class="mr-1.5 text-main" />
-                    Show on lesson list
-                  </button>
-                </Show>
-              </div>
+              </Show>
+            </div>
+            <div class="flex items-center gap-2 rounded-xl bg-sub-alt px-3 py-2 text-sm text-text">
+              <Fa icon="fa-lightbulb" class="text-main" />
+              Tip: {tip.text}
             </div>
 
             <div class="grid gap-2 sm:grid-cols-2">
-              <div class="flex items-center justify-between gap-3 rounded-xl bg-sub-alt/80 p-3">
+              <div class="flex items-center justify-between gap-3 rounded-double bg-sub-alt/80 p-3">
                 <div class="grid gap-1">
-                  <div class="flex items-center gap-2 text-sm font-medium text-text">
+                  <div class="flex items-center gap-2 text-base font-semibold text-text">
                     <Fa icon="fa-calendar-day" class="text-main" size={0.85} />
                     Today&apos;s Challenge
                   </div>
-                  <span class="text-em-xs text-sub">
+                  <span class="text-sm text-sub">
                     {props.dailyChallengeName}
                   </span>
-                  <span class="text-em-xs text-main">
+                  <span class="text-sm text-main">
                     {props.practiceRewardLabel("dailyChallenge")}
                   </span>
                 </div>
@@ -236,35 +223,35 @@ export function LessonHero(props: {
                   fallback={
                     <button
                       type="button"
-                      class="cursor-pointer rounded-lg bg-bg px-3 py-2 text-em-xs text-text transition-colors hover:bg-text hover:text-bg"
+                      class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-4 py-2 text-sm font-semibold text-text hover:bg-text hover:text-bg"
                       onClick={props.onDailyChallenge}
                     >
                       start
                     </button>
                   }
                 >
-                  <span class="flex items-center gap-1.5 text-em-xs text-main">
+                  <span class="flex items-center gap-1.5 text-sm font-semibold text-main">
                     <Fa icon="fa-check-circle" /> done
                   </span>
                 </Show>
               </div>
 
-              <div class="flex items-center justify-between gap-3 rounded-xl bg-sub-alt/80 p-3">
+              <div class="flex items-center justify-between gap-3 rounded-double bg-sub-alt/80 p-3">
                 <div class="grid gap-1">
-                  <div class="flex items-center gap-2 text-sm font-medium text-text">
+                  <div class="flex items-center gap-2 text-base font-semibold text-text">
                     <Fa icon="fa-dumbbell" class="text-main" size={0.85} />
                     Adaptive Review
                   </div>
-                  <span class="text-em-xs text-sub">
+                  <span class="text-sm text-sub">
                     Practice the keys you miss most
                   </span>
-                  <span class="text-em-xs text-main">
+                  <span class="text-sm text-main">
                     {props.practiceRewardLabel("adaptive")}
                   </span>
                 </div>
                 <button
                   type="button"
-                  class="cursor-pointer rounded-lg bg-bg px-3 py-2 text-em-xs text-text transition-colors hover:bg-text hover:text-bg"
+                  class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-4 py-2 text-sm font-semibold text-text hover:bg-text hover:text-bg"
                   onClick={props.onAdaptiveReview}
                   disabled={props.adaptiveLoading}
                 >

@@ -10,15 +10,22 @@ import {
 } from "solid-js";
 
 import { getEquippedAvatar } from "../../avatar/avatar-state";
+import { GARDEN_ITEMS } from "../../house/garden-items";
+import {
+  DEFAULT_GARDEN_THEME_ID,
+  getGardenTheme,
+} from "../../house/garden-themes";
 import {
   HOUSE_ITEMS,
   HouseItem,
   HouseSpriteItem,
 } from "../../house/house-items";
+import { houseScene, setHouseScene } from "../../house/house-scene";
 import { HOUSE_SMALL_ITEMS } from "../../house/house-small-items";
 import { HOUSE_SPRITE_ITEMS } from "../../house/house-sprite-items";
 import {
   claimDailyGreeting,
+  emptyHouseState,
   getHouseState,
   HouseItemPosition,
   saveItemPosition,
@@ -28,7 +35,6 @@ import {
 import {
   DEFAULT_HOUSE_THEME_ID,
   getHouseTheme,
-  HouseTheme,
 } from "../../house/house-themes";
 import { PET_ITEMS, PetItem } from "../../pet-shop/pet-items";
 import { getPetState } from "../../pet-shop/pet-state";
@@ -109,7 +115,8 @@ function findPlaceableItem(
   return (
     HOUSE_ITEMS.find((i) => i.id === id) ??
     HOUSE_SPRITE_ITEMS.find((i) => i.id === id) ??
-    HOUSE_SMALL_ITEMS.find((i) => i.id === id)
+    HOUSE_SMALL_ITEMS.find((i) => i.id === id) ??
+    GARDEN_ITEMS.find((i) => i.id === id)
   );
 }
 
@@ -421,17 +428,7 @@ export function HouseModal(): JSXElement {
     queryKey: ["houseState", getUserId()],
     queryFn: async () => {
       const uid = getUserId();
-      if (uid === null) {
-        return {
-          coins: 0,
-          ownedItems: {},
-          layout: {},
-          scale: {},
-          storedItems: {},
-          touchOrder: [],
-          themeId: DEFAULT_HOUSE_THEME_ID,
-        };
-      }
+      if (uid === null) return emptyHouseState();
       return getHouseState(uid);
     },
     enabled: isOpen() && isAuthenticated(),
@@ -457,38 +454,38 @@ export function HouseModal(): JSXElement {
   const [positions, setPositions] = createSignal<
     Record<string, HouseItemPosition>
   >({});
-  let positionsUid: string | null | undefined;
+  let positionsKey: string | undefined;
   createEffect(() => {
     if (!isOpen()) {
-      positionsUid = undefined;
+      positionsKey = undefined;
       setPositions({});
       return;
     }
-    const layout = houseQuery.data?.layout;
-    if (layout === undefined) return;
-    const uid = getUserId();
-    if (positionsUid !== uid) {
-      positionsUid = uid;
-      setPositions(layout);
+    const data = houseQuery.data;
+    if (data === undefined) return;
+    const key = `${getUserId() ?? ""}:${houseScene()}`;
+    if (positionsKey !== key) {
+      positionsKey = key;
+      setPositions(houseScene() === "garden" ? data.gardenLayout : data.layout);
     }
   });
 
   // Local copy of item scales, same seed-once-then-locally-own reasoning as
   // positions above.
   const [scales, setScales] = createSignal<Record<string, number>>({});
-  let scalesUid: string | null | undefined;
+  let scalesKey: string | undefined;
   createEffect(() => {
     if (!isOpen()) {
-      scalesUid = undefined;
+      scalesKey = undefined;
       setScales({});
       return;
     }
-    const scale = houseQuery.data?.scale;
-    if (scale === undefined) return;
-    const uid = getUserId();
-    if (scalesUid !== uid) {
-      scalesUid = uid;
-      setScales(scale);
+    const data = houseQuery.data;
+    if (data === undefined) return;
+    const key = `${getUserId() ?? ""}:${houseScene()}`;
+    if (scalesKey !== key) {
+      scalesKey = key;
+      setScales(houseScene() === "garden" ? data.gardenScale : data.scale);
     }
   });
 
@@ -540,12 +537,31 @@ export function HouseModal(): JSXElement {
     return clampToRoom(item.sizePx, effectiveScale(item), aspect, raw);
   };
 
-  const activeTheme = (): HouseTheme =>
-    getHouseTheme(houseQuery.data?.themeId ?? DEFAULT_HOUSE_THEME_ID);
+  const activeTheme = (): {
+    wall: string;
+    floor: string;
+    baseboard: string;
+  } =>
+    houseScene() === "garden"
+      ? getGardenTheme(
+          houseQuery.data?.gardenThemeId ?? DEFAULT_GARDEN_THEME_ID,
+        )
+      : getHouseTheme(houseQuery.data?.themeId ?? DEFAULT_HOUSE_THEME_ID);
 
-  const isPlaced = (id: string): boolean =>
-    houseQuery.data?.ownedItems[id] === true &&
-    houseQuery.data?.storedItems[id] !== true;
+  const isGardenOwned = (id: string): boolean => {
+    const item = GARDEN_ITEMS.find((entry) => entry.id === id);
+    return item?.price === 0 || houseQuery.data?.gardenOwned[id] === true;
+  };
+
+  const isPlaced = (id: string): boolean => {
+    if (houseScene() === "garden") {
+      return isGardenOwned(id) && houseQuery.data?.gardenStored[id] !== true;
+    }
+    return (
+      houseQuery.data?.ownedItems[id] === true &&
+      houseQuery.data?.storedItems[id] !== true
+    );
+  };
 
   // Small decor (books, food, bottles...) always renders on its own layer
   // above furniture (see the two separate <For> blocks below) so e.g. a book
@@ -557,19 +573,21 @@ export function HouseModal(): JSXElement {
   // bringing windows to front one at a time rather than only remembering
   // the single last one.
   const [touchOrder, setTouchOrder] = createSignal<string[]>([]);
-  let touchOrderUid: string | null | undefined;
+  let touchOrderKey: string | undefined;
   createEffect(() => {
     if (!isOpen()) {
-      touchOrderUid = undefined;
+      touchOrderKey = undefined;
       setTouchOrder([]);
       return;
     }
-    const order = houseQuery.data?.touchOrder;
-    if (order === undefined) return;
-    const uid = getUserId();
-    if (touchOrderUid !== uid) {
-      touchOrderUid = uid;
-      setTouchOrder(order);
+    const data = houseQuery.data;
+    if (data === undefined) return;
+    const key = `${getUserId() ?? ""}:${houseScene()}`;
+    if (touchOrderKey !== key) {
+      touchOrderKey = key;
+      setTouchOrder(
+        houseScene() === "garden" ? data.gardenTouchOrder : data.touchOrder,
+      );
     }
   });
   let touchOrderWriteTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -581,8 +599,9 @@ export function HouseModal(): JSXElement {
         if (touchOrderWriteTimeout !== null) {
           clearTimeout(touchOrderWriteTimeout);
         }
+        const scene = houseScene();
         touchOrderWriteTimeout = setTimeout(() => {
-          void saveTouchOrder(uid, next);
+          void saveTouchOrder(uid, next, scene);
         }, POSITION_WRITE_DEBOUNCE_MS);
       }
       return next;
@@ -627,10 +646,13 @@ export function HouseModal(): JSXElement {
   // references across calls, so this must return the original catalog item
   // objects unwrapped, not fresh {kind, item} wrappers.
   const sortedFurniture = (): (HouseItem | HouseSpriteItem)[] => {
-    const entries: (HouseItem | HouseSpriteItem)[] = [
-      ...HOUSE_ITEMS.filter((i) => isPlaced(i.id)),
-      ...HOUSE_SPRITE_ITEMS.filter((i) => isPlaced(i.id)),
-    ];
+    const entries: (HouseItem | HouseSpriteItem)[] =
+      houseScene() === "garden"
+        ? GARDEN_ITEMS.filter((item) => isPlaced(item.id))
+        : [
+            ...HOUSE_ITEMS.filter((i) => isPlaced(i.id)),
+            ...HOUSE_SPRITE_ITEMS.filter((i) => isPlaced(i.id)),
+          ];
     return sortByDepth(
       entries.map((item) => ({
         value: item,
@@ -766,9 +788,10 @@ export function HouseModal(): JSXElement {
         const clamped = effectivePos(item);
         setPositions((prev) => ({ ...prev, [resizeId]: clamped }));
         if (scaleWriteTimeout !== null) clearTimeout(scaleWriteTimeout);
+        const scene = houseScene();
         scaleWriteTimeout = setTimeout(() => {
-          void saveItemScale(uid, resizeId, scale);
-          void saveItemPosition(uid, resizeId, clamped);
+          void saveItemScale(uid, resizeId, scale, scene);
+          void saveItemPosition(uid, resizeId, clamped, scene);
         }, POSITION_WRITE_DEBOUNCE_MS);
       }
     }
@@ -783,8 +806,9 @@ export function HouseModal(): JSXElement {
     const clamped = effectivePos(item);
     setPositions((prev) => ({ ...prev, [id]: clamped }));
     if (positionWriteTimeout !== null) clearTimeout(positionWriteTimeout);
+    const scene = houseScene();
     positionWriteTimeout = setTimeout(() => {
-      void saveItemPosition(uid, id, clamped);
+      void saveItemPosition(uid, id, clamped, scene);
     }, POSITION_WRITE_DEBOUNCE_MS);
   };
 
@@ -873,7 +897,7 @@ export function HouseModal(): JSXElement {
     celebrateTimeout = setTimeout(() => setCelebrating(false), 900);
 
     const uid = getUserId();
-    if (uid === null) return;
+    if (uid === null || houseScene() === "garden") return;
     try {
       const result = await claimDailyGreeting(uid);
       if (result.claimed) {
@@ -890,30 +914,83 @@ export function HouseModal(): JSXElement {
   return (
     <AnimatedModal id="House" title="My House" modalClass="max-w-4xl">
       <div class="grid gap-4">
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class={cn(
+              "flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-bold",
+              houseScene() === "room"
+                ? "bg-main text-bg"
+                : "bg-sub-alt text-text",
+            )}
+            aria-pressed={houseScene() === "room"}
+            onClick={() => {
+              setDraggingId(null);
+              setResizingId(null);
+              setEditMode(false);
+              setHouseScene("room");
+            }}
+          >
+            <Fa icon="fa-home" />
+            Room
+          </button>
+          <button
+            type="button"
+            class={cn(
+              "flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-bold",
+              houseScene() === "garden"
+                ? "bg-main text-bg"
+                : "bg-sub-alt text-text",
+            )}
+            aria-pressed={houseScene() === "garden"}
+            onClick={() => {
+              setDraggingId(null);
+              setResizingId(null);
+              setEditMode(false);
+              setHouseScene("garden");
+            }}
+          >
+            <Fa icon="fa-tree" />
+            Garden
+          </button>
+        </div>
         <div class="flex items-center justify-end gap-3">
           <div class="flex items-center gap-1.5 font-bold text-main">
             <Fa icon="fa-coins" />
             {houseQuery.data?.coins ?? 0}
           </div>
           <Show
-            when={Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0}
+            when={
+              houseScene() === "garden" ||
+              Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0
+            }
           >
             <Button
-              text={editMode() ? "done" : "edit room"}
+              text={
+                editMode()
+                  ? "done"
+                  : houseScene() === "garden"
+                    ? "edit garden"
+                    : "edit room"
+              }
               fa={{ icon: editMode() ? "fa-check" : "fa-pen" }}
               onClick={() => setEditMode((prev) => !prev)}
             />
           </Show>
           <Button
-            text="furniture"
-            fa={{ icon: "fa-store" }}
+            text={houseScene() === "garden" ? "plants" : "furniture"}
+            fa={{
+              icon: houseScene() === "garden" ? "fa-seedling" : "fa-store",
+            }}
             onClick={() => showModal("HouseShop")}
           />
-          <Button
-            text="pets"
-            fa={{ icon: "fa-paw" }}
-            onClick={() => showModal("PetShop")}
-          />
+          <Show when={houseScene() === "room"}>
+            <Button
+              text="pets"
+              fa={{ icon: "fa-paw" }}
+              onClick={() => showModal("PetShop")}
+            />
+          </Show>
         </div>
 
         <div
@@ -928,24 +1005,33 @@ export function HouseModal(): JSXElement {
               a theme can give each its own pattern (tiles, planks, stripes). */}
           <div
             class="absolute inset-x-0 top-0"
-            style={{ height: "68%", background: activeTheme().wall }}
+            style={{
+              height: houseScene() === "garden" ? "45%" : "68%",
+              background: activeTheme().wall,
+            }}
           ></div>
           <div
             class="absolute inset-x-0 bottom-0"
-            style={{ height: "32%", background: activeTheme().floor }}
+            style={{
+              height: houseScene() === "garden" ? "55%" : "32%",
+              background: activeTheme().floor,
+            }}
           ></div>
 
-          {/* baseboard: where the wall meets the floor */}
+          {/* baseboard: where the wall meets the floor, or sky meets grass */}
           <div
             class="absolute inset-x-0 h-0.5"
             style={{
-              top: "68%",
+              top: houseScene() === "garden" ? "45%" : "68%",
               "background-color": activeTheme().baseboard,
             }}
           ></div>
 
           <Show
-            when={Object.keys(houseQuery.data?.ownedItems ?? {}).length === 0}
+            when={
+              houseScene() === "room" &&
+              Object.keys(houseQuery.data?.ownedItems ?? {}).length === 0
+            }
           >
             <div class="absolute inset-x-0 top-4 text-center text-sm text-sub">
               Your room is empty — visit the shop to decorate it!
@@ -1037,18 +1123,20 @@ export function HouseModal(): JSXElement {
             }}
           </For>
 
-          <For each={PET_ITEMS}>
-            {(item) => (
-              <Show
-                when={
-                  petQuery.data?.ownedPets[item.id] === true &&
-                  petQuery.data?.storedPets[item.id] !== true
-                }
-              >
-                <RoamingPet item={item} pickPos={pickPetPos} />
-              </Show>
-            )}
-          </For>
+          <Show when={houseScene() === "room"}>
+            <For each={PET_ITEMS}>
+              {(item) => (
+                <Show
+                  when={
+                    petQuery.data?.ownedPets[item.id] === true &&
+                    petQuery.data?.storedPets[item.id] !== true
+                  }
+                >
+                  <RoamingPet item={item} pickPos={pickPetPos} />
+                </Show>
+              )}
+            </For>
+          </Show>
 
           <Anime
             class="pointer-events-none absolute inset-0"
@@ -1086,41 +1174,52 @@ export function HouseModal(): JSXElement {
           </Anime>
 
           {/* Small decor always renders above furniture/avatar/pets - see sortedSmallItems. */}
-          <For each={sortedSmallItems()}>
-            {(item) => {
-              const smallPos = createMemo(() => effectivePos(item));
-              return (
-                <SpriteItem
-                  item={item}
-                  pos={smallPos()}
-                  scale={effectiveScale(item)}
-                  zIndex={layerZ(item.id, smallPos().yPct, SMALL_DECOR_Z)}
-                  editMode={editMode()}
-                  onPointerDown={(e) => handleItemPointerDown(item, e)}
-                  onResizePointerDown={(e) =>
-                    handleResizeHandlePointerDown(item, e)
-                  }
-                  onBringToFront={() => bringToFront(item.id)}
-                  onImageReady={onImageReady}
-                />
-              );
-            }}
-          </For>
+          <Show when={houseScene() === "room"}>
+            <For each={sortedSmallItems()}>
+              {(item) => {
+                const smallPos = createMemo(() => effectivePos(item));
+                return (
+                  <SpriteItem
+                    item={item}
+                    pos={smallPos()}
+                    scale={effectiveScale(item)}
+                    zIndex={layerZ(item.id, smallPos().yPct, SMALL_DECOR_Z)}
+                    editMode={editMode()}
+                    onPointerDown={(e) => handleItemPointerDown(item, e)}
+                    onResizePointerDown={(e) =>
+                      handleResizeHandlePointerDown(item, e)
+                    }
+                    onBringToFront={() => bringToFront(item.id)}
+                    onImageReady={onImageReady}
+                  />
+                );
+              }}
+            </For>
+          </Show>
         </div>
 
-        <div class="text-center text-sm text-sub">
-          Click your avatar to say hi!
+        <div class="text-center text-base text-text">
           <Show
-            when={Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0}
+            when={houseScene() === "room"}
+            fallback={
+              editMode()
+                ? "Drag a plant to move it. Use the corners to resize it or bring it forward."
+                : "Tap edit garden to move your plants."
+            }
           >
-            {" "}
-            {editMode()
-              ? "Drag furniture to rearrange it. Use the right corner handle to resize, or the left one to bring it to the front."
-              : "Tap edit room to rearrange or resize your furniture."}
-          </Show>
-          <Show when={Object.keys(petQuery.data?.ownedPets ?? {}).length > 0}>
-            {" "}
-            Pets can be picked up and moved too.
+            Click your avatar to say hi!
+            <Show
+              when={Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0}
+            >
+              {" "}
+              {editMode()
+                ? "Drag furniture to rearrange it. Use the right corner handle to resize, or the left one to bring it to the front."
+                : "Tap edit room to rearrange or resize your furniture."}
+            </Show>
+            <Show when={Object.keys(petQuery.data?.ownedPets ?? {}).length > 0}>
+              {" "}
+              Pets can be picked up and moved too.
+            </Show>
           </Show>
         </div>
       </div>

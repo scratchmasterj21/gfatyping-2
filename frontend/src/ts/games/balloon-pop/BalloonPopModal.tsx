@@ -16,6 +16,7 @@ import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
@@ -151,13 +152,15 @@ export function BalloonPopModal(props: Props): JSXElement {
                 onSelect={(d) => setDifficulty(d)}
               />
             </GameSetupSection>
-            <GameSetupSection title="Choose a word list">
-              <WordListPicker
-                groups={GROUPS}
-                selectedId={selected().id}
-                onSelect={setSelected}
-              />
-            </GameSetupSection>
+            <GameSetupMore>
+              <GameSetupSection title="Choose a word list">
+                <WordListPicker
+                  groups={GROUPS}
+                  selectedId={selected().id}
+                  onSelect={setSelected}
+                />
+              </GameSetupSection>
+            </GameSetupMore>
           </GamePickLayout>
         </Show>
 

@@ -2406,7 +2406,28 @@ export const themes: Record<ThemeName, Theme> = {
     colorfulError: "#c92a2a",
     colorfulErrorExtra: "#8f1d1d",
   },
+  space: {
+    bg: "#1b1f3b",
+    main: "#ffd43b",
+    caret: "#ff8787",
+    sub: "#8c93c9",
+    subAlt: "#262b52",
+    text: "#eef0ff",
+    error: "#ff6b6b",
+    errorExtra: "#c92a2a",
+    colorfulError: "#ff6b6b",
+    colorfulErrorExtra: "#c92a2a",
+  },
 };
+
+/** Bright, friendly themes made for students (ages 7-12). */
+export const KID_THEME_NAMES: readonly ThemeName[] = [
+  "jungle",
+  "candy",
+  "ocean",
+  "sunny",
+  "space",
+];
 
 export type ThemeWithName = Theme & { name: ThemeName };
 export const ThemesList: ThemeWithName[] = Object.keys(themes)

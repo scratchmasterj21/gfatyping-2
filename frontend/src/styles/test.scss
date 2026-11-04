@@ -104,6 +104,18 @@
     position: relative;
     width: 100%;
     margin: 0 auto;
+    --side-image-width: clamp(4rem, 8vw, 10rem);
+    --side-image-gap: 1rem;
+  }
+
+  // Side pictures sit in the side gutters. Keep the words out of that column
+  // so a tall picture (see the right-hand cat) cannot cover the last words.
+  @media (min-width: 768px) {
+    #typingTest[data-side-images] #words {
+      padding-inline: calc(
+        var(--side-image-gap) + var(--side-image-width) + 0.75rem
+      );
+    }
   }
 
   .ssWatermark {

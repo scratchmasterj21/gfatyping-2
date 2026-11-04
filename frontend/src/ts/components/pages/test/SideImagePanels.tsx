@@ -44,8 +44,8 @@ function Panel(props: {
     <div
       class="pointer-events-none absolute top-0 z-10 hidden h-full md:flex md:flex-col md:items-center md:justify-center"
       style={{
-        [props.side]: "1rem",
-        width: "clamp(4rem, 8vw, 10rem)",
+        [props.side]: "var(--side-image-gap)",
+        width: "var(--side-image-width)",
       }}
     >
       <Show when={props.src !== null && !failed()}>
@@ -231,6 +231,22 @@ export function SideImagePanels(): JSXElement {
   const isOff = (): boolean => activeIndex() >= sets().length;
   const currentSet = (): SideImageSet | null =>
     isOff() ? null : (sets()[activeIndex()] ?? null);
+
+  createEffect(() => {
+    const el = document.getElementById("typingTest");
+    if (el === null) return;
+    const set = currentSet();
+    const showing =
+      !resultVisibleSignal() &&
+      set !== null &&
+      (Boolean(set.left) || Boolean(set.right));
+    if (showing) el.dataset["sideImages"] = "";
+    else delete el.dataset["sideImages"];
+  });
+
+  onCleanup(() => {
+    delete document.getElementById("typingTest")?.dataset["sideImages"];
+  });
 
   return (
     <Show when={!resultVisibleSignal() && sets().length > 0}>

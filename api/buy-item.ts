@@ -22,6 +22,7 @@ const SHOP_IDS: Set<ShopId> = new Set([
   "caretEffect",
   "backdrop",
   "animalAvatar",
+  "garden",
 ]);
 
 type SideImageSet = { id?: string; price?: number };

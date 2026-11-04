@@ -24,7 +24,7 @@ export function BuyButton(props: {
     <button
       type="button"
       class={cn(
-        "flex items-center gap-1 rounded px-2 py-1 text-em-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "press-3d flex min-h-9 items-center gap-1 rounded-xl px-3 py-1.5 font-kid text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11",
         confirming() ? "bg-main text-bg" : "bg-bg text-text hover:text-main",
         props.class,
       )}

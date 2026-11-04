@@ -84,6 +84,7 @@ export class GameScene extends Scene {
   private maxWave = 0;
   private hordeEnabled = true;
   private targetYRange = DEFAULT_TARGET_Y_RANGE;
+  private bothSides = false;
   private multiplayerRole: "host" | "guest" | null = null;
   private lastWorldSnapshotAt = 0;
   private pendingRemoteWords = new Set<string>();
@@ -166,6 +167,8 @@ export class GameScene extends Scene {
     this.targetYRange =
       (this.registry.get("targetYRange") as number | undefined) ??
       DEFAULT_TARGET_Y_RANGE;
+    this.bothSides =
+      (this.registry.get("bothSides") as boolean | undefined) ?? false;
     this.multiplayerRole =
       (this.registry.get("multiplayerRole") as "host" | "guest" | undefined) ??
       null;
@@ -661,7 +664,7 @@ export class GameScene extends Scene {
     for (const ghost of this.ghosts) {
       const shouldBeTargetable =
         !this.pendingRemoteWords.has(ghost.word) &&
-        ghost.side === this.facing &&
+        (this.bothSides || ghost.side === this.facing) &&
         Math.abs(ghost.y - this.playerY) <= this.targetYRange;
       if (shouldBeTargetable !== ghost.isTargetable()) {
         ghost.setTargetable(shouldBeTargetable);

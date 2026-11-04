@@ -20,8 +20,8 @@ export function DifficultySegmented<T extends DifficultyOption>(props: {
           <button
             type="button"
             class={cn(
-              "flex-1 rounded-lg font-semibold transition-colors",
-              props.compact ? "px-2 py-1 text-em-xs" : "px-3 py-1.5 text-em-sm",
+              "press-3d min-h-12 flex-1 rounded-xl font-semibold",
+              props.compact ? "px-2 py-2 text-sm" : "px-3 py-3 text-base",
               props.selectedLabel === d.label
                 ? "bg-main text-bg"
                 : "bg-sub-alt text-sub hover:text-text",

@@ -16,6 +16,7 @@ import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
@@ -66,7 +67,9 @@ export function WordDefenderModal(props: Props): JSXElement {
     await Promise.resolve();
     if (containerRef === undefined) return;
     const usedDifficulty =
-      wordsOverride !== undefined ? easyDiff : difficulty();
+      wordsOverride !== undefined
+        ? { ...easyDiff, bossEnabled: false }
+        : difficulty();
     const usedGroup = selected().group;
     game = await createWordDefenderGame(
       containerRef,
@@ -147,13 +150,15 @@ export function WordDefenderModal(props: Props): JSXElement {
                 onSelect={(d) => setDifficulty(d)}
               />
             </GameSetupSection>
-            <GameSetupSection title="Choose a word list">
-              <WordListPicker
-                groups={GROUPS}
-                selectedId={selected().id}
-                onSelect={setSelected}
-              />
-            </GameSetupSection>
+            <GameSetupMore>
+              <GameSetupSection title="Choose a word list">
+                <WordListPicker
+                  groups={GROUPS}
+                  selectedId={selected().id}
+                  onSelect={setSelected}
+                />
+              </GameSetupSection>
+            </GameSetupMore>
           </GamePickLayout>
         </Show>
 

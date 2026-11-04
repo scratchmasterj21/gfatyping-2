@@ -31,6 +31,8 @@
 
   --radius: var(--roundness);
 
+  --font-kid: "Fredoka", "Lexend Deca", "Roboto Mono", sans-serif;
+
   @keyframes loader {
     0% {
       transform: translateX(-100%) scaleX(0);
@@ -40,6 +42,30 @@
     }
     100% {
       transform: translateX(100%) scaleX(0);
+    }
+  }
+
+  --animate-mascot-bob: mascot-bob 2.4s ease-in-out infinite;
+  --animate-mascot-blink: mascot-blink 4.5s ease-in-out infinite;
+
+  @keyframes mascot-bob {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4%);
+    }
+  }
+
+  @keyframes mascot-blink {
+    0%,
+    94%,
+    100% {
+      transform: scaleY(1);
+    }
+    97% {
+      transform: scaleY(0.1);
     }
   }
 
@@ -55,6 +81,32 @@
 
 @utility rounded-double {
   border-radius: calc(var(--roundness) * 2);
+}
+
+/* Chunky "pressable" look for the kid UI: a solid ledge under the element
+   that disappears when pressed. Ledge color follows --press-color. */
+@layer utilities {
+  .press-3d {
+    --press-depth: 0.25rem;
+    box-shadow: 0 var(--press-depth) 0
+      var(--press-color, color-mix(in srgb, var(--sub-color) 55%, transparent));
+    transition:
+      transform 0.08s ease-out,
+      box-shadow 0.08s ease-out,
+      background-color 0.15s,
+      color 0.15s;
+  }
+
+  .press-3d:active:not(:disabled) {
+    transform: translateY(var(--press-depth));
+    box-shadow: 0 0 0 transparent;
+  }
+
+  @media (prefers-reduced-motion) {
+    .press-3d {
+      transition: none;
+    }
+  }
 }
 
 @utility rounded-half {

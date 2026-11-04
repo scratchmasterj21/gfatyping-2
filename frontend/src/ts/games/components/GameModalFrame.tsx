@@ -32,7 +32,7 @@ export function GameModalFrame(props: {
     <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95">
       <div
         class={cn(
-          "relative flex flex-col overflow-hidden rounded-xl border border-main/30 bg-bg shadow-2xl",
+          "relative flex flex-col overflow-hidden rounded-double border-2 border-main/40 bg-bg shadow-2xl",
           props.layout === "playing"
             ? "h-[90vh] w-[95vw] max-w-5xl supports-[height:100dvh]:h-[90dvh]"
             : props.layout === "pick"
@@ -43,7 +43,7 @@ export function GameModalFrame(props: {
         <Show when={showBack() && props.layout === "playing"}>
           <button
             type="button"
-            class="absolute top-3 right-3 z-10 flex min-h-10 items-center justify-center rounded bg-sub-alt px-3 text-sm font-semibold text-sub hover:text-text"
+            class="absolute top-3 right-3 z-10 flex min-h-11 items-center justify-center rounded-full bg-sub-alt px-4 text-sm font-semibold text-text hover:bg-text hover:text-bg"
             onClick={() => props.onClose()}
           >
             ← Back to lessons
@@ -52,7 +52,7 @@ export function GameModalFrame(props: {
         {props.children}
         <Show when={showKeyboardHint()}>
           <div class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-4">
-            <div class="flex max-w-sm flex-col items-center gap-2 rounded-xl border border-main/40 bg-bg/95 p-5 text-center shadow-2xl">
+            <div class="flex max-w-sm flex-col items-center gap-2 rounded-double border-2 border-main/40 bg-bg/95 p-5 text-center shadow-2xl">
               <Fa icon="fa-keyboard" class="text-3xl text-main" />
               <div class="text-lg font-bold text-text">
                 Connect a keyboard to play

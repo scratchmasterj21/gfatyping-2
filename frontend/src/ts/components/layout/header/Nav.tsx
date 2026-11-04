@@ -9,11 +9,10 @@ import {
 
 import { isCurrentUserAdmin } from "../../../auth";
 import { usePendingConnectionsQuery } from "../../../collections/connections";
-import { restartTestEvent } from "../../../events/test";
+import { isKidThemeActive } from "../../../controllers/kid-theme-controller";
 import { createEffectOn } from "../../../hooks/effects";
 import { useRefWithUtils } from "../../../hooks/useRefWithUtils";
 import { useClassroomAlerts } from "../../../lessons/classroom-alerts";
-import { leaveLessonDrillThen } from "../../../lessons/lesson-launcher";
 import { prefetchLeaderboardPage } from "../../../queries/prefetch";
 import { getServerConfigurationQueryOptions } from "../../../queries/server-configuration";
 import { getActivePage } from "../../../states/core";
@@ -35,6 +34,8 @@ import { NotificationBubble } from "../../common/NotificationBubble";
 import { User } from "../../common/User";
 import { AccountMenu } from "./AccountMenu";
 import { AccountXpBar } from "./AccountXpBar";
+import { KID_TAB_BAR_HIDES } from "./KidTabBar";
+import { isNavPageActive, onFreeTypingNavClick } from "./nav-utils";
 
 export function Nav(): JSXElement {
   const [getAccountMenuOpen, setAccountMenuOpen] = createSignal(false);
@@ -63,23 +64,19 @@ export function Nav(): JSXElement {
   onCleanup(() => document.removeEventListener("click", handleClickOutside));
 
   const buttonClass = () =>
-    cn("aspect-square min-h-10 min-w-10 xl:aspect-auto", {
-      "opacity-(--nav-focus-opacity)": getFocus(),
-    });
+    cn(
+      "aspect-square min-h-10 min-w-10 xl:aspect-auto pointer-coarse:min-h-12 pointer-coarse:min-w-12",
+      {
+        "opacity-(--nav-focus-opacity)": getFocus(),
+      },
+    );
 
   const navLabel = (label: string): JSXElement => (
     <span class="hidden text-sm font-semibold lg:inline">{label}</span>
   );
 
-  const isLessonsNavActive = (): boolean => {
-    if (getActivePage() === "lessons") return true;
-    const path = window.location.pathname;
-    return path === "/" || path === "/lessons";
-  };
-
   const pageProperties = (page: string, label: string) => {
-    const active =
-      page === "lessons" ? isLessonsNavActive() : getActivePage() === page;
+    const active = isNavPageActive(page);
     return {
       active,
       "aria-label": label,
@@ -87,12 +84,15 @@ export function Nav(): JSXElement {
     };
   };
 
-  const destinationButtonClass = () => cn(buttonClass(), "hidden lg:flex");
+  // Students on phones/tablets navigate with the bottom KidTabBar instead.
+  const kidTabBarHides = () => isKidThemeActive() && KID_TAB_BAR_HIDES;
+
+  const destinationButtonClass = () =>
+    cn(buttonClass(), "hidden lg:flex", kidTabBarHides());
   const mobileDestinationClass = (page: string) =>
     cn(
       "w-full justify-start border-l-4 border-transparent",
-      (page === "lessons" ? isLessonsNavActive() : getActivePage() === page) &&
-        "border-main bg-sub-alt text-text",
+      isNavPageActive(page) && "border-main bg-sub-alt text-text",
     );
 
   createEffectOn(getActivePage, () => setMobileMenuOpen(false));
@@ -128,7 +128,7 @@ export function Nav(): JSXElement {
     <nav class={cn("z-5 flex w-full items-center gap-1 md:gap-2")}>
       <div
         ref={mobileMenuRef}
-        class="relative lg:hidden"
+        class={cn("relative", kidTabBarHides())}
         onKeyDown={(event) => {
           if (event.key === "Escape") setMobileMenuOpen(false);
         }}
@@ -170,9 +170,7 @@ export function Nav(): JSXElement {
               {...pageProperties("test", "Free typing practice")}
               onClick={() => {
                 setMobileMenuOpen(false);
-                leaveLessonDrillThen(() => {
-                  if (getActivePage() === "test") restartTestEvent.dispatch();
-                });
+                onFreeTypingNavClick();
               }}
             />
             <Button
@@ -261,11 +259,7 @@ export function Nav(): JSXElement {
         dataset={{
           "data-nav-item": "test",
         }}
-        onClick={() => {
-          leaveLessonDrillThen(() => {
-            if (getActivePage() === "test") restartTestEvent.dispatch();
-          });
-        }}
+        onClick={onFreeTypingNavClick}
       >
         {navLabel("Free typing")}
       </Button>
@@ -288,24 +282,6 @@ export function Nav(): JSXElement {
       >
         {navLabel("Rankings")}
       </Button>
-      <Show when={getSnapshot() !== undefined}>
-        <Button
-          variant="text"
-          fa={{
-            icon: "fa-flag-checkered",
-            fixedWidth: true,
-          }}
-          router-link
-          dataset={{
-            "data-nav-item": "race",
-          }}
-          class={destinationButtonClass()}
-          href="/race"
-          {...pageProperties("race", "Class race")}
-        >
-          {navLabel("Race")}
-        </Button>
-      </Show>
       <Show when={isCurrentUserAdmin()}>
         <Button
           variant="text"
@@ -340,22 +316,6 @@ export function Nav(): JSXElement {
           {navLabel("Host race")}
         </Button>
       </Show>
-      <Button
-        variant="text"
-        fa={{
-          icon: "fa-cog",
-          fixedWidth: true,
-        }}
-        class={buttonClass()}
-        href="/settings"
-        dataset={{
-          "data-nav-item": "settings",
-        }}
-        router-link
-        {...pageProperties("settings", "Settings")}
-      >
-        {navLabel("Settings")}
-      </Button>
       <div class="grow"></div>
       <Button
         variant="text"

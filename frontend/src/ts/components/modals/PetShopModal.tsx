@@ -59,13 +59,15 @@ export function PetShopModal(): JSXElement {
 
   return (
     <AnimatedModal id="PetShop" title="Pet Shop">
-      <div class="grid gap-4">
-        <div class="flex items-center justify-center gap-2 text-lg font-bold text-main">
-          <Fa icon="fa-coins" />
-          {stateQuery.data?.coins ?? 0}
+      <div class="grid gap-4 font-kid">
+        <div class="flex justify-center">
+          <span class="flex items-center gap-2 rounded-full bg-sub-alt px-5 py-2 text-xl font-bold text-main">
+            <Fa icon="fa-coins" />
+            {stateQuery.data?.coins ?? 0}
+          </span>
         </div>
 
-        <p class="text-center text-em-xs text-sub">
+        <p class="text-center text-sm text-sub">
           Choose a pet. Buy it once, then place it in your house.
         </p>
 
@@ -77,14 +79,14 @@ export function PetShopModal(): JSXElement {
               return (
                 <div
                   class={cn(
-                    "flex flex-col items-center gap-1.5 rounded p-3 shadow-sm",
+                    "flex flex-col items-center gap-2 rounded-double p-3",
                     owned() ? "bg-main text-bg" : "bg-sub-alt text-text",
                   )}
                 >
                   <div class="h-12 w-12">
                     <PetSprite species={item.species} sizePx={48} />
                   </div>
-                  <span class="text-center text-sm font-medium">
+                  <span class="text-center text-base font-semibold">
                     {item.name}
                   </span>
                   <Show
@@ -92,7 +94,7 @@ export function PetShopModal(): JSXElement {
                     fallback={
                       <button
                         type="button"
-                        class="flex items-center gap-1 rounded bg-bg px-2 py-1 text-em-xs text-text transition-colors hover:text-main disabled:cursor-not-allowed disabled:opacity-50"
+                        class="press-3d flex min-h-9 items-center gap-1 rounded-xl bg-bg px-3 py-1.5 text-sm font-semibold text-text hover:text-main disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
                         disabled={pendingId() !== null}
                         onClick={() =>
                           void guardedBuy(item.id, async () =>

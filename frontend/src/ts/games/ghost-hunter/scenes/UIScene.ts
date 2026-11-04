@@ -41,6 +41,9 @@ export class UIScene extends Scene {
     this.facingText = this.add
       .text(W / 2, 10, "▶", { ...top, fontSize: "20px", color: "#ffdd44" })
       .setOrigin(0.5, 0);
+    if (this.registry.get("bothSides") === true) {
+      this.facingText.setVisible(false);
+    }
     this.powerUpText = this.add
       .text(W / 2, 34, "", { ...top, fontSize: "14px", color: "#ffdd44" })
       .setOrigin(0.5, 0);

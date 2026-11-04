@@ -48,6 +48,7 @@ export async function createGhostHunterGame(
   difficulty: GameDifficulty = GHOST_DIFFICULTIES[0] as GameDifficulty,
   maxWave = 0,
   multiplayerRole?: "host" | "guest",
+  bothSides = false,
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ BootScene }, { GameOverScene }, { GameScene }, { UIScene }] =
@@ -80,5 +81,7 @@ export async function createGhostHunterGame(
   game.registry.set("targetYRange", difficulty.targetYRange);
   game.registry.set("maxWave", maxWave);
   game.registry.set("multiplayerRole", multiplayerRole);
+  // Grade 1 lesson checkpoints type either side. Free play still requires facing.
+  game.registry.set("bothSides", bothSides);
   return game;
 }

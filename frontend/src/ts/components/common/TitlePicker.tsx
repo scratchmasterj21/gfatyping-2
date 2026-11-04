@@ -28,9 +28,9 @@ export function TitlePicker(props: {
 
   return (
     <div class="grid gap-1.5 rounded bg-sub-alt p-2">
-      <span class="text-em-xs font-medium text-sub">
+      <span class="text-sm font-medium text-sub">
         <Fa icon="fa-id-badge" class="mr-1.5 text-main" />
-        Title (shows on leaderboards)
+        Title (shows on the rankings)
       </span>
       <div class="flex flex-wrap gap-1.5">
         <For each={TITLES}>
@@ -42,7 +42,7 @@ export function TitlePicker(props: {
               <button
                 type="button"
                 class={cn(
-                  "flex cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-em-xs transition-colors disabled:cursor-not-allowed",
+                  "flex min-h-11 cursor-pointer items-center gap-1 rounded-full px-3 text-sm transition-colors disabled:cursor-not-allowed",
                   active()
                     ? "bg-main text-bg"
                     : earned()

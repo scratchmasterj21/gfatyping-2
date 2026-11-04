@@ -20,6 +20,7 @@ import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
 import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
@@ -320,17 +321,6 @@ export function TypeRacerModal(props: Props): JSXElement {
               </p>
             </GameSetupSection>
 
-            <GameSetupSection title="Mode">
-              <SoloTogetherToggle
-                mode={mode()}
-                soloLabel="Race CPU"
-                togetherLabel="Race classmates"
-                multiplayerUnlocked={props.multiplayerUnlocked === true}
-                unlockHint={MULTIPLAYER_UNLOCK_HINT_TYPE_RACER}
-                onModeChange={setMode}
-              />
-            </GameSetupSection>
-
             <Show when={mode() === "solo"}>
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
@@ -362,13 +352,25 @@ export function TypeRacerModal(props: Props): JSXElement {
               </div>
             </GameSetupSection>
 
-            <GameSetupSection title="Choose a word list">
-              <WordListPicker
-                groups={GROUPS}
-                selectedId={selected().id}
-                onSelect={setSelected}
-              />
-            </GameSetupSection>
+            <GameSetupMore>
+              <GameSetupSection title="Mode">
+                <SoloTogetherToggle
+                  mode={mode()}
+                  soloLabel="Race CPU"
+                  togetherLabel="Race classmates"
+                  multiplayerUnlocked={props.multiplayerUnlocked === true}
+                  unlockHint={MULTIPLAYER_UNLOCK_HINT_TYPE_RACER}
+                  onModeChange={setMode}
+                />
+              </GameSetupSection>
+              <GameSetupSection title="Choose a word list">
+                <WordListPicker
+                  groups={GROUPS}
+                  selectedId={selected().id}
+                  onSelect={setSelected}
+                />
+              </GameSetupSection>
+            </GameSetupMore>
           </GamePickLayout>
         </Show>
 

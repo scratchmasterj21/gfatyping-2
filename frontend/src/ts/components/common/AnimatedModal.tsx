@@ -364,7 +364,9 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
         >
           <div class="sticky top-0 z-10 flex items-center justify-between gap-3 bg-bg">
             <Show when={props.title !== undefined && props.title !== ""}>
-              <div class="text-2xl text-sub">{props.title}</div>
+              <div class="text-2xl text-sub" data-ui-element="modalTitle">
+                {props.title}
+              </div>
             </Show>
             <Show
               when={
@@ -378,6 +380,7 @@ export function AnimatedModal(props: AnimatedModalProps): JSXElement {
                 text="Close"
                 fa={{ icon: "fa-times" }}
                 class="ml-auto min-h-10"
+                dataset={{ "data-modal-close": "" }}
                 onClick={() => storeHideModal(props.id)}
                 aria-label={`Close ${props.title ?? "dialog"}`}
               />

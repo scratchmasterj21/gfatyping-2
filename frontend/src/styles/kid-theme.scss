@@ -3,7 +3,7 @@
 // measurement in test-ui.ts stay identical.
 body.kid-theme {
   --roundness: 1rem;
-  --kid-font: "Lexend Deca", "Roboto Mono", "Vazirharf", sans-serif;
+  --kid-font: "Fredoka", "Lexend Deca", "Roboto Mono", "Vazirharf", sans-serif;
 
   font-family: var(--kid-font);
 
@@ -104,6 +104,24 @@ body.kid-theme {
     background-size: auto;
   }
 
+  &[data-theme="space"] {
+    background-image:
+      radial-gradient(
+        color-mix(in srgb, var(--text-color) 22%, transparent) 1px,
+        transparent 1.5px
+      ),
+      radial-gradient(
+        color-mix(in srgb, var(--main-color) 18%, transparent) 1.5px,
+        transparent 2px
+      );
+    background-position:
+      0 0,
+      37px 53px;
+    background-size:
+      61px 61px,
+      97px 97px;
+  }
+
   &[data-theme="candy"] {
     background-image:
       radial-gradient(
@@ -121,6 +139,144 @@ body.kid-theme {
   }
 }
 
+// Typing test page - visual only. Nothing here changes the size or position
+// of #words / letters, so caret + line measurement in test-ui.ts is untouched.
+body.kid-theme .pageTest {
+  // Soft rounded "paper" behind the words. Drawn as a pseudo-element so it
+  // adds no layout; only extends sideways because #wordsWrapper clips
+  // vertically (that clip hides the upcoming lines).
+  #wordsWrapper::before {
+    content: "";
+    position: absolute;
+    inset: 0 -0.6em;
+    z-index: -1;
+    border-radius: 0.5em;
+    background: color-mix(in srgb, var(--sub-alt-color) 75%, transparent);
+    pointer-events: none;
+  }
+
+  #wordsWrapper.tape::before {
+    display: none;
+  }
+
+  .outOfFocusWarning {
+    font-family: var(--kid-font);
+
+    > div:first-child {
+      display: none;
+    }
+
+    .text {
+      padding: 0.75rem 1.5rem;
+      border-radius: 999px;
+      background: var(--main-color);
+      color: var(--bg-color);
+      font-size: 1.25rem;
+      font-weight: 600;
+      box-shadow: 0 0.25rem 0 color-mix(in srgb, var(--main-color) 60%, black);
+    }
+  }
+
+  #restartTestButton {
+    position: relative;
+    z-index: 2;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    place-items: center;
+    place-content: center;
+    border-radius: 999px;
+    background: var(--sub-alt-color);
+    color: var(--main-color);
+    font-size: 1.35rem;
+    box-shadow: 0 0.25rem 0
+      color-mix(in srgb, var(--sub-color) 55%, transparent);
+    transition:
+      transform 0.08s ease-out,
+      box-shadow 0.08s ease-out,
+      opacity 0.15s;
+
+    &:active {
+      transform: translateY(0.25rem);
+      box-shadow: none;
+    }
+  }
+
+  #liveStatsMini {
+    font-weight: 700;
+  }
+}
+
+// Free-typing results for students (KidResultHero sets these classes).
+// The hero shows wpm + accuracy, so the adult stats and chart wait behind
+// "More details". Elements are only hidden, never removed.
+body.kid-theme #result.kid-result {
+  &:not(.kid-details-open) .wrapper {
+    > .stats,
+    > .chart {
+      display: none;
+    }
+  }
+
+  .lesson-result-top .buttons {
+    gap: 0.75rem;
+
+    button {
+      min-height: 3.25rem;
+      padding: 0.75em 1.25em;
+      border-radius: 1rem;
+      background: var(--sub-alt-color);
+      color: var(--text-color);
+      font-family: var(--kid-font);
+      font-weight: 600;
+      box-shadow: 0 0.25rem 0
+        color-mix(in srgb, var(--sub-color) 55%, transparent);
+      transition:
+        transform 0.08s ease-out,
+        box-shadow 0.08s ease-out;
+
+      &:active {
+        transform: translateY(0.25rem);
+        box-shadow: none;
+      }
+    }
+
+    #nextTestButton {
+      background: var(--main-color);
+      color: var(--bg-color);
+      box-shadow: 0 0.25rem 0 color-mix(in srgb, var(--main-color) 60%, black);
+    }
+  }
+}
+
+// Modal shell (AnimatedModal) - students get a bolder title and a chunky,
+// easy-to-hit close button. Teachers keep the classic look.
+body.kid-theme dialog > .modal {
+  font-family: var(--kid-font);
+
+  [data-ui-element="modalTitle"] {
+    color: var(--text-color);
+    font-weight: 700;
+  }
+
+  [data-modal-close] {
+    min-height: 2.75rem;
+    padding-inline: 1rem;
+    border-radius: 999px;
+    background: var(--sub-alt-color);
+    color: var(--text-color);
+    font-weight: 600;
+  }
+}
+
+body.kid-theme #capsWarning,
+body.kid-theme .pageTest #memoryTimer,
+body.kid-theme .pageTest #layoutfluidTimer {
+  border-radius: 999px;
+  font-family: var(--kid-font);
+  font-weight: 600;
+}
+
 @keyframes kid-star-pop {
   0% {
     opacity: 0;
@@ -135,6 +291,11 @@ body.kid-theme {
 @media (prefers-reduced-motion) {
   body.kid-theme .lesson-stars > * {
     animation: none;
+  }
+
+  body.kid-theme .pageTest #restartTestButton,
+  body.kid-theme #result.kid-result .lesson-result-top .buttons button {
+    transition: none;
   }
 }
 

@@ -89,8 +89,10 @@ import {
   lessonLockMessage,
 } from "../../../lessons/lesson-ux";
 import {
+  difficultyForGrade,
   findLesson,
   groupIdForLesson,
+  getStudentGrade,
   LessonGroup,
   lessonGroups,
   lessonOrder,
@@ -143,7 +145,7 @@ function GameButton(props: {
     <button
       type="button"
       class={cn(
-        "flex min-h-[5.5rem] flex-col gap-2 rounded-xl p-4 text-left transition-colors",
+        "press-3d flex min-h-24 flex-col gap-2 rounded-double p-4 text-left font-kid",
         props.locked
           ? "cursor-not-allowed bg-sub-alt text-sub"
           : "cursor-pointer bg-sub-alt text-text hover:bg-text hover:text-bg",
@@ -155,12 +157,14 @@ function GameButton(props: {
       }}
     >
       <div class="flex items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-2">
-          <Fa icon={props.icon} class="text-main" fixedWidth />
-          <span class="font-medium">{props.name}</span>
+        <div class="flex min-w-0 items-center gap-3">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-bg">
+            <Fa icon={props.icon} class="text-main" fixedWidth size={1.2} />
+          </span>
+          <span class="text-lg font-semibold">{props.name}</span>
         </div>
         <Show when={props.recommended === true}>
-          <span class="shrink-0 rounded bg-main px-2 py-0.5 text-em-xs font-semibold text-bg">
+          <span class="shrink-0 rounded-full bg-main px-2.5 py-1 text-xs font-semibold text-bg">
             Today
           </span>
         </Show>
@@ -168,7 +172,7 @@ function GameButton(props: {
           <Fa icon="fa-lock" class="shrink-0 text-sub" size={0.85} />
         </Show>
       </div>
-      <div class="text-em-xs text-sub">
+      <div class="text-sm text-sub">
         {props.locked
           ? (props.lockedMessage ??
             "Complete the required typing lessons to play")
@@ -188,16 +192,16 @@ function StatCard(props: {
   subClass?: string;
 }): JSXElement {
   return (
-    <div class="flex flex-col gap-1 rounded bg-sub-alt p-3">
-      <div class="flex items-center gap-1.5 text-em-xs text-sub">
-        <Fa icon={props.icon} size={0.8} />
+    <div class="flex flex-col gap-1.5 rounded-double bg-sub-alt p-4 font-kid">
+      <div class="flex items-center gap-2 text-sm font-semibold text-sub">
+        <Fa icon={props.icon} size={1} />
         {props.label}
       </div>
-      <div class="text-xl font-bold text-text">{props.value}</div>
+      <div class="text-2xl font-bold text-text">{props.value}</div>
       <Show when={props.progress !== undefined}>
-        <div class="h-1 rounded-full bg-bg">
+        <div class="h-2 rounded-full bg-bg">
           <div
-            class="h-1 rounded-full bg-main transition-[width]"
+            class="h-2 rounded-full bg-main transition-[width]"
             style={{
               width: `${Math.min(100, Math.max(0, (props.progress ?? 0) * 100))}%`,
             }}
@@ -205,7 +209,7 @@ function StatCard(props: {
         </div>
       </Show>
       <Show when={props.sub !== undefined}>
-        <div class={cn("text-em-xs", props.subClass ?? "text-sub")}>
+        <div class={cn("text-sm", props.subClass ?? "text-sub")}>
           {props.sub}
         </div>
       </Show>
@@ -500,13 +504,13 @@ function ClassLeaderboard(props: {
   const top5 = (): LessonLeaderboardEntry[] => props.entries.slice(0, 5);
   return (
     <Show when={top5().length > 1}>
-      <section>
+      <section class="rounded-double bg-sub-alt p-4 font-kid">
         <H2
           class="text-[1.65em] sm:text-[1.85em]"
           fa={{ icon: "fa-medal" }}
-          text="class leaderboard"
+          text="Class leaderboard"
         />
-        <div class="grid gap-1">
+        <div class="grid gap-2">
           <For each={top5()}>
             {(entry, i) => {
               // Bounded to the top 5 rows - shares the same cache key/data any
@@ -548,32 +552,36 @@ function ClassCompare(props: {
 }): JSXElement {
   return (
     <Show when={props.entries.length > 1}>
-      <section>
+      <section class="rounded-double bg-sub-alt p-4 font-kid">
         <H2
           class="text-[1.65em] sm:text-[1.85em]"
           fa={{ icon: "fa-users" }}
-          text="class vs class"
+          text="Class vs class"
         />
-        <div class="grid gap-1">
+        <div class="grid gap-2">
           <For each={props.entries}>
             {(entry) => (
               <div
                 class={cn(
-                  "flex items-center gap-3 rounded p-2",
-                  entry.classId === props.selfClassId ? "bg-sub-alt" : "",
+                  "flex min-h-12 items-center gap-3 rounded-xl p-3",
+                  entry.classId === props.selfClassId
+                    ? "bg-bg outline-2 outline-main"
+                    : "bg-bg/50",
                 )}
               >
-                <span class="w-5 text-center text-em-xs text-sub">
+                <span class="w-6 text-center text-base font-bold text-sub">
                   {entry.rank}
                 </span>
                 <span class="min-w-0 flex-1 truncate text-text">
                   {entry.classId}
                   {entry.classId === props.selfClassId ? " (you)" : ""}
                 </span>
-                <span class="text-em-xs text-sub">
+                <span class="text-sm text-sub">
                   {entry.studentCount} students
                 </span>
-                <span class="text-main">{entry.avgStars.toFixed(1)} ★ avg</span>
+                <span class="font-semibold text-main">
+                  {entry.avgStars.toFixed(1)} ★ avg
+                </span>
               </div>
             )}
           </For>
@@ -1262,7 +1270,13 @@ export function LessonsPage(): JSXElement {
       for (const lesson of lessonsToReview) {
         all.push(...(await lesson.generate()));
       }
-      const words = [...new Set(all.filter((w) => w.length > 0))];
+      let words = [...new Set(all.filter((w) => w.length > 0))];
+      // The word-review lesson allows 7-letter words. Grade 1 lessons stop at 3.
+      if (checkpoint.gameType === "ghost" && getStudentGrade() === 1) {
+        const maxLen = difficultyForGrade(1).maxWordLen;
+        const short = words.filter((word) => word.length <= maxLen);
+        if (short.length > 0) words = short;
+      }
       setLessonGameWords(words);
       setRecommendedGameId(
         recommended ? HOME_ROW_GAME_IDS[checkpoint.gameType] : undefined,
@@ -1460,10 +1474,40 @@ export function LessonsPage(): JSXElement {
     const idx = lessonGroups.findIndex((group) => group.id === id);
     return idx === -1 ? 0 : idx;
   });
+  const currentGroup = createMemo(
+    (): LessonGroup | undefined => lessonGroups[currentGroupIndex()],
+  );
 
   return (
     <Page id="lessons">
       <div class="lessons-student-ui content-grid grid gap-5">
+        <Show when={(assignmentsQuery.data?.length ?? 0) > 0}>
+          <section>
+            <H2
+              class="text-[1.65em] sm:text-[1.85em]"
+              fa={{ icon: "fa-list" }}
+              text="Teacher Assignments"
+            />
+            <p class="mb-3 text-sub">Finish these before free practice.</p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <For each={assignmentsQuery.data}>
+                {(a) => (
+                  <ContentButton
+                    title={a.title}
+                    subtitle={dueSubtitle(a)}
+                    subtitleClass={dueClass(a)}
+                    done={
+                      progressFor(`${ASSIGNMENT_PREFIX}${a.id}`)?.completed ===
+                      true
+                    }
+                    onClick={() => void launchAssignment(a)}
+                  />
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
+
         <LessonHero
           signedIn={isAuthenticated()}
           showClassSetupNotice={
@@ -1506,70 +1550,12 @@ export function LessonsPage(): JSXElement {
           }
         />
 
-        <Show when={isAuthenticated() && continueItem() !== undefined}>
-          <div
-            class={cn(
-              "sticky top-0 z-10 flex flex-wrap items-center justify-center gap-2 rounded-lg border border-sub-alt bg-bg/95 px-3 py-2 text-sm shadow-sm backdrop-blur-sm",
-            )}
-            data-ui-element="lessonsContinueBar"
-          >
-            <span class="max-w-[min(100%,14rem)] truncate font-medium text-text">
-              Next: {continueLabel()}
-            </span>
-            <Button
-              class="min-h-9 bg-main px-3 py-1.5 text-sm text-bg hover:opacity-90"
-              fa={{ icon: continueIcon(), fixedWidth: true }}
-              text={
-                continueItem()?.kind === "checkpoint"
-                  ? "Go"
-                  : "Go to next lesson"
-              }
-              onClick={() => onContinueClick(false)}
-            />
-            <Button
-              variant="text"
-              class="min-h-9 px-3 py-1.5 text-sm"
-              fa={{ icon: "fa-list", fixedWidth: true }}
-              text="Show"
-              onClick={scrollToContinueTarget}
-            />
-          </div>
-        </Show>
-
-        {/* Teacher work stays near the primary action, before optional areas. */}
-        <Show when={(assignmentsQuery.data?.length ?? 0) > 0}>
-          <section>
-            <H2
-              class="text-[1.65em] sm:text-[1.85em]"
-              fa={{ icon: "fa-list" }}
-              text="Teacher Assignments"
-            />
-            <p class="mb-3 text-sub">Finish these before free practice.</p>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <For each={assignmentsQuery.data}>
-                {(a) => (
-                  <ContentButton
-                    title={a.title}
-                    subtitle={dueSubtitle(a)}
-                    subtitleClass={dueClass(a)}
-                    done={
-                      progressFor(`${ASSIGNMENT_PREFIX}${a.id}`)?.completed ===
-                      true
-                    }
-                    onClick={() => void launchAssignment(a)}
-                  />
-                )}
-              </For>
-            </div>
-          </section>
-        </Show>
-
         <Show when={isAuthenticated() && progress.data !== undefined}>
           <section class="grid gap-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <h2 class="flex items-center gap-2 text-lg font-bold text-text">
                 <Fa icon="fa-map" class="text-main" />
-                Adventure Map
+                {currentGroup()?.name ?? "Adventure Map"}
               </h2>
               <Button
                 variant="text"
@@ -1579,9 +1565,9 @@ export function LessonsPage(): JSXElement {
                 onClick={toggleMap}
               />
             </div>
-            <Show when={!mapHidden()}>
+            <Show when={!mapHidden() && currentGroup() !== undefined}>
               <AdventureMap
-                groups={lessonGroups}
+                groups={[currentGroup() as LessonGroup]}
                 stateFor={mapStopState}
                 starsFor={groupStars}
                 onSelect={goToGroup}
@@ -1616,10 +1602,10 @@ export function LessonsPage(): JSXElement {
         </Show>
 
         <Show when={isAuthenticated()}>
-          <section class="rounded bg-sub-alt">
+          <section class="rounded-double bg-sub-alt font-kid">
             <button
               type="button"
-              class="flex min-h-12 w-full items-center justify-between gap-3 rounded px-4 py-3 text-left text-text transition-colors hover:bg-bg"
+              class="press-3d flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-double px-4 py-3 text-left text-lg text-text hover:bg-bg"
               aria-expanded={showExtras()}
               onClick={() => setShowExtras((open) => !open)}
             >
@@ -1644,7 +1630,7 @@ export function LessonsPage(): JSXElement {
         <Show when={isAuthenticated() && showExtras()}>
           <div class="grid gap-5">
             {/* Avatar + coins */}
-            <section class="flex items-center justify-between gap-4 rounded bg-sub-alt p-4">
+            <section class="flex flex-wrap items-center justify-between gap-4 rounded-double bg-sub-alt p-4 font-kid">
               <div class="flex items-center gap-4">
                 <div class="shrink-0">
                   <Avatar
@@ -1660,14 +1646,14 @@ export function LessonsPage(): JSXElement {
                     animalImage={animalAvatarQuery.data?.animalImage}
                   />
                 </div>
-                <div class="flex shrink-0 items-center gap-1.5 rounded bg-bg px-2.5 py-1.5 font-bold text-main">
+                <div class="flex shrink-0 items-center gap-2 rounded-full bg-bg px-4 py-2 text-xl font-bold text-main">
                   <Fa icon="fa-coins" size={0.9} />
                   {avatarStateQuery.data?.coins ?? 0}
                 </div>
               </div>
               <button
                 type="button"
-                class="cursor-pointer rounded bg-bg px-4 py-1.5 text-sm font-medium text-text transition-colors hover:bg-main hover:text-bg"
+                class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-4 py-2 text-base font-semibold text-text hover:bg-main hover:text-bg"
                 onClick={() => showModal("Achievements")}
               >
                 <Fa icon="fa-trophy" class="mr-1.5 text-main" />
@@ -1675,9 +1661,9 @@ export function LessonsPage(): JSXElement {
               </button>
             </section>
 
-            <section class="grid gap-3 rounded bg-sub-alt p-4">
+            <section class="grid gap-3 rounded-double bg-sub-alt p-4 font-kid">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="mr-1 flex items-center gap-2 font-bold text-text">
+                <span class="mr-1 flex items-center gap-2 text-lg font-bold text-text">
                   <Fa icon="fa-store" class="text-main" />
                   My Look
                 </span>
@@ -1686,7 +1672,7 @@ export function LessonsPage(): JSXElement {
                     <button
                       type="button"
                       class={cn(
-                        "cursor-pointer rounded px-3 py-1 text-sm font-medium transition-colors",
+                        "press-3d min-h-10 cursor-pointer rounded-xl px-4 py-1.5 text-base font-semibold",
                         shopTab() === tab.id
                           ? "bg-main text-bg"
                           : "bg-bg text-sub hover:text-text",
@@ -1704,7 +1690,7 @@ export function LessonsPage(): JSXElement {
                   {(item) => (
                     <button
                       type="button"
-                      class="cursor-pointer rounded bg-main px-4 py-1.5 text-sm font-medium text-bg transition-opacity hover:opacity-80"
+                      class="press-3d min-h-11 cursor-pointer rounded-xl bg-main px-4 py-2 text-base font-semibold text-bg [--press-color:color-mix(in_srgb,var(--main-color)_60%,black)] hover:opacity-90"
                       onClick={() => showModal(item.modal)}
                     >
                       <Fa icon={item.icon} class="mr-1.5" />
@@ -1757,6 +1743,29 @@ export function LessonsPage(): JSXElement {
               <p class="mb-2 text-sm font-medium text-main">
                 Start with the lesson marked Next and complete lessons in order.
               </p>
+              <div class="mb-4 grid gap-2">
+                <h3 class="text-sm font-bold text-text">All groups</h3>
+                <AdventureMap
+                  groups={lessonGroups}
+                  stateFor={mapStopState}
+                  starsFor={groupStars}
+                  onSelect={goToGroup}
+                  avatar={
+                    <Avatar
+                      color={equippedAvatarColor()}
+                      shape={avatarStateQuery.data?.shape}
+                      hair={avatarStateQuery.data?.equipped.hair}
+                      hat={avatarStateQuery.data?.equipped.hat}
+                      accessory={avatarStateQuery.data?.equipped.accessory}
+                      face={avatarStateQuery.data?.equipped.face}
+                      background={avatarStateQuery.data?.equipped.background}
+                      highlightColor={equippedAvatarHighlight()}
+                      size={28}
+                      animalImage={animalAvatarQuery.data?.animalImage}
+                    />
+                  }
+                />
+              </div>
               <Show when={progress.isLoading && progress.data === undefined}>
                 <div class="mb-4 grid gap-3" aria-hidden="true">
                   <div class="h-8 w-48 animate-pulse rounded-2xl bg-sub-alt"></div>
@@ -1937,7 +1946,7 @@ export function LessonsPage(): JSXElement {
                       aria-controls="games-tab-panel"
                       tabIndex={gamesTab() === tab ? 0 : -1}
                       class={cn(
-                        "rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                        "press-3d min-h-11 rounded-xl px-4 py-2 font-kid text-base font-semibold",
                         gamesTab() === tab
                           ? "bg-main text-bg"
                           : "bg-sub-alt text-sub hover:text-text",

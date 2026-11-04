@@ -14,9 +14,11 @@ import { setConfig } from "../../../../config/setters";
 import { getConfig } from "../../../../config/store";
 import {
   ColorName,
+  KID_THEME_NAMES,
   ThemesList,
   ThemeWithName,
 } from "../../../../constants/themes";
+import { isKidThemeActive } from "../../../../controllers/kid-theme-controller";
 import {
   convertCustomColorsToTheme,
   convertThemeToCustomColors,
@@ -52,8 +54,25 @@ export const sortedThemes: ThemeWithName[] = [...ThemesList].sort((a, b) => {
 export function Theme(): JSXElement {
   const customThemes = useCustomThemesLiveQuery();
 
+  const kidThemes = (): ThemeWithName[] =>
+    KID_THEME_NAMES.flatMap((name) => {
+      const theme = ThemesList.find((t) => t.name === name);
+      return theme === undefined ? [] : [theme];
+    });
+
   const Presets = () => (
     <div class="grid gap-4">
+      <Show when={isKidThemeActive()}>
+        <div class="grid gap-2">
+          <div class="text-sm font-semibold text-sub">Made for kids</div>
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-2">
+            <For each={kidThemes()}>
+              {(theme) => <ThemeButton theme={theme} />}
+            </For>
+          </div>
+        </div>
+        <Separator />
+      </Show>
       <Show when={getConfig.favThemes.length > 0}>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-2">
           <For

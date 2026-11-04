@@ -16,6 +16,7 @@ import {
 } from "../states/notifications";
 import { getCustomTextIndicator, isAuthenticated } from "../states/core";
 import { getAuthenticatedUser } from "../firebase";
+import { isKidThemeActive } from "../controllers/kid-theme-controller";
 import {
   curriculumNextAction,
   curriculumNextButtonLabel,
@@ -1291,12 +1292,20 @@ export async function update(
       `You typed nothing for ${roundedTime} seconds. And in that moment, you became legend.`,
     ];
 
-    showConfetti();
-    showNoticeNotification(Arrays.randomElementFromArray(messages), {
-      customTitle: "Nice",
-      durationMs: 15000,
-      important: true,
-    });
+    if (isKidThemeActive()) {
+      // Students get encouragement, not sarcasm.
+      showNoticeNotification(
+        "Looks like no keys were typed this time. Tap the words and give it a go - you've got this!",
+        { customTitle: "Let's try again", durationMs: 8000 },
+      );
+    } else {
+      showConfetti();
+      showNoticeNotification(Arrays.randomElementFromArray(messages), {
+        customTitle: "Nice",
+        durationMs: 15000,
+        important: true,
+      });
+    }
   }
 
   Focus.set(false);

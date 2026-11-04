@@ -20,6 +20,7 @@ import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
 import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
@@ -346,40 +347,7 @@ export function TypeTossModal(props: Props): JSXElement {
               </p>
             </GameSetupSection>
 
-            <GameSetupSection title="Mode">
-              <SoloTogetherToggle
-                mode={mode()}
-                multiplayerUnlocked={props.multiplayerUnlocked === true}
-                unlockHint={MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS}
-                onModeChange={setMode}
-              />
-            </GameSetupSection>
-
-            <Show
-              when={mode() === "solo"}
-              fallback={
-                <GameSetupSection title="Match length">
-                  <div class="grid grid-cols-2 gap-2">
-                    <For each={[30, 60] as const}>
-                      {(seconds) => (
-                        <button
-                          type="button"
-                          class={cn(
-                            "rounded-lg px-3 py-2 text-em-sm font-semibold",
-                            matchLength() === seconds
-                              ? "bg-main text-bg"
-                              : "bg-sub-alt text-sub",
-                          )}
-                          onClick={() => setMatchLength(seconds)}
-                        >
-                          {seconds}s
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                </GameSetupSection>
-              }
-            >
+            <Show when={mode() === "solo"}>
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
                   options={tossDifficultyOptions()}
@@ -389,13 +357,45 @@ export function TypeTossModal(props: Props): JSXElement {
               </GameSetupSection>
             </Show>
 
-            <GameSetupSection title="Choose a word list">
-              <WordListPicker
-                groups={GROUPS}
-                selectedId={selected().id}
-                onSelect={setSelected}
-              />
-            </GameSetupSection>
+            <GameSetupMore>
+              <GameSetupSection title="Mode">
+                <SoloTogetherToggle
+                  mode={mode()}
+                  multiplayerUnlocked={props.multiplayerUnlocked === true}
+                  unlockHint={MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS}
+                  onModeChange={setMode}
+                />
+              </GameSetupSection>
+              <Show when={mode() === "together"}>
+                <GameSetupSection title="Match length">
+                  <div class="grid grid-cols-2 gap-2">
+                    <For each={[30, 60] as const}>
+                      {(seconds) => (
+                        <button
+                          type="button"
+                          class={cn(
+                            "min-h-12 rounded-xl px-3 py-3 text-base font-semibold",
+                            matchLength() === seconds
+                              ? "bg-main text-bg"
+                              : "bg-bg text-sub",
+                          )}
+                          onClick={() => setMatchLength(seconds)}
+                        >
+                          {seconds}s
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </GameSetupSection>
+              </Show>
+              <GameSetupSection title="Choose a word list">
+                <WordListPicker
+                  groups={GROUPS}
+                  selectedId={selected().id}
+                  onSelect={setSelected}
+                />
+              </GameSetupSection>
+            </GameSetupMore>
           </GamePickLayout>
         </Show>
 

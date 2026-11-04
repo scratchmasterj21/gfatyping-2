@@ -46,40 +46,47 @@ export function LessonGroupSection(props: {
     groupCompletedCount(props.group, props.progressFor);
 
   return (
-    <div id={props.group.id}>
+    <div id={props.group.id} class="mb-2">
       <button
         type="button"
         class={cn(
-          "flex w-full items-center justify-between rounded-xl px-2 py-2 text-left transition-colors hover:bg-sub-alt",
-          props.isCurrent ? "ring-1 ring-main/50" : "",
+          "press-3d flex min-h-14 w-full cursor-pointer items-center justify-between gap-2 rounded-double bg-sub-alt px-3 py-2 text-left font-kid outline-offset-2 hover:outline-2 hover:outline-main/40",
+          props.isCurrent ? "outline-2 outline-main" : "",
           props.isFuture ? "opacity-80" : "",
         )}
         onClick={() => props.onToggle()}
       >
-        <div class="flex items-center gap-2 text-sub">
-          <Show
-            when={props.isComplete}
-            fallback={<Fa icon={props.group.icon} size={0.9} />}
-          >
-            <Fa icon="fa-check-circle" class="text-main" size={0.9} />
-          </Show>
-          <span class="font-medium text-text">{props.group.name}</span>
+        <div class="flex min-w-0 items-center gap-3 text-sub">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-bg">
+            <Show
+              when={props.isComplete}
+              fallback={<Fa icon={props.group.icon} size={1.1} />}
+            >
+              <Fa icon="fa-check-circle" class="text-main" size={1.1} />
+            </Show>
+          </span>
+          <span class="text-base font-semibold text-text">
+            {props.group.name}
+          </span>
           <Show when={props.isCurrent}>
-            <span class="rounded bg-main px-1.5 py-0.5 text-em-xs text-bg">
+            <span class="rounded-full bg-main px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-bg">
               You are here
             </span>
           </Show>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-em-xs text-sub" title="Stars earned in this group">
+          <span
+            class="text-sm font-semibold whitespace-nowrap text-sub"
+            title="Stars earned in this group"
+          >
             ★ {stars().earned}/{stars().max}
           </span>
-          <span class="text-em-xs text-sub">
+          <span class="text-sm whitespace-nowrap text-sub max-xs:hidden">
             {doneCount()}/{props.group.lessons.length}
           </span>
-          <div class="h-1 w-10 rounded-full bg-bg">
+          <div class="h-2 w-16 rounded-full bg-bg max-xs:hidden">
             <div
-              class="h-1 rounded-full bg-main transition-[width]"
+              class="h-2 rounded-full bg-main transition-[width]"
               style={{
                 width: `${Math.min(100, (doneCount() / props.group.lessons.length) * 100)}%`,
               }}
@@ -96,9 +103,7 @@ export function LessonGroupSection(props: {
         </div>
       </button>
       <Show when={!props.collapsed}>
-        <p class="mt-1 mb-2 pl-2 text-em-xs text-sub">
-          {props.group.description}
-        </p>
+        <p class="mt-2 mb-2 pl-2 text-sm text-sub">{props.group.description}</p>
         <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
           <Show when={LESSON_GROUP_INTRO_VIDEOS[props.group.id]} keyed>
             {(videoId) => (

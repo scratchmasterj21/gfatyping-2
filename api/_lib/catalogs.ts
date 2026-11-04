@@ -30,7 +30,8 @@ export type ShopId =
   | "keypressEffect"
   | "caretEffect"
   | "backdrop"
-  | "animalAvatar";
+  | "animalAvatar"
+  | "garden";
 
 /** users/{uid} field each shop's ownership map is stored under. */
 export const OWNED_FIELD: Record<ShopId, string> = {
@@ -44,6 +45,7 @@ export const OWNED_FIELD: Record<ShopId, string> = {
   caretEffect: "ownedCaretEffects",
   backdrop: "ownedBackdrops",
   animalAvatar: "ownedAnimalAvatars",
+  garden: "ownedGardenItems",
 };
 
 /** users/{uid} field for the "currently equipped/selected" id, if the shop has one. */
@@ -193,6 +195,20 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     "night-sky": { price: 120 },
     candy: { price: 120 },
     meadow: { price: 120 },
+  },
+  garden: {
+    // Outdoor decorations (see garden-items.ts). The free flower is absent.
+    "garden-bush": { price: 20 },
+    "garden-fence": { price: 25 },
+    "garden-butterfly": { price: 25 },
+    "garden-bench": { price: 30 },
+    "garden-carrots": { price: 30 },
+    "garden-bird": { price: 35 },
+    "garden-tree": { price: 40 },
+    "garden-pond": { price: 50 },
+    // Sky finishes (see garden-themes.ts). Free "grass" is absent.
+    "garden-sunset": { price: 60 },
+    "garden-night": { price: 80 },
   },
   pet: {
     dog: { price: 60 },

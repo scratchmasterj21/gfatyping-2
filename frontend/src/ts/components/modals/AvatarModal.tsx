@@ -27,7 +27,6 @@ import {
 } from "../../animal-avatars/animal-avatar-state";
 import {
   AVATAR_CATEGORIES,
-  AVATAR_CATEGORY_LABELS,
   AVATAR_ITEMS,
   AvatarCategory,
   AvatarItem,
@@ -36,8 +35,6 @@ import {
   COLLECTION_REWARD,
   collectionItems,
   findAvatarItem,
-  RARITY_LABELS,
-  rarityOf,
 } from "../../avatar/avatar-items";
 import {
   buyAvatarItem,
@@ -76,6 +73,16 @@ const SHAPES: { id: AvatarShape; label: string }[] = [
   { id: "hexagon", label: "Hexagon" },
   { id: "cloud", label: "Cloud" },
 ];
+const CATEGORY_LABELS: Record<AvatarCategory, string> = {
+  color: "Color",
+  hair: "Hair",
+  hat: "Hat",
+  accessory: "Extra",
+  face: "Face",
+  background: "Background",
+  highlight: "Glow",
+};
+const BIG_CHOICE = "press-3d min-h-12 rounded-xl px-4 text-base font-semibold";
 const MONTH_NAMES = [
   "January",
   "February",
@@ -100,19 +107,12 @@ const japanMonth = (): number =>
 
 let achievementsCheckedThisSession = false;
 
-const RARITY_CLASS: Record<ReturnType<typeof rarityOf>, string> = {
-  common: "text-sub",
-  rare: "text-text",
-  epic: "text-main",
-  legendary: "text-main",
-  limited: "text-main",
-};
-
 export function AvatarModal(): JSXElement {
   const currentMonth = japanMonth();
   const [tab, setTab] = createSignal<Tab>("style");
   const [category, setCategory] = createSignal<AvatarCategory>("color");
   const [onlyMine, setOnlyMine] = createSignal(false);
+  const [moreOpen, setMoreOpen] = createSignal(false);
   const [preview, setPreview] = createSignal<AvatarItem>();
   const [pendingShape, setPendingShape] = createSignal<AvatarShape>();
   const [animalShape, setAnimalShape] = createSignal<AnimalAvatarShape>(
@@ -465,8 +465,13 @@ export function AvatarModal(): JSXElement {
   };
 
   return (
-    <AnimatedModal id="Avatar" title="My Avatar">
-      <div class="grid gap-4">
+    <AnimatedModal id="Avatar" title="My Avatar" modalClass="max-w-3xl">
+      <div
+        class={cn(
+          "grid gap-4 font-kid",
+          preview() !== undefined ? "pb-36" : "",
+        )}
+      >
         <div class="flex items-center justify-center gap-6">
           <Avatar
             color={lookValue("color")}
@@ -478,9 +483,9 @@ export function AvatarModal(): JSXElement {
             background={lookId("background")}
             highlightColor={lookValue("highlight")}
             animalImage={equippedAnimalImage()}
-            size={120}
+            size={160}
           />
-          <div class="flex items-center gap-2 text-lg font-bold text-main">
+          <div class="flex min-h-14 items-center gap-2 rounded-full bg-sub-alt px-5 text-2xl font-bold text-main">
             <Fa icon="fa-coins" />
             {coins()}
           </div>
@@ -488,43 +493,50 @@ export function AvatarModal(): JSXElement {
 
         <Show when={preview()} keyed>
           {(item) => (
-            <TryOnPanel
-              item={item}
-              coinsNeeded={coinsNeeded(item)}
-              achievementEarned={
-                item.requiresAchievement !== undefined &&
-                isAchievementEarned(item.requiresAchievement)
-              }
-              achievement={
-                item.requiresAchievement === undefined
-                  ? undefined
-                  : achievementFor(item.requiresAchievement)
-              }
-              pending={costumePendingId() !== null}
-              onGet={() =>
-                void guardedCostumeAction(item.id, async () => handleBuy(item))
-              }
-              onCancel={() => setPreview(undefined)}
-            />
+            <div class="fixed bottom-3 left-1/2 z-30 w-[min(42rem,calc(100%-2rem))] -translate-x-1/2">
+              <TryOnPanel
+                item={item}
+                coinsNeeded={coinsNeeded(item)}
+                achievementEarned={
+                  item.requiresAchievement !== undefined &&
+                  isAchievementEarned(item.requiresAchievement)
+                }
+                achievement={
+                  item.requiresAchievement === undefined
+                    ? undefined
+                    : achievementFor(item.requiresAchievement)
+                }
+                pending={costumePendingId() !== null}
+                onGet={() =>
+                  void guardedCostumeAction(item.id, async () =>
+                    handleBuy(item),
+                  )
+                }
+                onCancel={() => setPreview(undefined)}
+              />
+            </div>
           )}
         </Show>
 
         <Show
           when={tab() !== "animals"}
           fallback={
-            <div class="flex flex-wrap items-center justify-center gap-2 text-em-xs text-sub">
-              <span>Animal shape:</span>
-              <div class="flex flex-wrap gap-1 rounded bg-sub-alt p-1">
+            <div class="grid justify-items-center gap-2">
+              <span class="text-base font-semibold text-text">
+                Animal shape
+              </span>
+              <div class="flex flex-wrap justify-center gap-2">
                 <For each={ANIMAL_AVATAR_SHAPES}>
                   {(s) => (
                     <button
                       type="button"
                       class={cn(
-                        "rounded px-3 py-1 transition-colors",
+                        BIG_CHOICE,
                         animalShape() === s.id
-                          ? "bg-bg text-text"
-                          : "text-sub hover:text-text",
+                          ? "bg-main text-bg"
+                          : "bg-sub-alt text-text",
                       )}
+                      aria-pressed={animalShape() === s.id}
                       onClick={() => setAnimalShape(s.id)}
                     >
                       {s.label}
@@ -535,18 +547,19 @@ export function AvatarModal(): JSXElement {
             </div>
           }
         >
-          <div class="flex flex-wrap items-center justify-center gap-2 text-em-xs text-sub">
-            <span>Face shape:</span>
-            <div class="flex flex-wrap gap-1 rounded bg-sub-alt p-1">
+          <div class="grid justify-items-center gap-2">
+            <span class="text-base font-semibold text-text">Face shape</span>
+            <div class="flex flex-wrap justify-center gap-2">
               <For each={SHAPES}>
                 {(s) => (
                   <button
                     type="button"
                     class={cn(
-                      "rounded px-3 py-1 transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                      BIG_CHOICE,
+                      "disabled:cursor-not-allowed disabled:opacity-50",
                       equippedShape() === s.id
-                        ? "bg-bg text-text"
-                        : "text-sub hover:text-text",
+                        ? "bg-main text-bg"
+                        : "bg-sub-alt text-text",
                     )}
                     aria-pressed={equippedShape() === s.id}
                     disabled={costumePendingId() !== null}
@@ -560,7 +573,7 @@ export function AvatarModal(): JSXElement {
           </div>
           <Show when={pendingShape()} keyed>
             {(shape) => (
-              <div class="grid gap-2 rounded bg-sub-alt p-3 text-center text-sm">
+              <div class="grid gap-3 rounded-xl bg-sub-alt p-4 text-center text-base">
                 <span class="text-text">
                   {misfitsFor(shape)
                     .map((i) => i.name)
@@ -571,7 +584,7 @@ export function AvatarModal(): JSXElement {
                 <div class="flex justify-center gap-2">
                   <button
                     type="button"
-                    class="cursor-pointer rounded bg-main px-4 py-1.5 font-medium text-bg hover:opacity-80"
+                    class="press-3d min-h-12 cursor-pointer rounded-xl bg-main px-5 text-base font-semibold text-bg hover:opacity-80"
                     onClick={() =>
                       void guardedCostumeAction(shape, async () =>
                         applyShape(shape),
@@ -582,7 +595,7 @@ export function AvatarModal(): JSXElement {
                   </button>
                   <button
                     type="button"
-                    class="cursor-pointer rounded bg-bg px-4 py-1.5 text-text hover:bg-text hover:text-bg"
+                    class="press-3d min-h-12 cursor-pointer rounded-xl bg-bg px-5 text-base font-semibold text-text hover:bg-text hover:text-bg"
                     onClick={() => setPendingShape(undefined)}
                   >
                     Keep {SHAPES.find((s) => s.id === equippedShape())?.label}
@@ -593,154 +606,77 @@ export function AvatarModal(): JSXElement {
           </Show>
         </Show>
 
-        <Show when={tab() === "style"}>
-          <div class="flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              class="cursor-pointer rounded bg-main px-3 py-1.5 text-sm font-medium text-bg hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={costumePendingId() !== null}
-              onClick={() =>
-                void guardedCostumeAction("__surprise__", surpriseMe)
-              }
-            >
-              <Fa icon="fa-random" class="mr-1.5" />
-              Surprise me
-            </button>
-            <For each={OUTFIT_SLOTS}>
-              {(slot) => (
-                <div class="flex items-center gap-1 rounded bg-sub-alt p-1 pr-2">
-                  <Show
-                    when={savedOutfit(slot)}
-                    fallback={
-                      <span class="flex h-8 w-8 items-center justify-center rounded-full border border-dashed border-sub text-em-xs text-sub">
-                        {slot}
-                      </span>
-                    }
-                  >
-                    {(saved) => (
-                      <button
-                        type="button"
-                        class="cursor-pointer rounded-full disabled:cursor-not-allowed"
-                        title={`Wear outfit ${slot}`}
-                        aria-label={`Wear outfit ${slot}`}
-                        disabled={costumePendingId() !== null}
-                        onClick={() =>
-                          void guardedCostumeAction(`wear-${slot}`, async () =>
-                            runOutfitAction(
-                              async () => wearOutfit(slot),
-                              "Couldn't put that on",
-                            ),
-                          )
-                        }
-                      >
-                        <Avatar
-                          shape={saved().shape}
-                          color={savedLookValue(slot, "color")}
-                          hair={saved().equipped.hair}
-                          hat={saved().equipped.hat}
-                          accessory={saved().equipped.accessory}
-                          face={saved().equipped.face}
-                          background={saved().equipped.background}
-                          highlightColor={savedLookValue(slot, "highlight")}
-                          size={32}
-                        />
-                      </button>
-                    )}
-                  </Show>
-                  <button
-                    type="button"
-                    class="cursor-pointer text-em-xs text-sub hover:text-text disabled:cursor-not-allowed"
-                    title={`Save my look as outfit ${slot}`}
-                    disabled={costumePendingId() !== null}
-                    onClick={() =>
-                      void guardedCostumeAction(`save-${slot}`, async () =>
-                        runOutfitAction(
-                          async () => saveOutfit(slot),
-                          "Couldn't save that",
-                        ),
-                      )
-                    }
-                  >
-                    save
-                  </button>
-                </div>
-              )}
-            </For>
-          </div>
-          <TitlePicker
-            current={stateQuery.data?.title}
-            earned={earnedQuery.data}
-            onPick={pickTitle}
-          />
-        </Show>
-
-        <div class="flex gap-1 rounded bg-sub-alt p-1">
+        <div class="flex gap-2">
           <For each={visibleTabs()}>
             {(t) => (
               <button
                 type="button"
                 class={cn(
-                  "flex-1 rounded px-3 py-1.5 text-sm capitalize transition-colors",
-                  tab() === t ? "bg-bg text-text" : "text-sub hover:text-text",
+                  "press-3d flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-bold",
+                  tab() === t ? "bg-main text-bg" : "bg-sub-alt text-text",
                 )}
                 aria-pressed={tab() === t}
                 onClick={() => pickTab(t)}
               >
-                {t}
+                <Fa icon={t === "style" ? "fa-tshirt" : "fa-paw"} />
+                {t === "style" ? "Clothes" : "Animals"}
               </button>
             )}
           </For>
         </div>
 
-        <p class="text-center text-em-xs text-sub">
+        <p class="text-center text-base text-text">
           {tab() === "style"
-            ? "Tap something you own to wear it. Tap anything else to try it on first."
-            : "Choose an animal to buy or equip it."}
+            ? "Tap yours to wear it. Tap a new one to try it on."
+            : "Tap an animal to wear it."}
         </p>
 
         <Show when={tab() === "style"}>
-          <div class="flex flex-wrap items-center gap-1">
+          <div class="flex flex-wrap items-center gap-2">
             <For each={AVATAR_CATEGORIES}>
               {(cat) => (
                 <button
                   type="button"
                   class={cn(
-                    "relative rounded px-2.5 py-1 text-em-xs transition-colors",
+                    "press-3d relative min-h-12 rounded-xl px-4 text-base font-semibold",
                     category() === cat
                       ? "bg-main text-bg"
-                      : "bg-sub-alt text-sub hover:text-text",
+                      : "bg-sub-alt text-text",
                   )}
                   aria-pressed={category() === cat}
                   onClick={() => pickCategory(cat)}
                 >
-                  {AVATAR_CATEGORY_LABELS[cat]}
+                  {CATEGORY_LABELS[cat]}
                   <Show when={hasNewFor(cat)}>
                     <span
-                      class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-main ring-2 ring-bg"
+                      class="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-main ring-2 ring-bg"
                       title="You can get something new here"
                     ></span>
                   </Show>
                 </button>
               )}
             </For>
-            <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-em-xs text-sub pointer-coarse:min-h-10 pointer-coarse:text-sm">
-              <input
-                type="checkbox"
-                checked={onlyMine()}
-                onChange={(e) => {
-                  setOnlyMine(e.currentTarget.checked);
-                  setPreview(undefined);
-                }}
-              />
-              Only mine
-            </label>
+            <button
+              type="button"
+              class={cn(
+                "press-3d min-h-12 rounded-xl px-4 text-base font-semibold",
+                onlyMine() ? "bg-main text-bg" : "bg-sub-alt text-text",
+              )}
+              aria-pressed={onlyMine()}
+              onClick={() => {
+                setOnlyMine((value) => !value);
+                setPreview(undefined);
+              }}
+            >
+              My stuff
+            </button>
           </div>
         </Show>
 
         <Show
           when={tab() === "style" && COLLECTION_CATEGORIES.includes(category())}
         >
-          <div class="flex flex-wrap items-center gap-3 rounded bg-sub-alt px-3 py-2 text-em-xs">
+          <div class="flex flex-wrap items-center gap-3 rounded-xl bg-sub-alt px-4 py-3 text-sm">
             <span class="font-medium text-text">
               <Fa icon="fa-layer-group" class="mr-1.5 text-main" />
               Collection {collectionOwned(category())}/
@@ -776,7 +712,7 @@ export function AvatarModal(): JSXElement {
               >
                 <button
                   type="button"
-                  class="cursor-pointer rounded bg-main px-3 py-1 font-bold text-bg hover:opacity-80 disabled:opacity-50"
+                  class="press-3d min-h-11 cursor-pointer rounded-xl bg-main px-4 font-bold text-bg hover:opacity-80 disabled:opacity-50"
                   disabled={costumePendingId() !== null}
                   onClick={() => {
                     const cat = category();
@@ -792,12 +728,12 @@ export function AvatarModal(): JSXElement {
           </div>
         </Show>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           <Show when={tab() === "animals"}>
             <button
               type="button"
               class={cn(
-                "relative flex cursor-pointer flex-col items-center gap-1.5 rounded p-3 shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                "press-3d relative flex cursor-pointer flex-col items-center gap-1.5 rounded-double p-3 outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
                 equippedAnimalImage() === undefined
                   ? "bg-main text-bg"
                   : "bg-sub-alt text-text hover:bg-text hover:text-bg",
@@ -810,8 +746,8 @@ export function AvatarModal(): JSXElement {
               <Show when={equippedAnimalImage() === undefined}>
                 <CheckBadge />
               </Show>
-              <Avatar shape={equippedShape()} size={48} />
-              <span class="text-sm font-medium">Normal avatar</span>
+              <Avatar shape={equippedShape()} size={72} />
+              <span class="text-base font-semibold">No animal</span>
             </button>
 
             <For each={animalItemsToShow()}>
@@ -825,7 +761,7 @@ export function AvatarModal(): JSXElement {
                   <button
                     type="button"
                     class={cn(
-                      "relative flex flex-col items-center gap-1.5 rounded p-3 shadow-sm transition-colors",
+                      "press-3d relative flex flex-col items-center gap-1.5 rounded-double p-3 outline-offset-2",
                       equipped()
                         ? "bg-main text-bg"
                         : "bg-sub-alt text-text hover:bg-text hover:text-bg",
@@ -848,24 +784,21 @@ export function AvatarModal(): JSXElement {
                   >
                     <Show when={equipped()}>
                       <CheckBadge />
-                      <span class="text-em-xs font-bold">Equipped</span>
                     </Show>
                     <img
                       src={item.image}
-                      width={48}
-                      height={48}
+                      width={72}
+                      height={72}
                       alt={item.name}
                     />
-                    <span class="text-sm font-medium">{item.name}</span>
+                    <span class="text-base font-semibold">{item.name}</span>
                     <Show when={!owned()}>
-                      <span class="flex items-center gap-1 text-em-xs">
+                      <span class="flex items-center gap-1 text-base">
                         <Show
                           when={animalPendingId() !== item.id}
-                          fallback={
-                            <Fa icon="fa-circle-notch" spin size={0.7} />
-                          }
+                          fallback={<Fa icon="fa-circle-notch" spin />}
                         >
-                          <Fa icon="fa-coins" size={0.7} />
+                          <Fa icon="fa-coins" />
                           {canAfford()
                             ? item.price
                             : `Need ${item.price - coins()} more`}
@@ -882,7 +815,7 @@ export function AvatarModal(): JSXElement {
             <button
               type="button"
               class={cn(
-                "relative flex cursor-pointer flex-col items-center gap-1.5 rounded p-3 shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                "press-3d relative flex cursor-pointer flex-col items-center gap-1.5 rounded-double p-3 outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
                 equippedId(category()) === undefined
                   ? "bg-main text-bg"
                   : "bg-sub-alt text-text hover:bg-text hover:text-bg",
@@ -896,8 +829,8 @@ export function AvatarModal(): JSXElement {
               <Show when={equippedId(category()) === undefined}>
                 <CheckBadge />
               </Show>
-              <Avatar shape={equippedShape()} size={48} />
-              <span class="text-sm font-medium">None</span>
+              <Avatar shape={equippedShape()} size={72} />
+              <span class="text-base font-semibold">None</span>
             </button>
 
             <For each={itemsToShow()}>
@@ -909,11 +842,11 @@ export function AvatarModal(): JSXElement {
                   <button
                     type="button"
                     class={cn(
-                      "relative flex cursor-pointer flex-col items-center gap-1.5 rounded p-3 shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                      "press-3d relative flex cursor-pointer flex-col items-center gap-1.5 rounded-double p-3 outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
                       equipped()
                         ? "bg-main text-bg"
                         : "bg-sub-alt text-text hover:bg-text hover:text-bg",
-                      trying() ? "ring-2 ring-main" : "",
+                      trying() ? "outline-3 outline-main" : "",
                     )}
                     aria-pressed={equipped() || trying()}
                     disabled={costumePendingId() !== null}
@@ -930,10 +863,9 @@ export function AvatarModal(): JSXElement {
                   >
                     <Show when={equipped()}>
                       <CheckBadge />
-                      <span class="text-em-xs font-bold">Equipped</span>
                     </Show>
                     <Show when={item.seasonMonths !== undefined}>
-                      <span class="absolute top-1 left-1 rounded bg-bg px-1.5 py-0.5 text-[0.65em] font-bold text-main">
+                      <span class="absolute top-1 left-1 rounded bg-bg px-2 py-0.5 text-xs font-bold text-main">
                         {item.seasonMonths
                           ?.map((m) => MONTH_NAMES[m - 1]?.slice(0, 3))
                           .join("/")}{" "}
@@ -949,26 +881,13 @@ export function AvatarModal(): JSXElement {
                           : lookValue("color")
                       }
                     />
-                    <span class="text-sm font-medium">{item.name}</span>
-                    <Show when={rarityOf(item) !== "limited"}>
-                      <span
-                        class={cn(
-                          "text-[0.65em] font-bold tracking-wide uppercase",
-                          equipped() ? "text-bg" : RARITY_CLASS[rarityOf(item)],
-                        )}
-                      >
-                        <Show when={rarityOf(item) === "legendary"}>
-                          <Fa icon="fa-crown" class="mr-1" size={0.7} />
-                        </Show>
-                        {RARITY_LABELS[rarityOf(item)]}
-                      </span>
-                    </Show>
+                    <span class="text-base font-semibold">{item.name}</span>
                     <Show when={!owned()}>
                       <Show
                         when={costumePendingId() !== item.id}
-                        fallback={<Fa icon="fa-circle-notch" spin size={0.7} />}
+                        fallback={<Fa icon="fa-circle-notch" spin />}
                       >
-                        <span class="flex items-center gap-1 text-em-xs">
+                        <span class="flex items-center gap-1 text-base">
                           <Show
                             when={item.requiresAchievement === undefined}
                             fallback={
@@ -981,17 +900,16 @@ export function AvatarModal(): JSXElement {
                                       ? "fa-gift"
                                       : "fa-lock"
                                   }
-                                  size={0.7}
                                 />
                                 {isAchievementEarned(
                                   item.requiresAchievement ?? "",
                                 )
-                                  ? "Claim!"
+                                  ? "Get it"
                                   : "Locked"}
                               </>
                             }
                           >
-                            <Fa icon="fa-coins" size={0.7} />
+                            <Fa icon="fa-coins" />
                             {coinsNeeded(item) === 0
                               ? item.price
                               : `Need ${coinsNeeded(item)} more`}
@@ -1009,10 +927,117 @@ export function AvatarModal(): JSXElement {
         <Show
           when={tab() === "style" && onlyMine() && itemsToShow().length === 0}
         >
-          <div class="place-self-center text-em-xs text-sub">
-            You don&apos;t own any of these yet - untick &quot;Only mine&quot;
-            to see what you can get!
-          </div>
+          <p class="text-center text-base text-text">
+            You don&apos;t have any yet. Tap My stuff again to see them all.
+          </p>
+        </Show>
+
+        <Show when={tab() === "style"}>
+          <section class="grid gap-2">
+            <button
+              type="button"
+              class="flex min-h-12 items-center justify-between rounded-xl bg-sub-alt px-4 text-base font-semibold text-text"
+              aria-expanded={moreOpen()}
+              onClick={() => setMoreOpen((value) => !value)}
+            >
+              More
+              <Fa
+                icon="fa-chevron-down"
+                class={cn(
+                  "text-sub transition-transform",
+                  moreOpen() ? "rotate-180" : "",
+                )}
+              />
+            </button>
+            <Show when={moreOpen()}>
+              <div class="grid gap-3">
+                <button
+                  type="button"
+                  class="press-3d min-h-12 cursor-pointer rounded-xl bg-main px-4 text-base font-semibold text-bg hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={costumePendingId() !== null}
+                  onClick={() =>
+                    void guardedCostumeAction("__surprise__", surpriseMe)
+                  }
+                >
+                  <Fa icon="fa-random" class="mr-2" />
+                  Surprise me
+                </button>
+                <div class="flex flex-wrap items-center justify-center gap-2">
+                  <For each={OUTFIT_SLOTS}>
+                    {(slot) => (
+                      <div class="flex items-center gap-2 rounded-xl bg-sub-alt p-2">
+                        <Show
+                          when={savedOutfit(slot)}
+                          fallback={
+                            <span class="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-sub text-base text-sub">
+                              {slot}
+                            </span>
+                          }
+                        >
+                          {(saved) => (
+                            <button
+                              type="button"
+                              class="cursor-pointer rounded-full disabled:cursor-not-allowed"
+                              title={`Wear outfit ${slot}`}
+                              aria-label={`Wear outfit ${slot}`}
+                              disabled={costumePendingId() !== null}
+                              onClick={() =>
+                                void guardedCostumeAction(
+                                  `wear-${slot}`,
+                                  async () =>
+                                    runOutfitAction(
+                                      async () => wearOutfit(slot),
+                                      "Couldn't put that on",
+                                    ),
+                                )
+                              }
+                            >
+                              <Avatar
+                                shape={saved().shape}
+                                color={savedLookValue(slot, "color")}
+                                hair={saved().equipped.hair}
+                                hat={saved().equipped.hat}
+                                accessory={saved().equipped.accessory}
+                                face={saved().equipped.face}
+                                background={saved().equipped.background}
+                                highlightColor={savedLookValue(
+                                  slot,
+                                  "highlight",
+                                )}
+                                size={48}
+                              />
+                            </button>
+                          )}
+                        </Show>
+                        <button
+                          type="button"
+                          class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-3 text-base font-semibold text-text disabled:cursor-not-allowed"
+                          disabled={costumePendingId() !== null}
+                          onClick={() =>
+                            void guardedCostumeAction(
+                              `save-${slot}`,
+                              async () =>
+                                runOutfitAction(
+                                  async () => saveOutfit(slot),
+                                  "Couldn't save that",
+                                ),
+                            )
+                          }
+                        >
+                          Save
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                </div>
+                <TitlePicker
+                  current={stateQuery.data?.title}
+                  earned={earnedQuery.data}
+                  onPick={pickTitle}
+                />
+              </div>
+            </Show>
+          </section>
         </Show>
       </div>
     </AnimatedModal>
@@ -1021,8 +1046,8 @@ export function AvatarModal(): JSXElement {
 
 function CheckBadge(): JSXElement {
   return (
-    <span class="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-bg text-main ring-2 ring-main">
-      <Fa icon="fa-check" size={0.6} />
+    <span class="absolute -top-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full bg-bg text-main ring-2 ring-main">
+      <Fa icon="fa-check" size={0.8} />
     </span>
   );
 }
@@ -1049,12 +1074,12 @@ function ItemThumb(props: {
               accessory={only("accessory")}
               face={only("face")}
               background={only("background")}
-              size={48}
+              size={72}
             />
           }
         >
           <span
-            class="block h-7 w-7 rounded-full bg-bg"
+            class="block h-14 w-14 rounded-full bg-bg"
             style={{
               "box-shadow": `0 0 0 2px ${props.item.value}, 0 0 6px ${props.item.value}`,
             }}
@@ -1063,7 +1088,7 @@ function ItemThumb(props: {
       }
     >
       <span
-        class="block h-7 w-7 rounded-full shadow-inner ring-2 ring-bg"
+        class="block h-14 w-14 rounded-full shadow-inner ring-2 ring-bg"
         style={{ "background-color": props.item.value }}
       ></span>
     </Show>
@@ -1084,27 +1109,27 @@ function TryOnPanel(props: {
   const canGet = (): boolean =>
     isAchievementItem() ? props.achievementEarned : props.coinsNeeded === 0;
   return (
-    <div class="grid gap-2 rounded bg-sub-alt p-3 text-center">
-      <span class="text-sm text-sub">
-        Trying on <span class="font-bold text-text">{props.item.name}</span>
+    <div class="grid gap-3 rounded-xl bg-sub-alt p-4 text-center">
+      <span class="text-base text-text">
+        Trying on <span class="font-bold">{props.item.name}</span>
       </span>
       <Show when={isAchievementItem() && !props.achievementEarned}>
-        <span class="text-em-xs text-sub">
+        <span class="text-base text-sub">
           <Fa icon="fa-lock" class="mr-1.5" />
-          Unlock it with &quot;{props.achievement?.name}&quot;:{" "}
+          Finish &quot;{props.achievement?.name}&quot; first.{" "}
           {props.achievement?.description}
         </span>
       </Show>
       <Show when={!isAchievementItem() && props.coinsNeeded > 0}>
-        <span class="text-em-xs text-sub">
-          You need {props.coinsNeeded} more coins. Finish lessons to earn them!
+        <span class="text-base text-sub">
+          You need {props.coinsNeeded} more coins. Finish a lesson to get them.
         </span>
       </Show>
-      <div class="flex justify-center gap-2">
+      <div class="flex flex-wrap justify-center gap-2">
         <Show when={canGet()}>
           <button
             type="button"
-            class="cursor-pointer rounded bg-main px-4 py-1.5 font-medium text-bg hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+            class="press-3d min-h-12 cursor-pointer rounded-xl bg-main px-5 text-base font-semibold text-bg hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={props.pending}
             onClick={() => props.onGet()}
           >
@@ -1112,8 +1137,8 @@ function TryOnPanel(props: {
               when={!props.pending}
               fallback={<Fa icon="fa-circle-notch" spin />}
             >
-              <Show when={!isAchievementItem()} fallback="Claim it free!">
-                <Fa icon="fa-coins" class="mr-1.5" />
+              <Show when={!isAchievementItem()} fallback="Get it">
+                <Fa icon="fa-coins" class="mr-2" />
                 Buy for {props.item.price}
               </Show>
             </Show>
@@ -1121,10 +1146,10 @@ function TryOnPanel(props: {
         </Show>
         <button
           type="button"
-          class="cursor-pointer rounded bg-bg px-4 py-1.5 text-text hover:bg-text hover:text-bg"
+          class="press-3d min-h-12 cursor-pointer rounded-xl bg-bg px-5 text-base font-semibold text-text hover:bg-text hover:text-bg"
           onClick={() => props.onCancel()}
         >
-          Take it off
+          Not now
         </button>
       </div>
     </div>
