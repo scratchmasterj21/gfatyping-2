@@ -2593,9 +2593,15 @@ function RacesTab(props: {
             <details class="rounded bg-sub-alt p-3">
               <summary class="cursor-pointer text-text">
                 {r.contentLabel} ·{" "}
-                {r.format === "timed"
-                  ? `${r.durationSec}s sprint`
-                  : "first to finish"}{" "}
+                {r.format === "blitz"
+                  ? "word blitz"
+                  : r.format === "tug"
+                    ? `${r.durationSec}s tug of war`
+                    : r.format === "timed"
+                      ? `${r.durationSec}s sprint`
+                      : r.format === "accuracy"
+                        ? "accuracy race"
+                        : "first to finish"}{" "}
                 · {formatDate(r.savedAt)} · {r.standings.length} players
               </summary>
               <div class="mt-2 grid gap-1">

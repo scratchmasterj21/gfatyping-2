@@ -27,7 +27,7 @@ import {
   setRaceParticipants,
   setRaceRole,
 } from "./race-state";
-import { Race } from "./race-types";
+import { isTimedFormat, Race } from "./race-types";
 
 const PROGRESS_POLL_INTERVAL_MS = 500;
 const MIN_PROGRESS_WRITE_INTERVAL_MS = 2000;
@@ -137,7 +137,10 @@ export async function tryReconnectRace(): Promise<void> {
     });
     if (race.status === "lobby") subscribeToParticipants(savedPin);
 
-    if (race.status === "running" || race.status === "countdown") {
+    if (
+      (race.status === "running" || race.status === "countdown") &&
+      race.format !== "blitz"
+    ) {
       enterTest(race);
     }
   } catch {
@@ -174,7 +177,10 @@ function handleRaceUpdate(race: Race): void {
 
   if (
     (race.status === "countdown" || race.status === "running") &&
-    enteredRound !== race.round
+    enteredRound !== race.round &&
+    // Word Blitz is played in its own on-screen quiz (RaceOverlay), not the
+    // typing test.
+    race.format !== "blitz"
   ) {
     enterTest(race);
   }
@@ -207,7 +213,7 @@ function enterTest(race: Race): void {
   CustomText.setPipeDelimiter(false);
   CustomText.setMode("repeat");
   CustomText.setText(race.tokens);
-  if (race.format === "timed" && race.durationSec !== undefined) {
+  if (isTimedFormat(race.format) && race.durationSec !== undefined) {
     CustomText.setLimitMode("time");
     CustomText.setLimitValue(race.durationSec);
   } else {

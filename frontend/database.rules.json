@@ -117,6 +117,16 @@
       "$pin": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
         ".write": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
+        "blitz": {
+          "answers": {
+            "$round": {
+              "$uid": {
+                ".write": "auth != null && auth.uid == $uid && !data.exists() && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('classRaces').child($pin).child('blitz').child('state').child('phase').val() == 'live' && root.child('classRaces').child($pin).child('blitz').child('state').child('round').val() + '' == $round",
+                ".validate": "newData.hasChildren(['word', 'at']) && newData.child('at').val() == now && newData.child('word').val() == root.child('classRaces').child($pin).child('blitz').child('state').child('word').val() && (!newData.child('name').exists() || (newData.child('name').isString() && newData.child('name').val().length <= 80))"
+              }
+            }
+          }
+        },
         "participants": {
           "$uid": {
             ".write": "auth != null && auth.uid == $uid && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",

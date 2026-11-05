@@ -21,6 +21,16 @@ import { CLASS_IDS } from "../../../constants/classes";
 import { Confetti } from "../../../games/mini/Confetti";
 import { lessonGroups } from "../../../lessons/lessons-data";
 import {
+  addPoints,
+  BLITZ_REVEAL_MS,
+  BLITZ_ROUND_MS,
+  BlitzAnswer,
+  BlitzState,
+  pickBlitzWords,
+  rankAnswers,
+  roundPoints,
+} from "../../../race/blitz";
+import {
   createRace,
   deleteRace,
   finishRace,
@@ -31,17 +41,35 @@ import {
   restartRace,
   saveHistory,
   setRaceRunning,
+  standingCoins,
+  standingTotals,
   startRace,
   subscribeParticipants,
   subscribeRace,
+  withTeams,
+  clearBlitz,
+  subscribeBlitzAnswers,
+  writeBlitzScores,
+  writeBlitzState,
+  writeTugTotals,
 } from "../../../race/race-db";
 import {
+  isTimedFormat,
   Race,
   RaceFormat,
   RaceParticipant,
   RaceStanding,
   rankParticipants,
+  TugTeam,
 } from "../../../race/race-types";
+import {
+  assignTeams,
+  ropeOffset,
+  teamTotals,
+  TugTotals,
+  tugOutcome,
+  tugWinMargin,
+} from "../../../race/tug";
 import { showErrorNotification } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
@@ -102,7 +130,25 @@ const FORMATS: {
     title: "Timed sprint",
     hint: "Most words before time's up",
   },
+  {
+    value: "tug",
+    icon: "🪢",
+    title: "Tug of War",
+    hint: "Two teams pull with every word",
+  },
+  {
+    value: "blitz",
+    icon: "⚡",
+    title: "Word Blitz",
+    hint: "10 words - fastest typer scores",
+  },
 ];
+
+/** Durations offered per timed format. */
+const DURATIONS: Partial<Record<RaceFormat, number[]>> = {
+  timed: [15, 30, 60],
+  tug: [30, 60, 90],
+};
 
 const CONTENT_KINDS: { value: ContentKind; label: string }[] = [
   { value: "random", label: "🎲 Random words" },
@@ -159,7 +205,7 @@ function RaceSetupFields(props: {
         <div class="text-sm font-bold tracking-wide text-sub uppercase">
           Race type
         </div>
-        <div class="grid gap-3 sm:grid-cols-3">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <For each={FORMATS}>
             {(f) => (
               <button
@@ -171,7 +217,16 @@ function RaceSetupFields(props: {
                     : "bg-bg text-text hover:bg-sub/20",
                 )}
                 aria-pressed={props.format === f.value}
-                onClick={() => props.onFormat(f.value)}
+                onClick={() => {
+                  props.onFormat(f.value);
+                  const options = DURATIONS[f.value];
+                  if (
+                    options !== undefined &&
+                    !options.includes(props.duration)
+                  ) {
+                    props.onDuration(options[1] ?? options[0] ?? 30);
+                  }
+                }}
               >
                 <span class="text-4xl" aria-hidden="true">
                   {f.icon}
@@ -189,10 +244,10 @@ function RaceSetupFields(props: {
             )}
           </For>
         </div>
-        <Show when={props.format === "timed"}>
+        <Show when={isTimedFormat(props.format)}>
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sub">How long?</span>
-            <For each={[15, 30, 60]}>
+            <For each={DURATIONS[props.format] ?? []}>
               {(sec) => (
                 <ChoicePill
                   active={props.duration === sec}
@@ -399,6 +454,237 @@ function RacePodium(props: {
   );
 }
 
+const TEAM_STYLE: Record<
+  TugTeam,
+  { label: string; emoji: string; bg: string; text: string }
+> = {
+  red: {
+    label: "Red team",
+    emoji: "🔴",
+    bg: "bg-game-red",
+    text: "text-game-red",
+  },
+  blue: {
+    label: "Blue team",
+    emoji: "🔵",
+    bg: "bg-game-blue",
+    text: "text-game-blue",
+  },
+};
+
+/** Avatars of one team, shown on its side of the rope. */
+function TeamRoster(props: {
+  team: TugTeam;
+  players: RaceParticipant[];
+  align: "start" | "end";
+}): JSXElement {
+  return (
+    <div
+      class={cn(
+        "flex flex-wrap gap-1.5",
+        props.align === "end" ? "justify-end" : "justify-start",
+      )}
+    >
+      <For each={props.players}>
+        {(p) => (
+          <span
+            class={cn(
+              "flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 text-xs font-bold text-game-cream",
+              TEAM_STYLE[props.team].bg,
+            )}
+          >
+            <Avatar url={p.avatarUrl} />
+            <span class="max-w-20 truncate">{p.name}</span>
+          </span>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/**
+ * The projector's tug of war: a rope with a flag that slides toward the
+ * leading team; reaching a team's line wins it for them.
+ */
+function TugArena(props: {
+  totals: TugTotals;
+  offset: number;
+  red: RaceParticipant[];
+  blue: RaceParticipant[];
+}): JSXElement {
+  // flag position: 50% centre, ±40% at each team's win line
+  const flagLeft = (): string => `${50 + props.offset * 40}%`;
+  return (
+    <div class="grid gap-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div class="grid gap-1">
+          <div class="text-3xl font-bold text-game-red">
+            🔴 {props.totals.red}
+          </div>
+          <div class="text-sm text-sub">words pulled</div>
+        </div>
+        <div class="grid justify-items-end gap-1 text-right">
+          <div class="text-3xl font-bold text-game-blue">
+            {props.totals.blue} 🔵
+          </div>
+          <div class="text-sm text-sub">words pulled</div>
+        </div>
+      </div>
+      <div class="relative h-40 overflow-hidden rounded-double bg-game-grass">
+        <div class="absolute inset-y-0 left-0 w-[10%] bg-game-red/25"></div>
+        <div class="absolute inset-y-0 right-0 w-[10%] bg-game-blue/25"></div>
+        <div class="absolute inset-y-3 left-[10%] w-1.5 rounded-full bg-game-red"></div>
+        <div class="absolute inset-y-3 right-[10%] w-1.5 rounded-full bg-game-blue"></div>
+        <div class="absolute inset-y-3 left-1/2 w-1 -translate-x-1/2 rounded-full bg-game-cream/70"></div>
+        <div class="absolute inset-x-2 top-1/2 h-3 -translate-y-1/2 rounded-full bg-game-tan shadow-[0_3px_0_var(--color-game-brown)]"></div>
+        <div
+          class="absolute top-1/2 flex -translate-x-1/2 -translate-y-full flex-col items-center transition-[left] duration-700 ease-out motion-reduce:transition-none"
+          style={{ left: flagLeft() }}
+        >
+          <span class="rounded-md bg-game-yellow px-2 py-0.5 text-sm font-bold text-game-ink shadow">
+            🚩
+          </span>
+          <span class="h-6 w-1 bg-game-ink/70"></span>
+        </div>
+        <div class="absolute bottom-2 left-3 text-sm font-bold text-game-red">
+          RED
+        </div>
+        <div class="absolute right-3 bottom-2 text-sm font-bold text-game-blue">
+          BLUE
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <TeamRoster team="red" players={props.red} align="start" />
+        <TeamRoster team="blue" players={props.blue} align="end" />
+      </div>
+    </div>
+  );
+}
+
+/** The projector's quiz-show round: the word, who's answered, the leaders. */
+function BlitzStage(props: {
+  state: BlitzState | null;
+  rounds: number;
+  secondsLeft: number;
+  answers: { uid: string; name: string; avatarUrl?: string }[];
+  leaders: { uid: string; name: string; avatarUrl?: string; points: number }[];
+  playerCount: number;
+  onNext: () => void;
+}): JSXElement {
+  return (
+    <div class="grid gap-4 lg:grid-cols-[1fr_16rem]">
+      <div class="grid gap-4">
+        <Show
+          when={props.state}
+          fallback={
+            <div class="py-16 text-center text-2xl font-bold text-sub">
+              Getting the first word ready…
+            </div>
+          }
+        >
+          {(st) => (
+            <>
+              <div class="flex items-center justify-between text-lg font-bold">
+                <span class="rounded-full bg-game-purple px-4 py-1 text-game-cream">
+                  Word {st().round} of {props.rounds}
+                </span>
+                <Show when={st().phase === "live"}>
+                  <span
+                    class={cn(
+                      "rounded-full px-4 py-1 tabular-nums",
+                      props.secondsLeft <= 5
+                        ? "bg-game-red text-game-cream"
+                        : "bg-game-cream text-game-ink",
+                    )}
+                  >
+                    ⏱ {props.secondsLeft}s
+                  </span>
+                </Show>
+              </div>
+              <Show when={`${st().round}:${st().phase}`} keyed>
+                {(_key) => (
+                  <div class="grid animate-game-pop justify-items-center gap-2 rounded-double bg-game-night px-6 py-10 text-center motion-reduce:animate-none">
+                    <Show
+                      when={st().phase === "reveal"}
+                      fallback={
+                        <>
+                          <div class="text-lg font-bold text-game-cream/80">
+                            Type this word!
+                          </div>
+                          <div class="font-mono text-7xl font-bold tracking-wide text-game-yellow [text-shadow:0_6px_0_rgb(0_0_0/0.3)] sm:text-8xl">
+                            {st().word}
+                          </div>
+                        </>
+                      }
+                    >
+                      <div class="font-mono text-4xl font-bold text-game-cream/70">
+                        {st().word}
+                      </div>
+                      <div class="text-4xl font-bold text-game-yellow sm:text-5xl">
+                        {st().winnerName !== undefined
+                          ? `⚡ ${st().winnerName} was fastest!`
+                          : "⏰ Nobody got it this time"}
+                      </div>
+                    </Show>
+                  </div>
+                )}
+              </Show>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-base font-bold text-sub">
+                  ✅ {props.answers.length} / {props.playerCount} got it
+                </span>
+                <For each={props.answers.slice(0, 8)}>
+                  {(a, i) => (
+                    <span
+                      class={cn(
+                        "flex animate-game-pop items-center gap-1 rounded-full py-0.5 pr-3 pl-0.5 text-sm font-bold motion-reduce:animate-none",
+                        i() === 0
+                          ? "bg-game-gold text-game-ink"
+                          : "bg-bg text-text",
+                      )}
+                    >
+                      <Avatar url={a.avatarUrl} />
+                      {i() === 0 ? "⚡ " : ""}
+                      {a.name}
+                    </span>
+                  )}
+                </For>
+              </div>
+              <div>
+                <Button
+                  chunky
+                  size="lg"
+                  text={st().phase === "live" ? "Show answer" : "Next word"}
+                  fa={{ icon: "fa-forward" }}
+                  onClick={() => props.onNext()}
+                />
+              </div>
+            </>
+          )}
+        </Show>
+      </div>
+      <div class="grid content-start gap-2 rounded-double bg-bg p-4">
+        <div class="text-lg font-bold text-text">🏆 Leaders</div>
+        <For
+          each={props.leaders.slice(0, 6)}
+          fallback={<div class="text-sm text-sub">No points yet</div>}
+        >
+          {(l, i) => (
+            <div class="flex items-center gap-2 text-base">
+              <span class="w-5 text-center font-bold text-main">{i() + 1}</span>
+              <Avatar url={l.avatarUrl} />
+              <span class="min-w-0 flex-1 truncate font-bold text-text">
+                {l.name}
+              </span>
+              <span class="font-bold text-text tabular-nums">{l.points}</span>
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  );
+}
+
 export function RaceHostPage(): JSXElement {
   const [hostedPin, setHostedPinSignal] = createSignal<string | null>(null);
   const [race, setRace] = createSignal<Race | null>(null);
@@ -526,7 +812,7 @@ export function RaceHostPage(): JSXElement {
 
     if (
       r.status === "running" &&
-      r.format === "timed" &&
+      isTimedFormat(r.format) &&
       r.durationSec !== undefined &&
       r.runningAt !== undefined
     ) {
@@ -631,8 +917,17 @@ export function RaceHostPage(): JSXElement {
   // this just needs to write the countdown's start time.
   const start = async (): Promise<void> => {
     const pin = hostedPin();
-    if (pin === null || race() === null) return;
-    await startRace(pin, COUNTDOWN_MS);
+    const r = race();
+    if (pin === null || r === null) return;
+    const teams =
+      r.format === "tug"
+        ? assignTeams(participants().map((p) => p.uid))
+        : undefined;
+    if (r.format === "blitz") {
+      resetBlitz();
+      await clearBlitz(pin);
+    }
+    await startRace(pin, COUNTDOWN_MS, teams);
   };
 
   const close = async (): Promise<void> => {
@@ -701,15 +996,164 @@ export function RaceHostPage(): JSXElement {
   };
   const timeLeft = (): number | null => {
     const r = race();
-    if (r?.format !== "timed" || r.runningAt === undefined) return null;
+    if (!isTimedFormat(r?.format) || r?.runningAt === undefined) return null;
     const end = r.runningAt + (r.durationSec ?? 0) * 1000;
     return Math.max(0, Math.ceil((end - now()) / 1000));
   };
   const joinUrl = (): string => `${window.location.host}/race`;
   const metric = (s: RaceStanding): string =>
-    race()?.format === "accuracy"
-      ? `${Math.round(s.finalAcc)}% · ${Math.round(s.finalWpm)} wpm`
-      : `${Math.round(s.finalWpm)} wpm · ${Math.round(s.finalAcc)}%`;
+    race()?.format === "blitz"
+      ? `${s.words ?? 0} points`
+      : race()?.format === "accuracy"
+        ? `${Math.round(s.finalAcc)}% · ${Math.round(s.finalWpm)} wpm`
+        : `${Math.round(s.finalWpm)} wpm · ${Math.round(s.finalAcc)}%`;
+
+  // ---- Word Blitz (host runs the rounds) ----
+  const isBlitz = (): boolean => race()?.format === "blitz";
+  const blitzWords = createMemo(() => pickBlitzWords(race()?.tokens ?? []));
+  const [blitzState, setBlitzState] = createSignal<BlitzState | null>(null);
+  const [blitzAnswers, setBlitzAnswers] = createSignal<Record<
+    string,
+    BlitzAnswer
+  > | null>(null);
+  const [blitzTotals, setBlitzTotals] = createSignal<Record<string, number>>(
+    {},
+  );
+  let blitzUnsub: (() => void) | null = null;
+  let blitzTimer: ReturnType<typeof setTimeout> | null = null;
+  let blitzStarted = false;
+  const stopBlitzRound = (): void => {
+    blitzUnsub?.();
+    blitzUnsub = null;
+    if (blitzTimer !== null) clearTimeout(blitzTimer);
+    blitzTimer = null;
+  };
+  const resetBlitz = (): void => {
+    stopBlitzRound();
+    blitzStarted = false;
+    setBlitzState(null);
+    setBlitzAnswers(null);
+    setBlitzTotals({});
+  };
+  onCleanup(stopBlitzRound);
+
+  const beginBlitzRound = (round: number): void => {
+    const pin = hostedPin();
+    const word = blitzWords()[round - 1];
+    if (pin === null || word === undefined) return;
+    stopBlitzRound();
+    setBlitzAnswers(null);
+    const state: BlitzState = {
+      round,
+      word,
+      phase: "live",
+      startedAt: Date.now(),
+    };
+    setBlitzState(state);
+    void writeBlitzState(pin, state);
+    blitzUnsub = subscribeBlitzAnswers(pin, round, setBlitzAnswers);
+    blitzTimer = setTimeout(() => revealBlitzRound(), BLITZ_ROUND_MS);
+  };
+
+  const revealBlitzRound = (): void => {
+    const pin = hostedPin();
+    const st = blitzState();
+    if (pin === null || st === null || st.phase !== "live") return;
+    const answers = blitzAnswers();
+    stopBlitzRound();
+    setBlitzTotals((t) => addPoints(t, roundPoints(answers)));
+    const winner = rankAnswers(answers)[0];
+    const winnerName =
+      winner === undefined
+        ? undefined
+        : (participants().find((p) => p.uid === winner.uid)?.name ??
+          winner.answer.name);
+    const revealed: BlitzState = {
+      ...st,
+      phase: "reveal",
+      ...(winner !== undefined ? { winnerUid: winner.uid } : {}),
+      ...(winnerName !== undefined ? { winnerName } : {}),
+    };
+    setBlitzState(revealed);
+    void writeBlitzState(pin, revealed);
+    blitzTimer = setTimeout(() => blitzNext(), BLITZ_REVEAL_MS);
+  };
+
+  const finishBlitz = async (): Promise<void> => {
+    const pin = hostedPin();
+    if (pin === null) return;
+    stopBlitzRound();
+    await writeBlitzScores(
+      pin,
+      blitzTotals(),
+      participants().map((p) => p.uid),
+    );
+    await endRace();
+  };
+
+  /** Teacher's button: reveal a live round early, or go to the next word. */
+  const blitzNext = (): void => {
+    const st = blitzState();
+    if (st === null) return;
+    if (st.phase === "live") {
+      revealBlitzRound();
+      return;
+    }
+    if (blitzTimer !== null) clearTimeout(blitzTimer);
+    blitzTimer = null;
+    if (st.round >= blitzWords().length) {
+      void finishBlitz();
+    } else {
+      beginBlitzRound(st.round + 1);
+    }
+  };
+
+  // Start round 1 when the race goes live.
+  createEffect(() => {
+    if (!isBlitz() || race()?.status !== "running" || blitzStarted) return;
+    blitzStarted = true;
+    beginBlitzRound(1);
+  });
+  // Close the round early once everyone has answered.
+  createEffect(() => {
+    const st = blitzState();
+    const count = Object.keys(blitzAnswers() ?? {}).length;
+    if (
+      st?.phase === "live" &&
+      participants().length > 0 &&
+      count >= participants().length
+    ) {
+      if (blitzTimer !== null) clearTimeout(blitzTimer);
+      blitzTimer = setTimeout(() => revealBlitzRound(), 800);
+    }
+  });
+  const blitzSecondsLeft = (): number => {
+    const st = blitzState();
+    if (st?.phase !== "live") return 0;
+    return Math.max(
+      0,
+      Math.ceil((st.startedAt + BLITZ_ROUND_MS - now()) / 1000),
+    );
+  };
+  const personOf = (
+    uid: string,
+    fallbackName?: string,
+  ): { uid: string; name: string; avatarUrl?: string } => {
+    const p = participants().find((x) => x.uid === uid);
+    return {
+      uid,
+      name: p?.name ?? fallbackName ?? "Student",
+      ...(p?.avatarUrl !== undefined ? { avatarUrl: p.avatarUrl } : {}),
+    };
+  };
+  const blitzAnswerList = createMemo(() =>
+    rankAnswers(blitzAnswers()).map((a) => personOf(a.uid, a.answer.name)),
+  );
+  const blitzLeaders = createMemo(() =>
+    Object.entries(blitzTotals())
+      .map(([uid, points]) => ({ ...personOf(uid), points }))
+      .sort((a, b) => b.points - a.points),
+  );
 
   const maxWpm = (): number =>
     Math.max(
@@ -720,7 +1164,7 @@ export function RaceHostPage(): JSXElement {
     );
   const barPct = (p: RaceParticipant): number => {
     const r = race();
-    if (r?.format === "timed") {
+    if (isTimedFormat(r?.format)) {
       const wpm = p.finished ? (p.finalWpm ?? 0) : (p.liveWpm ?? 0);
       return Math.min(100, (wpm / maxWpm()) * 100);
     }
@@ -734,12 +1178,50 @@ export function RaceHostPage(): JSXElement {
   const liveSorted = createMemo((): RaceParticipant[] => {
     const fmt = race()?.format ?? "finish";
     return [...participants()].sort((a, b) =>
-      fmt === "timed" ? b.wordIndex - a.wordIndex : b.progress - a.progress,
+      isTimedFormat(fmt) ? b.wordIndex - a.wordIndex : b.progress - a.progress,
     );
   });
   const standings = createMemo(() =>
     rankParticipants(participants(), race()?.format ?? "finish"),
   );
+
+  // ---- Tug of War ----
+  const isTug = (): boolean => race()?.format === "tug";
+  const tugTotals = createMemo(
+    (): TugTotals => teamTotals(participants(), race()?.teams),
+  );
+  const tugMargin = (): number =>
+    tugWinMargin(Object.keys(race()?.teams ?? {}).length);
+  const teamPlayers = (team: TugTeam): RaceParticipant[] =>
+    participants().filter((p) => race()?.teams?.[p.uid] === team);
+  // Publish the totals for students' screens (once a second) and end the
+  // game early when a team drags the flag over its line.
+  createEffect(() => {
+    const pin = hostedPin();
+    if (pin === null || !isTug() || race()?.status !== "running") return;
+    let last = "";
+    const t = setInterval(() => {
+      const totals = tugTotals();
+      const key = `${totals.red}:${totals.blue}`;
+      if (key !== last) {
+        last = key;
+        void writeTugTotals(pin, totals);
+      }
+      if (Math.abs(totals.red - totals.blue) >= tugMargin()) {
+        clearInterval(t);
+        void endRace();
+      }
+    }, 1000);
+    onCleanup(() => clearInterval(t));
+  });
+  const tugStandings = createMemo(() => withTeams(standings(), race()?.teams));
+  const tugFinalTotals = createMemo(() => standingTotals(tugStandings()));
+  const coinsFor = (st: RaceStanding): number =>
+    standingCoins(st, race()?.format, tugStandings());
+  const tugWinner = (): TugTeam | null => {
+    const o = tugOutcome(tugFinalTotals());
+    return o === "draw" ? null : o;
+  };
 
   const setupFields = (): JSXElement => (
     <RaceSetupFields
@@ -837,11 +1319,15 @@ export function RaceHostPage(): JSXElement {
                   <PinTiles pin={hostedPin() ?? ""} />
                   <div class="text-base text-game-cream/80">
                     {race()?.contentLabel} ·{" "}
-                    {race()?.format === "timed"
-                      ? `timed sprint · ${race()?.durationSec}s`
-                      : race()?.format === "accuracy"
-                        ? "accuracy race"
-                        : "first to finish"}
+                    {race()?.format === "blitz"
+                      ? `word blitz · ${blitzWords().length} words`
+                      : race()?.format === "tug"
+                        ? `tug of war · ${race()?.durationSec}s`
+                        : race()?.format === "timed"
+                          ? `timed sprint · ${race()?.durationSec}s`
+                          : race()?.format === "accuracy"
+                            ? "accuracy race"
+                            : "first to finish"}
                   </div>
                 </div>
 
@@ -903,6 +1389,30 @@ export function RaceHostPage(): JSXElement {
                       </div>
                     )}
                   </Show>
+                  <Show when={isTug()}>
+                    <div class="mt-4 grid w-full max-w-3xl grid-cols-2 gap-4 px-4 text-left">
+                      <div class="grid gap-2">
+                        <div class="text-xl font-bold text-game-red">
+                          🔴 Red team
+                        </div>
+                        <TeamRoster
+                          team="red"
+                          players={teamPlayers("red")}
+                          align="start"
+                        />
+                      </div>
+                      <div class="grid justify-items-end gap-2 text-right">
+                        <div class="text-xl font-bold text-game-blue">
+                          Blue team 🔵
+                        </div>
+                        <TeamRoster
+                          team="blue"
+                          players={teamPlayers("blue")}
+                          align="end"
+                        />
+                      </div>
+                    </div>
+                  </Show>
                 </div>
               </Show>
 
@@ -911,7 +1421,11 @@ export function RaceHostPage(): JSXElement {
                 <div class="grid gap-3 rounded-double bg-sub-alt p-5">
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="text-2xl font-bold text-text">
-                      🏎️ Race in progress
+                      {isBlitz()
+                        ? "⚡ Word Blitz"
+                        : isTug()
+                          ? "🪢 Pull, pull, pull!"
+                          : "🏎️ Race in progress"}
                     </div>
                     <Show when={timeLeft() !== null}>
                       <div
@@ -926,18 +1440,43 @@ export function RaceHostPage(): JSXElement {
                       </div>
                     </Show>
                   </div>
-                  <For each={liveSorted()}>
-                    {(p, i) => (
-                      <RaceLane
-                        name={p.name}
-                        avatarUrl={p.avatarUrl}
-                        pct={barPct(p)}
-                        label={wpmLabel(p) || "0 wpm"}
-                        place={i() + 1}
-                        finished={p.finished}
-                      />
-                    )}
-                  </For>
+                  <Show when={isBlitz()}>
+                    <BlitzStage
+                      state={blitzState()}
+                      rounds={blitzWords().length}
+                      secondsLeft={blitzSecondsLeft()}
+                      answers={blitzAnswerList()}
+                      leaders={blitzLeaders()}
+                      playerCount={participants().length}
+                      onNext={() => blitzNext()}
+                    />
+                  </Show>
+                  <Show
+                    when={isTug()}
+                    fallback={
+                      <Show when={!isBlitz()}>
+                        <For each={liveSorted()}>
+                          {(p, i) => (
+                            <RaceLane
+                              name={p.name}
+                              avatarUrl={p.avatarUrl}
+                              pct={barPct(p)}
+                              label={wpmLabel(p) || "0 wpm"}
+                              place={i() + 1}
+                              finished={p.finished}
+                            />
+                          )}
+                        </For>
+                      </Show>
+                    }
+                  >
+                    <TugArena
+                      totals={tugTotals()}
+                      offset={ropeOffset(tugTotals(), tugMargin())}
+                      red={teamPlayers("red")}
+                      blue={teamPlayers("blue")}
+                    />
+                  </Show>
                   <div class="mt-2">
                     <Button
                       chunky
@@ -957,9 +1496,57 @@ export function RaceHostPage(): JSXElement {
                   <div class="text-center text-3xl font-bold text-text">
                     🏆 Race results
                   </div>
-                  <RacePodium top={standings().slice(0, 3)} metric={metric} />
+                  <Show
+                    when={isTug()}
+                    fallback={
+                      <RacePodium
+                        top={standings().slice(0, 3)}
+                        metric={metric}
+                      />
+                    }
+                  >
+                    <div class="grid justify-items-center gap-2 text-center">
+                      <Show
+                        when={tugWinner()}
+                        fallback={
+                          <div class="animate-game-pop rounded-full bg-game-purple px-6 py-2 text-3xl font-bold text-game-cream motion-reduce:animate-none">
+                            🤝 It&apos;s a draw!
+                          </div>
+                        }
+                      >
+                        {(team) => (
+                          <div
+                            class={cn(
+                              "animate-game-pop rounded-full px-6 py-2 text-3xl font-bold text-game-cream motion-reduce:animate-none",
+                              TEAM_STYLE[team()].bg,
+                            )}
+                          >
+                            {TEAM_STYLE[team()].emoji}{" "}
+                            {TEAM_STYLE[team()].label} wins!
+                          </div>
+                        )}
+                      </Show>
+                      <div class="text-xl font-bold">
+                        <span class="text-game-red">
+                          🔴 {tugFinalTotals().red}
+                        </span>
+                        <span class="mx-3 text-sub">vs</span>
+                        <span class="text-game-blue">
+                          {tugFinalTotals().blue} 🔵
+                        </span>
+                      </div>
+                      <Show when={tugStandings()[0]}>
+                        {(mvp) => (
+                          <div class="text-lg text-text">
+                            ⭐ MVP: <b>{mvp().name}</b> · {mvp().words ?? 0}{" "}
+                            words
+                          </div>
+                        )}
+                      </Show>
+                    </div>
+                  </Show>
                   <div class="grid gap-2">
-                    <For each={standings()}>
+                    <For each={tugStandings()}>
                       {(st) => (
                         <div class="flex items-center gap-3 rounded-xl bg-bg p-2 text-base">
                           <span class="w-8 text-center text-xl font-bold text-main">
@@ -967,9 +1554,23 @@ export function RaceHostPage(): JSXElement {
                           </span>
                           <Avatar url={st.avatarUrl} />
                           <span class="min-w-0 flex-1 truncate font-bold text-text">
+                            <Show when={st.team}>
+                              {(team) => (
+                                <span class="mr-1.5">
+                                  {TEAM_STYLE[team()].emoji}
+                                </span>
+                              )}
+                            </Show>
                             {st.name}
                           </span>
-                          <span class="font-bold text-text">{metric(st)}</span>
+                          <span class="font-bold text-text">
+                            {isTug() ? `${st.words ?? 0} words` : metric(st)}
+                          </span>
+                          <Show when={coinsFor(st) > 0}>
+                            <span class="flex items-center gap-1 rounded-full bg-game-gold px-2 py-0.5 text-sm font-bold text-game-ink">
+                              <Fa icon="fa-coins" />+{coinsFor(st)}
+                            </span>
+                          </Show>
                         </div>
                       )}
                     </For>

@@ -4,6 +4,7 @@ import {
   onValue,
   ref as dbRef,
   remove,
+  serverTimestamp,
   set,
   update,
 } from "firebase/database";
@@ -11,6 +12,7 @@ import {
   collection,
   CollectionReference,
   deleteDoc,
+  deleteField,
   doc,
   DocumentReference,
   getDoc,
@@ -35,13 +37,17 @@ import {
 } from "../firebase";
 import {
   generatePin,
+  isTimedFormat,
   Race,
   RaceFormat,
   RaceHistory,
   RaceParticipant,
   RaceStanding,
   rankParticipants,
+  TugTeam,
 } from "./race-types";
+import { BlitzAnswer, blitzCoins, BlitzState } from "./blitz";
+import { tugCoins, tugOutcome, TugTotals } from "./tug";
 
 /** Description of what a race should be run on, resolved into tokens at create time. */
 export type RaceContentSource =
@@ -174,7 +180,7 @@ export async function createRace(input: {
     status: "lobby",
     round: 1,
     format: input.format,
-    durationSec: input.format === "timed" ? input.durationSec : undefined,
+    durationSec: isTimedFormat(input.format) ? input.durationSec : undefined,
     tokens: input.tokens,
     contentLabel: input.contentLabel,
     classId: input.classId,
@@ -195,11 +201,138 @@ export async function getRace(pin: string): Promise<Race | null> {
 export async function startRace(
   pin: string,
   countdownMs: number,
+  teams?: Record<string, TugTeam>,
 ): Promise<void> {
   await setDoc(
     raceDoc(pin),
-    { status: "countdown", startAt: Date.now() + countdownMs },
+    {
+      status: "countdown",
+      startAt: Date.now() + countdownMs,
+      teams: teams ?? deleteField(),
+    },
     { merge: true },
+  );
+}
+
+// ---- Word Blitz ----
+
+function blitzRef(pin: string, path = ""): DatabaseReference {
+  return dbRef(getRealtimeDb(), `classRaces/${pin}/blitz${path}`);
+}
+
+/** Host: clear any previous game's rounds before a new one. */
+export async function clearBlitz(pin: string): Promise<void> {
+  await remove(blitzRef(pin));
+}
+
+/** Host: publish the current round (students only watch this node). */
+export async function writeBlitzState(
+  pin: string,
+  state: BlitzState,
+): Promise<void> {
+  await set(blitzRef(pin, "/state"), {
+    ...state,
+    startedAt: state.phase === "live" ? serverTimestamp() : state.startedAt,
+  });
+}
+
+export function subscribeBlitzState(
+  pin: string,
+  cb: (state: BlitzState | null) => void,
+): () => void {
+  return trackRealtimeListener(
+    onValue(
+      blitzRef(pin, "/state"),
+      (snap) => cb(snap.exists() ? (snap.val() as BlitzState) : null),
+      () => cb(null),
+    ),
+  );
+}
+
+/**
+ * Student: answer the live round. The database stamps the time itself and
+ * the rules only accept the current round's word, once per student.
+ */
+export async function submitBlitzAnswer(
+  pin: string,
+  round: number,
+  word: string,
+  name: string,
+): Promise<void> {
+  const user = getAuthenticatedUser();
+  if (user === null) return;
+  await set(blitzRef(pin, `/answers/${round}/${user.uid}`), {
+    word,
+    name: name.slice(0, 80),
+    at: serverTimestamp(),
+  });
+}
+
+/** Host: watch one round's answers as they arrive. */
+export function subscribeBlitzAnswers(
+  pin: string,
+  round: number,
+  cb: (answers: Record<string, BlitzAnswer> | null) => void,
+): () => void {
+  return trackRealtimeListener(
+    onValue(
+      blitzRef(pin, `/answers/${round}`),
+      (snap) =>
+        cb(snap.exists() ? (snap.val() as Record<string, BlitzAnswer>) : null),
+      () => cb(null),
+    ),
+  );
+}
+
+/**
+ * Host: store final points on each participant (points live in wordIndex)
+ * so standings, history and coins work like any other race.
+ */
+export async function writeBlitzScores(
+  pin: string,
+  points: Record<string, number>,
+  uids: string[],
+): Promise<void> {
+  const now = Date.now();
+  await Promise.all(
+    uids.map(async (uid) => {
+      const p = points[uid] ?? 0;
+      await update(participantRef(pin, uid), {
+        wordIndex: p,
+        progress: 1,
+        finished: p > 0,
+        finishedAt: p > 0 ? now : 0,
+        lastSeen: now,
+      });
+    }),
+  );
+}
+
+function tugRef(pin: string): DatabaseReference {
+  return dbRef(getRealtimeDb(), `classRaces/${pin}/tug`);
+}
+
+/**
+ * Host publishes the live team totals (a tiny node) so students can see the
+ * rope without each listening to every classmate's progress.
+ */
+export async function writeTugTotals(
+  pin: string,
+  totals: TugTotals,
+): Promise<void> {
+  await set(tugRef(pin), totals);
+}
+
+export function subscribeTugTotals(
+  pin: string,
+  cb: (totals: TugTotals | null) => void,
+): () => void {
+  return trackRealtimeListener(
+    onValue(
+      tugRef(pin),
+      (snap) => cb(snap.exists() ? (snap.val() as TugTotals) : null),
+      () => cb(null),
+    ),
   );
 }
 
@@ -239,12 +372,13 @@ export async function restartRace(
   await setDoc(
     raceDoc(pin),
     clean({
+      teams: deleteField(),
       status: "lobby",
       round: input.round,
       format: input.format,
       tokens: input.tokens,
       contentLabel: input.contentLabel,
-      durationSec: input.format === "timed" ? input.durationSec : undefined,
+      durationSec: isTimedFormat(input.format) ? input.durationSec : undefined,
     }),
     { merge: true },
   );
@@ -413,13 +547,54 @@ export function raceCoinsEarned(s: RaceStanding): number {
   return RACE_PARTICIPATION_COINS + (RACE_RANK_BONUS[s.rank] ?? 0);
 }
 
+/** Copy each player's Tug of War team onto their standing. */
+export function withTeams(
+  standings: RaceStanding[],
+  teams: Record<string, TugTeam> | undefined,
+): RaceStanding[] {
+  if (teams === undefined) return standings;
+  return standings.map((s) => {
+    const team = teams[s.uid];
+    return team === undefined ? s : { ...s, team };
+  });
+}
+
+/** Final team totals from standings (words each player pulled). */
+export function standingTotals(standings: RaceStanding[]): TugTotals {
+  const totals: TugTotals = { red: 0, blue: 0 };
+  for (const s of standings) {
+    if (s.team !== undefined) totals[s.team] += s.words ?? 0;
+  }
+  return totals;
+}
+
+/**
+ * Coins for a standing in any race format. Tug of War pays its own (higher)
+ * rates: participation + winning team + MVP; see race/tug.ts.
+ */
+export function standingCoins(
+  s: RaceStanding,
+  format: RaceFormat | undefined,
+  standings: RaceStanding[],
+): number {
+  if (format === "blitz") return blitzCoins(s);
+  if (format !== "tug") return raceCoinsEarned(s);
+  const mvpWords = Math.max(0, ...standings.map((x) => x.words ?? 0));
+  return tugCoins(s, tugOutcome(standingTotals(standings)), mvpWords);
+}
+
 /**
  * Denormalize each participant's race bests onto their own user doc, so the
  * classroom racewpm/raceacc leaderboards can rank from `users` directly
  * instead of scanning the entire (ever-growing) raceHistory collection. Also
  * awards race-completion coins (see raceCoinsEarned) in the same write.
  */
-async function updateRaceStats(standings: RaceStanding[]): Promise<void> {
+async function updateRaceStats(
+  standings: RaceStanding[],
+  format: RaceFormat,
+): Promise<void> {
+  const outcome =
+    format === "tug" ? tugOutcome(standingTotals(standings)) : null;
   await Promise.all(
     standings.map(async (s) => {
       const ref = doc(getDb(), "users", s.uid);
@@ -434,7 +609,8 @@ async function updateRaceStats(standings: RaceStanding[]): Promise<void> {
         s.finalAcc > (prev.raceBestAcc ?? 0)
           ? { raceBestAcc: s.finalAcc, raceBestAccWpm: s.finalWpm }
           : {};
-      const coinsEarned = raceCoinsEarned(s);
+      const coinsEarned = standingCoins(s, format, standings);
+      const won = outcome === null ? s.rank === 1 : outcome === s.team;
 
       await setDoc(
         ref,
@@ -442,7 +618,7 @@ async function updateRaceStats(standings: RaceStanding[]): Promise<void> {
           ...bestWpm,
           ...bestAcc,
           raceTotalRaces: increment(1),
-          raceWins: increment(s.rank === 1 ? 1 : 0),
+          raceWins: increment(won ? 1 : 0),
           ...(coinsEarned > 0 ? { coins: increment(coinsEarned) } : {}),
         },
         { merge: true },
@@ -468,10 +644,13 @@ export async function saveHistory(
     createdAt: race.createdAt,
     finishedAt: race.finishedAt ?? Date.now(),
     savedAt: Date.now(),
-    standings: rankParticipants(participants, race.format),
+    standings: withTeams(
+      rankParticipants(participants, race.format),
+      race.teams,
+    ),
   };
   await setDoc(ref, clean(record));
-  await updateRaceStats(record.standings);
+  await updateRaceStats(record.standings, race.format);
 }
 
 /** Delete the live race and all participant docs (post-race cleanup). */

@@ -8,8 +8,20 @@
  *  - raceHistory/{autoId}            an immutable snapshot saved when finished
  */
 
-/** First-to-finish, accuracy race (full text, ranked by accuracy), or timed sprint. */
-export type RaceFormat = "finish" | "timed" | "accuracy";
+/**
+ * First-to-finish, accuracy race (full text, ranked by accuracy), timed sprint,
+ * Tug of War (timed, two teams pulling with every word typed), or Word Blitz
+ * (quiz-show rounds: fastest to type the shown word scores most).
+ */
+export type RaceFormat = "finish" | "timed" | "accuracy" | "tug" | "blitz";
+
+/** Tug of War team. */
+export type TugTeam = "red" | "blue";
+
+/** Formats that run on a clock (durationSec) instead of a full text. */
+export function isTimedFormat(format: RaceFormat | undefined): boolean {
+  return format === "timed" || format === "tug";
+}
 
 /**
  * Lifecycle of a race:
@@ -37,6 +49,8 @@ export type Race = {
   /** class the race targets, if any (purely informational) */
   classId?: string;
   createdAt: number;
+  /** Tug of War only: each participant's team, set when the host starts */
+  teams?: Record<string, TugTeam>;
   /** epoch ms the race is scheduled to start; set when status -> countdown */
   startAt?: number;
   /** epoch ms when status actually became "running"; used for timed countdown */
@@ -73,6 +87,10 @@ export type RaceStanding = {
   finishedAt: number;
   progress: number;
   rank: number;
+  /** words typed (Tug of War pulls) */
+  words?: number;
+  /** Tug of War team */
+  team?: TugTeam;
 };
 
 export type RaceHistory = {
@@ -122,6 +140,11 @@ export function rankParticipants(
       if (b.progress !== a.progress) return b.progress - a.progress;
       return (b.finalAcc ?? 0) - (a.finalAcc ?? 0);
     }
+    // tug: most words pulled; blitz: most points (both kept in wordIndex)
+    if (format === "tug" || format === "blitz") {
+      if (b.wordIndex !== a.wordIndex) return b.wordIndex - a.wordIndex;
+      return (b.finalAcc ?? 0) - (a.finalAcc ?? 0);
+    }
     // timed: rank by wpm, then accuracy
     if ((b.finalWpm ?? 0) !== (a.finalWpm ?? 0)) {
       return (b.finalWpm ?? 0) - (a.finalWpm ?? 0);
@@ -138,5 +161,6 @@ export function rankParticipants(
     finishedAt: p.finishedAt ?? 0,
     progress: p.progress,
     rank: i + 1,
+    words: p.wordIndex,
   }));
 }

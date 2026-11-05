@@ -106,7 +106,8 @@ export default async function handler(
     const runningAt = Number(race.runningAt);
     const elapsedMs = Date.now() - runningAt;
     const timedComplete =
-      race.format === "timed" &&
+      // timed sprints and Tug of War both end on the clock
+      (race.format === "timed" || race.format === "tug") &&
       Number.isFinite(race.durationSec) &&
       elapsedMs >= Number(race.durationSec) * 1000 - 1_000;
     const textComplete = wordIndex >= tokenCount - 1;
