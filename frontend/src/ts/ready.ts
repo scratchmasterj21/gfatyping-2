@@ -6,6 +6,7 @@ import { authPromise } from "./firebase";
 import { animate } from "animejs";
 import { onDOMReady, qs } from "./utils/dom";
 import { isDevEnvironment } from "./utils/env";
+import { startVersionCheck } from "./utils/version-check";
 
 onDOMReady(async () => {
   await configLoadPromise;
@@ -37,6 +38,7 @@ onDOMReady(async () => {
         }
       });
   } else {
+    startVersionCheck();
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker

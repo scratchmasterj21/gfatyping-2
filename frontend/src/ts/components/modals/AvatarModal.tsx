@@ -632,6 +632,83 @@ export function AvatarModal(): JSXElement {
         </p>
 
         <Show when={tab() === "style"}>
+          <section class="grid gap-2 rounded-xl bg-bg p-3">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+              <h3 class="font-kid text-lg font-bold text-text">
+                <Fa icon="fa-tshirt" class="mr-2 text-main" />
+                My outfits
+              </h3>
+              <span class="text-sm text-sub">
+                Save your look in a slot, then tap it to wear it again.
+              </span>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <For each={OUTFIT_SLOTS}>
+                {(slot) => (
+                  <div class="flex items-center gap-2 rounded-xl bg-sub-alt p-2">
+                    <Show
+                      when={savedOutfit(slot)}
+                      fallback={
+                        <span class="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-sub text-base text-sub">
+                          {slot}
+                        </span>
+                      }
+                    >
+                      {(saved) => (
+                        <button
+                          type="button"
+                          class="cursor-pointer rounded-full disabled:cursor-not-allowed"
+                          title={`Wear outfit ${slot}`}
+                          aria-label={`Wear outfit ${slot}`}
+                          disabled={costumePendingId() !== null}
+                          onClick={() =>
+                            void guardedCostumeAction(
+                              `wear-${slot}`,
+                              async () =>
+                                runOutfitAction(
+                                  async () => wearOutfit(slot),
+                                  "Couldn't put that on",
+                                ),
+                            )
+                          }
+                        >
+                          <Avatar
+                            shape={saved().shape}
+                            color={savedLookValue(slot, "color")}
+                            hair={saved().equipped.hair}
+                            hat={saved().equipped.hat}
+                            accessory={saved().equipped.accessory}
+                            face={saved().equipped.face}
+                            background={saved().equipped.background}
+                            highlightColor={savedLookValue(slot, "highlight")}
+                            size={48}
+                          />
+                        </button>
+                      )}
+                    </Show>
+                    <button
+                      type="button"
+                      class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-3 text-base font-semibold text-text disabled:cursor-not-allowed"
+                      disabled={costumePendingId() !== null}
+                      onClick={() =>
+                        void guardedCostumeAction(`save-${slot}`, async () =>
+                          runOutfitAction(
+                            async () => saveOutfit(slot),
+                            "Couldn't save that",
+                          ),
+                        )
+                      }
+                    >
+                      Save
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </section>
+        </Show>
+
+        <Show when={tab() === "style"}>
           <div class="flex flex-wrap items-center gap-2">
             <For each={AVATAR_CATEGORIES}>
               {(cat) => (
@@ -962,74 +1039,6 @@ export function AvatarModal(): JSXElement {
                   <Fa icon="fa-random" class="mr-2" />
                   Surprise me
                 </button>
-                <div class="flex flex-wrap items-center justify-center gap-2">
-                  <For each={OUTFIT_SLOTS}>
-                    {(slot) => (
-                      <div class="flex items-center gap-2 rounded-xl bg-sub-alt p-2">
-                        <Show
-                          when={savedOutfit(slot)}
-                          fallback={
-                            <span class="flex h-12 w-12 items-center justify-center rounded-full border border-dashed border-sub text-base text-sub">
-                              {slot}
-                            </span>
-                          }
-                        >
-                          {(saved) => (
-                            <button
-                              type="button"
-                              class="cursor-pointer rounded-full disabled:cursor-not-allowed"
-                              title={`Wear outfit ${slot}`}
-                              aria-label={`Wear outfit ${slot}`}
-                              disabled={costumePendingId() !== null}
-                              onClick={() =>
-                                void guardedCostumeAction(
-                                  `wear-${slot}`,
-                                  async () =>
-                                    runOutfitAction(
-                                      async () => wearOutfit(slot),
-                                      "Couldn't put that on",
-                                    ),
-                                )
-                              }
-                            >
-                              <Avatar
-                                shape={saved().shape}
-                                color={savedLookValue(slot, "color")}
-                                hair={saved().equipped.hair}
-                                hat={saved().equipped.hat}
-                                accessory={saved().equipped.accessory}
-                                face={saved().equipped.face}
-                                background={saved().equipped.background}
-                                highlightColor={savedLookValue(
-                                  slot,
-                                  "highlight",
-                                )}
-                                size={48}
-                              />
-                            </button>
-                          )}
-                        </Show>
-                        <button
-                          type="button"
-                          class="press-3d min-h-11 cursor-pointer rounded-xl bg-bg px-3 text-base font-semibold text-text disabled:cursor-not-allowed"
-                          disabled={costumePendingId() !== null}
-                          onClick={() =>
-                            void guardedCostumeAction(
-                              `save-${slot}`,
-                              async () =>
-                                runOutfitAction(
-                                  async () => saveOutfit(slot),
-                                  "Couldn't save that",
-                                ),
-                            )
-                          }
-                        >
-                          Save
-                        </button>
-                      </div>
-                    )}
-                  </For>
-                </div>
                 <TitlePicker
                   current={stateQuery.data?.title}
                   earned={earnedQuery.data}
