@@ -80,6 +80,8 @@ export type LessonCompletionResult = {
   ok: boolean;
   reason?: string;
   passed?: boolean;
+  /** this attempt passed with 2+ stars: counts toward unlocking games */
+  countsForGames?: boolean;
   completed?: boolean;
   coinsAwarded?: number;
   practiceReward?: number;
@@ -274,7 +276,7 @@ export async function recordCompletion(
       return result;
     }
 
-    if (result.passed === true) noteLessonPassed(lessonId);
+    if (result.countsForGames === true) noteLessonPassed(lessonId);
     const newStars = result.stars ?? 0;
     const wasFirst3Star = (prev.stars ?? 0) < 3 && newStars === 3;
 
@@ -768,7 +770,7 @@ setOnLessonSynced((uid, payload, result) => {
       payload.correctChars ?? {},
     );
   }
-  if (result.passed === true) noteLessonPassed(payload.lessonId);
+  if (result.countsForGames === true) noteLessonPassed(payload.lessonId);
   const newStars = result.stars ?? 0;
   const wasFirst3Star =
     payload.prevStars !== undefined && payload.prevStars < 3 && newStars === 3;

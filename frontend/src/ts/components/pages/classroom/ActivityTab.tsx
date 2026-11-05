@@ -277,7 +277,8 @@ function EarnStepper(props: {
       >
         <Fa icon="fa-plus" />
       </button>
-      different lessons each day to unlock games.
+      different lessons with ⭐⭐ (2+ stars on that try) each day to unlock
+      games. Retries of old lessons count.
     </div>
   );
 }
@@ -345,7 +346,7 @@ function StudentRow(props: {
         : "Can play";
     }
     if (s.reason === "earn") {
-      return `Locked: ${props.today.lessonsPassed}/${policy().earnLessons} lessons`;
+      return `Locked: ${props.today.lessonsPassed}/${policy().earnLessons} ⭐⭐ lessons`;
     }
     return "Games off";
   };
@@ -412,7 +413,7 @@ function StudentRow(props: {
             <span class="text-text">
               🎮 {formatMinutes(props.today.gameSec)}
             </span>{" "}
-            · {props.today.lessonsPassed} lessons
+            · {props.today.lessonsPassed} ⭐⭐ lessons
           </div>
           <div class="flex items-center gap-2 text-sub">
             7 days:

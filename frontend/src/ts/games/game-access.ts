@@ -6,7 +6,8 @@ import {
   parseActivityDays,
   tokyoDate,
 } from "../classroom/activity";
-import { getDb } from "../firebase";
+import { getAuthenticatedUser, getDb } from "../firebase";
+import { queryClient } from "../queries";
 import { getSnapshot } from "../states/snapshot";
 
 /**
@@ -20,7 +21,7 @@ export type GameMode = "on" | "off" | "earn";
 
 export type GamePolicy = {
   mode?: GameMode;
-  /** "earn": distinct lessons to pass today before games unlock */
+  /** "earn": distinct lessons to pass with 2+ stars today to unlock games */
   earnLessons?: number;
   /** game ids that stay locked */
   blocked?: string[];
@@ -212,7 +213,7 @@ export function gameLockMessage(access: GameAccess): string {
     return "🔒 Your teacher turned games off for now";
   }
   const n = access.lessonsLeft ?? 1;
-  return `🔒 Pass ${n} more lesson${n === 1 ? "" : "s"} today to unlock games`;
+  return `🔒 Get ⭐⭐ on ${n} more lesson${n === 1 ? "" : "s"} today to unlock games`;
 }
 
 // ---- the signed-in student's own activity today ----
@@ -264,4 +265,17 @@ export function myToday(): { lessonsPassed: number; gameSec: number } {
     lessonsPassed: lessons.size,
     gameSec: (snap.g ?? 0) + local.gameSec,
   };
+}
+
+/**
+ * Whether the signed-in student is in "earn with lessons" mode, from the
+ * cached settings the Lessons page already loaded (no extra read).
+ */
+export function isEarnModeActive(): boolean {
+  const access = queryClient.getQueryData<GameAccessDoc>(["gameAccess"]);
+  if (access === undefined) return false;
+  return (
+    resolvePolicy(access, getSnapshot()?.classId, getAuthenticatedUser()?.uid)
+      .mode === "earn"
+  );
 }

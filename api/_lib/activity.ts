@@ -7,7 +7,7 @@ import { tokyoDateString } from "./time.js";
  * "lessons vs games" view and the earn-game-time rule. Keyed by Japan date.
  *   t  - seconds of typing tests (lessons + free practice)
  *   l  - seconds in lessons / assignments / passages
- *   lx - ids of the lessons passed (distinct)
+ *   lx - ids of lessons passed with 2+ stars on that attempt (distinct)
  *   g  - seconds in free-play games
  *   gp - free-play games opened
  * Mirrors frontend/src/ts/classroom/activity.ts.

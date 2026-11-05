@@ -288,6 +288,10 @@ export default async function handler(
         const passed = !gated || acc >= lessonPassAccuracy(grade);
         const completed = prev.completed === true || passed;
         const newStars = completed ? starsForGrade(bestWpm, grade) : 0;
+        // Toward unlocking games: THIS attempt must pass with 2+ stars (by
+        // its own speed, not the best-ever), so slowly retyping an old
+        // 3-star lesson doesn't count.
+        const countsForGames = passed && starsForGrade(wpm, grade) >= 2;
 
         const bonusDue =
           completed &&
@@ -379,7 +383,7 @@ export default async function handler(
         const activity = activityUpdate(
           userData,
           { l: activeSeconds },
-          { passedLessonId: passed ? lessonId : undefined },
+          { passedLessonId: countsForGames ? lessonId : undefined },
         );
         tx.set(
           userRef,
@@ -398,6 +402,7 @@ export default async function handler(
 
         return {
           passed,
+          countsForGames,
           completed,
           coinsAwarded: totalCoins,
           practiceReward,

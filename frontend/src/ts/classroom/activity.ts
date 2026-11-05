@@ -11,7 +11,7 @@ export type ActivityDay = {
   t?: number;
   /** seconds in lessons / assignments / passages */
   l?: number;
-  /** ids of lessons passed that day (distinct) */
+  /** ids of lessons passed with 2+ stars on that attempt (distinct) */
   lx?: string[];
   /** seconds in free-play games */
   g?: number;

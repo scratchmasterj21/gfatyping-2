@@ -216,7 +216,7 @@ function GameAccessBanner(props: {
         : undefined;
     }
     if (a.reason === "earn") {
-      return `🎮 Pass ${props.policy.earnLessons} lessons today to unlock games - ${Math.min(props.lessonsPassed, props.policy.earnLessons)}/${props.policy.earnLessons} done!`;
+      return `🎮 Get ⭐⭐ (2 stars or more) on ${props.policy.earnLessons} lessons today to unlock games - ${Math.min(props.lessonsPassed, props.policy.earnLessons)}/${props.policy.earnLessons} done! Retrying an old lesson counts too.`;
     }
     if (a.reason === "off") {
       return "⏸️ Your teacher turned games off for now. Keep practicing your lessons!";

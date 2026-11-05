@@ -25,6 +25,8 @@ export type PendingLessonPayload = {
 export type PendingLessonSyncResult = {
   ok: boolean;
   passed?: boolean;
+  /** this attempt passed with 2+ stars: counts toward unlocking games */
+  countsForGames?: boolean;
   stars?: number;
   coinsAwarded?: number;
   newlyCompletedQuests?: { name: string; coinReward: number }[];

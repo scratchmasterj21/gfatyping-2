@@ -16,6 +16,7 @@ import {
 } from "../states/notifications";
 import { getCustomTextIndicator, isAuthenticated } from "../states/core";
 import { getAuthenticatedUser } from "../firebase";
+import { isEarnModeActive } from "../games/game-access";
 import { isKidThemeActive } from "../controllers/kid-theme-controller";
 import {
   curriculumNextAction,
@@ -1013,7 +1014,11 @@ async function updateLessonGate(
     el.removeClass("fail")
       .addClass("pass")
       .setHtml(
-        `<i class="fas fa-check"></i> Lesson passed · ${"★".repeat(stars)}${"☆".repeat(3 - stars)}${reward}`,
+        `<i class="fas fa-check"></i> Lesson passed · ${"★".repeat(stars)}${"☆".repeat(3 - stars)}${reward}${
+          outcome.countsForGames === false && isEarnModeActive()
+            ? " · this try was under ⭐⭐, so it doesn't count toward games"
+            : ""
+        }`,
       )
       .show();
     celebrateLessonPass();
