@@ -132,6 +132,7 @@ export function GhostHunterModal(props: Props): JSXElement {
   let unsubscribeActions: (() => void) | undefined;
   let startTimer: ReturnType<typeof setTimeout> | undefined;
   let multiplayerGameStarted = false;
+  let hostLeft = false;
   let lastPositionWrite = 0;
 
   const groups = createMemo(() =>
@@ -303,6 +304,7 @@ export function GhostHunterModal(props: Props): JSXElement {
 
   const watchRoom = (code: string): void => {
     unsubscribeRoom?.();
+    hostLeft = false;
     setRoomCode(code);
     setPhase("lobby");
     unsubscribeRoom = subscribeGhostRoom(code, (next) => {
@@ -314,6 +316,25 @@ export function GhostHunterModal(props: Props): JSXElement {
         return;
       }
       setRoom(next);
+      if (hostLeft) return;
+      // The host runs the shared ghosts; if they drop mid-game the world
+      // freezes for everyone else, so end it for the guests instead.
+      if (
+        multiplayerGameStarted &&
+        next.status === "playing" &&
+        next.hostUid !== getAuthenticatedUser()?.uid &&
+        next.players[next.hostUid]?.online === false
+      ) {
+        hostLeft = true;
+        if (game !== null) {
+          game.destroy(true);
+          game = null;
+        }
+        setResult(null);
+        setPhase("results");
+        showErrorNotification("The host left, so the game ended");
+        return;
+      }
       if (next.status === "countdown" && next.startAt !== undefined) {
         if (startTimer !== undefined) clearTimeout(startTimer);
         const delay = Math.max(0, next.startAt - Date.now());

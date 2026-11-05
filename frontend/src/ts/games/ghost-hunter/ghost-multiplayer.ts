@@ -13,7 +13,11 @@ import {
   update,
 } from "firebase/database";
 
-import { getAuthenticatedUser, getRealtimeDb } from "../../firebase";
+import {
+  getAuthenticatedUser,
+  getRealtimeDb,
+  trackRealtimeListener,
+} from "../../firebase";
 
 export type GhostRoomStatus = "lobby" | "countdown" | "playing" | "finished";
 
@@ -144,6 +148,9 @@ export async function createGhostRoom(input: {
       await onDisconnect(playerRef(roomCode, user.uid)).update({
         online: false,
       });
+      // A lobby only its host can start is useless once the host drops -
+      // delete it then (cancelled in startGhostRoom once the game begins).
+      await onDisconnect(roomRef(roomCode)).remove();
       return roomCode;
     }
   }
@@ -180,10 +187,19 @@ export function subscribeGhostRoom(
   roomCode: string,
   callback: (room: GhostRoom | null) => void,
 ): () => void {
-  return onValue(roomRef(roomCode), (snap) => callback(roomFromSnapshot(snap)));
+  return trackRealtimeListener(
+    onValue(roomRef(roomCode), (snap) => callback(roomFromSnapshot(snap))),
+  );
 }
 
 export async function startGhostRoom(roomCode: string): Promise<void> {
+  // The game is under way: keep the room if the host drops now. Cancelling
+  // also clears the host's own presence hook, so set that one again.
+  await onDisconnect(roomRef(roomCode)).cancel();
+  const host = getAuthenticatedUser();
+  if (host !== null) {
+    await onDisconnect(playerRef(roomCode, host.uid)).update({ online: false });
+  }
   await update(roomRef(roomCode), {
     status: "countdown",
     startAt: Date.now() + 3000,
@@ -234,8 +250,10 @@ export function subscribeGhostWorld(
   roomCode: string,
   callback: (world: GhostWorld | null) => void,
 ): () => void {
-  return onValue(worldRef(roomCode), (snap) =>
-    callback(snap.exists() ? (snap.val() as GhostWorld) : null),
+  return trackRealtimeListener(
+    onValue(worldRef(roomCode), (snap) =>
+      callback(snap.exists() ? (snap.val() as GhostWorld) : null),
+    ),
   );
 }
 
@@ -255,10 +273,12 @@ export function subscribeGhostActions(
   roomCode: string,
   callback: (action: GhostAction) => void,
 ): () => void {
-  return onChildAdded(actionsRef(roomCode), (snap) => {
-    callback(snap.val() as GhostAction);
-    void remove(snap.ref);
-  });
+  return trackRealtimeListener(
+    onChildAdded(actionsRef(roomCode), (snap) => {
+      callback(snap.val() as GhostAction);
+      void remove(snap.ref);
+    }),
+  );
 }
 
 export async function awardGhostPlayer(

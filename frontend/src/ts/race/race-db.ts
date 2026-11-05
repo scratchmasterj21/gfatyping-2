@@ -16,7 +16,9 @@ import {
   getDoc,
   getDocs,
   increment,
+  limit,
   onSnapshot,
+  orderBy,
   query,
   setDoc,
   where,
@@ -25,7 +27,12 @@ import {
 import { callApi } from "../api-client";
 import { getPassage, getWordList } from "../classroom/assignments";
 import { findLesson, realWords } from "../lessons/lessons-data";
-import { getAuthenticatedUser, getDb, getRealtimeDb } from "../firebase";
+import {
+  getAuthenticatedUser,
+  getDb,
+  getRealtimeDb,
+  trackRealtimeListener,
+} from "../firebase";
 import {
   generatePin,
   Race,
@@ -372,10 +379,12 @@ export function subscribeParticipants(
   pin: string,
   cb: (participants: RaceParticipant[]) => void,
 ): () => void {
-  return onValue(
-    participantsRef(pin),
-    (snap) => cb(readParticipants(snap.val())),
-    () => cb([]),
+  return trackRealtimeListener(
+    onValue(
+      participantsRef(pin),
+      (snap) => cb(readParticipants(snap.val())),
+      () => cb([]),
+    ),
   );
 }
 
@@ -471,22 +480,39 @@ export async function deleteRace(pin: string): Promise<void> {
   await deleteDoc(raceDoc(pin));
 }
 
-/** List saved race history, newest first. */
-export async function listHistory(): Promise<RaceHistory[]> {
-  const snap = await getDocs(historyCol());
-  return snap.docs
-    .map((d) => ({ ...(d.data() as RaceHistory), id: d.id }))
-    .sort((a, b) => b.savedAt - a.savedAt);
-}
+/** How many past races the class dashboard loads. */
+export const RACE_HISTORY_LIMIT = 50;
 
-/** History scoped to one class, newest first. */
+/**
+ * History scoped to one class, newest first - only the latest
+ * RACE_HISTORY_LIMIT, so the read cost stays flat as races pile up. Needs the
+ * (classId, savedAt desc) index in firestore.indexes.json; until that's
+ * deployed, falls back to reading the class's whole history.
+ */
 export async function listHistoryForClass(
   classId: string,
 ): Promise<RaceHistory[]> {
-  const snap = await getDocs(
-    query(historyCol(), where("classId", "==", classId)),
-  );
-  return snap.docs
-    .map((d) => ({ ...(d.data() as RaceHistory), id: d.id }))
-    .sort((a, b) => b.savedAt - a.savedAt);
+  const toHistory = (
+    docs: { id: string; data: () => unknown }[],
+  ): RaceHistory[] =>
+    docs
+      .map((d) => ({ ...(d.data() as RaceHistory), id: d.id }))
+      .sort((a, b) => b.savedAt - a.savedAt);
+  try {
+    const snap = await getDocs(
+      query(
+        historyCol(),
+        where("classId", "==", classId),
+        orderBy("savedAt", "desc"),
+        limit(RACE_HISTORY_LIMIT),
+      ),
+    );
+    return toHistory(snap.docs);
+  } catch (e) {
+    if ((e as { code?: string }).code !== "failed-precondition") throw e;
+    const snap = await getDocs(
+      query(historyCol(), where("classId", "==", classId)),
+    );
+    return toHistory(snap.docs);
+  }
 }

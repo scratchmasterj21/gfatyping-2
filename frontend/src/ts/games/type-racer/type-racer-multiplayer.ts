@@ -11,7 +11,11 @@ import {
   update,
 } from "firebase/database";
 
-import { getAuthenticatedUser, getRealtimeDb } from "../../firebase";
+import {
+  getAuthenticatedUser,
+  getRealtimeDb,
+  trackRealtimeListener,
+} from "../../firebase";
 
 export type RacerPlayer = {
   uid: string;
@@ -101,6 +105,9 @@ export async function createRacerRoom(input: {
     });
     if (result.committed) {
       await onDisconnect(playerRef(code, player.uid)).update({ online: false });
+      // A lobby only its host can start is useless once the host drops -
+      // delete it then (cancelled in startRacerRoom once the game begins).
+      await onDisconnect(roomRef(code)).remove();
       return code;
     }
   }
@@ -128,10 +135,19 @@ export function subscribeRacerRoom(
   code: string,
   callback: (room: RacerRoom | null) => void,
 ): () => void {
-  return onValue(roomRef(code), (snapshot) => callback(readRoom(snapshot)));
+  return trackRealtimeListener(
+    onValue(roomRef(code), (snapshot) => callback(readRoom(snapshot))),
+  );
 }
 
 export async function startRacerRoom(code: string): Promise<void> {
+  // The game is under way: keep the room if the host drops now. Cancelling
+  // also clears the host's own presence hook, so set that one again.
+  await onDisconnect(roomRef(code)).cancel();
+  const host = getAuthenticatedUser();
+  if (host !== null) {
+    await onDisconnect(playerRef(code, host.uid)).update({ online: false });
+  }
   await update(roomRef(code), {
     status: "countdown",
     startAt: Date.now() + 3000,

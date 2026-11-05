@@ -39,7 +39,7 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
 } from "firebase/firestore";
-import { Database, getDatabase } from "firebase/database";
+import { Database, getDatabase, goOffline, goOnline } from "firebase/database";
 import { tryCatch } from "@monkeytype/util/trycatch";
 import { googleSignUpEvent } from "./events/google-sign-up";
 import { addBanner } from "./states/banners";
@@ -181,13 +181,59 @@ export function getDb(): Firestore {
   return dbInstance;
 }
 
-/** Realtime Database instance for short-lived multiplayer state. */
+/**
+ * How long the Realtime Database connection stays open with nothing using it.
+ * The Spark plan allows only 100 simultaneous RTDB connections for the whole
+ * school, so a student who once joined a race/room must not keep holding one
+ * while they do lessons. Long enough for any pending write to flush.
+ */
+const RTDB_IDLE_MS = 30_000;
+let realtimeOffline = false;
+let realtimeListeners = 0;
+let realtimeIdleTimer: ReturnType<typeof setTimeout> | undefined;
+
+function scheduleRealtimeIdle(): void {
+  clearTimeout(realtimeIdleTimer);
+  realtimeIdleTimer = setTimeout(() => {
+    if (realtimeListeners > 0 || realtimeDbInstance === undefined) return;
+    goOffline(realtimeDbInstance);
+    realtimeOffline = true;
+  }, RTDB_IDLE_MS);
+}
+
+/**
+ * Realtime Database instance for short-lived multiplayer state. Every use
+ * (re)opens the connection and restarts the idle timer; it closes itself
+ * once nothing is subscribed (see trackRealtimeListener).
+ */
 export function getRealtimeDb(): Database {
   if (app === undefined) {
     throw new Error("Firebase is not initialized");
   }
   realtimeDbInstance ??= getDatabase(app);
+  if (realtimeOffline) {
+    goOnline(realtimeDbInstance);
+    realtimeOffline = false;
+  }
+  scheduleRealtimeIdle();
   return realtimeDbInstance;
+}
+
+/**
+ * Wrap an RTDB listener's unsubscribe so the connection stays open while it
+ * is active, and may close (after RTDB_IDLE_MS) once the last one stops.
+ */
+export function trackRealtimeListener(unsubscribe: () => void): () => void {
+  realtimeListeners++;
+  clearTimeout(realtimeIdleTimer);
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    unsubscribe();
+    realtimeListeners = Math.max(0, realtimeListeners - 1);
+    if (realtimeListeners === 0) scheduleRealtimeIdle();
+  };
 }
 
 export function isAuthAvailable(): boolean {

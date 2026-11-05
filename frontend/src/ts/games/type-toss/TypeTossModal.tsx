@@ -69,6 +69,9 @@ const toView = (d: TossEnd): GameResultView => ({
   ],
 });
 
+/** Minimum gap between live multiplayer stat writes. */
+const STATS_INTERVAL_MS = 350;
+
 const OPTIONS = getWordListOptions();
 const GROUPS = groupWordListOptions(OPTIONS);
 
@@ -176,12 +179,33 @@ export function TypeTossModal(props: Props): JSXElement {
       },
     );
     if (multiplayerRoom !== undefined) {
-      game.events.on(
-        "type-toss-local-stats",
-        (
-          stats: Pick<TossPlayer, "score" | "words" | "accuracy" | "finished">,
-        ) => void updateTossPlayer(multiplayerRoom.code, stats),
-      );
+      // Every word or typo emits stats; send at most ~3 a second (always the
+      // latest, and the final one immediately) so key-mashing can't flood
+      // the Realtime Database.
+      type TossStats = Pick<
+        TossPlayer,
+        "score" | "words" | "accuracy" | "finished"
+      >;
+      let lastSent = 0;
+      let pending: TossStats | null = null;
+      let flushTimer: ReturnType<typeof setTimeout> | undefined;
+      const send = (stats: TossStats): void => {
+        lastSent = Date.now();
+        pending = null;
+        void updateTossPlayer(multiplayerRoom.code, stats);
+      };
+      game.events.on("type-toss-local-stats", (stats: TossStats) => {
+        clearTimeout(flushTimer);
+        const wait = STATS_INTERVAL_MS - (Date.now() - lastSent);
+        if (stats.finished || wait <= 0) {
+          send(stats);
+          return;
+        }
+        pending = stats;
+        flushTimer = setTimeout(() => {
+          if (pending !== null) send(pending);
+        }, wait);
+      });
     }
     game.events.on("game-over-screen", (d: TossEnd) => {
       setResult({ view: toView(d), multiplayer: d.multiplayer === true });

@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "raceHistory",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "savedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

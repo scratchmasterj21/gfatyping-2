@@ -18,6 +18,7 @@ import {
   WordList,
 } from "../../../classroom/assignments";
 import { CLASS_IDS } from "../../../constants/classes";
+import { Confetti } from "../../../games/mini/Confetti";
 import { lessonGroups } from "../../../lessons/lessons-data";
 import {
   createRace,
@@ -38,22 +39,23 @@ import {
   Race,
   RaceFormat,
   RaceParticipant,
+  RaceStanding,
   rankParticipants,
 } from "../../../race/race-types";
 import { showErrorNotification } from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
-import { H2 } from "../../common/Headers";
+import { Mascot } from "../../common/Mascot";
 import { Page } from "../../common/Page";
 
 const COUNTDOWN_MS = 4000;
 const HOST_STORAGE_KEY = "gfa_hosted_race";
 
 const selectClass =
-  "rounded bg-bg px-2 py-1 text-text outline-none focus:ring-2 focus:ring-sub";
+  "w-full max-w-md rounded-xl bg-bg px-3 py-2 font-kid text-base text-text outline-none focus:outline-2 focus:outline-main";
 const inputClass =
-  "w-full rounded bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
+  "w-full rounded-xl bg-bg px-3 py-2 font-kid text-text outline-none focus:outline-2 focus:outline-main";
 
 type ContentKind = "random" | "custom" | "lesson" | "wordlist" | "passage";
 
@@ -73,6 +75,61 @@ function Avatar(props: { url?: string }): JSXElement {
         class="aspect-square w-7 shrink-0 rounded-full object-cover"
       />
     </Show>
+  );
+}
+
+const FORMATS: {
+  value: RaceFormat;
+  icon: string;
+  title: string;
+  hint: string;
+}[] = [
+  {
+    value: "finish",
+    icon: "🏁",
+    title: "First to finish",
+    hint: "Fastest to type it all wins",
+  },
+  {
+    value: "accuracy",
+    icon: "🎯",
+    title: "Accuracy race",
+    hint: "Fewest mistakes wins",
+  },
+  {
+    value: "timed",
+    icon: "⏱️",
+    title: "Timed sprint",
+    hint: "Most words before time's up",
+  },
+];
+
+const CONTENT_KINDS: { value: ContentKind; label: string }[] = [
+  { value: "random", label: "🎲 Random words" },
+  { value: "lesson", label: "📘 Lesson" },
+  { value: "wordlist", label: "📝 Word list" },
+  { value: "passage", label: "📖 Reading passage" },
+  { value: "custom", label: "✏️ Custom text" },
+];
+
+/** Rounded choice pill used for durations, word counts and content kinds. */
+function ChoicePill(props: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}): JSXElement {
+  return (
+    <button
+      type="button"
+      class={cn(
+        "press-3d rounded-full px-4 py-2 font-kid text-base font-bold",
+        props.active ? "bg-main text-bg" : "bg-bg text-text hover:bg-sub/20",
+      )}
+      aria-pressed={props.active}
+      onClick={() => props.onClick()}
+    >
+      {props.label}
+    </button>
   );
 }
 
@@ -97,55 +154,85 @@ function RaceSetupFields(props: {
   passages: ReadingPassage[];
 }): JSXElement {
   return (
-    <>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-sub">format</span>
-        <select
-          class={selectClass}
-          value={props.format}
-          onChange={(e) => props.onFormat(e.currentTarget.value as RaceFormat)}
-        >
-          <option value="finish">first to finish</option>
-          <option value="accuracy">accuracy race</option>
-          <option value="timed">timed sprint</option>
-        </select>
+    <div class="grid gap-5 font-kid">
+      <div class="grid gap-2">
+        <div class="text-sm font-bold tracking-wide text-sub uppercase">
+          Race type
+        </div>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <For each={FORMATS}>
+            {(f) => (
+              <button
+                type="button"
+                class={cn(
+                  "press-3d grid justify-items-center gap-1 rounded-double p-4 text-center",
+                  props.format === f.value
+                    ? "bg-main text-bg"
+                    : "bg-bg text-text hover:bg-sub/20",
+                )}
+                aria-pressed={props.format === f.value}
+                onClick={() => props.onFormat(f.value)}
+              >
+                <span class="text-4xl" aria-hidden="true">
+                  {f.icon}
+                </span>
+                <span class="text-lg font-bold">{f.title}</span>
+                <span
+                  class={cn(
+                    "text-sm",
+                    props.format === f.value ? "text-bg/80" : "text-sub",
+                  )}
+                >
+                  {f.hint}
+                </span>
+              </button>
+            )}
+          </For>
+        </div>
         <Show when={props.format === "timed"}>
-          <select
-            class={selectClass}
-            value={props.duration}
-            onChange={(e) => props.onDuration(Number(e.currentTarget.value))}
-          >
-            <option value={15}>15s</option>
-            <option value={30}>30s</option>
-            <option value={60}>60s</option>
-          </select>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sub">How long?</span>
+            <For each={[15, 30, 60]}>
+              {(sec) => (
+                <ChoicePill
+                  active={props.duration === sec}
+                  label={`${sec} seconds`}
+                  onClick={() => props.onDuration(sec)}
+                />
+              )}
+            </For>
+          </div>
         </Show>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-sub">content</span>
-        <select
-          class={selectClass}
-          value={props.kind}
-          onChange={(e) => props.onKind(e.currentTarget.value as ContentKind)}
-        >
-          <option value="random">random words</option>
-          <option value="lesson">built-in lesson</option>
-          <option value="wordlist">word list</option>
-          <option value="passage">reading passage</option>
-          <option value="custom">custom passage</option>
-        </select>
+      <div class="grid gap-2">
+        <div class="text-sm font-bold tracking-wide text-sub uppercase">
+          What to type
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <For each={CONTENT_KINDS}>
+            {(k) => (
+              <ChoicePill
+                active={props.kind === k.value}
+                label={k.label}
+                onClick={() => props.onKind(k.value)}
+              />
+            )}
+          </For>
+        </div>
         <Show when={props.kind === "random"}>
-          <select
-            class={selectClass}
-            value={props.count}
-            onChange={(e) => props.onCount(Number(e.currentTarget.value))}
-          >
-            <option value={10}>10 words</option>
-            <option value={20}>20 words</option>
-            <option value={30}>30 words</option>
-            <option value={50}>50 words</option>
-          </select>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sub">How many words?</span>
+            <For each={[10, 20, 30, 50]}>
+              {(n) => (
+                <ChoicePill
+                  active={props.count === n}
+                  label={String(n)}
+                  onClick={() => props.onCount(n)}
+                />
+              )}
+            </For>
+          </div>
         </Show>
         <Show when={props.kind === "lesson"}>
           <select
@@ -170,7 +257,7 @@ function RaceSetupFields(props: {
             value={props.wordListId}
             onChange={(e) => props.onWordListId(e.currentTarget.value)}
           >
-            <option value="">select word list...</option>
+            <option value="">Choose a word list…</option>
             <For each={props.wordLists}>
               {(wl) => <option value={wl.id}>{wl.title}</option>}
             </For>
@@ -182,23 +269,133 @@ function RaceSetupFields(props: {
             value={props.passageId}
             onChange={(e) => props.onPassageId(e.currentTarget.value)}
           >
-            <option value="">select passage...</option>
+            <option value="">Choose a passage…</option>
             <For each={props.passages}>
               {(p) => <option value={p.id}>{p.title}</option>}
             </For>
           </select>
         </Show>
+        <Show when={props.kind === "custom"}>
+          <textarea
+            class={cn(inputClass, "min-h-24 resize-y")}
+            placeholder="Paste the passage students will race on…"
+            value={props.custom}
+            onInput={(e) => props.onCustom(e.currentTarget.value)}
+          ></textarea>
+        </Show>
       </div>
+    </div>
+  );
+}
 
-      <Show when={props.kind === "custom"}>
-        <textarea
-          class={cn(inputClass, "min-h-24 resize-y")}
-          placeholder="paste the passage students will race on..."
-          value={props.custom}
-          onInput={(e) => props.onCustom(e.currentTarget.value)}
-        ></textarea>
-      </Show>
-    </>
+const LANE_COLORS = ["blue", "pink", "green", "yellow", "purple", "orange"].map(
+  (c) => `var(--color-game-${c})`,
+);
+
+/** The race PIN as big keycaps for the projector. */
+function PinTiles(props: { pin: string }): JSXElement {
+  return (
+    <div class="flex justify-center gap-2" aria-label={`Race PIN ${props.pin}`}>
+      <For each={[...props.pin]}>
+        {(digit) => (
+          <span class="flex h-16 w-12 items-center justify-center rounded-xl bg-game-cream font-kid text-4xl font-bold text-game-ink shadow-[0_6px_0_rgb(43_33_64/0.35)] sm:h-20 sm:w-16 sm:text-5xl">
+            {digit}
+          </span>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** One student's lane: their avatar rides a kart toward the finish flag. */
+function RaceLane(props: {
+  name: string;
+  avatarUrl?: string;
+  pct: number;
+  label: string;
+  place: number;
+  finished: boolean;
+}): JSXElement {
+  const color = (): string =>
+    LANE_COLORS[(props.place - 1) % LANE_COLORS.length] ??
+    "var(--color-game-blue)";
+  return (
+    <div class="grid grid-cols-[2rem_minmax(0,9rem)_1fr] items-center gap-2 font-kid sm:grid-cols-[2.5rem_minmax(0,11rem)_1fr]">
+      <span class="text-center text-xl font-bold text-main">{props.place}</span>
+      <span class="truncate text-base font-bold text-text">{props.name}</span>
+      <div class="relative h-12 rounded-full bg-[#5b6378]">
+        <div class="absolute inset-x-3 top-1/2 h-0.5 -translate-y-1/2 border-t-2 border-dashed border-game-cream/50"></div>
+        <div
+          class="absolute top-0 right-2 flex h-full items-center text-xl"
+          aria-hidden="true"
+        >
+          🏁
+        </div>
+        <div
+          class="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center transition-[left] duration-300 ease-out"
+          style={{
+            left: `calc(1.75rem + (100% - 4.5rem) * ${props.pct / 100})`,
+          }}
+        >
+          <span
+            class="flex h-10 items-center gap-1 rounded-full py-1 pr-2 pl-1 shadow"
+            style={{ "background-color": color() }}
+          >
+            <Avatar url={props.avatarUrl} />
+            <span class="text-xs font-bold whitespace-nowrap text-game-ink">
+              {props.finished ? "🏆 " : ""}
+              {props.label}
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Top three on podium steps (gold in the middle). */
+function RacePodium(props: {
+  top: RaceStanding[];
+  metric: (s: RaceStanding) => string;
+}): JSXElement {
+  const order = (): RaceStanding[] =>
+    [2, 1, 3].flatMap((rank) =>
+      props.top.filter((s) => s.rank === rank).slice(0, 1),
+    );
+  const step = (rank: number): { h: string; color: string; medal: string } =>
+    rank === 1
+      ? { h: "h-36", color: "bg-game-gold", medal: "🥇" }
+      : rank === 2
+        ? { h: "h-28", color: "bg-game-grey", medal: "🥈" }
+        : { h: "h-20", color: "bg-game-orange", medal: "🥉" };
+  return (
+    <div class="flex items-end justify-center gap-3 font-kid">
+      <For each={order()}>
+        {(s) => (
+          <div class="flex w-28 animate-game-pop flex-col items-center gap-1 motion-reduce:animate-none sm:w-36">
+            <span class="text-3xl" aria-hidden="true">
+              {step(s.rank).medal}
+            </span>
+            <div class="scale-150">
+              <Avatar url={s.avatarUrl} />
+            </div>
+            <span class="mt-2 max-w-full truncate text-base font-bold text-text">
+              {s.name}
+            </span>
+            <span class="text-sm font-bold text-sub">{props.metric(s)}</span>
+            <div
+              class={cn(
+                "flex w-full items-start justify-center rounded-t-xl pt-2 text-3xl font-bold text-game-ink",
+                step(s.rank).h,
+                step(s.rank).color,
+              )}
+            >
+              {s.rank}
+            </div>
+          </div>
+        )}
+      </For>
+    </div>
   );
 }
 
@@ -490,6 +687,30 @@ export function RaceHostPage(): JSXElement {
     }
   };
 
+  // ticking clock for the big countdown and the timed-race timer
+  const [now, setNow] = createSignal(Date.now());
+  createEffect(() => {
+    const st = race()?.status;
+    if (st !== "countdown" && st !== "running") return;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    onCleanup(() => clearInterval(t));
+  });
+  const countdownLeft = (): number => {
+    const at = race()?.startAt;
+    return at === undefined ? 0 : Math.max(0, Math.ceil((at - now()) / 1000));
+  };
+  const timeLeft = (): number | null => {
+    const r = race();
+    if (r?.format !== "timed" || r.runningAt === undefined) return null;
+    const end = r.runningAt + (r.durationSec ?? 0) * 1000;
+    return Math.max(0, Math.ceil((end - now()) / 1000));
+  };
+  const joinUrl = (): string => `${window.location.host}/race`;
+  const metric = (s: RaceStanding): string =>
+    race()?.format === "accuracy"
+      ? `${Math.round(s.finalAcc)}% · ${Math.round(s.finalWpm)} wpm`
+      : `${Math.round(s.finalWpm)} wpm · ${Math.round(s.finalAcc)}%`;
+
   const maxWpm = (): number =>
     Math.max(
       1,
@@ -520,6 +741,29 @@ export function RaceHostPage(): JSXElement {
     rankParticipants(participants(), race()?.format ?? "finish"),
   );
 
+  const setupFields = (): JSXElement => (
+    <RaceSetupFields
+      format={format()}
+      onFormat={setFormat}
+      duration={duration()}
+      onDuration={setDuration}
+      kind={kind()}
+      onKind={setKind}
+      count={count()}
+      onCount={setCount}
+      custom={custom()}
+      onCustom={setCustom}
+      lessonId={lessonId()}
+      onLessonId={setLessonId}
+      wordListId={wordListId()}
+      onWordListId={setWordListId}
+      wordLists={wordLists()}
+      passageId={passageId()}
+      onPassageId={setPassageId}
+      passages={passages()}
+    />
+  );
+
   return (
     <Page id="racehost">
       <Show
@@ -531,51 +775,45 @@ export function RaceHostPage(): JSXElement {
           </div>
         }
       >
-        <div class="content-grid grid gap-6 py-6">
-          <H2 fa={{ icon: "fa-stopwatch" }} text="host a race" />
-
+        <div class="content-grid grid gap-6 py-6 font-kid">
           {/* CREATE FORM */}
           <Show when={hostedPin() === null}>
-            <div class="grid max-w-xl gap-3 rounded bg-sub-alt p-4">
-              <RaceSetupFields
-                format={format()}
-                onFormat={setFormat}
-                duration={duration()}
-                onDuration={setDuration}
-                kind={kind()}
-                onKind={setKind}
-                count={count()}
-                onCount={setCount}
-                custom={custom()}
-                onCustom={setCustom}
-                lessonId={lessonId()}
-                onLessonId={setLessonId}
-                wordListId={wordListId()}
-                onWordListId={setWordListId}
-                wordLists={wordLists()}
-                passageId={passageId()}
-                onPassageId={setPassageId}
-                passages={passages()}
-              />
-
+            <div class="mx-auto grid w-full max-w-3xl gap-6 rounded-double bg-sub-alt p-6">
+              <div class="flex items-center gap-4">
+                <Mascot mood="cheer" size={72} />
+                <div>
+                  <h2 class="text-3xl font-bold text-text">
+                    Host a class race
+                  </h2>
+                  <p class="text-sub">
+                    Pick a race, show the PIN on the big screen, and let the
+                    class join.
+                  </p>
+                </div>
+              </div>
+              {setupFields()}
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-sub">class (optional)</span>
+                <span class="text-sm font-bold tracking-wide text-sub uppercase">
+                  Class
+                </span>
                 <select
-                  class={selectClass}
+                  class={cn(selectClass, "w-auto")}
                   value={classId()}
                   onChange={(e) => setClassId(e.currentTarget.value)}
                 >
-                  <option value="none">none</option>
+                  <option value="none">Any class</option>
                   <For each={CLASS_IDS}>
                     {(c) => <option value={c}>{c}</option>}
                   </For>
                 </select>
               </div>
-
               <div>
                 <Button
-                  text={busy() ? "creating..." : "create race"}
-                  fa={{ icon: "fa-plus" }}
+                  chunky
+                  size="lg"
+                  active
+                  text={busy() ? "Creating…" : "Create race"}
+                  fa={{ icon: "fa-flag-checkered" }}
                   onClick={() => void create()}
                   disabled={busy()}
                 />
@@ -583,53 +821,68 @@ export function RaceHostPage(): JSXElement {
             </div>
           </Show>
 
-          {/* CONTROL PANEL */}
+          {/* CONTROL PANEL (projector view) */}
           <Show when={hostedPin() !== null}>
-            <div class="grid max-w-xl gap-4">
-              <div class="flex flex-col items-center gap-1 rounded bg-sub-alt p-6">
-                <span class="tracking-widest text-sub uppercase">race pin</span>
-                <span class="text-[3em] leading-none font-bold tracking-[0.3em] text-main">
-                  {hostedPin()}
-                </span>
-                <span class="text-sub">{race()?.contentLabel}</span>
-                <span class="text-em-xs text-sub">
-                  {race()?.format === "timed"
-                    ? `timed · ${race()?.durationSec}s`
-                    : race()?.format === "accuracy"
-                      ? "accuracy race"
-                      : "first to finish"}
-                  {" · "}
-                  {race()?.status}
-                </span>
-              </div>
-
+            <div class="mx-auto grid w-full max-w-5xl gap-5">
               {/* lobby */}
               <Show when={race()?.status === "lobby"}>
-                <div class="grid gap-2">
-                  <div class="text-sub">players ({participants().length})</div>
-                  <For
-                    each={participants()}
-                    fallback={
-                      <div class="text-sub">waiting for players to join...</div>
-                    }
-                  >
-                    {(p) => (
-                      <div class="flex items-center gap-3 rounded bg-sub-alt p-2">
-                        <Avatar url={p.avatarUrl} />
-                        <span class="text-text">{p.name}</span>
-                      </div>
-                    )}
-                  </For>
-                  <div class="mt-2 flex gap-2">
+                <div class="grid justify-items-center gap-4 rounded-double bg-game-night p-6 text-center shadow-xl sm:p-8">
+                  <div class="text-xl font-bold text-game-cream/90">
+                    Go to{" "}
+                    <span class="rounded-lg bg-game-cream/15 px-2 py-0.5 text-game-yellow">
+                      {joinUrl()}
+                    </span>{" "}
+                    and type this PIN:
+                  </div>
+                  <PinTiles pin={hostedPin() ?? ""} />
+                  <div class="text-base text-game-cream/80">
+                    {race()?.contentLabel} ·{" "}
+                    {race()?.format === "timed"
+                      ? `timed sprint · ${race()?.durationSec}s`
+                      : race()?.format === "accuracy"
+                        ? "accuracy race"
+                        : "first to finish"}
+                  </div>
+                </div>
+
+                <div class="grid gap-3 rounded-double bg-sub-alt p-5">
+                  <div class="flex items-center gap-2 text-xl font-bold text-text">
+                    <Fa icon="fa-users" class="text-main" />
+                    {participants().length}{" "}
+                    {participants().length === 1 ? "racer" : "racers"} ready
+                  </div>
+                  <div class="flex flex-wrap gap-3">
+                    <For
+                      each={participants()}
+                      fallback={
+                        <div class="flex items-center gap-3 text-sub">
+                          <Mascot mood="thinking" size={48} />
+                          Waiting for players to join…
+                        </div>
+                      }
+                    >
+                      {(p) => (
+                        <div class="flex animate-game-pop items-center gap-2 rounded-full bg-bg py-1.5 pr-4 pl-1.5 text-base font-bold text-text motion-reduce:animate-none">
+                          <Avatar url={p.avatarUrl} />
+                          {p.name}
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                  <div class="mt-1 flex flex-wrap gap-3">
                     <Button
-                      text="start race"
+                      chunky
+                      size="lg"
+                      active
+                      text="Start race"
                       fa={{ icon: "fa-play" }}
                       onClick={() => void start()}
                       disabled={participants().length === 0}
                     />
                     <Button
-                      variant="text"
-                      text="cancel"
+                      chunky
+                      size="lg"
+                      text="Cancel"
                       fa={{ icon: "fa-trash" }}
                       onClick={() => void close()}
                     />
@@ -637,35 +890,59 @@ export function RaceHostPage(): JSXElement {
                 </div>
               </Show>
 
-              {/* running / countdown */}
-              <Show
-                when={
-                  race()?.status === "countdown" || race()?.status === "running"
-                }
-              >
-                <div class="grid gap-2">
-                  <For each={liveSorted()}>
-                    {(p) => (
-                      <div class="flex items-center gap-2">
-                        <Avatar url={p.avatarUrl} />
-                        <div class="min-w-0 flex-1">
-                          <div class="mb-0.5 flex justify-between text-em-xs text-sub">
-                            <span class="truncate">{p.name}</span>
-                            <span>{wpmLabel(p)}</span>
-                          </div>
-                          <div class="h-2 w-full overflow-hidden rounded bg-sub-alt">
-                            <div
-                              class="h-full rounded bg-main transition-[width] duration-200"
-                              style={{ width: `${barPct(p)}%` }}
-                            ></div>
-                          </div>
-                        </div>
+              {/* countdown */}
+              <Show when={race()?.status === "countdown"}>
+                <div class="grid justify-items-center gap-2 rounded-double bg-game-night py-16 text-center">
+                  <div class="text-2xl font-bold text-game-cream/90">
+                    Get ready…
+                  </div>
+                  <Show when={countdownLeft()} keyed>
+                    {(n) => (
+                      <div class="animate-game-pop text-[9rem] leading-none font-bold text-game-yellow [text-shadow:0_8px_0_rgb(0_0_0/0.3)] motion-reduce:animate-none">
+                        {n}
                       </div>
+                    )}
+                  </Show>
+                </div>
+              </Show>
+
+              {/* running */}
+              <Show when={race()?.status === "running"}>
+                <div class="grid gap-3 rounded-double bg-sub-alt p-5">
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-2xl font-bold text-text">
+                      🏎️ Race in progress
+                    </div>
+                    <Show when={timeLeft() !== null}>
+                      <div
+                        class={cn(
+                          "rounded-full px-4 py-1.5 text-2xl font-bold tabular-nums",
+                          (timeLeft() ?? 0) <= 5
+                            ? "animate-game-pulse bg-game-red text-game-cream motion-reduce:animate-none"
+                            : "bg-game-cream text-game-ink",
+                        )}
+                      >
+                        ⏱ {timeLeft()}s
+                      </div>
+                    </Show>
+                  </div>
+                  <For each={liveSorted()}>
+                    {(p, i) => (
+                      <RaceLane
+                        name={p.name}
+                        avatarUrl={p.avatarUrl}
+                        pct={barPct(p)}
+                        label={wpmLabel(p) || "0 wpm"}
+                        place={i() + 1}
+                        finished={p.finished}
+                      />
                     )}
                   </For>
                   <div class="mt-2">
                     <Button
-                      text="end race"
+                      chunky
+                      size="lg"
+                      text="End race"
                       fa={{ icon: "fa-flag-checkered" }}
                       onClick={() => void endRace()}
                     />
@@ -675,74 +952,56 @@ export function RaceHostPage(): JSXElement {
 
               {/* finished */}
               <Show when={race()?.status === "finished"}>
-                <div class="grid gap-2">
-                  <div class="flex items-center gap-2 text-main">
-                    <Fa icon="fa-trophy" />
-                    final standings
+                <div class="relative grid gap-5 overflow-hidden rounded-double bg-sub-alt p-6">
+                  <Confetti />
+                  <div class="text-center text-3xl font-bold text-text">
+                    🏆 Race results
                   </div>
-                  <For each={standings()}>
-                    {(s) => (
-                      <div class="flex items-center gap-3 rounded bg-sub-alt p-2">
-                        <span class="w-6 text-center font-bold text-main">
-                          {s.rank}
-                        </span>
-                        <Avatar url={s.avatarUrl} />
-                        <span class="min-w-0 flex-1 truncate text-text">
-                          {s.name}
-                        </span>
-                        <span class="text-text">
-                          {race()?.format === "accuracy"
-                            ? `${Math.round(s.finalAcc)}%`
-                            : `${Math.round(s.finalWpm)} wpm`}
-                        </span>
-                        <span class="text-em-xs text-sub">
-                          {race()?.format === "accuracy"
-                            ? `${Math.round(s.finalWpm)} wpm`
-                            : `${Math.round(s.finalAcc)}%`}
-                        </span>
-                      </div>
-                    )}
-                  </For>
-                  <div class="mt-2 text-em-xs text-sub">
-                    saved to race history
+                  <RacePodium top={standings().slice(0, 3)} metric={metric} />
+                  <div class="grid gap-2">
+                    <For each={standings()}>
+                      {(st) => (
+                        <div class="flex items-center gap-3 rounded-xl bg-bg p-2 text-base">
+                          <span class="w-8 text-center text-xl font-bold text-main">
+                            {st.rank}
+                          </span>
+                          <Avatar url={st.avatarUrl} />
+                          <span class="min-w-0 flex-1 truncate font-bold text-text">
+                            {st.name}
+                          </span>
+                          <span class="font-bold text-text">{metric(st)}</span>
+                        </div>
+                      )}
+                    </For>
                   </div>
+                  <div class="text-sm text-sub">
+                    <Fa icon="fa-check" class="mr-1.5" />
+                    Saved to race history
+                  </div>
+                </div>
 
-                  <div class="mt-2 grid gap-3 rounded bg-sub-alt p-4">
-                    <div class="text-sub">race again (same players)</div>
-                    <RaceSetupFields
-                      format={format()}
-                      onFormat={setFormat}
-                      duration={duration()}
-                      onDuration={setDuration}
-                      kind={kind()}
-                      onKind={setKind}
-                      count={count()}
-                      onCount={setCount}
-                      custom={custom()}
-                      onCustom={setCustom}
-                      lessonId={lessonId()}
-                      onLessonId={setLessonId}
-                      wordListId={wordListId()}
-                      onWordListId={setWordListId}
-                      wordLists={wordLists()}
-                      passageId={passageId()}
-                      onPassageId={setPassageId}
-                      passages={passages()}
+                <div class="grid gap-4 rounded-double bg-sub-alt p-5">
+                  <div class="text-xl font-bold text-text">
+                    Race again with the same players
+                  </div>
+                  {setupFields()}
+                  <div class="flex flex-wrap gap-3">
+                    <Button
+                      chunky
+                      size="lg"
+                      active
+                      text={busy() ? "Restarting…" : "Race again"}
+                      fa={{ icon: "fa-redo" }}
+                      onClick={() => void raceAgain()}
+                      disabled={busy()}
                     />
-                    <div class="flex gap-2">
-                      <Button
-                        text={busy() ? "restarting..." : "race again"}
-                        fa={{ icon: "fa-redo" }}
-                        onClick={() => void raceAgain()}
-                        disabled={busy()}
-                      />
-                      <Button
-                        variant="text"
-                        text="close race"
-                        fa={{ icon: "fa-check" }}
-                        onClick={() => void close()}
-                      />
-                    </div>
+                    <Button
+                      chunky
+                      size="lg"
+                      text="Close race"
+                      fa={{ icon: "fa-check" }}
+                      onClick={() => void close()}
+                    />
                   </div>
                 </div>
               </Show>
