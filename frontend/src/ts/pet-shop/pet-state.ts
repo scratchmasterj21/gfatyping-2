@@ -30,7 +30,13 @@ export type PetState = {
  */
 export async function getPetState(uid: string): Promise<PetState> {
   const snap = await getDoc(userRef(uid));
-  const data = snap.exists() ? snap.data() : undefined;
+  return petStateFromDoc(snap.exists() ? snap.data() : undefined);
+}
+
+/** Pet fields from an already-loaded user doc (class street: no extra read). */
+export function petStateFromDoc(
+  data: Record<string, unknown> | undefined,
+): PetState {
   return {
     coins: (data?.["coins"] as number | undefined) ?? 0,
     ownedPets: (data?.["ownedPets"] as Record<string, true> | undefined) ?? {},

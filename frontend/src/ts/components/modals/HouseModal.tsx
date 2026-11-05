@@ -9,6 +9,8 @@ import {
   Show,
 } from "solid-js";
 
+import type { StreetHouse } from "../../house/class-street";
+
 import { getEquippedAvatar } from "../../avatar/avatar-state";
 import { myLocalTodayLessons } from "../../games/game-access";
 import {
@@ -25,7 +27,13 @@ import {
   HouseItem,
   HouseSpriteItem,
 } from "../../house/house-items";
-import { houseScene, setHouseScene } from "../../house/house-scene";
+import {
+  housePlace,
+  houseScene,
+  houseVisit,
+  setHouseScene,
+  setHouseVisit,
+} from "../../house/house-scene";
 import { HOUSE_SMALL_ITEMS } from "../../house/house-small-items";
 import { HOUSE_SPRITE_ITEMS } from "../../house/house-sprite-items";
 import {
@@ -59,6 +67,7 @@ import { Avatar } from "../common/Avatar";
 import { Button } from "../common/Button";
 import { Fa } from "../common/Fa";
 import { PetSprite } from "../common/PetSprite";
+import { ClassStreet } from "./ClassStreet";
 import { TrophyShelf } from "./TrophyShelf";
 
 const ROAM_INTERVAL_MS = 4500;
@@ -454,11 +463,17 @@ function SpriteItem(props: {
 
 export function HouseModal(): JSXElement {
   const isOpen = (): boolean => isModalOpen("House");
+  /** Whose house is shown: a visited classmate's (view-only) or your own. */
+  const viewUid = (): string | null => houseVisit()?.uid ?? getUserId();
+  const visiting = (): boolean => houseVisit() !== undefined;
+  // street data is cached 5 min; visited houses come from that cache
+  const visitStaleMs = (): number => (visiting() ? 5 * 60 * 1000 : 0);
 
   const equippedQuery = useQuery(() => ({
-    queryKey: ["houseEquippedAvatar", getUserId()],
+    queryKey: ["houseEquippedAvatar", viewUid()],
+    staleTime: visitStaleMs(),
     queryFn: async () => {
-      const uid = getUserId();
+      const uid = viewUid();
       if (uid === null) return {};
       return getEquippedAvatar(uid);
     },
@@ -466,9 +481,10 @@ export function HouseModal(): JSXElement {
   }));
 
   const houseQuery = useQuery(() => ({
-    queryKey: ["houseState", getUserId()],
+    queryKey: ["houseState", viewUid()],
+    staleTime: visitStaleMs(),
     queryFn: async () => {
-      const uid = getUserId();
+      const uid = viewUid();
       if (uid === null) return emptyHouseState();
       return getHouseState(uid);
     },
@@ -476,9 +492,10 @@ export function HouseModal(): JSXElement {
   }));
 
   const petQuery = useQuery(() => ({
-    queryKey: ["petState", getUserId()],
+    queryKey: ["petState", viewUid()],
+    staleTime: visitStaleMs(),
     queryFn: async () => {
-      const uid = getUserId();
+      const uid = viewUid();
       if (uid === null) return { coins: 0, ownedPets: {}, storedPets: {} };
       return getPetState(uid);
     },
@@ -494,7 +511,7 @@ export function HouseModal(): JSXElement {
     summarizePractice({
       activity: houseQuery.data?.activity,
       lastStarLessonDate: houseQuery.data?.lastStarLessonDate,
-      extraTodayLessons: myLocalTodayLessons(),
+      extraTodayLessons: visiting() ? [] : myLocalTodayLessons(),
     }),
   );
   const ownsPets = (): boolean =>
@@ -541,7 +558,7 @@ export function HouseModal(): JSXElement {
     }
     const data = houseQuery.data;
     if (data === undefined) return;
-    const key = `${getUserId() ?? ""}:${houseScene()}`;
+    const key = `${viewUid() ?? ""}:${houseScene()}`;
     if (positionsKey !== key) {
       positionsKey = key;
       setPositions(houseScene() === "garden" ? data.gardenLayout : data.layout);
@@ -560,7 +577,7 @@ export function HouseModal(): JSXElement {
     }
     const data = houseQuery.data;
     if (data === undefined) return;
-    const key = `${getUserId() ?? ""}:${houseScene()}`;
+    const key = `${viewUid() ?? ""}:${houseScene()}`;
     if (scalesKey !== key) {
       scalesKey = key;
       setScales(houseScene() === "garden" ? data.gardenScale : data.scale);
@@ -660,7 +677,7 @@ export function HouseModal(): JSXElement {
     }
     const data = houseQuery.data;
     if (data === undefined) return;
-    const key = `${getUserId() ?? ""}:${houseScene()}`;
+    const key = `${viewUid() ?? ""}:${houseScene()}`;
     if (touchOrderKey !== key) {
       touchOrderKey = key;
       setTouchOrder(
@@ -677,7 +694,7 @@ export function HouseModal(): JSXElement {
         if (touchOrderWriteTimeout !== null) {
           clearTimeout(touchOrderWriteTimeout);
         }
-        const scene = houseScene();
+        const scene = housePlace();
         touchOrderWriteTimeout = setTimeout(() => {
           void saveTouchOrder(uid, next, scene);
         }, POSITION_WRITE_DEBOUNCE_MS);
@@ -866,7 +883,7 @@ export function HouseModal(): JSXElement {
         const clamped = effectivePos(item);
         setPositions((prev) => ({ ...prev, [resizeId]: clamped }));
         if (scaleWriteTimeout !== null) clearTimeout(scaleWriteTimeout);
-        const scene = houseScene();
+        const scene = housePlace();
         scaleWriteTimeout = setTimeout(() => {
           void saveItemScale(uid, resizeId, scale, scene);
           void saveItemPosition(uid, resizeId, clamped, scene);
@@ -884,7 +901,7 @@ export function HouseModal(): JSXElement {
     const clamped = effectivePos(item);
     setPositions((prev) => ({ ...prev, [id]: clamped }));
     if (positionWriteTimeout !== null) clearTimeout(positionWriteTimeout);
-    const scene = houseScene();
+    const scene = housePlace();
     positionWriteTimeout = setTimeout(() => {
       void saveItemPosition(uid, id, clamped, scene);
     }, POSITION_WRITE_DEBOUNCE_MS);
@@ -896,7 +913,11 @@ export function HouseModal(): JSXElement {
   // from the avatar shop rather than drawing a new expression.
   const isEnergetic = (): boolean => {
     const mood = practice().mood;
-    if (mood === "new") return (getSnapshot()?.streak ?? 0) > 0;
+    if (mood === "new") {
+      // no practice data yet: your own avatar follows your streak; a
+      // classmate's stays awake rather than looking sleepy
+      return visiting() || (getSnapshot()?.streak ?? 0) > 0;
+    }
     return mood === "great" || mood === "happy";
   };
 
@@ -978,6 +999,7 @@ export function HouseModal(): JSXElement {
     if (celebrateTimeout !== null) clearTimeout(celebrateTimeout);
     celebrateTimeout = setTimeout(() => setCelebrating(false), 900);
 
+    if (visiting()) return;
     const uid = getUserId();
     if (uid === null || houseScene() === "garden") return;
     try {
@@ -992,6 +1014,24 @@ export function HouseModal(): JSXElement {
       showErrorNotification("Something went wrong");
     }
   };
+
+  const visitHouse = (h: StreetHouse): void => {
+    setDraggingId(null);
+    setResizingId(null);
+    setEditMode(false);
+    setHouseVisit(h.isMe ? undefined : { uid: h.uid, name: h.name });
+    setHouseScene("room");
+  };
+  const goHome = (): void => {
+    setHouseVisit(undefined);
+    setHouseScene("room");
+  };
+  // closing My House always comes back home next time
+  createEffect(() => {
+    if (isOpen()) return;
+    setHouseVisit(undefined);
+    if (houseScene() === "street") setHouseScene("room");
+  });
 
   return (
     <AnimatedModal id="House" title="My House" modalClass="max-w-4xl">
@@ -1035,321 +1075,377 @@ export function HouseModal(): JSXElement {
             <Fa icon="fa-tree" />
             Garden
           </button>
-        </div>
-        <div class="flex items-center justify-end gap-3">
-          <div class="flex items-center gap-1.5 font-bold text-main">
-            <Fa icon="fa-coins" />
-            {houseQuery.data?.coins ?? 0}
-          </div>
-          <Show
-            when={
-              houseScene() === "garden" ||
-              Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0
-            }
+          <button
+            type="button"
+            class={cn(
+              "flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl text-base font-bold",
+              houseScene() === "street"
+                ? "bg-main text-bg"
+                : "bg-sub-alt text-text",
+            )}
+            aria-pressed={houseScene() === "street"}
+            onClick={() => {
+              setDraggingId(null);
+              setResizingId(null);
+              setEditMode(false);
+              setHouseVisit(undefined);
+              setHouseScene("street");
+            }}
           >
-            <Button
-              text={
-                editMode()
-                  ? "done"
-                  : houseScene() === "garden"
-                    ? "edit garden"
-                    : "edit room"
-              }
-              fa={{ icon: editMode() ? "fa-check" : "fa-pen" }}
-              onClick={() => setEditMode((prev) => !prev)}
-            />
-          </Show>
-          <Button
-            text={houseScene() === "garden" ? "plants" : "furniture"}
-            fa={{
-              icon: houseScene() === "garden" ? "fa-seedling" : "fa-store",
-            }}
-            onClick={() => showModal("HouseShop")}
-          />
-          <Show when={houseScene() === "room"}>
-            <Button
-              text="pets"
-              fa={{ icon: "fa-paw" }}
-              onClick={() => showModal("PetShop")}
-            />
-          </Show>
+            <Fa icon="fa-users" />
+            Class street
+          </button>
         </div>
-
-        <div
-          class={cn(
-            "rounded-xl px-4 py-2 text-center font-kid text-base font-semibold",
-            practice().drooping || practice().mood === "droopy"
-              ? "bg-sub-alt text-text"
-              : "bg-game-gold/90 text-game-ink",
-          )}
-        >
-          {practiceMessage()}
-        </div>
-
-        <div
-          ref={roomRef}
-          data-house-room
-          class="relative h-112 w-full touch-none overflow-hidden rounded-xl"
-          onPointerMove={handleRoomPointerMove}
-          onPointerUp={handleRoomPointerUp}
-          onPointerCancel={handleRoomPointerUp}
-        >
-          {/* Wall and floor are two stacked bands rather than one gradient, so
-              a theme can give each its own pattern (tiles, planks, stripes). */}
-          <div
-            class="absolute inset-x-0 top-0"
-            style={{
-              height: houseScene() === "garden" ? "45%" : "68%",
-              background: activeTheme().wall,
-            }}
-          ></div>
-          <div
-            class="absolute inset-x-0 bottom-0"
-            style={{
-              height: houseScene() === "garden" ? "55%" : "32%",
-              background: activeTheme().floor,
-            }}
-          ></div>
-
-          {/* baseboard: where the wall meets the floor, or sky meets grass */}
-          <div
-            class="absolute inset-x-0 h-0.5"
-            style={{
-              top: houseScene() === "garden" ? "45%" : "68%",
-              "background-color": activeTheme().baseboard,
-            }}
-          ></div>
-
-          <Show
-            when={
-              houseScene() === "room" &&
-              Object.keys(houseQuery.data?.ownedItems ?? {}).length === 0
-            }
-          >
-            <div class="absolute inset-x-0 top-20 text-center text-sm text-sub">
-              Your room is empty — visit the shop to decorate it!
+        <Show when={!visiting() && houseScene() !== "street"}>
+          <div class="flex items-center justify-end gap-3">
+            <div class="flex items-center gap-1.5 font-bold text-main">
+              <Fa icon="fa-coins" />
+              {houseQuery.data?.coins ?? 0}
             </div>
-          </Show>
-
-          <Show when={houseScene() === "room" ? houseQuery.data : undefined}>
-            {(data) => <TrophyShelf trophies={data().trophies} />}
-          </Show>
-
-          <For each={sortedFurniture()}>
-            {(item) => {
-              // effectivePos re-clamps against the item's footprint, and this
-              // runs on every drag frame - compute it once per render instead
-              // of the three or four times the markup below reads it.
-              const pos = createMemo(() => effectivePos(item));
-              if ("image" in item) {
-                return (
-                  <SpriteItem
-                    item={item}
-                    pos={pos()}
-                    scale={effectiveScale(item)}
-                    zIndex={layerZ(item.id, pos().yPct, 0)}
-                    editMode={editMode()}
-                    onPointerDown={(e) => handleItemPointerDown(item, e)}
-                    onResizePointerDown={(e) =>
-                      handleResizeHandlePointerDown(item, e)
-                    }
-                    onBringToFront={() => bringToFront(item.id)}
-                    onImageReady={onImageReady}
-                  />
-                );
+            <Show
+              when={
+                houseScene() === "garden" ||
+                Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0
               }
-              return (
-                <RoomAnchor
-                  xPct={pos().xPct}
-                  yPct={pos().yPct}
-                  zIndex={layerZ(item.id, pos().yPct, 0)}
-                  // w-max for the same reason as the sprite wrapper above -
-                  // an emoji glyph can't be scaled down by max-width, but a
-                  // squeezed box would still throw off -translate-x-1/2
-                  // centering near the walls.
-                  class={cn(
-                    "w-max -translate-x-1/2 -translate-y-1/2 touch-none text-center select-none",
-                    editMode() && "cursor-grab active:cursor-grabbing",
-                  )}
-                  title={item.name}
-                  onPointerDown={(e) => handleItemPointerDown(item, e)}
-                >
-                  <div class="relative">
-                    <div
-                      class={cn(
-                        "origin-bottom transition-[filter,transform] duration-700",
-                        houseScene() === "garden" &&
-                          isGrowingPlant(item.id) &&
-                          practice().drooping &&
-                          "rotate-12 grayscale-[0.7]",
-                      )}
-                      style={{
-                        "font-size": `${
-                          item.sizePx *
-                          effectiveScale(item) *
-                          (houseScene() === "garden"
-                            ? plantLook(item, practice().plantStage).sizeFactor
-                            : 1)
-                        }px`,
-                        "line-height": "1",
-                      }}
-                    >
-                      {houseScene() === "garden"
-                        ? plantLook(item, practice().plantStage).emoji
-                        : item.emoji}
-                    </div>
-                    <Show
-                      when={
-                        houseScene() === "garden" &&
-                        isGrowingPlant(item.id) &&
-                        practice().plantStage === 3 &&
-                        !practice().drooping
-                      }
-                    >
-                      <div class="pointer-events-none absolute -top-2 -right-2 text-base motion-safe:animate-pulse">
-                        ✨
-                      </div>
-                    </Show>
-                    <div
-                      class="bg-black/20 mx-auto -mt-1 rounded-full blur-[2px]"
-                      style={{
-                        height: `${item.sizePx * effectiveScale(item) * 0.12}px`,
-                        width: `${item.sizePx * effectiveScale(item) * 0.6}px`,
-                      }}
-                    ></div>
-                    <Show when={editMode()}>
-                      <div
-                        data-item-control
-                        class="absolute -right-1 -bottom-1 flex size-4.5 cursor-nwse-resize items-center justify-center rounded-full border border-sub bg-bg text-[9px] text-sub opacity-70 hover:opacity-100"
-                        title="Resize"
-                        onPointerDown={(e) =>
-                          handleResizeHandlePointerDown(item, e)
-                        }
-                      >
-                        <Fa icon="fa-expand" />
-                      </div>
-                      <div
-                        data-item-control
-                        class="absolute -bottom-1 -left-1 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-sub bg-bg text-[9px] text-sub opacity-70 hover:opacity-100"
-                        title="Bring to front"
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          bringToFront(item.id);
-                        }}
-                      >
-                        <Fa icon="fa-layer-group" />
-                      </div>
-                    </Show>
-                  </div>
-                </RoomAnchor>
-              );
-            }}
-          </For>
-
-          <Show when={houseScene() === "room"}>
-            <For each={PET_ITEMS}>
-              {(item) => (
-                <Show
-                  when={
-                    petQuery.data?.ownedPets[item.id] === true &&
-                    petQuery.data?.storedPets[item.id] !== true
-                  }
-                >
-                  <RoamingPet
-                    item={item}
-                    pickPos={pickPetPos}
-                    mood={practice().mood}
-                  />
-                </Show>
-              )}
-            </For>
-          </Show>
-
-          <Anime
-            class="pointer-events-none absolute inset-0"
-            style={{ "z-index": `${depthZ(pos().y)}` }}
-            initial={{ translateX: `${pos().x}%`, translateY: `${pos().y}%` }}
-            animate={{
-              translateX: `${pos().x}%`,
-              translateY: `${pos().y}%`,
-              duration: 2200,
-              easing: "easeInOutQuad",
-            }}
-          >
-            <div
-              class="pointer-events-auto absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
-              onClick={() => void handleAvatarClick()}
             >
-              <Avatar
-                color={equippedQuery.data?.color}
-                shape={equippedQuery.data?.shape}
-                hair={equippedQuery.data?.hair}
-                hat={equippedQuery.data?.hat}
-                accessory={equippedQuery.data?.accessory}
-                face={
-                  !isEnergetic() && !celebrating()
-                    ? "sleepy"
-                    : equippedQuery.data?.face
+              <Button
+                text={
+                  editMode()
+                    ? "done"
+                    : houseScene() === "garden"
+                      ? "edit garden"
+                      : "edit room"
                 }
-                background={equippedQuery.data?.background}
-                highlightColor={equippedQuery.data?.highlight}
-                celebrate={celebrating()}
-                size={80}
-                animalImage={equippedQuery.data?.animalImage}
+                fa={{ icon: editMode() ? "fa-check" : "fa-pen" }}
+                onClick={() => setEditMode((prev) => !prev)}
+              />
+            </Show>
+            <Button
+              text={houseScene() === "garden" ? "plants" : "furniture"}
+              fa={{
+                icon: houseScene() === "garden" ? "fa-seedling" : "fa-store",
+              }}
+              onClick={() => showModal("HouseShop")}
+            />
+            <Show when={houseScene() === "room"}>
+              <Button
+                text="pets"
+                fa={{ icon: "fa-paw" }}
+                onClick={() => showModal("PetShop")}
+              />
+            </Show>
+          </div>
+        </Show>
+
+        <Show when={houseVisit()}>
+          {(v) => (
+            <div class="flex flex-wrap items-center justify-center gap-3 rounded-xl bg-game-sky px-4 py-2 text-center font-kid text-base font-semibold text-game-ink">
+              🏠 Visiting {v().name}&apos;s house - look, but don&apos;t touch!
+              <Button
+                text="back to street"
+                fa={{ icon: "fa-users" }}
+                onClick={() => {
+                  setHouseVisit(undefined);
+                  setHouseScene("street");
+                }}
+              />
+              <Button
+                text="my house"
+                fa={{ icon: "fa-home" }}
+                onClick={goHome}
               />
             </div>
-          </Anime>
+          )}
+        </Show>
+        <Show when={!visiting() && houseScene() !== "street"}>
+          <div
+            class={cn(
+              "rounded-xl px-4 py-2 text-center font-kid text-base font-semibold",
+              practice().drooping || practice().mood === "droopy"
+                ? "bg-sub-alt text-text"
+                : "bg-game-gold/90 text-game-ink",
+            )}
+          >
+            {practiceMessage()}
+          </div>
+        </Show>
 
-          {/* Small decor always renders above furniture/avatar/pets - see sortedSmallItems. */}
-          <Show when={houseScene() === "room"}>
-            <For each={sortedSmallItems()}>
+        <Show
+          when={houseScene() !== "street"}
+          fallback={<ClassStreet open={isOpen()} onVisit={visitHouse} />}
+        >
+          <div
+            ref={roomRef}
+            data-house-room
+            class="relative h-112 w-full touch-none overflow-hidden rounded-xl"
+            onPointerMove={handleRoomPointerMove}
+            onPointerUp={handleRoomPointerUp}
+            onPointerCancel={handleRoomPointerUp}
+          >
+            {/* Wall and floor are two stacked bands rather than one gradient, so
+              a theme can give each its own pattern (tiles, planks, stripes). */}
+            <div
+              class="absolute inset-x-0 top-0"
+              style={{
+                height: houseScene() === "garden" ? "45%" : "68%",
+                background: activeTheme().wall,
+              }}
+            ></div>
+            <div
+              class="absolute inset-x-0 bottom-0"
+              style={{
+                height: houseScene() === "garden" ? "55%" : "32%",
+                background: activeTheme().floor,
+              }}
+            ></div>
+
+            {/* baseboard: where the wall meets the floor, or sky meets grass */}
+            <div
+              class="absolute inset-x-0 h-0.5"
+              style={{
+                top: houseScene() === "garden" ? "45%" : "68%",
+                "background-color": activeTheme().baseboard,
+              }}
+            ></div>
+
+            <Show
+              when={
+                houseScene() === "room" &&
+                Object.keys(houseQuery.data?.ownedItems ?? {}).length === 0
+              }
+            >
+              <div class="absolute inset-x-0 top-20 text-center text-sm text-sub">
+                {visiting()
+                  ? "This room is still empty!"
+                  : "Your room is empty — visit the shop to decorate it!"}
+              </div>
+            </Show>
+
+            <Show when={houseScene() === "room" ? houseQuery.data : undefined}>
+              {(data) => <TrophyShelf trophies={data().trophies} />}
+            </Show>
+
+            <For each={sortedFurniture()}>
               {(item) => {
-                const smallPos = createMemo(() => effectivePos(item));
+                // effectivePos re-clamps against the item's footprint, and this
+                // runs on every drag frame - compute it once per render instead
+                // of the three or four times the markup below reads it.
+                const pos = createMemo(() => effectivePos(item));
+                if ("image" in item) {
+                  return (
+                    <SpriteItem
+                      item={item}
+                      pos={pos()}
+                      scale={effectiveScale(item)}
+                      zIndex={layerZ(item.id, pos().yPct, 0)}
+                      editMode={editMode()}
+                      onPointerDown={(e) => handleItemPointerDown(item, e)}
+                      onResizePointerDown={(e) =>
+                        handleResizeHandlePointerDown(item, e)
+                      }
+                      onBringToFront={() => bringToFront(item.id)}
+                      onImageReady={onImageReady}
+                    />
+                  );
+                }
                 return (
-                  <SpriteItem
-                    item={item}
-                    pos={smallPos()}
-                    scale={effectiveScale(item)}
-                    zIndex={layerZ(item.id, smallPos().yPct, SMALL_DECOR_Z)}
-                    editMode={editMode()}
+                  <RoomAnchor
+                    xPct={pos().xPct}
+                    yPct={pos().yPct}
+                    zIndex={layerZ(item.id, pos().yPct, 0)}
+                    // w-max for the same reason as the sprite wrapper above -
+                    // an emoji glyph can't be scaled down by max-width, but a
+                    // squeezed box would still throw off -translate-x-1/2
+                    // centering near the walls.
+                    class={cn(
+                      "w-max -translate-x-1/2 -translate-y-1/2 touch-none text-center select-none",
+                      editMode() && "cursor-grab active:cursor-grabbing",
+                    )}
+                    title={item.name}
                     onPointerDown={(e) => handleItemPointerDown(item, e)}
-                    onResizePointerDown={(e) =>
-                      handleResizeHandlePointerDown(item, e)
-                    }
-                    onBringToFront={() => bringToFront(item.id)}
-                    onImageReady={onImageReady}
-                  />
+                  >
+                    <div class="relative">
+                      <div
+                        class={cn(
+                          "origin-bottom transition-[filter,transform] duration-700",
+                          houseScene() === "garden" &&
+                            isGrowingPlant(item.id) &&
+                            practice().drooping &&
+                            "rotate-12 grayscale-[0.7]",
+                        )}
+                        style={{
+                          "font-size": `${
+                            item.sizePx *
+                            effectiveScale(item) *
+                            (houseScene() === "garden"
+                              ? plantLook(item, practice().plantStage)
+                                  .sizeFactor
+                              : 1)
+                          }px`,
+                          "line-height": "1",
+                        }}
+                      >
+                        {houseScene() === "garden"
+                          ? plantLook(item, practice().plantStage).emoji
+                          : item.emoji}
+                      </div>
+                      <Show
+                        when={
+                          houseScene() === "garden" &&
+                          isGrowingPlant(item.id) &&
+                          practice().plantStage === 3 &&
+                          !practice().drooping
+                        }
+                      >
+                        <div class="pointer-events-none absolute -top-2 -right-2 text-base motion-safe:animate-pulse">
+                          ✨
+                        </div>
+                      </Show>
+                      <div
+                        class="bg-black/20 mx-auto -mt-1 rounded-full blur-[2px]"
+                        style={{
+                          height: `${item.sizePx * effectiveScale(item) * 0.12}px`,
+                          width: `${item.sizePx * effectiveScale(item) * 0.6}px`,
+                        }}
+                      ></div>
+                      <Show when={editMode()}>
+                        <div
+                          data-item-control
+                          class="absolute -right-1 -bottom-1 flex size-4.5 cursor-nwse-resize items-center justify-center rounded-full border border-sub bg-bg text-[9px] text-sub opacity-70 hover:opacity-100"
+                          title="Resize"
+                          onPointerDown={(e) =>
+                            handleResizeHandlePointerDown(item, e)
+                          }
+                        >
+                          <Fa icon="fa-expand" />
+                        </div>
+                        <div
+                          data-item-control
+                          class="absolute -bottom-1 -left-1 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-sub bg-bg text-[9px] text-sub opacity-70 hover:opacity-100"
+                          title="Bring to front"
+                          onPointerDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            bringToFront(item.id);
+                          }}
+                        >
+                          <Fa icon="fa-layer-group" />
+                        </div>
+                      </Show>
+                    </div>
+                  </RoomAnchor>
                 );
               }}
             </For>
-          </Show>
-        </div>
 
-        <div class="text-center text-base text-text">
-          <Show
-            when={houseScene() === "room"}
-            fallback={
-              editMode()
-                ? "Drag a plant to move it. Use the corners to resize it or bring it forward."
-                : "Tap edit garden to move your plants."
-            }
-          >
-            Click your avatar to say hi!
-            <Show
-              when={Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0}
+            <Show when={houseScene() === "room"}>
+              <For each={PET_ITEMS}>
+                {(item) => (
+                  <Show
+                    when={
+                      petQuery.data?.ownedPets[item.id] === true &&
+                      petQuery.data?.storedPets[item.id] !== true
+                    }
+                  >
+                    <RoamingPet
+                      item={item}
+                      pickPos={pickPetPos}
+                      mood={practice().mood}
+                    />
+                  </Show>
+                )}
+              </For>
+            </Show>
+
+            <Anime
+              class="pointer-events-none absolute inset-0"
+              style={{ "z-index": `${depthZ(pos().y)}` }}
+              initial={{ translateX: `${pos().x}%`, translateY: `${pos().y}%` }}
+              animate={{
+                translateX: `${pos().x}%`,
+                translateY: `${pos().y}%`,
+                duration: 2200,
+                easing: "easeInOutQuad",
+              }}
             >
-              {" "}
-              {editMode()
-                ? "Drag furniture to rearrange it. Use the right corner handle to resize, or the left one to bring it to the front."
-                : "Tap edit room to rearrange or resize your furniture."}
+              <div
+                class="pointer-events-auto absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-pointer"
+                onClick={() => void handleAvatarClick()}
+              >
+                <Avatar
+                  color={equippedQuery.data?.color}
+                  shape={equippedQuery.data?.shape}
+                  hair={equippedQuery.data?.hair}
+                  hat={equippedQuery.data?.hat}
+                  accessory={equippedQuery.data?.accessory}
+                  face={
+                    !isEnergetic() && !celebrating()
+                      ? "sleepy"
+                      : equippedQuery.data?.face
+                  }
+                  background={equippedQuery.data?.background}
+                  highlightColor={equippedQuery.data?.highlight}
+                  celebrate={celebrating()}
+                  size={80}
+                  animalImage={equippedQuery.data?.animalImage}
+                />
+              </div>
+            </Anime>
+
+            {/* Small decor always renders above furniture/avatar/pets - see sortedSmallItems. */}
+            <Show when={houseScene() === "room"}>
+              <For each={sortedSmallItems()}>
+                {(item) => {
+                  const smallPos = createMemo(() => effectivePos(item));
+                  return (
+                    <SpriteItem
+                      item={item}
+                      pos={smallPos()}
+                      scale={effectiveScale(item)}
+                      zIndex={layerZ(item.id, smallPos().yPct, SMALL_DECOR_Z)}
+                      editMode={editMode()}
+                      onPointerDown={(e) => handleItemPointerDown(item, e)}
+                      onResizePointerDown={(e) =>
+                        handleResizeHandlePointerDown(item, e)
+                      }
+                      onBringToFront={() => bringToFront(item.id)}
+                      onImageReady={onImageReady}
+                    />
+                  );
+                }}
+              </For>
             </Show>
-            <Show when={Object.keys(petQuery.data?.ownedPets ?? {}).length > 0}>
-              {" "}
-              Pets can be picked up and moved too.
+          </div>
+        </Show>
+
+        <Show when={!visiting() && houseScene() !== "street"}>
+          <div class="text-center text-base text-text">
+            <Show
+              when={houseScene() === "room"}
+              fallback={
+                editMode()
+                  ? "Drag a plant to move it. Use the corners to resize it or bring it forward."
+                  : "Tap edit garden to move your plants."
+              }
+            >
+              Click your avatar to say hi!
+              <Show
+                when={Object.keys(houseQuery.data?.ownedItems ?? {}).length > 0}
+              >
+                {" "}
+                {editMode()
+                  ? "Drag furniture to rearrange it. Use the right corner handle to resize, or the left one to bring it to the front."
+                  : "Tap edit room to rearrange or resize your furniture."}
+              </Show>
+              <Show
+                when={Object.keys(petQuery.data?.ownedPets ?? {}).length > 0}
+              >
+                {" "}
+                Pets can be picked up and moved too.
+              </Show>
             </Show>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </div>
     </AnimatedModal>
   );

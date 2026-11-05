@@ -11,7 +11,7 @@ import { ActivityDays, parseActivityDays } from "../classroom/activity";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { DEFAULT_GARDEN_THEME_ID } from "./garden-themes";
-import { HouseScene } from "./house-scene";
+import { HousePlace as HouseScene } from "./house-scene";
 import { DEFAULT_HOUSE_THEME_ID } from "./house-themes";
 
 const SCENE_FIELDS = {
@@ -99,7 +99,13 @@ const num = (v: unknown): number =>
 
 export async function getHouseState(uid: string): Promise<HouseState> {
   const snap = await getDoc(userRef(uid));
-  const data = snap.exists() ? snap.data() : undefined;
+  return houseStateFromDoc(snap.exists() ? snap.data() : undefined);
+}
+
+/** House fields from an already-loaded user doc (class street: no extra read). */
+export function houseStateFromDoc(
+  data: Record<string, unknown> | undefined,
+): HouseState {
   return {
     coins: (data?.["coins"] as number | undefined) ?? 0,
     ownedItems:

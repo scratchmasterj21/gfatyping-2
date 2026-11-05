@@ -13,7 +13,7 @@ import {
   HouseItem,
   HouseSpriteItem,
 } from "../../house/house-items";
-import { houseScene } from "../../house/house-scene";
+import { housePlace, houseScene } from "../../house/house-scene";
 import { HOUSE_SMALL_ITEMS } from "../../house/house-small-items";
 import { HOUSE_SPRITE_ITEMS } from "../../house/house-sprite-items";
 import {
@@ -87,7 +87,7 @@ export function HouseShopModal(): JSXElement {
   const handleBuy = async (item: { id: string }): Promise<void> => {
     const uid = getUserId();
     if (uid === null) return;
-    const result = await buyHouseItem(uid, item, houseScene());
+    const result = await buyHouseItem(uid, item, housePlace());
     if (!result.ok) {
       showErrorNotification(result.reason ?? "Couldn't buy that");
       return;
@@ -98,7 +98,7 @@ export function HouseShopModal(): JSXElement {
   const handleToggleStored = async (id: string): Promise<void> => {
     const uid = getUserId();
     if (uid === null) return;
-    await setItemStored(uid, id, !isStored(id), houseScene());
+    await setItemStored(uid, id, !isStored(id), housePlace());
     refresh();
   };
 
@@ -126,7 +126,7 @@ export function HouseShopModal(): JSXElement {
   const handleSelectTheme = async (themeId: string): Promise<void> => {
     const uid = getUserId();
     if (uid === null) return;
-    await selectHouseTheme(uid, themeId, houseScene());
+    await selectHouseTheme(uid, themeId, housePlace());
     refresh();
   };
 
@@ -137,12 +137,12 @@ export function HouseShopModal(): JSXElement {
   ): Promise<void> => {
     const uid = getUserId();
     if (uid === null) return;
-    const result = await buyHouseItem(uid, theme, houseScene());
+    const result = await buyHouseItem(uid, theme, housePlace());
     if (!result.ok) {
       showErrorNotification(result.reason ?? "Couldn't buy that");
       return;
     }
-    await selectHouseTheme(uid, theme.id, houseScene());
+    await selectHouseTheme(uid, theme.id, housePlace());
     refresh();
   };
 
