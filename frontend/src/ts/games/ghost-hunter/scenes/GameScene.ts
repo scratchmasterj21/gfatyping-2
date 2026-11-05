@@ -1,5 +1,7 @@
 import { Scene, GameObjects, Time } from "phaser";
 
+import { hex } from "../../shared/game-palette";
+import { popBanner, TappyBuddy } from "../../shared/phaser-ui";
 import { Ghost } from "../entities/Ghost";
 import { PowerUp, PowerUpKind } from "../entities/PowerUp";
 import {
@@ -22,7 +24,7 @@ const GROUND_FRAC = 0.68; // the fence/ground line sits at this fraction of scre
 // however tall/short the canvas is.
 const LAWN_TOP_MARGIN = 80; // gap below the fence before the lawn band starts, so sprites' heads clear it
 const LAWN_BAND_HEIGHT = 130; // depth of the lawn band (entirely below the fence) the player patrols and ghosts spawn across
-const LOG_MAX_HP = 5; // hits a log can absorb before it breaks
+export const LOG_MAX_HP = 5; // hits a log can absorb before it breaks
 // Logs sit close to the player rather than out in the middle of the lawn, so
 // a ghost has to cross almost the whole lawn before it can even reach one -
 // maximizing the time kids have to type-kill it before any damage happens.
@@ -121,6 +123,7 @@ export class GameScene extends Scene {
 
   // PLACEHOLDER: player + log graphics — replace with sprites
   private playerGfx!: GameObjects.Graphics;
+  private tappy!: TappyBuddy;
   private leftLogGfx!: GameObjects.Graphics;
   private rightLogGfx!: GameObjects.Graphics;
 
@@ -192,6 +195,7 @@ export class GameScene extends Scene {
     this.rightLogGfx = this.add.graphics();
     this.redrawLogs();
     this.drawPlayer();
+    this.tappy = new TappyBuddy(this, W * 0.12, this.groundY - 6, 50);
 
     this.matcher = new WordMatcher((buf, locked) => {
       for (const ghost of this.ghosts) {
@@ -384,51 +388,118 @@ export class GameScene extends Scene {
     }
   }
 
-  // PLACEHOLDER: draw a simple haunted-house silhouette background
-  // Replace with: this.add.image(W/2, H/2, "gh-bg").setDisplaySize(W, H)
+  /** Friendly spooky night: moon, stars, bats, a haunted house and fog. */
   private drawBackground(W: number, H: number): void {
     const sky = this.add.graphics();
-    sky.fillGradientStyle(0x0d0022, 0x0d0022, 0x1a003a, 0x1a003a, 1);
+    sky.fillGradientStyle(
+      hex("night"),
+      hex("night"),
+      hex("dusk"),
+      hex("dusk"),
+      1,
+    );
     sky.fillRect(0, 0, W, H);
 
-    // Moon
-    const moon = this.add.graphics();
-    moon.fillStyle(0xffffcc, 0.9);
-    moon.fillCircle(W * 0.82, H * 0.12, 30);
-    moon.fillStyle(0x1a003a, 1);
-    moon.fillCircle(W * 0.82 + 10, H * 0.12 - 6, 25);
-
-    // Stars
     const stars = this.add.graphics();
-    stars.fillStyle(0xffffff, 0.7);
-    for (let i = 0; i < 40; i++) {
-      stars.fillRect(
+    stars.fillStyle(hex("cream"), 0.8);
+    for (let i = 0; i < 50; i++) {
+      stars.fillCircle(
         Math.random() * W,
         Math.random() * H * 0.55,
-        Math.random() < 0.3 ? 2 : 1,
-        Math.random() < 0.3 ? 2 : 1,
+        Math.random() < 0.3 ? 2 : 1.2,
       );
+    }
+
+    const moonX = W * 0.8;
+    const moonY = Math.max(200, H * 0.22);
+    const moon = this.add.graphics();
+    moon.fillStyle(hex("cream"), 0.18);
+    moon.fillCircle(moonX, moonY, 64);
+    moon.fillStyle(hex("cream"), 1);
+    moon.fillCircle(moonX, moonY, 40);
+    moon.fillStyle(hex("tan"), 0.8);
+    moon.fillCircle(moonX - 12, moonY - 8, 8);
+    moon.fillCircle(moonX + 14, moonY + 10, 6);
+    moon.fillCircle(moonX + 4, moonY - 18, 4);
+
+    // haunted house + spooky trees on the hill behind the fence
+    const hill = this.add.graphics();
+    hill.fillStyle(0x2f2463, 1);
+    hill.fillEllipse(W * 0.3, this.groundY + 10, W * 1.1, 150);
+    hill.fillEllipse(W * 0.85, this.groundY + 14, W * 0.9, 110);
+    this.add
+      .image(W * 0.3, this.groundY - 30, "gh-house")
+      .setDisplaySize(170, 110)
+      .setOrigin(0.5, 1);
+
+    // bats flapping across the sky
+    for (let i = 0; i < 3; i++) {
+      const bat = this.add
+        .image(-40, H * (0.12 + i * 0.1), "gh-bat")
+        .setDisplaySize(36, 18);
+      this.tweens.add({
+        targets: bat,
+        x: W + 40,
+        duration: 9000 + i * 3000,
+        delay: i * 2500,
+        repeat: -1,
+      });
+      this.tweens.add({
+        targets: bat,
+        scaleY: bat.scaleY * 0.4,
+        duration: 160,
+        yoyo: true,
+        repeat: -1,
+      });
     }
   }
 
-  // PLACEHOLDER: draw a simple ground + fence
-  // Replace with a tilemap or background image
+  /** Picket fence, night lawn, pumpkins and drifting fog. */
   private drawGround(W: number, H: number): void {
     const g = this.add.graphics();
-
-    // Grass
-    g.fillStyle(0x1a4a1a, 1);
-    g.fillRect(0, this.groundY + 10, W, H - this.groundY - 10);
-
-    // Fence posts
-    g.fillStyle(0x8b6a3a, 1);
-    for (let x = 0; x < W; x += 38) {
-      g.fillRect(x, this.groundY - 22, 8, 32);
+    g.fillStyle(0x3f7a4c, 1);
+    g.fillRect(0, this.groundY + 6, W, H - this.groundY - 6);
+    g.fillStyle(0x4f8f5a, 1);
+    for (let x = 20; x < W; x += 70) {
+      g.fillEllipse(x, this.groundY + 40 + ((x * 13) % 60), 26, 8);
     }
-    // Fence rail
-    g.fillStyle(0xb89060, 1);
-    g.fillRect(0, this.groundY - 14, W, 5);
-    g.fillRect(0, this.groundY - 4, W, 4);
+
+    // picket fence
+    g.fillStyle(hex("tan"), 1);
+    g.fillRect(0, this.groundY - 16, W, 6);
+    g.fillRect(0, this.groundY - 2, W, 5);
+    for (let x = 4; x < W; x += 30) {
+      g.fillRect(x, this.groundY - 28, 12, 34);
+      g.fillTriangle(
+        x,
+        this.groundY - 28,
+        x + 12,
+        this.groundY - 28,
+        x + 6,
+        this.groundY - 36,
+      );
+    }
+
+    for (const fx of [0.04, 0.96]) {
+      this.add
+        .image(W * fx, this.groundY + 26, "gh-pumpkin")
+        .setDisplaySize(40, 37);
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const fog = this.add
+        .image(W * (i / 3), this.groundY + 8, "gh-fog")
+        .setDisplaySize(W * 0.6, 70)
+        .setAlpha(0.14);
+      this.tweens.add({
+        targets: fog,
+        x: fog.x + 60,
+        duration: 6000 + i * 1200,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+    }
   }
 
   private redrawLogs(): void {
@@ -440,7 +511,7 @@ export class GameScene extends Scene {
     );
   }
 
-  // PLACEHOLDER: simple wooden post with HP notches — replace with a sprite
+  /** A stacked-log barricade; glowing dots show how many hits it has left. */
   private drawLog(g: GameObjects.Graphics, x: number, hp: number): void {
     g.clear();
     // Spans nearly the full grass depth (not just the thin patrol band) so it
@@ -449,23 +520,25 @@ export class GameScene extends Scene {
     const bottom = this.scale.height - 20;
     const broken = hp <= 0;
 
-    g.fillStyle(broken ? 0x3a2a1a : 0x8b5a2b, broken ? 0.35 : 0.9);
-    g.fillRoundedRect(x - 10, top, 20, bottom - top, 6);
-    g.lineStyle(2, broken ? 0x5c3a22 : 0xc4843c, 0.8);
-    g.strokeRoundedRect(x - 10, top, 20, bottom - top, 6);
-
+    g.fillStyle(hex("brownDark"), broken ? 0.3 : 1);
+    g.fillRoundedRect(x - 13, top + 4, 26, bottom - top, 10);
+    g.fillStyle(hex("brown"), broken ? 0.3 : 1);
+    g.fillRoundedRect(x - 13, top, 26, bottom - top - 4, 10);
     if (!broken) {
+      g.fillStyle(hex("tan"), 1);
+      g.fillEllipse(x, top + 8, 18, 10);
+      g.lineStyle(2, hex("brownDark"), 0.6);
+      g.strokeEllipse(x, top + 8, 10, 5);
       for (let i = 0; i < LOG_MAX_HP; i++) {
         const notchY =
-          top + 14 + i * ((bottom - top - 28) / Math.max(1, LOG_MAX_HP - 1));
-        g.fillStyle(i < hp ? 0xd8a860 : 0x5c3a22, 1);
-        g.fillCircle(x, notchY, 3);
+          top + 30 + i * ((bottom - top - 50) / Math.max(1, LOG_MAX_HP - 1));
+        g.fillStyle(i < hp ? hex("yellow") : hex("brownDark"), 1);
+        g.fillCircle(x, notchY, 4.5);
       }
     }
   }
 
-  // PLACEHOLDER: draw a simple ghost-buster character, facing left/right
-  // Replace with: this.playerGfx = this.add.sprite(this.centerX, this.playerY, "player")
+  // Player body - the kid's avatar (DOM, see GhostHunterModal) sits on the head.
   private drawPlayer(): void {
     const g = this.add.graphics();
     this.playerGfx = g;
@@ -477,22 +550,54 @@ export class GameScene extends Scene {
     const cx = this.centerX;
     const gy = this.playerY;
     const dir = this.facing === "left" ? -1 : 1;
-    // Body
-    g.fillStyle(0x4466cc, 1);
-    g.fillRect(cx - 12, gy - 44, 24, 32);
-    // Head
-    g.fillStyle(0xffcc99, 1);
+    // flashlight glow in the faced direction
+    g.fillStyle(hex("yellow"), 0.18);
+    g.fillTriangle(
+      cx + dir * 34,
+      gy - 40,
+      cx + dir * 120,
+      gy - 74,
+      cx + dir * 120,
+      gy - 6,
+    );
+    // backpack
+    g.fillStyle(hex("grey"), 1);
+    g.fillRoundedRect(cx - dir * 18 - 7, gy - 44, 14, 24, 5);
+    // body (raincoat)
+    g.fillStyle(hex("yellow"), 1);
+    g.fillRoundedRect(cx - 13, gy - 44, 26, 34, 10);
+    g.fillStyle(hex("orange"), 1);
+    g.fillRect(cx - 1, gy - 42, 2, 30);
+    // head (under the avatar)
+    g.fillStyle(hex("tan"), 1);
     g.fillCircle(cx, gy - 52, 13);
-    // Proton pack (backpack) - slung on the side opposite the wand
-    g.fillStyle(0x888888, 1);
-    g.fillRect(cx - dir * 20, gy - 42, 10 * dir, 22);
-    // Wand - points in the currently-faced direction
-    g.lineStyle(3, 0xaaff44, 1);
-    g.lineBetween(cx + dir * 20, gy - 34, cx + dir * 36, gy - 48);
-    // Legs
-    g.fillStyle(0x334488, 1);
-    g.fillRect(cx - 10, gy - 12, 9, 12);
-    g.fillRect(cx + 1, gy - 12, 9, 12);
+    // flashlight
+    g.fillStyle(hex("navy"), 1);
+    g.fillRoundedRect(cx + dir * 14 - (dir < 0 ? 18 : 0), gy - 38, 18, 8, 3);
+    g.fillStyle(hex("cream"), 1);
+    g.fillCircle(cx + dir * 34, gy - 34, 4);
+    // boots
+    g.fillStyle(hex("red"), 1);
+    g.fillRoundedRect(cx - 11, gy - 12, 10, 12, 3);
+    g.fillRoundedRect(cx + 1, gy - 12, 10, 12, 3);
+  }
+
+  /** A flash of light from the player to a ghost being caught. */
+  private beam(x: number, y: number): void {
+    const dir = x < this.centerX ? -1 : 1;
+    const fx = this.centerX + dir * 34;
+    const fy = this.playerY - 34;
+    const g = this.add.graphics();
+    g.lineStyle(14, hex("yellow"), 0.35);
+    g.lineBetween(fx, fy, x, y);
+    g.lineStyle(5, hex("cream"), 0.95);
+    g.lineBetween(fx, fy, x, y);
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 260,
+      onComplete: () => g.destroy(),
+    });
   }
 
   private nextWord(): string {
@@ -747,7 +852,9 @@ export class GameScene extends Scene {
     this.game.events.emit("ui-score", this.score);
     this.game.events.emit("ui-streak", this.streak);
     playExplode();
+    this.tappy.cheer();
 
+    this.beam(ghost.x, ghost.y - 30);
     this.poof(ghost.x, ghost.y - 30);
     ghost.destroy();
     this.ghosts.splice(idx, 1);
@@ -784,6 +891,7 @@ export class GameScene extends Scene {
       this.game.events.emit("ui-log-right", this.rightLogHp);
     }
     this.redrawLogs();
+    this.tappy.sad();
     this.cameras.main.shake(180, 0.007);
     playMiss();
     this.checkWaveComplete();
@@ -839,25 +947,16 @@ export class GameScene extends Scene {
 
       if (this.isHordeWave(this.wave)) {
         // Horde incoming — show warning, then unleash
-        const banner = this.add
-          .text(W / 2, H / 2, "👻 HORDE INCOMING!", {
-            fontSize: "30px",
-            fontFamily: "monospace",
-            color: "#cc44ff",
-            fontStyle: "bold",
-          })
-          .setOrigin(0.5);
-
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          "👻 Ghost party coming!",
+          "purple",
+          WAVE_PAUSE_MS,
+        );
         this.cameras.main.flash(300, 80, 0, 120, false);
         playHordeIncoming();
-
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: H / 2 - 50,
-          duration: WAVE_PAUSE_MS,
-          onComplete: () => banner.destroy(),
-        });
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
           if (this.maxWave > 0 && this.wave >= this.maxWave) {
@@ -880,21 +979,15 @@ export class GameScene extends Scene {
           this.startHordeWave();
         });
       } else {
-        const banner = this.add
-          .text(W / 2, H / 2, `Wave ${this.wave} Clear! 👻`, {
-            fontSize: "30px",
-            fontFamily: "monospace",
-            color: "#aaddff",
-          })
-          .setOrigin(0.5);
-
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: H / 2 - 50,
-          duration: WAVE_PAUSE_MS,
-          onComplete: () => banner.destroy(),
-        });
+        this.tappy.cheer();
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          `Wave ${this.wave} clear! 👻`,
+          "green",
+          WAVE_PAUSE_MS,
+        );
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
           if (this.maxWave > 0 && this.wave >= this.maxWave) {
@@ -921,13 +1014,13 @@ export class GameScene extends Scene {
   }
 
   private poof(x: number, y: number): void {
-    const particles = this.add.particles(x, y, "gh-particle", {
-      lifespan: 450,
-      speed: { min: 40, max: 130 },
-      scale: { start: 0.5, end: 0 },
+    const particles = this.add.particles(x, y, "gh-sparkle", {
+      lifespan: 550,
+      speed: { min: 50, max: 140 },
+      scale: { start: 0.9, end: 0 },
+      rotate: { min: 0, max: 180 },
       quantity: 10,
-      blendMode: "ADD",
-      tint: [0xaaddff, 0xffffff, 0xddccff],
+      tint: [hex("yellow"), hex("cream"), hex("mint"), hex("pink")],
       emitting: false,
     });
     particles.explode(10);

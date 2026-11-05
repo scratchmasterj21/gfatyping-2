@@ -1,34 +1,12 @@
-import { createSignal } from "solid-js";
-
 import {
   playBossDefeated,
   playMiss,
   playPop,
   playWaveClear,
 } from "../shared/sounds";
+import { muted } from "../shared/sound-mute";
 
-const KEY = "gfa-mini-games-muted";
-
-const readMuted = (): boolean => {
-  try {
-    return localStorage.getItem(KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-
-const [muted, setMutedSignal] = createSignal(readMuted());
-
-export { muted };
-
-export function setMuted(value: boolean): void {
-  setMutedSignal(value);
-  try {
-    localStorage.setItem(KEY, value ? "1" : "0");
-  } catch {
-    // storage blocked - mute still works for this session
-  }
-}
+export { muted, setMuted } from "../shared/sound-mute";
 
 let ctx: AudioContext | null = null;
 const audio = (): AudioContext | null => {

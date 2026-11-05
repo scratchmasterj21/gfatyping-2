@@ -2,6 +2,7 @@ import { createSignal, JSXElement, Show } from "solid-js";
 
 import { Fa } from "../../components/common/Fa";
 import { cn } from "../../utils/cn";
+import { MuteButton } from "./MuteButton";
 
 const isTouchScreen =
   typeof window.matchMedia === "function" &&
@@ -48,6 +49,9 @@ export function GameModalFrame(props: {
           >
             ← Back to lessons
           </button>
+        </Show>
+        <Show when={props.layout === "playing"}>
+          <MuteButton class="absolute top-3 left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-sub-alt text-text hover:bg-text hover:text-bg" />
         </Show>
         {props.children}
         <Show when={showKeyboardHint()}>

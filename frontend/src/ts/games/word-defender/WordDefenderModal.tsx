@@ -9,6 +9,8 @@ import {
   Show,
 } from "solid-js";
 
+import type { GameOverScene } from "./scenes/GameOverScene";
+
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { LESSON_CHECKPOINT_MAX_WAVE } from "../../lessons/lesson-checkpoints";
@@ -16,17 +18,39 @@ import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GamePickLayout } from "../components/GamePickLayout";
+import {
+  GameResultOverlay,
+  GameResultView,
+} from "../components/GameResultOverlay";
 import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
 import { WordListPicker } from "../components/WordListPicker";
+import { waveAccuracy, WaveEnd, waveStars } from "../shared/wave-result";
 import {
   createWordDefenderGame,
   DEFENDER_DIFFICULTIES,
   GameDifficulty,
 } from "./game-config";
 import { getWordListOptions, WordListOption } from "./systems/vocab-pool";
+
+const toView = (d: WaveEnd): GameResultView => ({
+  headline:
+    d.cleared === true
+      ? "Base saved!"
+      : d.wave >= 6
+        ? "Space hero!"
+        : "Great defending!",
+  score: d.score,
+  stars: waveStars(d),
+  stats: [
+    { label: "wave reached", value: String(d.wave) },
+    { label: "accuracy", value: `${waveAccuracy(d)}%` },
+    { label: "ships zapped", value: String(d.hits) },
+    { label: "missed keys", value: String(d.misses) },
+  ],
+});
 
 const OPTIONS = getWordListOptions();
 const GROUPS = groupWordListOptions(OPTIONS);
@@ -54,6 +78,7 @@ export function WordDefenderModal(props: Props): JSXElement {
     "pick",
   );
   const [avatarVisible, setAvatarVisible] = createSignal(false);
+  const [result, setResult] = createSignal<GameResultView | null>(null);
   let containerRef: HTMLDivElement | undefined;
   let game: Phaser.Game | null = null;
 
@@ -83,6 +108,9 @@ export function WordDefenderModal(props: Props): JSXElement {
       setAvatarVisible(false);
       onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
     });
+    game.events.on("game-over-screen", (d: WaveEnd) => {
+      setResult(toView(d));
+    });
     game.events.on("exit-game", () => {
       onClose();
     });
@@ -95,6 +123,13 @@ export function WordDefenderModal(props: Props): JSXElement {
     }
     setPhase("pick");
     setAvatarVisible(false);
+    setResult(null);
+  };
+
+  const playAgain = (): void => {
+    setResult(null);
+    const over = game?.scene.getScene("GameOver") as GameOverScene | null;
+    over?.playAgain();
   };
 
   createEffect(() => {
@@ -187,6 +222,15 @@ export function WordDefenderModal(props: Props): JSXElement {
             }}
             class="h-full w-full"
           ></div>
+          <Show when={result()}>
+            {(r) => (
+              <GameResultOverlay
+                result={r()}
+                onPlayAgain={playAgain}
+                onExit={() => props.onClose()}
+              />
+            )}
+          </Show>
         </Show>
       </GameModalFrame>
     </Show>

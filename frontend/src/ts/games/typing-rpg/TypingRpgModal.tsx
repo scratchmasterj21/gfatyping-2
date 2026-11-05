@@ -9,6 +9,8 @@ import {
   Show,
 } from "solid-js";
 
+import { Button } from "../../components/common/Button";
+import { Mascot } from "../../components/common/Mascot";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { realWords } from "../../lessons/lessons-data";
@@ -17,10 +19,15 @@ import { cn } from "../../utils/cn";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GamePickLayout } from "../components/GamePickLayout";
+import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
+import { Confetti } from "../mini/Confetti";
+import { StarRating } from "../mini/StarRating";
+import { monsterSvg } from "./art";
 import { playerMaxHp, type QuestMode } from "./endless-rules";
 import { createTypingRpgGame } from "./game-config";
+import { questStars } from "./quest-stars";
 import { prepareRpgWords } from "./rpg-words";
 import {
   claimTypingQuestReward,
@@ -28,6 +35,7 @@ import {
   startTypingQuestRun,
   TypingQuestReward,
 } from "./typing-rpg-reward";
+import { appearanceForWave } from "./wave-appearance";
 
 type Battle = {
   wave: number;
@@ -74,48 +82,30 @@ type Props = {
 function MonsterPortrait(props: {
   name: string;
   kind: Battle["kind"];
+  wave: number;
 }): JSXElement {
-  const guardian = () => props.kind === "guardian";
-  const imp = () => props.kind === "imp";
+  const src = (): string =>
+    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+      monsterSvg(props.kind, appearanceForWave(props.wave).floorIndex),
+    )}`;
   return (
-    <svg
-      viewBox="0 0 80 80"
-      role="img"
-      aria-label={`${props.name} portrait`}
-      class={cn(
-        "h-20 w-20 drop-shadow-lg",
-        guardian() ? "text-error" : "text-main",
-      )}
-    >
-      <Show when={imp() || guardian()}>
-        <path d="M16 30 10 8 30 24M64 30 70 8 50 24" fill="currentColor"></path>
-      </Show>
-      <Show
-        when={guardian()}
-        fallback={
-          <path
-            d="M10 54Q8 27 30 20Q54 12 69 38L72 63Q62 72 53 64Q42 75 31 65Q17 73 10 54Z"
-            fill="currentColor"
-          ></path>
-        }
-      >
-        <path
-          d="M40 14 65 25 64 53 40 72 16 53 15 25Z"
-          fill="currentColor"
-        ></path>
-      </Show>
-      <ellipse cx="29" cy="43" rx="5" ry="7" class="fill-bg"></ellipse>
-      <ellipse cx="51" cy="43" rx="5" ry="7" class="fill-bg"></ellipse>
-      <circle cx="30" cy="44" r="2" class="fill-text"></circle>
-      <circle cx="50" cy="44" r="2" class="fill-text"></circle>
-      <path
-        d="M33 57Q40 62 47 57"
-        fill="none"
-        class="stroke-bg"
-        stroke-width="3"
-        stroke-linecap="round"
-      ></path>
-    </svg>
+    <img
+      src={src()}
+      alt={`${props.name} portrait`}
+      class="h-20 w-20 drop-shadow-lg"
+    />
+  );
+}
+
+/** One "how to play" line with a big emoji. */
+function HowToLine(props: { icon: string; children: JSXElement }): JSXElement {
+  return (
+    <li class="flex items-start gap-3">
+      <span class="text-2xl leading-none" aria-hidden="true">
+        {props.icon}
+      </span>
+      <span class="pt-0.5">{props.children}</span>
+    </li>
   );
 }
 
@@ -414,36 +404,49 @@ export function TypingRpgModal(props: Props): JSXElement {
             }
           >
             <GameSetupSection title="How to play" accent>
-              <p class="text-em-sm text-sub">
-                Survive endless waves in the forest. Defeat every monster, then
-                choose to continue or leave with your coins.
-              </p>
+              <ul class="grid gap-3 font-kid text-base text-text">
+                <HowToLine icon="🗺️">
+                  Walk with the arrow keys (or WASD).
+                </HowToLine>
+                <HowToLine icon="⚔️">
+                  Bump into a monster, then type words fast to attack!
+                </HowToLine>
+                <HowToLine icon="❤️">
+                  You have {playerMaxHp("normal")} HP and no healing - be
+                  careful.
+                </HowToLine>
+                <HowToLine icon="🪙">
+                  Beat every monster, then keep going or leave with coins.
+                </HowToLine>
+              </ul>
             </GameSetupSection>
-            <GameSetupSection title="Controls">
-              <p class="text-em-sm text-sub">
-                Hold arrows or WASD to move. Talk to the Guide with Enter.
-                Monsters patrol; type as many words as you can during each
-                battle turn. Battles use common English words.
-              </p>
-            </GameSetupSection>
-            <GameSetupSection title="Rewards">
-              <p class="text-em-sm text-sub">
-                Start with 100 HP and no healing. Typing turns shrink from 20 to
-                8 seconds. First completed run: 100 coins. Next 10: 10 coins
-                each; later runs: 1 coin. Bonus clears reset daily. Deeper waves
-                add up to 10 depth coins per normal run.
-              </p>
-            </GameSetupSection>
-            <GameSetupSection title="Fast mode">
-              <p class="text-em-sm text-sub">
-                50 HP, 8-second turns, double run coins, plus 8 depth coins per
-                extra wave (up to 80 per run). Modes share 10 daily bonus clears
-                and an 80-unit daily depth pool.{" "}
-                {fastUnlocked()
-                  ? "Unlocked."
-                  : "Unlock with two 30-second English tests at 40+ WPM and 95%+ accuracy."}
-              </p>
-            </GameSetupSection>
+            <GameSetupMore>
+              <GameSetupSection title="Controls">
+                <p class="text-em-sm text-sub">
+                  Hold arrows or WASD to move. Talk to Tappy the Guide with
+                  Enter. Monsters patrol; type as many words as you can during
+                  each battle turn. Battles use common English words.
+                </p>
+              </GameSetupSection>
+              <GameSetupSection title="Rewards">
+                <p class="text-em-sm text-sub">
+                  Start with 100 HP and no healing. Typing turns shrink from 20
+                  to 8 seconds. First completed run: 100 coins. Next 10: 10
+                  coins each; later runs: 1 coin. Bonus clears reset daily.
+                  Deeper waves add up to 10 depth coins per normal run.
+                </p>
+              </GameSetupSection>
+              <GameSetupSection title="Fast mode">
+                <p class="text-em-sm text-sub">
+                  50 HP, 8-second turns, double run coins, plus 8 depth coins
+                  per extra wave (up to 80 per run). Modes share 10 daily bonus
+                  clears and an 80-unit daily depth pool.{" "}
+                  {fastUnlocked()
+                    ? "Unlocked."
+                    : "Unlock with two 30-second English tests at 40+ WPM and 95%+ accuracy."}
+                </p>
+              </GameSetupSection>
+            </GameSetupMore>
           </GamePickLayout>
         </Show>
 
@@ -474,20 +477,20 @@ export function TypingRpgModal(props: Props): JSXElement {
             )}
           </Show>
           <div
-            class="pointer-events-none absolute top-12 left-3 z-10 rounded border border-main/40 bg-bg/90 px-3 py-2 text-em-sm font-bold text-text"
+            class="pointer-events-none absolute top-3 left-16 z-10 max-w-[calc(100%-15rem)] rounded-2xl bg-game-cream px-3 py-1.5 font-kid text-sm font-bold text-game-ink shadow-[0_3px_0_rgb(43_33_64/0.3)]"
             aria-live="polite"
           >
             {objective()} · Best {bestWave()}
           </div>
-          <div class="pointer-events-none absolute right-2 bottom-2 left-2 z-20 rounded bg-bg/90 px-3 py-2 text-center text-em-xs text-text">
+          <div class="pointer-events-none absolute right-3 bottom-3 left-3 z-20 rounded-full bg-game-cream/95 px-4 py-2 text-center font-kid text-sm font-semibold text-game-ink shadow-[0_3px_0_rgb(43_33_64/0.3)]">
             {prompt()}
           </div>
           <Show when={battle() === null && dialogue() === null}>
-            <div class="absolute bottom-12 left-3 z-20 grid touch-none grid-cols-3 gap-1 rounded bg-bg/80 p-2">
+            <div class="absolute bottom-16 left-3 z-20 grid touch-none grid-cols-3 gap-1.5 rounded-double bg-game-ink/45 p-2 font-kid">
               <div></div>
               <button
                 type="button"
-                class="button"
+                class="press-3d h-12 w-12 rounded-xl bg-game-cream text-xl font-bold text-game-ink [--press-color:rgb(43_33_64/0.35)]"
                 aria-label="Move up"
                 onPointerDown={() => startMoving("up")}
                 onPointerUp={() => stopMoving("up")}
@@ -500,7 +503,7 @@ export function TypingRpgModal(props: Props): JSXElement {
               <div></div>
               <button
                 type="button"
-                class="button"
+                class="press-3d h-12 w-12 rounded-xl bg-game-cream text-xl font-bold text-game-ink [--press-color:rgb(43_33_64/0.35)]"
                 aria-label="Move left"
                 onPointerDown={() => startMoving("left")}
                 onPointerUp={() => stopMoving("left")}
@@ -512,7 +515,7 @@ export function TypingRpgModal(props: Props): JSXElement {
               </button>
               <button
                 type="button"
-                class="button"
+                class="press-3d h-12 w-12 rounded-xl bg-game-cream text-xl font-bold text-game-ink [--press-color:rgb(43_33_64/0.35)]"
                 aria-label="Move down"
                 onPointerDown={() => startMoving("down")}
                 onPointerUp={() => stopMoving("down")}
@@ -524,7 +527,7 @@ export function TypingRpgModal(props: Props): JSXElement {
               </button>
               <button
                 type="button"
-                class="button"
+                class="press-3d h-12 w-12 rounded-xl bg-game-cream text-xl font-bold text-game-ink [--press-color:rgb(43_33_64/0.35)]"
                 aria-label="Move right"
                 onPointerDown={() => startMoving("right")}
                 onPointerUp={() => stopMoving("right")}
@@ -536,28 +539,30 @@ export function TypingRpgModal(props: Props): JSXElement {
               </button>
               <button
                 type="button"
-                class="button col-span-3"
+                class="press-3d col-span-3 h-11 rounded-xl bg-game-yellow text-base font-bold text-game-ink [--press-color:rgb(43_33_64/0.35)]"
                 onClick={() => game?.events.emit("rpg-interact")}
               >
-                Talk
+                💬 Talk
               </button>
             </div>
           </Show>
           <Show when={dialogue()}>
             {(message) => (
               <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
-                <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 text-text shadow-xl">
-                  <p class="mb-4">{message()}</p>
-                  <button
-                    type="button"
-                    class="button primary"
-                    onClick={() => {
-                      setDialogue(null);
-                      game?.events.emit("rpg-close-dialogue");
-                    }}
-                  >
-                    Got it
-                  </button>
+                <div class="flex w-full max-w-md items-start gap-3 rounded-double bg-bg p-5 font-kid text-text shadow-2xl">
+                  <Mascot mood="happy" size={64} />
+                  <div class="grid gap-4">
+                    <p class="text-lg">{message()}</p>
+                    <Button
+                      chunky
+                      active
+                      text="Got it"
+                      onClick={() => {
+                        setDialogue(null);
+                        game?.events.emit("rpg-close-dialogue");
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -565,7 +570,12 @@ export function TypingRpgModal(props: Props): JSXElement {
           <Show when={waveClear()}>
             {(clear) => (
               <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/80 p-4">
-                <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-6 text-center text-text shadow-xl">
+                <div class="grid w-full max-w-md justify-items-center rounded-double bg-bg p-6 text-center font-kid text-text shadow-2xl">
+                  <Mascot
+                    mood="cheer"
+                    size={80}
+                    class="mb-2 animate-game-pop motion-reduce:animate-none"
+                  />
                   <h3 class="mb-3 text-2xl font-bold text-main">
                     Wave {clear().wave} cleared!
                   </h3>
@@ -577,21 +587,22 @@ export function TypingRpgModal(props: Props): JSXElement {
                     {clear().nextMonsterCount} monsters ·{" "}
                     {clear().nextTurnSeconds}s per turn
                   </p>
-                  <div class="flex justify-center gap-3">
-                    <button
-                      type="button"
-                      class="button primary"
+                  <div class="flex flex-wrap justify-center gap-3">
+                    <Button
+                      chunky
+                      size="lg"
+                      active
+                      fa={{ icon: "fa-arrow-right" }}
+                      text="Keep going"
                       onClick={() => game?.events.emit("rpg-continue")}
-                    >
-                      Continue →
-                    </button>
-                    <button
-                      type="button"
-                      class="button"
+                    />
+                    <Button
+                      chunky
+                      size="lg"
+                      fa={{ icon: "fa-coins" }}
+                      text="Leave with coins"
                       onClick={() => game?.events.emit("rpg-leave")}
-                    >
-                      Leave with coins
-                    </button>
+                    />
                   </div>
                 </div>
               </div>
@@ -600,28 +611,28 @@ export function TypingRpgModal(props: Props): JSXElement {
           <Show when={battle()}>
             {(enemy) => (
               <div class="absolute inset-0 z-20 flex items-center justify-center bg-bg/75 p-4">
-                <div class="w-full max-w-md rounded-xl border border-main bg-sub-alt p-5 shadow-xl">
+                <div class="w-full max-w-md rounded-double bg-bg p-5 font-kid shadow-2xl">
                   <div class="mb-1 text-em-xs font-bold tracking-widest text-sub uppercase">
                     Wave {enemy().wave} · typing turn {enemy().turn}
                   </div>
                   <div
                     class={cn(
-                      "mb-4 rounded px-3 py-2 text-center text-em-sm font-bold",
+                      "mb-4 rounded-full px-3 py-2 text-center text-base font-bold",
                       enemy().stage === "typing"
-                        ? "bg-main/15 text-main"
-                        : "bg-error/15 text-error",
+                        ? "bg-game-green text-game-ink"
+                        : "bg-game-red text-game-cream",
                     )}
                     aria-live="polite"
                   >
                     {enemy().stage === "typing"
                       ? enemy().ready
-                        ? "YOUR TURN · TYPE WORDS"
-                        : "READY · FOCUS THE TYPING BOX"
+                        ? "⚔️ Your turn - type words!"
+                        : "Tap the typing box to start"
                       : enemy().hp === 0
-                        ? "MONSTER DEFEATED!"
+                        ? "🎉 Monster defeated!"
                         : enemy().message?.includes("hit you")
-                          ? "MONSTER ATTACKED"
-                          : "MONSTER'S TURN"}
+                          ? "Ouch! The monster attacked"
+                          : "Monster's turn…"}
                   </div>
                   <div class="mb-4 grid grid-cols-[1fr_auto_1fr] items-start gap-3 text-center">
                     <div class="min-w-0">
@@ -681,6 +692,7 @@ export function TypingRpgModal(props: Props): JSXElement {
                         <MonsterPortrait
                           name={enemy().name}
                           kind={enemy().kind}
+                          wave={enemy().wave}
                         />
                         <Show when={impact()?.target === "monster"}>
                           <span
@@ -756,8 +768,8 @@ export function TypingRpgModal(props: Props): JSXElement {
                         </span>
                       </Show>
                     </p>
-                    <div class="mb-3 rounded bg-bg p-3 text-center font-mono text-2xl tracking-wider text-text">
-                      <span class="text-main">
+                    <div class="mb-3 rounded-double bg-game-cream p-3 text-center text-3xl font-bold tracking-wide text-game-ink">
+                      <span class="text-game-green">
                         {enemy().word.slice(0, typed().length)}
                       </span>
                       {enemy().word.slice(typed().length)}
@@ -767,8 +779,10 @@ export function TypingRpgModal(props: Props): JSXElement {
                         inputRef = element;
                       }}
                       class={cn(
-                        "w-full rounded border bg-bg p-3 text-center font-mono text-xl text-text outline-none",
-                        wrongKey() ? "border-error" : "border-main",
+                        "w-full rounded-double border-4 bg-game-cream p-3 text-center text-2xl font-bold text-game-ink outline-none",
+                        wrongKey()
+                          ? "animate-game-shake border-game-red motion-reduce:animate-none"
+                          : "border-game-ink/15 focus:border-game-blue",
                       )}
                       aria-label={`Type ${enemy().word} to attack`}
                       autocomplete="off"
@@ -797,14 +811,26 @@ export function TypingRpgModal(props: Props): JSXElement {
         </Show>
 
         <Show when={phase() === "results"}>
-          <div class="pt-12 text-center">
-            <div class="mb-3 text-3xl font-bold text-main">
+          <div class="relative grid justify-items-center overflow-hidden pt-10 text-center font-kid">
+            <Show when={questStars(result()?.completedWaves ?? 0) >= 2}>
+              <Confetti />
+            </Show>
+            <Mascot
+              mood={result()?.outcome === "defeated" ? "thinking" : "cheer"}
+              size={88}
+              class="mb-2 animate-game-pop motion-reduce:animate-none"
+            />
+            <div class="mb-2 text-3xl font-bold text-main">
               {result()?.outcome === "defeated"
-                ? "Run ended"
+                ? "Good try, hero!"
                 : "Well played! ✨"}
             </div>
+            <div class="mb-3">
+              <StarRating stars={questStars(result()?.completedWaves ?? 0)} />
+            </div>
             <p class="mb-4 text-sub">
-              {result()?.completedWaves} waves cleared ·{" "}
+              {result()?.completedWaves}{" "}
+              {result()?.completedWaves === 1 ? "wave" : "waves"} cleared ·{" "}
               {result()?.outcome === "defeated"
                 ? "You were defeated"
                 : "You left safely"}
@@ -817,7 +843,7 @@ export function TypingRpgModal(props: Props): JSXElement {
               Time {result()?.elapsed}s · Score {result()?.score}
             </p>
             <div
-              class="mb-5 rounded-xl border border-main/50 bg-sub-alt p-4"
+              class="mb-5 w-full max-w-sm rounded-double bg-sub-alt p-4"
               aria-live="polite"
             >
               <p class="mb-1 text-em-sm font-bold text-sub">Run reward</p>
@@ -854,34 +880,39 @@ export function TypingRpgModal(props: Props): JSXElement {
               </Show>
             </div>
             <Show when={reward() === "error"}>
-              <button
-                type="button"
-                class="button mb-4"
-                onClick={() => {
-                  const clear = result();
-                  if (clear !== undefined && activeRewardRunId !== undefined) {
-                    requestRunReward(clear, activeRewardRunId, runId);
-                  }
-                }}
-              >
-                Retry coin claim
-              </button>
+              <div class="mb-4">
+                <Button
+                  chunky
+                  fa={{ icon: "fa-redo-alt" }}
+                  text="Retry coin claim"
+                  onClick={() => {
+                    const clear = result();
+                    if (
+                      clear !== undefined &&
+                      activeRewardRunId !== undefined
+                    ) {
+                      requestRunReward(clear, activeRewardRunId, runId);
+                    }
+                  }}
+                />
+              </div>
             </Show>
-            <div class="flex justify-center gap-3">
-              <button
-                type="button"
-                class="button primary"
+            <div class="flex flex-wrap justify-center gap-3">
+              <Button
+                chunky
+                size="lg"
+                active
+                fa={{ icon: "fa-redo-alt" }}
+                text="Play again"
                 onClick={() => void start(mode())}
-              >
-                Play again
-              </button>
-              <button
-                type="button"
-                class="button"
+              />
+              <Button
+                chunky
+                size="lg"
+                fa={{ icon: "fa-times" }}
+                text="Done"
                 onClick={() => props.onClose()}
-              >
-                Back to lessons
-              </button>
+              />
             </div>
           </div>
         </Show>

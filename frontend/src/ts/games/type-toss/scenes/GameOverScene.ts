@@ -1,112 +1,32 @@
-import { Geom, Scene } from "phaser";
+import { Scene } from "phaser";
 
-type GameOverData = {
-  score: number;
-  wordsTyped: number;
-  hits: number;
-  misses: number;
-  totalChars: number;
-  totalTime: number;
-};
+import type { TossEnd } from "../toss-result";
 
+/**
+ * End of a round. The result card is drawn by the modal (DOM) over the
+ * canvas; this scene reports the result and restarts on request.
+ */
 export class GameOverScene extends Scene {
   constructor() {
     super({ key: "GameOver" });
   }
 
-  create(data: GameOverData): void {
-    const W = this.scale.width;
-    const H = this.scale.height;
-    const cx = W / 2;
-    const cy = H / 2;
-
-    const wpm = Math.round(data.totalChars / 5 / (data.totalTime / 60));
-    const accuracy =
-      data.hits + data.misses > 0
-        ? Math.round((data.hits / (data.hits + data.misses)) * 100)
-        : 0;
-
+  create(data: TossEnd): void {
     this.game.events.emit("game-result", {
       score: data.score,
       wave: data.wordsTyped,
       cleared: this.registry.get("lessonCheckpoint") === true,
     });
-
-    const panel = this.add.graphics();
-    panel.fillStyle(0x3b1a06, 0.95);
-    panel.fillRoundedRect(cx - 210, cy - 155, 420, 310, 16);
-    panel.lineStyle(2.5, 0xf9a825, 0.8);
-    panel.strokeRoundedRect(cx - 210, cy - 155, 420, 310, 16);
-
-    const h = { fontSize: "26px", fontFamily: "monospace", color: "#f9a825" };
-    const s = { fontSize: "14px", fontFamily: "monospace", color: "#c8a97a" };
-    const v = { fontSize: "15px", fontFamily: "monospace", color: "#ffffff" };
-
-    this.add.text(cx, cy - 122, "🎪 TIME'S UP!", h).setOrigin(0.5);
-
-    const rows: [string, string][] = [
-      ["Words typed", `${data.wordsTyped}`],
-      ["Score", `${data.score}`],
-      ["WPM", `${wpm}`],
-      ["Accuracy", `${accuracy}%`],
-    ];
-    rows.forEach(([label, value], i) => {
-      const y = cy - 72 + i * 44;
-      this.add.text(cx - 60, y, label, s).setOrigin(1, 0.5);
-      this.add.text(cx - 44, y, value, v).setOrigin(0, 0.5);
+    this.game.events.emit("game-over-screen", {
+      ...data,
+      multiplayer: this.registry.get("multiplayer") === true,
     });
-
-    const btnY = cy + 118;
-    if (this.registry.get("multiplayer") === true) {
-      this.add
-        .text(cx, btnY - 28, "Waiting for the other players…", {
-          fontSize: "13px",
-          fontFamily: "monospace",
-          color: "#c8a97a",
-        })
-        .setOrigin(0.5);
-      this.makeBtn(cx, btnY + 12, "Back to Lessons", () => {
-        this.game.events.emit("exit-game");
-      });
-    } else {
-      this.makeBtn(cx - 90, btnY, "Play Again", () => {
-        this.scene.stop("UI");
-        this.scene.start("Boot");
-        this.scene.launch("UI");
-      });
-      this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
-        this.game.events.emit("exit-game");
-      });
-    }
   }
 
-  private makeBtn(
-    x: number,
-    y: number,
-    label: string,
-    onClick: () => void,
-  ): void {
-    const bg = this.add.graphics();
-    bg.fillStyle(0x8b4513, 1);
-    bg.fillRoundedRect(x - 80, y - 24, 160, 48, 8);
-    bg.lineStyle(1.5, 0xf9a825, 0.7);
-    bg.strokeRoundedRect(x - 80, y - 20, 160, 40, 8);
-
-    const txt = this.add
-      .text(x, y, label, {
-        fontSize: "14px",
-        fontFamily: "monospace",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5);
-
-    bg.setInteractive({
-      hitArea: new Geom.Rectangle(x - 80, y - 24, 160, 48),
-      hitAreaCallback: Geom.Rectangle.Contains,
-      useHandCursor: true,
-    })
-      .on("pointerdown", onClick)
-      .on("pointerover", () => txt.setColor("#f9a825"))
-      .on("pointerout", () => txt.setColor("#ffffff"));
+  /** Same restart as the old in-canvas "Play Again" button (solo only). */
+  playAgain(): void {
+    this.scene.stop("UI");
+    this.scene.start("Boot");
+    this.scene.launch("UI");
   }
 }

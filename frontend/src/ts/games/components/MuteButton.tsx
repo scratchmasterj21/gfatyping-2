@@ -1,7 +1,7 @@
 import { JSXElement } from "solid-js";
 
 import { Fa } from "../../components/common/Fa";
-import { muted, setMuted } from "./mini-sounds";
+import { muted, setMuted } from "../shared/sound-mute";
 
 /** Round sound on/off toggle for the mini games. */
 export function MuteButton(props: { class?: string }): JSXElement {

@@ -1,5 +1,9 @@
 import { GameObjects, Scene, Structs } from "phaser";
 
+import { hex, PALETTE } from "../../shared/game-palette";
+import { KID_FONT, tappyTextureDefs } from "../../shared/phaser-ui";
+import { addSvgTextures, ensureKidFont } from "../../shared/svg-texture";
+import { monsterKey, rpgTextureDefs } from "../art";
 import { turnDamage } from "../battle-rules";
 import { appearanceForWave, type MonsterKind } from "../wave-appearance";
 import {
@@ -63,34 +67,12 @@ const MONSTER_COLORS: Record<MonsterKind, number> = {
   guardian: 0xa85d7a,
 };
 
-function mixCanvasColor(from: number, to: number, amount: number): number {
-  const channel = (shift: number): number =>
-    Math.round(
-      ((from >> shift) & 255) * (1 - amount) + ((to >> shift) & 255) * amount,
-    );
-  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
-}
-
+/** Bright, kid-friendly floors: Moss Grove, Crystal Hollow, Ember Trail, Moonlit Ruins. */
 const FLOOR_PALETTES = [
-  { dark: 0x4a7844, light: 0x52804c, detail: 0x79b874, edge: 0x245338 },
-  {
-    dark: mixCanvasColor(0x172c2b, 0x395fbd, 0.42),
-    light: mixCanvasColor(0x172c2b, 0x395fbd, 0.54),
-    detail: 0xf3cfa0,
-    edge: 0x395fbd,
-  },
-  {
-    dark: mixCanvasColor(0x172c2b, 0xa85d7a, 0.42),
-    light: mixCanvasColor(0x172c2b, 0xf3cfa0, 0.34),
-    detail: 0xf3cfa0,
-    edge: 0xa85d7a,
-  },
-  {
-    dark: mixCanvasColor(0x172c2b, 0x7f68ac, 0.42),
-    light: mixCanvasColor(0x172c2b, 0x7f68ac, 0.53),
-    detail: 0xf3cfa0,
-    edge: 0x7f68ac,
-  },
+  { dark: 0x5fb85f, light: 0x6cc96a, detail: 0xc8f2dc, edge: 0x2f7d3e },
+  { dark: 0x7f8fd6, light: 0x8fa0e2, detail: 0xfff8ec, edge: 0x5aa9ff },
+  { dark: 0xe08a5a, light: 0xeda070, detail: 0xffd23f, edge: 0xb9774a },
+  { dark: 0x5a4d9a, light: 0x6a5daa, detail: 0xfff8ec, edge: 0xa77bff },
 ] as const;
 
 export class RpgScene extends Scene {
@@ -178,6 +160,13 @@ export class RpgScene extends Scene {
     this.safeUntilAt = 0;
     this.time.paused = false;
     this.draw();
+    // drawn monsters + Tappy load async; redraw once they're ready
+    void Promise.all([
+      ensureKidFont(),
+      addSvgTextures(this, { ...rpgTextureDefs(), ...tappyTextureDefs() }),
+    ]).then(() => {
+      if (this.sys.isActive() && !this.finished) this.draw();
+    });
 
     this.keydownHandler = (event) => {
       if (
@@ -446,7 +435,7 @@ export class RpgScene extends Scene {
     const graphics = this.add.graphics();
     const appearance = appearanceForWave(this.wave);
     const palette = FLOOR_PALETTES[appearance.floorIndex] ?? FLOOR_PALETTES[0];
-    graphics.fillStyle(0x172c2b);
+    graphics.fillStyle(hex("ink"));
     graphics.fillRect(0, 0, this.scale.width, this.scale.height);
 
     for (let y = 0; y < ROWS; y++) {
@@ -462,7 +451,7 @@ export class RpgScene extends Scene {
         if (!edge && appearance.floorIndex === 0) {
           const pathCenter = 6 + Math.sin(y * 0.85 + appearance.tier) * 1.45;
           if (Math.abs(x - pathCenter) < 1.5) {
-            graphics.fillStyle(0xf3cfa0, 0.14);
+            graphics.fillStyle(hex("tan"), 0.55);
             graphics.fillRoundedRect(
               tileX + size * 0.03,
               tileY + size * 0.03,
@@ -635,22 +624,43 @@ export class RpgScene extends Scene {
     }
 
     const npc = this.center(1, 2);
-    graphics.fillStyle(0x7f68ac);
-    graphics.fillRoundedRect(
-      npc.x - size * 0.18,
-      npc.y - size * 0.15,
-      size * 0.36,
-      size * 0.48,
-      4,
-    );
-    graphics.fillStyle(0xf3cfa0);
-    graphics.fillCircle(npc.x, npc.y - size * 0.18, size * 0.14);
-    this.label(npc.x, npc.y - size * 0.42, "Guide", Math.max(10, size * 0.16));
+    if (this.textures.exists("tappy-happy")) {
+      // Tappy is the Guide
+      this.add
+        .image(npc.x, npc.y + size * 0.36, "tappy-happy")
+        .setOrigin(0.5, 1)
+        .setDisplaySize(size * 0.7, size * 0.72);
+    } else {
+      graphics.fillStyle(0x7f68ac);
+      graphics.fillRoundedRect(
+        npc.x - size * 0.18,
+        npc.y - size * 0.15,
+        size * 0.36,
+        size * 0.48,
+        4,
+      );
+    }
+    this.label(npc.x, npc.y - size * 0.46, "Tappy", Math.max(11, size * 0.17));
 
     for (const monster of this.monsters) {
       if (monster.hp === 0) continue;
       const p = this.center(monster.x, monster.y);
       const visual = this.add.container(p.x, p.y);
+      const key = monsterKey(monster.kind, appearance.floorIndex);
+      if (this.textures.exists(key)) {
+        const s = size * (monster.kind === "guardian" ? 1 : 0.9);
+        visual.add(this.add.image(0, size * 0.04, key).setDisplaySize(s, s));
+        visual.add(
+          this.label(
+            0,
+            -size * 0.46,
+            `${monster.name} ${monster.hp}/${monster.maxHp}`,
+            Math.max(10, size * 0.14),
+          ),
+        );
+        this.monsterVisuals.set(monster, visual);
+        continue;
+      }
       const body = this.add.graphics();
       const bodyColor = MONSTER_COLORS[monster.kind];
       body.fillStyle(bodyColor);
@@ -701,22 +711,45 @@ export class RpgScene extends Scene {
     const p = this.center(this.player.x, this.player.y);
     this.playerVisual = this.add.container(p.x, p.y);
     const playerBody = this.add.graphics();
-    playerBody.fillStyle(0x395fbd);
-    playerBody.fillRoundedRect(
-      -size * 0.19,
+    // cape, tunic, belt and boots - the kid's avatar is the head
+    playerBody.fillStyle(hex("red"));
+    playerBody.fillTriangle(
+      -size * 0.24,
+      size * 0.44,
+      size * 0.24,
+      size * 0.44,
+      0,
       -size * 0.02,
-      size * 0.38,
-      size * 0.48,
-      4,
     );
+    playerBody.fillStyle(hex("blue"));
+    playerBody.fillRoundedRect(
+      -size * 0.17,
+      -size * 0.02,
+      size * 0.34,
+      size * 0.4,
+      size * 0.08,
+    );
+    playerBody.fillStyle(hex("gold"));
+    playerBody.fillRect(-size * 0.17, size * 0.2, size * 0.34, size * 0.05);
+    playerBody.fillStyle(hex("brownDark"));
+    playerBody.fillRoundedRect(
+      -size * 0.15,
+      size * 0.36,
+      size * 0.12,
+      size * 0.1,
+      3,
+    );
+    playerBody.fillRoundedRect(
+      size * 0.03,
+      size * 0.36,
+      size * 0.12,
+      size * 0.1,
+      3,
+    );
+    playerBody.fillStyle(hex("tan"));
+    playerBody.fillCircle(0, -size * 0.16, size * 0.14);
     this.playerVisual.add(playerBody);
     this.emitPlayerPosition();
-    this.label(
-      this.scale.width / 2,
-      14,
-      `${this.mode === "fast" ? "FAST · " : ""}${appearance.name} · Wave ${this.wave} · HP ${this.playerHp}/${playerMaxHp(this.mode)} · ${this.monsters.filter((monster) => monster.hp === 0).length}/${this.monsters.length} monsters`,
-      15,
-    );
     this.lastPrompt = this.prompt();
     this.game.events.emit("rpg-prompt", this.lastPrompt);
     const defeated = this.monsters.filter((monster) => monster.hp === 0).length;
@@ -724,7 +757,7 @@ export class RpgScene extends Scene {
       "rpg-objective",
       this.betweenWaves
         ? `Wave ${this.wave} cleared · Choose your next move`
-        : `${appearance.name} · Wave ${this.wave} · Defeat monsters · ${defeated}/${this.monsters.length}`,
+        : `${this.mode === "fast" ? "Fast · " : ""}${appearance.name} · Wave ${this.wave} · ❤ ${this.playerHp}/${playerMaxHp(this.mode)} · Monsters ${defeated}/${this.monsters.length}`,
     );
   }
 
@@ -786,11 +819,12 @@ export class RpgScene extends Scene {
   ): GameObjects.Text {
     return this.add
       .text(x, y, value, {
-        fontFamily: "monospace",
+        fontFamily: KID_FONT,
+        fontStyle: "bold",
         fontSize: `${size}px`,
-        color: "#ffffff",
-        stroke: "#173028",
-        strokeThickness: 3,
+        color: PALETTE.cream,
+        stroke: PALETTE.ink,
+        strokeThickness: 4,
       })
       .setOrigin(0.5);
   }

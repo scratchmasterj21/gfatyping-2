@@ -1,34 +1,30 @@
 import { Scene, GameObjects } from "phaser";
 
-// ASSETS: To swap in real sprites, replace drawBody() with:
-//   this.sprite = scene.add.sprite(0, -hh * 0.3, typeIdx % 2 === 0 ? "duck" : "panda");
-//   this.add(this.sprite);
-// Load textures in BootScene.preload() with:
-//   this.load.image("duck", "url"); this.load.image("panda", "url");
+import { hex, PaletteName } from "../../shared/game-palette";
+import { WordTag } from "../../shared/phaser-ui";
+import { PRIZES } from "../art";
 
-const BODY_COLORS = [0xfff176, 0xe1f5fe, 0xf3e5f5, 0xe8f5e9, 0xfce4ec];
-const BORDER_COLORS = [0xf9a825, 0x0277bd, 0x7b1fa2, 0x2e7d32, 0xc62828];
-const EMOJIS = ["🦆", "🐼", "🎯", "⭐", "🎪"];
+const BORDERS: PaletteName[] = ["yellow", "blue", "purple", "green", "pink"];
 
 export type TargetKind = "normal" | "bonusTime" | "doublePoints" | "trap";
 
 const SPECIAL_STYLE: Record<
   Exclude<TargetKind, "normal">,
-  { body: number; border: number; emoji: string }
+  { fill: PaletteName; border: PaletteName; icon: string }
 > = {
-  bonusTime: { body: 0xfff59d, border: 0xf9a825, emoji: "⏱️" },
-  doublePoints: { body: 0xe1bee7, border: 0x8e24aa, emoji: "✨" },
-  trap: { body: 0xffab91, border: 0xc62828, emoji: "💣" },
+  bonusTime: { fill: "mint", border: "green", icon: "tt-clock" },
+  doublePoints: { fill: "cream", border: "purple", icon: "tt-sparkle2x" },
+  trap: { fill: "blush", border: "red", icon: "tt-bomb" },
 };
 
+/** A prize card on the booth shelf: a drawn prize with its word below. */
 export class Target extends GameObjects.Container {
   readonly word: string;
   readonly typeIdx: number;
   readonly kind: TargetKind;
   private ring!: GameObjects.Graphics;
   private flashOverlay!: GameObjects.Graphics;
-  private labelTyped: GameObjects.Text;
-  private labelRemain: GameObjects.Text;
+  private tag: WordTag;
 
   constructor(
     scene: Scene,
@@ -47,20 +43,11 @@ export class Target extends GameObjects.Container {
     this.kind = kind;
     this.drawBody(scene, w, h, typeIdx, kind);
 
-    const ts = { fontSize: `${fontSize}px`, fontFamily: "monospace" };
-    this.labelTyped = scene.add
-      .text(0, h * 0.15, "", { ...ts, color: "#1a7a3a" })
-      .setOrigin(1, 0.5);
-    this.labelRemain = scene.add
-      .text(0, h * 0.15, word, { ...ts, color: "#1a1a2e" })
-      .setOrigin(0, 0.5);
-    this.add([this.labelTyped, this.labelRemain]);
-    this.positionLabels();
+    this.tag = new WordTag(scene, 0, h * 0.27, word, fontSize + 2);
+    this.add(this.tag);
     scene.add.existing(this);
   }
 
-  // PLACEHOLDER: colored rounded rect with emoji character
-  // ASSETS: see comment at top of file
   private drawBody(
     scene: Scene,
     w: number,
@@ -71,43 +58,42 @@ export class Target extends GameObjects.Container {
     const hw = w / 2;
     const hh = h / 2;
     const special = kind !== "normal" ? SPECIAL_STYLE[kind] : null;
-    const bodyColor =
-      special?.body ?? BODY_COLORS[typeIdx % BODY_COLORS.length] ?? 0xfff176;
-    const borderColor =
-      special?.border ??
-      BORDER_COLORS[typeIdx % BORDER_COLORS.length] ??
-      0xf9a825;
+    const fill = special?.fill ?? "cream";
+    const border =
+      special?.border ?? BORDERS[typeIdx % BORDERS.length] ?? "yellow";
 
     const g = scene.add.graphics();
-    g.fillStyle(bodyColor, 1);
-    g.fillRoundedRect(-hw, -hh, w, h, 10);
-    g.lineStyle(special !== null ? 3.5 : 2.5, borderColor, 1);
-    g.strokeRoundedRect(-hw, -hh, w, h, 10);
+    g.fillStyle(hex("ink"), 0.25);
+    g.fillRoundedRect(-hw, -hh + 6, w, h, 14);
+    g.fillStyle(hex(fill), 1);
+    g.fillRoundedRect(-hw, -hh, w, h, 14);
+    g.lineStyle(special !== null ? 5 : 4, hex(border), 1);
+    g.strokeRoundedRect(-hw, -hh, w, h, 14);
     this.add(g);
 
-    const emojiSize = Math.max(16, Math.floor(h * 0.32));
-    const emoji = special?.emoji ?? EMOJIS[typeIdx % EMOJIS.length] ?? "🎯";
+    const iconSize = Math.max(26, Math.min(h * 0.5, w * 0.45));
+    const icon =
+      special?.icon ?? `tt-${PRIZES[typeIdx % PRIZES.length] ?? "star"}`;
     this.add(
-      scene.add
-        .text(0, -hh * 0.28, emoji, { fontSize: `${emojiSize}px` })
-        .setOrigin(0.5),
+      scene.add.image(0, -hh * 0.28, icon).setDisplaySize(iconSize, iconSize),
     );
 
     this.ring = scene.add.graphics();
-    this.ring.lineStyle(3.5, borderColor, 0.9);
-    this.ring.strokeRoundedRect(-hw - 4, -hh - 4, w + 8, h + 8, 12);
+    this.ring.lineStyle(5, hex("gold"), 1);
+    this.ring.strokeRoundedRect(-hw - 6, -hh - 6, w + 12, h + 12, 18);
     this.ring.setVisible(false);
     this.add(this.ring);
 
     this.flashOverlay = scene.add.graphics();
-    this.flashOverlay.fillStyle(0xff2222, 0.38);
-    this.flashOverlay.fillRoundedRect(-hw, -hh, w, h, 10);
+    this.flashOverlay.fillStyle(hex("red"), 0.35);
+    this.flashOverlay.fillRoundedRect(-hw, -hh, w, h, 14);
     this.flashOverlay.setVisible(false);
     this.add(this.flashOverlay);
   }
 
   setHighlighted(on: boolean): void {
     this.ring.setVisible(on);
+    this.tag.setMode(on ? "locked" : "normal");
   }
 
   flashRed(): void {
@@ -117,17 +103,7 @@ export class Target extends GameObjects.Container {
     });
   }
 
-  private positionLabels(): void {
-    const total = this.labelTyped.width + this.labelRemain.width;
-    const half = total / 2;
-    this.labelTyped.setX(-half + this.labelTyped.width);
-    this.labelRemain.setX(-half + this.labelTyped.width);
-  }
-
   updateTyped(typed: string): void {
-    const remain = this.word.slice(typed.length);
-    this.labelTyped.setText(typed);
-    this.labelRemain.setText(remain);
-    this.positionLabels();
+    this.tag.setTyped(typed);
   }
 }

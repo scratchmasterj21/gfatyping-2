@@ -1,133 +1,29 @@
 import { Scene } from "phaser";
 
-type GameOverData = {
-  playerWon: boolean;
-  wpm: number;
-  accuracy: number;
-  elapsed: number;
-  wordsTyped: number;
-  marginChars: number;
-};
+import type { RaceEnd } from "../racer-result";
 
+/**
+ * End of a race. The result card is drawn by the modal (DOM) over the
+ * canvas; this scene reports the result and restarts on request.
+ */
 export class GameOverScene extends Scene {
   constructor() {
     super({ key: "GameOver" });
   }
 
-  create(data: GameOverData): void {
-    const W = this.scale.width;
-    const H = this.scale.height;
-    const cx = W / 2;
-    const cy = H / 2;
-
-    const panel = this.add.graphics();
-    panel.fillStyle(0x0a0a1a, 0.94);
-    panel.fillRoundedRect(cx - 210, cy - 165, 420, 330, 16);
-    panel.lineStyle(2, data.playerWon ? 0x44aa44 : 0xcc3322, 0.7);
-    panel.strokeRoundedRect(cx - 210, cy - 165, 420, 330, 16);
-
-    const title = data.playerWon ? "YOU WIN! 🏆" : "CPU WINS";
-    const titleColor = data.playerWon ? "#44ee44" : "#ee4444";
-
-    this.add
-      .text(cx, cy - 118, title, {
-        fontSize: "30px",
-        fontFamily: "monospace",
-        color: titleColor,
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(
-        cx,
-        cy - 82,
-        data.marginChars <= 5
-          ? "PHOTO FINISH!"
-          : data.playerWon
-            ? `Won by ${data.marginChars} characters`
-            : `${data.marginChars} characters behind`,
-        {
-          fontSize: "14px",
-          fontFamily: "monospace",
-          color: data.marginChars <= 5 ? "#ffdd44" : "#aaaacc",
-        },
-      )
-      .setOrigin(0.5);
-
-    const s = { fontSize: "14px", fontFamily: "monospace", color: "#888888" };
-    const v = { fontSize: "14px", fontFamily: "monospace", color: "#ffffff" };
-
-    const rows: [string, string][] = [
-      ["WPM", `${data.wpm}`],
-      ["Accuracy", `${data.accuracy}%`],
-      ["Words typed", `${data.wordsTyped}`],
-      ["Time", `${data.elapsed}s`],
-    ];
-
-    rows.forEach(([label, value], i) => {
-      const y = cy - 48 + i * 34;
-      this.add.text(cx - 80, y, label, s).setOrigin(0, 0.5);
-      this.add.text(cx + 80, y, value, v).setOrigin(1, 0.5);
-    });
-
+  create(data: RaceEnd): void {
     this.game.events.emit("game-result", {
       score: data.wpm,
       wave: data.wordsTyped,
     });
-
-    const btnY = cy + 132;
-    if (this.registry.get("multiplayer") === true) {
-      this.add
-        .text(cx, btnY - 28, "Waiting for the other racers…", {
-          fontSize: "13px",
-          fontFamily: "monospace",
-          color: "#aaaacc",
-        })
-        .setOrigin(0.5);
-      this.makeBtn(cx, btnY + 14, "Back to Lessons", () => {
-        this.game.events.emit("exit-game");
-      });
-    } else {
-      this.makeBtn(cx - 90, btnY, "Play Again", () => {
-        this.scene.start("Game");
-      });
-      this.makeBtn(cx + 90, btnY, "Back to Lessons", () => {
-        this.game.events.emit("exit-game");
-      });
-    }
+    this.game.events.emit("game-over-screen", {
+      ...data,
+      multiplayer: this.registry.get("multiplayer") === true,
+    });
   }
 
-  private makeBtn(
-    x: number,
-    y: number,
-    label: string,
-    onClick: () => void,
-  ): void {
-    const bg = this.add.graphics();
-    bg.fillStyle(0x224466, 1);
-    bg.fillRect(x - 80, y - 24, 160, 48);
-    const txt = this.add
-      .text(x, y, label, {
-        fontSize: "14px",
-        fontFamily: "monospace",
-        color: "#ffffff",
-      })
-      .setOrigin(0.5)
-      .on("pointerover", () => {
-        txt.setColor("#ffcc44");
-      })
-      .on("pointerout", () => {
-        txt.setColor("#ffffff");
-      });
-
-    // A centered zone gives the button a reliable local hit area. The old
-    // Graphics hit area used canvas coordinates and could miss clicks,
-    // especially after resizing the game modal.
-    this.add
-      .zone(x, y, 160, 48)
-      .setInteractive({ useHandCursor: true })
-      .on("pointerdown", onClick)
-      .on("pointerover", () => txt.setColor("#ffcc44"))
-      .on("pointerout", () => txt.setColor("#ffffff"));
+  /** Same restart as the old in-canvas "Play Again" button (solo only). */
+  playAgain(): void {
+    this.scene.start("Game");
   }
 }

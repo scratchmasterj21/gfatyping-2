@@ -25,6 +25,13 @@ import {
   towerScore,
   towerStars,
 } from "../../src/ts/games/tower-climb/tower-rules";
+import { waveAccuracy, waveStars } from "../../src/ts/games/shared/wave-result";
+import { questStars } from "../../src/ts/games/typing-rpg/quest-stars";
+import { tossStars, tossWpm } from "../../src/ts/games/type-toss/toss-result";
+import {
+  raceHeadline,
+  raceStars,
+} from "../../src/ts/games/type-racer/racer-result";
 
 /** Deterministic rng cycling through the given values. */
 const seq = (...values: number[]): (() => number) => {
@@ -110,5 +117,59 @@ describe("echo keys", () => {
     expect(s).toMatchObject({ length: 4, score: 30, rounds: 1, longest: 3 });
     s = echoOnMistake(echoOnMistake(echoOnMistake(s)));
     expect(echoIsOver(s)).toBe(true);
+  });
+});
+
+describe("wave game result", () => {
+  const base = { score: 50, wave: 1, hits: 3, misses: 1 };
+  it("gives stars by wave, and 3 for a cleared lesson", () => {
+    expect(waveStars({ ...base, score: 0 })).toBe(0);
+    expect(waveStars(base)).toBe(1);
+    expect(waveStars({ ...base, wave: 3 })).toBe(2);
+    expect(waveStars({ ...base, wave: 6 })).toBe(3);
+    expect(waveStars({ ...base, cleared: true })).toBe(3);
+    expect(waveAccuracy(base)).toBe(75);
+  });
+});
+
+describe("type racer result", () => {
+  const r = {
+    playerWon: false,
+    wpm: 20,
+    accuracy: 90,
+    elapsed: 60,
+    wordsTyped: 10,
+    marginChars: 30,
+  };
+  it("gives 3 for a win, 2 for a photo finish, 1 otherwise", () => {
+    expect(raceStars({ ...r, playerWon: true })).toBe(3);
+    expect(raceStars({ ...r, marginChars: 4 })).toBe(2);
+    expect(raceStars(r)).toBe(1);
+    expect(raceStars({ ...r, wordsTyped: 0 })).toBe(0);
+    expect(raceHeadline({ ...r, marginChars: 2 })).toBe("Photo finish!");
+  });
+});
+
+describe("type toss result", () => {
+  const d = {
+    score: 50,
+    wordsTyped: 10,
+    hits: 10,
+    misses: 0,
+    totalChars: 50,
+    totalTime: 60,
+  };
+  it("gives stars by words per minute", () => {
+    expect(tossWpm(d)).toBe(10);
+    expect(tossStars(d)).toBe(2);
+    expect(tossStars({ ...d, totalChars: 100 })).toBe(3);
+    expect(tossStars({ ...d, totalChars: 20 })).toBe(1);
+    expect(tossStars({ ...d, wordsTyped: 0 })).toBe(0);
+  });
+});
+
+describe("typing quest result", () => {
+  it("gives stars by waves cleared", () => {
+    expect([0, 1, 2, 5].map(questStars)).toEqual([0, 1, 2, 3]);
   });
 });

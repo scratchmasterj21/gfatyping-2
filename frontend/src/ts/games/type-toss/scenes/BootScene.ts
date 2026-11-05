@@ -1,11 +1,8 @@
 import { Scene } from "phaser";
 
-// ASSETS: Add real asset loads here, e.g.:
-//   this.load.image("duck", "https://your-cdn.com/duck.png");
-//   this.load.image("panda", "https://your-cdn.com/panda.png");
-//   this.load.image("tt-bg", "https://your-cdn.com/carnival-bg.png");
-//   this.load.image("shelf", "https://your-cdn.com/shelf.png");
-// Then replace placeholder drawing in Target.drawBody() and GameScene methods.
+import { tappyTextureDefs } from "../../shared/phaser-ui";
+import { addSvgTextures, ensureKidFont } from "../../shared/svg-texture";
+import { tossTextureDefs } from "../art";
 
 export class BootScene extends Scene {
   constructor() {
@@ -20,6 +17,11 @@ export class BootScene extends Scene {
       g.generateTexture("tt-particle", 16, 16);
       g.destroy();
     }
-    this.scene.start("Game");
+    void Promise.all([
+      ensureKidFont(),
+      addSvgTextures(this, { ...tossTextureDefs(), ...tappyTextureDefs() }),
+    ]).then(() => {
+      if (this.scene.isActive()) this.scene.start("Game");
+    });
   }
 }

@@ -1,6 +1,11 @@
 import { Scene, GameObjects } from "phaser";
 
-export const FRUIT_COLORS = [0xffcc00, 0xff3333, 0x33cc44, 0xff7722, 0xaa44dd];
+import { hex } from "../../shared/game-palette";
+import { WordTag } from "../../shared/phaser-ui";
+import { FRUIT_KINDS } from "../art";
+
+/** Drawn size of a fruit, px. */
+export const FRUIT_SIZE = 60;
 
 export class Fruit extends GameObjects.Container {
   readonly word: string;
@@ -9,9 +14,8 @@ export class Fruit extends GameObjects.Container {
   vx = 0;
   vy = 0;
   omega = 0;
-  private ring!: GameObjects.Graphics;
-  private labelTyped: GameObjects.Text;
-  private labelRemain: GameObjects.Text;
+  private ring: GameObjects.Graphics;
+  private tag: WordTag;
 
   constructor(
     scene: Scene,
@@ -25,20 +29,25 @@ export class Fruit extends GameObjects.Container {
     this.word = word;
     this.typeIdx = typeIdx;
     this.isBomb = isBomb;
-    this.drawBody(scene);
 
-    const ts = { fontSize: "18px", fontFamily: "monospace" };
-    this.labelTyped = scene.add
-      .text(0, -34, "", { ...ts, color: "#88ffaa" })
-      .setOrigin(1, 0.5);
-    this.labelRemain = scene.add
-      .text(0, -34, word, {
-        ...ts,
-        color: isBomb ? "#ff6666" : "#ffffff",
-      })
-      .setOrigin(0, 0.5);
-    this.add([this.labelTyped, this.labelRemain]);
-    this.positionLabels();
+    this.ring = scene.add.graphics();
+    this.add(this.ring);
+    if (isBomb) {
+      this.ring.lineStyle(4, hex("red"), 1);
+      this.ring.strokeCircle(0, 2, 34);
+    } else {
+      this.ring.fillStyle(hex("yellow"), 0.45);
+      this.ring.fillCircle(0, 0, 38);
+      this.ring.setVisible(false);
+    }
+
+    const key = isBomb
+      ? "fn-bomb"
+      : `fn-${FRUIT_KINDS[typeIdx % FRUIT_KINDS.length] ?? "apple"}`;
+    this.add(scene.add.image(0, 0, key).setDisplaySize(FRUIT_SIZE, FRUIT_SIZE));
+
+    this.tag = new WordTag(scene, 0, -48, word, 18, isBomb ? "blush" : "cream");
+    this.add(this.tag);
 
     if (isBomb) {
       scene.tweens.add({
@@ -54,59 +63,23 @@ export class Fruit extends GameObjects.Container {
     scene.add.existing(this);
   }
 
-  private drawBody(scene: Scene): void {
-    if (this.isBomb) {
-      const g = scene.add.graphics();
-      g.fillStyle(0x111122, 1);
-      g.fillCircle(0, 0, 20);
-      g.fillStyle(0x334, 0.5);
-      g.fillCircle(-5, -7, 6);
-      this.add(g);
-
-      this.ring = scene.add.graphics();
-      this.ring.lineStyle(3, 0xff2200, 1);
-      this.ring.strokeCircle(0, 0, 27);
-      this.add(this.ring);
-    } else {
-      const color =
-        FRUIT_COLORS[this.typeIdx % FRUIT_COLORS.length] ?? 0xffcc00;
-      const g = scene.add.graphics();
-      g.fillStyle(color, 1);
-      g.fillCircle(0, 0, 20);
-      g.fillStyle(0xffffff, 0.28);
-      g.fillCircle(-6, -8, 7);
-      this.add(g);
-
-      this.ring = scene.add.graphics();
-      this.ring.lineStyle(2.5, 0xffffff, 0.9);
-      this.ring.strokeCircle(0, 0, 24);
-      this.ring.setVisible(false);
-      this.add(this.ring);
-    }
-  }
-
   setHighlighted(on: boolean): void {
+    this.tag.setMode(on ? "locked" : "normal");
     if (!this.isBomb) this.ring.setVisible(on);
   }
 
-  private positionLabels(): void {
-    const total = this.labelTyped.width + this.labelRemain.width;
-    const half = total / 2;
-    this.labelTyped.setX(-half + this.labelTyped.width);
-    this.labelRemain.setX(-half + this.labelTyped.width);
-  }
-
   updateTyped(typed: string): void {
-    const remain = this.word.slice(typed.length);
-    this.labelTyped.setText(typed);
-    this.labelRemain.setText(remain);
-    this.positionLabels();
+    this.tag.setTyped(typed);
   }
 
   /** Cancels out the container's tumbling rotation so the word stays upright/readable. */
   keepLabelsUpright(): void {
-    this.labelTyped.setRotation(-this.rotation);
-    this.labelRemain.setRotation(-this.rotation);
+    this.tag.setRotation(-this.rotation);
+    // keep the tag above the fruit whichever way it spins
+    this.tag.setPosition(
+      -48 * Math.sin(this.rotation),
+      -48 * Math.cos(this.rotation),
+    );
   }
 
   /** Phaser's GameObject.destroy() doesn't kill tweens targeting it - the bomb's

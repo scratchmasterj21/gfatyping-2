@@ -1,4 +1,4 @@
-import { Scene, GameObjects, BlendModes, Time, Structs } from "phaser";
+import { Scene, GameObjects, Time, Structs } from "phaser";
 
 import { BombEntity } from "../entities/BombEntity";
 import { BossShip } from "../entities/BossShip";
@@ -14,12 +14,15 @@ import {
   playMiss,
   playWaveClear,
 } from "../../shared/sounds";
+import { hex, PaletteName } from "../../shared/game-palette";
+import { popBanner, TappyBuddy } from "../../shared/phaser-ui";
 import { WordMatcher } from "../systems/word-matcher";
 import { shuffleCyclic } from "../systems/vocab-pool";
 
-const LIVES = 8;
+export const LIVES = 8;
 const WAVE_PAUSE_MS = 2500;
-const BASE_TINTS = [0xffffff, 0xffaa44, 0xff4422] as const;
+const BASE_TINTS = [0xffffff, 0xffd0a0, 0xff9a9a] as const;
+const BLAST_TINTS: PaletteName[] = ["yellow", "pink", "orange", "cream"];
 
 const POWERUP_WORDS: Record<PowerUpKind, string> = {
   emp: "emp",
@@ -30,7 +33,7 @@ const POWERUP_SPAWN_MAX_MS = 22000;
 const POWERUP_DESCEND_SPEED = 40; // fixed, not wave-scaled - equally catchable at any wave
 const EMP_DURATION_MS = 8000;
 
-type Star = { x: number; y: number; speed: number; g: GameObjects.Graphics };
+type Star = { img: GameObjects.Image; speed: number };
 
 export class GameScene extends Scene {
   private words: string[] = [];
@@ -54,6 +57,12 @@ export class GameScene extends Scene {
 
   private stars: Star[] = [];
   private baseImg!: GameObjects.Image;
+  private sky!: GameObjects.Graphics;
+  private ground!: GameObjects.Graphics;
+  private planet!: GameObjects.Image;
+  private moon!: GameObjects.Image;
+  private nebula: GameObjects.Image[] = [];
+  private tappy!: TappyBuddy;
   private baseX = 0;
   private baseY = 0;
   private baseCracks = 0;
@@ -97,6 +106,7 @@ export class GameScene extends Scene {
     this.bossRaging = false;
     this.bombTimer = null;
     this.stars = [];
+    this.nebula = [];
     this.gameOver = false;
     this.lives = LIVES;
     this.score = 0;
@@ -128,18 +138,19 @@ export class GameScene extends Scene {
     this.baseX = W / 2;
     this.baseY = H - 40;
 
-    if (!this.textures.exists("particle")) {
-      const pg = this.add.graphics();
-      pg.fillStyle(0xffffff, 1);
-      pg.fillCircle(16, 16, 16);
-      pg.generateTexture("particle", 32, 32);
-      pg.destroy();
-    }
-
+    this.createBackdrop(W, H);
     this.createStars(W, H);
 
-    this.baseImg = this.add.image(this.baseX, this.baseY - 20, "base");
-    this.baseImg.setDisplaySize(120, 56);
+    this.ground = this.add.graphics();
+    this.drawGround(W, H);
+    this.baseImg = this.add.image(this.baseX, this.baseY - 20, "wd-base");
+    this.baseImg.setDisplaySize(130, 66);
+    this.tappy = new TappyBuddy(
+      this,
+      Math.max(44, this.baseX - 120),
+      H - 6,
+      56,
+    );
 
     this.matcher = new WordMatcher((buf, locked) => {
       this.game.events.emit("ui-buffer", buf, locked);
@@ -218,6 +229,11 @@ export class GameScene extends Scene {
       this.baseX = size.width / 2;
       this.baseY = size.height - 40;
       this.baseImg.setPosition(this.baseX, this.baseY - 20);
+      this.tappy.setPosition(Math.max(44, this.baseX - 120), size.height - 6);
+      this.drawSky(size.width, size.height);
+      this.drawGround(size.width, size.height);
+      this.planet.setPosition(size.width * 0.82, size.height * 0.2);
+      this.moon.setPosition(size.width * 0.14, size.height * 0.36);
       this.repositionStars(size.width, size.height);
     });
 
@@ -280,35 +296,102 @@ export class GameScene extends Scene {
     }
 
     for (const star of this.stars) {
-      star.y += star.speed * dt;
-      if (star.y > H) {
-        star.y = 0;
+      star.img.y += star.speed * dt;
+      if (star.img.y > H) {
+        star.img.y = 0;
       }
-      star.g.clear();
-      star.g.fillStyle(0xffffff, 0.5);
-      star.g.fillRect(star.x, star.y, 1, 1);
+    }
+  }
+
+  /** Night-sky gradient, soft nebula clouds, a ringed planet and a moon. */
+  private createBackdrop(W: number, H: number): void {
+    this.sky = this.add.graphics();
+    this.drawSky(W, H);
+    const clouds: [number, number, PaletteName, number][] = [
+      [0.25, 0.3, "pink", 0.16],
+      [0.75, 0.55, "blue", 0.16],
+      [0.5, 0.15, "purple", 0.2],
+    ];
+    for (const [fx, fy, color, alpha] of clouds) {
+      const n = this.add
+        .image(W * fx, H * fy, "wd-glow")
+        .setDisplaySize(W * 0.9, H * 0.6)
+        .setTint(hex(color))
+        .setAlpha(alpha);
+      this.nebula.push(n);
+    }
+    this.planet = this.add
+      .image(W * 0.82, H * 0.2, "wd-planet")
+      .setDisplaySize(150, 112)
+      .setAlpha(0.95);
+    this.moon = this.add
+      .image(W * 0.14, H * 0.36, "wd-moon")
+      .setDisplaySize(44, 44)
+      .setAlpha(0.9);
+    this.tweens.add({
+      targets: this.planet,
+      y: "+=10",
+      duration: 4000,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
+  }
+
+  private drawSky(W: number, H: number): void {
+    this.sky.clear();
+    this.sky.fillGradientStyle(
+      hex("night"),
+      hex("night"),
+      hex("navy"),
+      hex("navy"),
+      1,
+    );
+    this.sky.fillRect(0, 0, W, H);
+    for (const n of this.nebula) n.setDisplaySize(W * 0.9, H * 0.6);
+  }
+
+  /** Grey moon surface the base sits on. */
+  private drawGround(W: number, H: number): void {
+    const top = H - 34;
+    this.ground.clear();
+    this.ground.fillStyle(hex("grey"), 1);
+    this.ground.fillEllipse(W / 2, top + W * 0.9, W * 2.2, W * 1.8);
+    this.ground.fillStyle(0x7e879a, 1);
+    for (const [fx, r] of [
+      [0.12, 10],
+      [0.3, 6],
+      [0.72, 9],
+      [0.9, 5],
+    ] as const) {
+      this.ground.fillEllipse(W * fx, top + 18, r * 2.4, r);
     }
   }
 
   private createStars(W: number, H: number): void {
-    for (let i = 0; i < 80; i++) {
-      const g = this.add.graphics();
-      const star: Star = {
-        x: Math.random() * W,
-        y: Math.random() * H,
-        speed: 20 + Math.random() * 40,
-        g,
-      };
-      g.fillStyle(0xffffff, 0.5);
-      g.fillRect(star.x, star.y, 1, 1);
-      this.stars.push(star);
+    for (let i = 0; i < 70; i++) {
+      const size = 2 + Math.random() * 3;
+      const img = this.add
+        .image(Math.random() * W, Math.random() * H, "wd-dot")
+        .setDisplaySize(size, size)
+        .setAlpha(0.4 + Math.random() * 0.5);
+      if (i % 4 === 0) {
+        this.tweens.add({
+          targets: img,
+          alpha: 0.15,
+          duration: 800 + Math.random() * 1200,
+          yoyo: true,
+          repeat: -1,
+        });
+      }
+      this.stars.push({ img, speed: 10 + Math.random() * 30 });
     }
   }
 
   private repositionStars(W: number, H: number): void {
     for (const star of this.stars) {
-      if (star.x > W) star.x = Math.random() * W;
-      if (star.y > H) star.y = Math.random() * H;
+      if (star.img.x > W) star.img.x = Math.random() * W;
+      if (star.img.y > H) star.img.y = Math.random() * H;
     }
   }
 
@@ -579,9 +662,8 @@ export class GameScene extends Scene {
     const tx = ship.x;
     const ty = ship.y;
 
+    this.tappy.cheer();
     const bullet = this.add.graphics();
-    bullet.lineStyle(2, 0x44ffaa, 1);
-    bullet.lineBetween(bx, by, bx, by);
 
     this.tweens.add({
       targets: { p: 0 },
@@ -589,14 +671,13 @@ export class GameScene extends Scene {
       duration: 180,
       onUpdate: (_tween, target: { p: number }) => {
         const progress = target.p;
+        const ex = bx + (tx - bx) * progress;
+        const ey = by - 60 + (ty - by + 60) * progress;
         bullet.clear();
-        bullet.lineStyle(2, 0x44ffaa, 1 - progress * 0.3);
-        bullet.lineBetween(
-          bx,
-          by,
-          bx + (tx - bx) * progress,
-          by + (ty - by) * progress,
-        );
+        bullet.lineStyle(10, hex("green"), 0.35);
+        bullet.lineBetween(bx, by - 60, ex, ey);
+        bullet.lineStyle(4, hex("mint"), 1);
+        bullet.lineBetween(bx, by - 60, ex, ey);
       },
       onComplete: () => {
         bullet.destroy();
@@ -694,24 +775,14 @@ export class GameScene extends Scene {
     const W = this.scale.width;
     const H = this.scale.height;
 
-    const banner = this.add
-      .text(W / 2, H / 2, "BOSS DEFEATED!", {
-        fontSize: "36px",
-        fontFamily: "monospace",
-        color: "#ffcc00",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
-
-    this.tweens.add({
-      targets: banner,
-      alpha: 0,
-      y: H / 2 - 60,
-      duration: WAVE_PAUSE_MS,
-      onComplete: () => {
-        banner.destroy();
-      },
-    });
+    popBanner(
+      this,
+      W / 2,
+      H / 2,
+      "Mothership defeated!",
+      "gold",
+      WAVE_PAUSE_MS,
+    );
 
     this.game.events.emit("ui-boss", false);
 
@@ -740,6 +811,7 @@ export class GameScene extends Scene {
   private loseLife(): void {
     if (this.gameOver) return;
     this.lives = Math.max(0, this.lives - 1);
+    this.tappy.sad();
     this.baseCracks = LIVES - this.lives;
     this.updateBaseTint();
     this.game.events.emit("ui-lives", this.lives);
@@ -791,13 +863,13 @@ export class GameScene extends Scene {
   }
 
   private explodeSmall(x: number, y: number): void {
-    const particles = this.add.particles(x, y, "particle", {
-      lifespan: 280,
-      speed: { min: 25, max: 70 },
-      scale: { start: 0.22, end: 0 },
+    const particles = this.add.particles(x, y, "wd-star", {
+      lifespan: 320,
+      speed: { min: 30, max: 80 },
+      scale: { start: 0.35, end: 0 },
+      rotate: { min: 0, max: 360 },
       quantity: 6,
-      blendMode: BlendModes.ADD,
-      tint: [0xff3300, 0xff8800, 0xffcc00],
+      tint: BLAST_TINTS.map(hex),
       emitting: false,
     });
     particles.explode(6);
@@ -807,13 +879,13 @@ export class GameScene extends Scene {
   }
 
   private explode(x: number, y: number): void {
-    const particles = this.add.particles(x, y, "particle", {
-      lifespan: 400,
-      speed: { min: 40, max: 120 },
-      scale: { start: 0.4, end: 0 },
+    const particles = this.add.particles(x, y, "wd-star", {
+      lifespan: 520,
+      speed: { min: 60, max: 160 },
+      scale: { start: 0.6, end: 0 },
+      rotate: { min: 0, max: 360 },
       quantity: 12,
-      blendMode: BlendModes.ADD,
-      tint: [0xff8800, 0xffcc00, 0xff4400],
+      tint: BLAST_TINTS.map(hex),
       emitting: false,
     });
     particles.explode(12);
@@ -842,44 +914,26 @@ export class GameScene extends Scene {
 
       if (this.isBossWave(this.wave)) {
         playWaveClear();
-        const banner = this.add
-          .text(W / 2, H / 2, "⚠ BOSS INCOMING!", {
-            fontSize: "30px",
-            fontFamily: "monospace",
-            color: "#ff4422",
-            fontStyle: "bold",
-          })
-          .setOrigin(0.5);
-
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: H / 2 - 40,
-          duration: WAVE_PAUSE_MS,
-          onComplete: () => {
-            banner.destroy();
-            this.startBossWave();
-          },
-        });
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          "Mothership coming!",
+          "pink",
+          WAVE_PAUSE_MS,
+        );
+        this.time.delayedCall(WAVE_PAUSE_MS, () => this.startBossWave());
       } else {
         playWaveClear();
-        const banner = this.add
-          .text(W / 2, H / 2, `Wave ${this.wave} Clear!`, {
-            fontSize: "32px",
-            fontFamily: "monospace",
-            color: "#44ffaa",
-          })
-          .setOrigin(0.5);
-
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: H / 2 - 40,
-          duration: WAVE_PAUSE_MS,
-          onComplete: () => {
-            banner.destroy();
-          },
-        });
+        this.tappy.cheer();
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          `Wave ${this.wave} clear!`,
+          "green",
+          WAVE_PAUSE_MS,
+        );
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
           this.wave++;

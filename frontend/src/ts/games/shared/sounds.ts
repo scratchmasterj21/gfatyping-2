@@ -1,3 +1,5 @@
+import { muted } from "./sound-mute";
+
 let _ctx: AudioContext | null = null;
 
 function getCtx(): AudioContext {
@@ -7,6 +9,7 @@ function getCtx(): AudioContext {
 }
 
 export function playExplode(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -37,6 +40,7 @@ export function playExplode(): void {
 }
 
 export function playPop(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -54,6 +58,7 @@ export function playPop(): void {
 }
 
 export function playMiss(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -71,6 +76,7 @@ export function playMiss(): void {
 }
 
 export function playWaveClear(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
   ([523, 659, 784] as const).forEach((freq, i) => {
@@ -90,6 +96,7 @@ export function playWaveClear(): void {
 }
 
 export function playHordeIncoming(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -126,6 +133,7 @@ export function playHordeIncoming(): void {
 }
 
 export function playBombExplode(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -158,6 +166,7 @@ export function playBombExplode(): void {
 }
 
 export function playDeflect(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -175,6 +184,7 @@ export function playDeflect(): void {
 }
 
 export function playBossHit(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -204,6 +214,7 @@ export function playBossHit(): void {
 }
 
 export function playBossDefeated(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 
@@ -239,6 +250,7 @@ export function playBossDefeated(): void {
 }
 
 export function playGameOver(): void {
+  if (muted()) return;
   const c = getCtx();
   const t = c.currentTime;
 

@@ -1,10 +1,8 @@
 import { Scene } from "phaser";
 
-// ASSETS: Add real asset loads here, e.g.:
-//   this.load.image("ghost", "https://your-cdn.com/ghost.png");
-//   this.load.image("player", "https://your-cdn.com/ghost-buster.png");
-//   this.load.image("gh-bg", "https://your-cdn.com/haunted-bg.png");
-// Then swap out the placeholder graphics in GameScene and Ghost.ts.
+import { tappyTextureDefs } from "../../shared/phaser-ui";
+import { addSvgTextures, ensureKidFont } from "../../shared/svg-texture";
+import { ghostTextureDefs } from "../art";
 
 export class BootScene extends Scene {
   constructor() {
@@ -12,14 +10,32 @@ export class BootScene extends Scene {
   }
 
   create(): void {
-    // Generate a soft glow particle texture for the pop effect
-    if (!this.textures.exists("gh-particle")) {
-      const g = this.add.graphics();
-      g.fillStyle(0xaaddff, 1);
-      g.fillCircle(12, 12, 12);
-      g.generateTexture("gh-particle", 24, 24);
-      g.destroy();
+    if (!this.textures.exists("gh-fog")) {
+      // soft round glow for the fog drifting over the fence
+      const size = 256;
+      const tex = this.textures.createCanvas("gh-fog", size, size);
+      const ctx = tex?.getContext();
+      if (tex && ctx) {
+        const g = ctx.createRadialGradient(
+          size / 2,
+          size / 2,
+          0,
+          size / 2,
+          size / 2,
+          size / 2,
+        );
+        g.addColorStop(0, "rgba(255,255,255,1)");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, size, size);
+        tex.refresh();
+      }
     }
-    this.scene.start("Game");
+    void Promise.all([
+      ensureKidFont(),
+      addSvgTextures(this, { ...ghostTextureDefs(), ...tappyTextureDefs() }),
+    ]).then(() => {
+      if (this.scene.isActive()) this.scene.start("Game");
+    });
   }
 }

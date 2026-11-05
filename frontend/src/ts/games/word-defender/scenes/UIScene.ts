@@ -1,14 +1,20 @@
-import { Scene, GameObjects, Structs, Time } from "phaser";
+import { Scene, Structs, Time } from "phaser";
+
+import { HudChip, rowLayout } from "../../shared/phaser-ui";
+import { LIVES } from "./GameScene";
+
+/** Row below the page's mute/back buttons. */
+const ROW_Y = 74;
 
 export class UIScene extends Scene {
-  private waveText!: GameObjects.Text;
-  private scoreText!: GameObjects.Text;
-  private livesText!: GameObjects.Text;
-  private bufferText!: GameObjects.Text;
-  private streakText!: GameObjects.Text;
-  private bossText!: GameObjects.Text;
-  private powerUpText!: GameObjects.Text;
-  private empText!: GameObjects.Text;
+  private waveChip!: HudChip;
+  private scoreChip!: HudChip;
+  private livesChip!: HudChip;
+  private bossChip!: HudChip;
+  private powerUpChip!: HudChip;
+  private empChip!: HudChip;
+  private bufferChip!: HudChip;
+  private streakChip!: HudChip;
   private empClearTimer: Time.TimerEvent | null = null;
 
   constructor() {
@@ -16,102 +22,103 @@ export class UIScene extends Scene {
   }
 
   create(): void {
-    const W = this.scale.width;
-    const H = this.scale.height;
-
-    const topStyle = {
-      fontSize: "15px",
-      fontFamily: "monospace",
-      color: "#aaaaaa",
-    };
-    const bufStyle = {
-      fontSize: "18px",
-      fontFamily: "monospace",
-      color: "#ffffff",
-      backgroundColor: "#ffffff22",
-      padding: { x: 10, y: 4 },
-    };
-
-    this.waveText = this.add.text(12, 10, "Wave 1", topStyle);
-    this.scoreText = this.add.text(12, 30, "Score: 0", topStyle);
-    this.bossText = this.add
-      .text(W - 12, 10, "⚠ BOSS", {
-        fontSize: "15px",
-        fontFamily: "monospace",
-        color: "#ff4422",
-        fontStyle: "bold",
-      })
-      .setOrigin(1, 0)
+    this.waveChip = new HudChip(this, 0, ROW_Y, "Wave 1");
+    this.scoreChip = new HudChip(this, 0, ROW_Y, "⭐ 0");
+    // starts full: the first lives event fires before this scene exists
+    this.livesChip = new HudChip(this, 0, ROW_Y, "❤".repeat(LIVES)).setColors(
+      "cream",
+      "red",
+    );
+    this.bossChip = new HudChip(this, 0, ROW_Y, "👾 Mothership!").setColors(
+      "pink",
+      "ink",
+    );
+    this.bossChip.setVisible(false);
+    this.powerUpChip = new HudChip(this, 0, ROW_Y + 38, "").setColors(
+      "gold",
+      "ink",
+    );
+    this.powerUpChip.setVisible(false);
+    this.empChip = new HudChip(this, 0, ROW_Y + 76, "⚡ Ships frozen!")
+      .setColors("sky", "ink")
       .setVisible(false);
-    this.livesText = this.add
-      .text(W / 2, 10, "❤ ❤ ❤ ❤ ❤ ❤ ❤ ❤", { ...topStyle, color: "#ee4444" })
-      .setOrigin(0.5, 0);
-    this.powerUpText = this.add
-      .text(W / 2, 34, "", { ...topStyle, fontSize: "14px", color: "#ffdd44" })
-      .setOrigin(0.5, 0);
-    this.empText = this.add
-      .text(W / 2, H / 2 - 110, "", {
-        fontSize: "24px",
-        fontFamily: "monospace",
-        color: "#88ddff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
+    this.bufferChip = new HudChip(this, 0, 0, "").setVisible(false);
+    this.streakChip = new HudChip(this, 0, 0, "")
+      .setColors("orange", "cream")
+      .setVisible(false);
 
-    this.bufferText = this.add
-      .text(W / 2, H - 16, "", bufStyle)
-      .setOrigin(0.5, 1);
-    this.streakText = this.add
-      .text(W / 2, H - 50, "", {
-        fontSize: "13px",
-        fontFamily: "monospace",
-        color: "#ffaa00",
-      })
-      .setOrigin(0.5, 1);
-
+    this.layout(this.scale.width, this.scale.height);
     this.scale.on("resize", (size: Structs.Size) => {
-      this.livesText.setX(size.width / 2);
-      this.powerUpText.setX(size.width / 2);
-      this.empText.setX(size.width / 2).setY(size.height / 2 - 110);
-      this.bufferText.setX(size.width / 2).setY(size.height - 16);
-      this.streakText.setX(size.width / 2).setY(size.height - 50);
-      this.bossText.setX(size.width - 12);
+      this.layout(size.width, size.height);
     });
 
     this.game.events.on("ui-wave", (wave: number) => {
-      this.waveText.setText(`Wave ${wave}`);
+      this.waveChip.setLabel(`Wave ${wave}`);
+      this.layoutTop();
     });
     this.game.events.on("ui-score", (score: number) => {
-      this.scoreText.setText(`Score: ${score}`);
+      this.scoreChip.setLabel(`⭐ ${score}`);
+      this.layoutTop();
     });
     this.game.events.on("ui-lives", (lives: number) => {
-      this.livesText.setText("❤ ".repeat(lives).trim());
+      this.livesChip.setLabel(lives > 0 ? "❤".repeat(lives) : "💔");
+      this.layoutTop();
     });
     this.game.events.on("ui-powerup", (kind: "emp" | "nuke" | null) => {
       if (kind === null) {
-        this.powerUpText.setText("");
+        this.powerUpChip.setVisible(false);
       } else {
-        const icon = kind === "emp" ? "⚡" : "☢️";
-        this.powerUpText.setText(`${icon} Press ENTER to use!`);
+        const icon = kind === "emp" ? "⚡" : "💥";
+        this.powerUpChip
+          .setLabel(`${icon} Press ENTER to use!`)
+          .setVisible(true)
+          .setX(this.scale.width / 2);
       }
     });
     this.game.events.on("ui-frozen", (durationMs: number) => {
-      this.empText.setText("⚡ EMP!");
+      this.empChip.setVisible(true).setX(this.scale.width / 2);
       this.empClearTimer?.remove();
       this.empClearTimer = this.time.delayedCall(durationMs, () => {
-        this.empText.setText("");
+        this.empChip.setVisible(false);
       });
     });
     this.game.events.on("ui-buffer", (buf: string, locked: string | null) => {
-      this.bufferText.setText(buf.length > 0 ? `${buf}_` : "");
-      this.bufferText.setColor(locked !== null ? "#ffcc44" : "#ffffff");
+      this.bufferChip
+        .setLabel(buf.length > 0 ? `${buf}_` : "")
+        .setColors(locked !== null ? "yellow" : "cream", "ink")
+        .setVisible(buf.length > 0);
+      this.layoutBottom(this.scale.width, this.scale.height);
     });
     this.game.events.on("ui-streak", (streak: number) => {
-      this.streakText.setText(streak >= 5 ? `🔥 ${streak} streak!` : "");
+      this.streakChip
+        .setLabel(`🔥 ${streak} in a row!`)
+        .setVisible(streak >= 5);
+      this.layoutBottom(this.scale.width, this.scale.height);
     });
     this.game.events.on("ui-boss", (active: boolean) => {
-      this.bossText.setVisible(active);
+      this.bossChip.setVisible(active);
+      this.layoutTop();
     });
+  }
+
+  private layout(W: number, H: number): void {
+    this.layoutTop();
+    this.powerUpChip.setX(W / 2);
+    this.empChip.setX(W / 2);
+    this.layoutBottom(W, H);
+  }
+
+  private layoutTop(): void {
+    rowLayout(
+      [this.waveChip, this.scoreChip, this.livesChip, this.bossChip],
+      this.scale.width / 2,
+    );
+  }
+
+  /** Typed letters + streak sit bottom-right, clear of the base. */
+  private layoutBottom(W: number, H: number): void {
+    this.bufferChip.setPosition(W - 16 - this.bufferChip.chipWidth / 2, H - 26);
+    this.streakChip.setPosition(W - 16 - this.streakChip.chipWidth / 2, H - 64);
   }
 
   shutdown(): void {

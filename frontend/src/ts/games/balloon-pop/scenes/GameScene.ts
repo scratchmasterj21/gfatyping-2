@@ -1,4 +1,7 @@
-import { Scene, GameObjects, BlendModes, Time, Structs } from "phaser";
+import { Scene, GameObjects, Time, Structs } from "phaser";
+
+import { hex, PALETTE, PaletteName } from "../../shared/game-palette";
+import { kidText, popBanner, TappyBuddy } from "../../shared/phaser-ui";
 
 import { Balloon } from "../entities/Balloon";
 import { PowerUp, PowerUpKind } from "../entities/PowerUp";
@@ -15,7 +18,8 @@ import {
 import { WordMatcher } from "../../word-defender/systems/word-matcher";
 import { shuffleCyclic } from "../../word-defender/systems/vocab-pool";
 
-const LIVES = 8;
+export const LIVES = 8;
+const CONFETTI: PaletteName[] = ["yellow", "pink", "blue", "green", "purple"];
 const WAVE_PAUSE_MS = 2500;
 
 const BIG_BALLOON_CHANCE = 0.15;
@@ -63,6 +67,8 @@ export class GameScene extends Scene {
   private gameOver = false;
 
   private clouds: Cloud[] = [];
+  private park!: GameObjects.Graphics;
+  private tappy!: TappyBuddy;
   private balloonsThisWave = 0;
   private balloonsSpawned = 0;
   // Reserved spawns still waiting on a non-duplicate word (see
@@ -119,10 +125,27 @@ export class GameScene extends Scene {
 
     // Sky gradient background
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xe0f4ff, 0xe0f4ff, 1);
-    bg.fillRect(0, 0, W, H);
+    const drawSky = (w: number, h: number): void => {
+      bg.clear();
+      bg.fillGradientStyle(
+        hex("skyTop"),
+        hex("skyTop"),
+        hex("mint"),
+        hex("mint"),
+        1,
+      );
+      bg.fillRect(0, 0, w, h);
+      bg.fillStyle(hex("yellow"), 0.3);
+      bg.fillCircle(w * 0.18, h * 0.16, 60);
+      bg.fillStyle(hex("yellow"), 1);
+      bg.fillCircle(w * 0.18, h * 0.16, 40);
+    };
+    drawSky(W, H);
 
     this.createClouds(W, H);
+    this.park = this.add.graphics();
+    this.drawPark(W, H);
+    this.tappy = new TappyBuddy(this, W - 56, H - 50, 56);
 
     this.matcher = new WordMatcher((buf, locked) => {
       this.game.events.emit("ui-buffer", buf, locked);
@@ -190,9 +213,9 @@ export class GameScene extends Scene {
     });
 
     this.scale.on("resize", (size: Structs.Size) => {
-      bg.clear();
-      bg.fillGradientStyle(0x87ceeb, 0x87ceeb, 0xe0f4ff, 0xe0f4ff, 1);
-      bg.fillRect(0, 0, size.width, size.height);
+      drawSky(size.width, size.height);
+      this.drawPark(size.width, size.height);
+      this.tappy.setPosition(size.width - 56, size.height - 50);
     });
 
     this.scene.launch("UI");
@@ -246,7 +269,7 @@ export class GameScene extends Scene {
         x: Math.random() * W,
         y: 30 + Math.random() * (H * 0.5),
         speed: 8 + Math.random() * 12,
-        r: 40 + Math.random() * 30,
+        r: 24 + Math.random() * 18,
         g,
       };
       this.drawCloud(c);
@@ -254,9 +277,30 @@ export class GameScene extends Scene {
     }
   }
 
+  /** Rolling park hills with trees along the bottom of the sky. */
+  private drawPark(W: number, H: number): void {
+    const g = this.park;
+    g.clear();
+    g.fillStyle(hex("grassDark"), 1);
+    g.fillEllipse(W * 0.2, H - 20, W * 0.9, 150);
+    g.fillEllipse(W * 0.85, H - 10, W * 0.8, 170);
+    for (const fx of [0.08, 0.36, 0.62, 0.92]) {
+      const x = W * fx;
+      const y = H - 72 - ((fx * 37) % 20);
+      g.fillStyle(hex("brown"), 1);
+      g.fillRect(x - 4, y, 8, 34);
+      g.fillStyle(hex("green"), 1);
+      g.fillCircle(x, y - 6, 24);
+      g.fillCircle(x - 14, y + 6, 16);
+      g.fillCircle(x + 14, y + 6, 16);
+    }
+    g.fillStyle(hex("grass"), 1);
+    g.fillEllipse(W * 0.5, H + 10, W * 1.5, 110);
+  }
+
   private drawCloud(c: Cloud): void {
     c.g.clear();
-    c.g.fillStyle(0xffffff, 0.55);
+    c.g.fillStyle(0xffffff, 0.75);
     c.g.fillCircle(c.x, c.y, c.r);
     c.g.fillCircle(c.x + c.r * 0.6, c.y + 5, c.r * 0.7);
     c.g.fillCircle(c.x - c.r * 0.55, c.y + 8, c.r * 0.65);
@@ -372,6 +416,7 @@ export class GameScene extends Scene {
         }
       });
       this.game.events.emit("ui-frozen", GUST_DURATION_MS);
+      this.gustWind(GUST_DURATION_MS);
       this.cameras.main.flash(200, 150, 220, 255, false);
       playWaveClear();
     } else {
@@ -385,7 +430,7 @@ export class GameScene extends Scene {
           (10 + b.word.length * 2 + this.streak) *
             (b.isBig ? BIG_BALLOON_SCORE_MULT : 1),
         );
-        this.pop(b.x, b.y);
+        this.pop(b.x, b.y, b.colorName);
         b.destroy();
         this.balloons.splice(i, 1);
       }
@@ -454,11 +499,12 @@ export class GameScene extends Scene {
     this.game.events.emit("ui-score", this.score);
     this.game.events.emit("ui-streak", this.streak);
     playPop();
+    this.tappy.cheer();
     if (this.streak > 0 && this.streak % STREAK_SOUND_MILESTONE === 0) {
       playBossDefeated();
     }
 
-    this.pop(balloon.x, balloon.y);
+    this.pop(balloon.x, balloon.y, balloon.colorName);
     balloon.destroy();
     this.balloons.splice(idx, 1);
     this.checkWaveComplete();
@@ -468,6 +514,7 @@ export class GameScene extends Scene {
   private loseLife(): void {
     if (this.gameOver) return;
     this.lives = Math.max(0, this.lives - 1);
+    this.tappy.sad();
     this.game.events.emit("ui-lives", this.lives);
 
     if (this.lives <= 0) {
@@ -502,16 +549,21 @@ export class GameScene extends Scene {
     this.matcher.unregister(balloon.word);
 
     const missText = this.add
-      .text(balloon.x, balloon.y, "missed!", {
-        fontSize: "14px",
-        fontFamily: "monospace",
-        color: "#ff6666",
-      })
+      .text(
+        Math.min(Math.max(balloon.x, 60), this.scale.width - 60),
+        40,
+        "Floated away!",
+        {
+          ...kidText(16, "red"),
+          stroke: PALETTE.cream,
+          strokeThickness: 5,
+        },
+      )
       .setOrigin(0.5);
     this.tweens.add({
       targets: missText,
       alpha: 0,
-      y: balloon.y - 24,
+      y: 16,
       duration: 500,
       onComplete: () => missText.destroy(),
     });
@@ -528,20 +580,58 @@ export class GameScene extends Scene {
     }
   }
 
-  private pop(x: number, y: number): void {
-    const particles = this.add.particles(x, y, "bp-particle", {
-      lifespan: 500,
-      speed: { min: 60, max: 160 },
-      scale: { start: 0.5, end: 0 },
-      quantity: 14,
-      blendMode: BlendModes.ADD,
-      tint: [0x4488ee, 0xaaddff, 0xffffff, 0xffdd44],
+  /** Burst ring + confetti in the balloon's colour. */
+  private pop(x: number, y: number, color: PaletteName = "pink"): void {
+    const ring = this.add.graphics();
+    ring.lineStyle(5, hex(color), 1);
+    ring.strokeCircle(0, 0, 22);
+    ring.setPosition(x, y);
+    this.tweens.add({
+      targets: ring,
+      scale: 2.4,
+      alpha: 0,
+      duration: 320,
+      ease: "Quad.Out",
+      onComplete: () => ring.destroy(),
+    });
+    const particles = this.add.particles(x, y, "bp-confetti", {
+      lifespan: 900,
+      speed: { min: 90, max: 220 },
+      gravityY: 300,
+      rotate: { min: 0, max: 360 },
+      scale: { start: 1, end: 0.6 },
+      quantity: 16,
+      tint: [hex(color), ...CONFETTI.map(hex)],
       emitting: false,
     });
-    particles.explode(14);
-    this.time.delayedCall(600, () => {
+    particles.explode(16);
+    this.time.delayedCall(950, () => {
       particles.destroy();
     });
+  }
+
+  /** Wind streaks across the sky while a gust holds the balloons. */
+  private gustWind(durationMs: number): void {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const until = this.time.now + durationMs;
+    const streak = (): void => {
+      if (this.time.now > until || this.gameOver) return;
+      const y = 40 + Math.random() * (H - 160);
+      const len = 60 + Math.random() * 80;
+      const line = this.add.graphics();
+      line.lineStyle(4, hex("cloud"), 0.8);
+      line.lineBetween(0, 0, len, 0);
+      line.setPosition(-len, y);
+      this.tweens.add({
+        targets: line,
+        x: W + len,
+        duration: 900,
+        onComplete: () => line.destroy(),
+      });
+      this.time.delayedCall(180, streak);
+    };
+    streak();
   }
 
   private checkWaveComplete(): void {
@@ -564,27 +654,17 @@ export class GameScene extends Scene {
       const H = this.scale.height;
 
       if (this.isHordeWave(this.wave)) {
-        const banner = this.add
-          .text(W / 2, H / 2, "🎈 HORDE INCOMING!", {
-            fontSize: "30px",
-            fontFamily: "monospace",
-            color: "#ff6699",
-            fontStyle: "bold",
-          })
-          .setOrigin(0.5);
-
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          "🎈 Balloon party coming!",
+          "pink",
+          WAVE_PAUSE_MS,
+        );
+        this.tappy.cheer();
         this.cameras.main.flash(300, 255, 200, 80, false);
         playHordeIncoming();
-
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: H / 2 - 50,
-          duration: WAVE_PAUSE_MS,
-          onComplete: () => {
-            banner.destroy();
-          },
-        });
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
           this.wave++;
@@ -603,23 +683,15 @@ export class GameScene extends Scene {
           this.startHordeWave();
         });
       } else {
-        const banner = this.add
-          .text(W / 2, H / 2, `Wave ${this.wave} Clear! 🎈`, {
-            fontSize: "30px",
-            fontFamily: "monospace",
-            color: "#224488",
-          })
-          .setOrigin(0.5);
-
-        this.tweens.add({
-          targets: banner,
-          alpha: 0,
-          y: H / 2 - 50,
-          duration: WAVE_PAUSE_MS,
-          onComplete: () => {
-            banner.destroy();
-          },
-        });
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          `Wave ${this.wave} clear! 🎈`,
+          "green",
+          WAVE_PAUSE_MS,
+        );
+        this.tappy.cheer();
 
         this.time.delayedCall(WAVE_PAUSE_MS, () => {
           this.wave++;

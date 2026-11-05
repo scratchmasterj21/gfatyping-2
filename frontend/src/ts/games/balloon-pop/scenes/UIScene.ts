@@ -1,13 +1,20 @@
-import { Scene, GameObjects, Structs, Time } from "phaser";
+import { Scene, Structs, Time } from "phaser";
 
+import { HudChip, rowLayout } from "../../shared/phaser-ui";
+import { LIVES } from "./GameScene";
+
+/**
+ * Balloons escape off the TOP, so the HUD lives along the bottom where it
+ * never hides a balloon that's about to get away.
+ */
 export class UIScene extends Scene {
-  private waveText!: GameObjects.Text;
-  private scoreText!: GameObjects.Text;
-  private livesText!: GameObjects.Text;
-  private powerUpText!: GameObjects.Text;
-  private gustText!: GameObjects.Text;
-  private bufferText!: GameObjects.Text;
-  private streakText!: GameObjects.Text;
+  private waveChip!: HudChip;
+  private scoreChip!: HudChip;
+  private livesChip!: HudChip;
+  private powerUpChip!: HudChip;
+  private gustChip!: HudChip;
+  private bufferChip!: HudChip;
+  private streakChip!: HudChip;
   private gustClearTimer: Time.TimerEvent | null = null;
 
   constructor() {
@@ -15,89 +22,84 @@ export class UIScene extends Scene {
   }
 
   create(): void {
-    const W = this.scale.width;
-    const H = this.scale.height;
+    this.waveChip = new HudChip(this, 0, 0, "Wave 1");
+    this.scoreChip = new HudChip(this, 0, 0, "⭐ 0");
+    // starts full: the first lives event fires before this scene exists
+    this.livesChip = new HudChip(this, 0, 0, "❤".repeat(LIVES)).setColors(
+      "cream",
+      "red",
+    );
+    this.powerUpChip = new HudChip(this, 0, 0, "")
+      .setColors("gold", "ink")
+      .setVisible(false);
+    this.gustChip = new HudChip(this, 0, 0, "🌪️ Balloons held!")
+      .setColors("sky", "ink")
+      .setVisible(false);
+    this.bufferChip = new HudChip(this, 0, 0, "").setVisible(false);
+    this.streakChip = new HudChip(this, 0, 0, "")
+      .setColors("orange", "cream")
+      .setVisible(false);
 
-    const topStyle = {
-      fontSize: "15px",
-      fontFamily: "monospace",
-      color: "#aaaaaa",
-    };
-    const bufStyle = {
-      fontSize: "18px",
-      fontFamily: "monospace",
-      color: "#ffffff",
-      backgroundColor: "#ffffff22",
-      padding: { x: 10, y: 4 },
-    };
-
-    this.waveText = this.add.text(12, 10, "Wave 1", topStyle);
-    this.scoreText = this.add.text(12, 30, "Score: 0", topStyle);
-    this.livesText = this.add
-      .text(W / 2, 10, "❤ ❤ ❤ ❤ ❤ ❤ ❤ ❤", { ...topStyle, color: "#ee4444" })
-      .setOrigin(0.5, 0);
-    this.powerUpText = this.add
-      .text(W / 2, 34, "", { ...topStyle, fontSize: "14px", color: "#ffdd44" })
-      .setOrigin(0.5, 0);
-    this.gustText = this.add
-      .text(W / 2, H / 2 - 110, "", {
-        fontSize: "24px",
-        fontFamily: "monospace",
-        color: "#88ddff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
-
-    this.bufferText = this.add
-      .text(W / 2, H - 16, "", bufStyle)
-      .setOrigin(0.5, 1);
-    this.streakText = this.add
-      .text(W / 2, H - 50, "", {
-        fontSize: "13px",
-        fontFamily: "monospace",
-        color: "#ffaa00",
-      })
-      .setOrigin(0.5, 1);
-
-    this.scale.on("resize", (size: Structs.Size) => {
-      this.livesText.setX(size.width / 2);
-      this.powerUpText.setX(size.width / 2);
-      this.gustText.setX(size.width / 2).setY(size.height / 2 - 110);
-      this.bufferText.setX(size.width / 2).setY(size.height - 16);
-      this.streakText.setX(size.width / 2).setY(size.height - 50);
-    });
+    this.layout();
+    this.scale.on("resize", (_size: Structs.Size) => this.layout());
 
     this.game.events.on("ui-wave", (wave: number) => {
-      this.waveText.setText(`Wave ${wave}`);
+      this.waveChip.setLabel(`Wave ${wave}`);
+      this.layout();
     });
     this.game.events.on("ui-score", (score: number) => {
-      this.scoreText.setText(`Score: ${score}`);
+      this.scoreChip.setLabel(`⭐ ${score}`);
+      this.layout();
     });
     this.game.events.on("ui-lives", (lives: number) => {
-      this.livesText.setText("❤ ".repeat(lives).trim());
+      this.livesChip.setLabel(lives > 0 ? "❤".repeat(lives) : "💔");
+      this.layout();
     });
     this.game.events.on("ui-powerup", (kind: "gust" | "golden" | null) => {
       if (kind === null) {
-        this.powerUpText.setText("");
+        this.powerUpChip.setVisible(false);
       } else {
-        const icon = kind === "gust" ? "🌪️" : "🎇";
-        this.powerUpText.setText(`${icon} Press ENTER to use!`);
+        const icon = kind === "gust" ? "🌪️" : "🌟";
+        this.powerUpChip
+          .setLabel(`${icon} Press ENTER to use!`)
+          .setVisible(true);
       }
+      this.layout();
     });
     this.game.events.on("ui-frozen", (durationMs: number) => {
-      this.gustText.setText("🌪️ GUST!");
+      this.gustChip.setVisible(true);
+      this.layout();
       this.gustClearTimer?.remove();
       this.gustClearTimer = this.time.delayedCall(durationMs, () => {
-        this.gustText.setText("");
+        this.gustChip.setVisible(false);
       });
     });
     this.game.events.on("ui-buffer", (buf: string, locked: string | null) => {
-      this.bufferText.setText(buf.length > 0 ? `${buf}_` : "");
-      this.bufferText.setColor(locked !== null ? "#ffcc44" : "#ffffff");
+      this.bufferChip
+        .setLabel(buf.length > 0 ? `${buf}_` : "")
+        .setColors(locked !== null ? "yellow" : "cream", "ink")
+        .setVisible(buf.length > 0);
+      this.layout();
     });
     this.game.events.on("ui-streak", (streak: number) => {
-      this.streakText.setText(streak >= 5 ? `🎈 ${streak} streak!` : "");
+      this.streakChip
+        .setLabel(`🎈 ${streak} in a row!`)
+        .setVisible(streak >= 5);
+      this.layout();
     });
+  }
+
+  private layout(): void {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    for (const c of [this.waveChip, this.scoreChip, this.livesChip]) {
+      c.setY(H - 26);
+    }
+    rowLayout([this.waveChip, this.scoreChip, this.livesChip], W / 2);
+    this.bufferChip.setPosition(W / 2, H - 64);
+    this.streakChip.setPosition(W / 2, H - 100);
+    this.powerUpChip.setPosition(W / 2, H - 136);
+    this.gustChip.setPosition(W / 2, H - 172);
   }
 
   shutdown(): void {

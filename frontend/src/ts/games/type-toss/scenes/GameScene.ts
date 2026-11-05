@@ -1,5 +1,8 @@
 import { Scene, Time } from "phaser";
 
+import { hex, PALETTE } from "../../shared/game-palette";
+import { kidText, popBanner, TappyBuddy } from "../../shared/phaser-ui";
+
 import { Target, TargetKind } from "../entities/Target";
 import {
   playPop,
@@ -66,6 +69,7 @@ export class GameScene extends Scene {
   private _spawnTimer: Time.TimerEvent | null = null;
   private multiplayer = false;
   private randomState = 1;
+  private tappy!: TappyBuddy;
 
   constructor() {
     super({ key: "Game" });
@@ -119,6 +123,7 @@ export class GameScene extends Scene {
     });
 
     this.createGrid(W, H);
+    this.tappy = new TappyBuddy(this, W - 48, H - 12, 52);
 
     this.input.keyboard?.on("keydown", (e: KeyboardEvent) => {
       if (this.gameOver || e.repeat) return;
@@ -179,54 +184,59 @@ export class GameScene extends Scene {
     }
   }
 
-  // PLACEHOLDER: carnival curtain background
-  // ASSETS: replace with this.add.image(W/2, H/2, "tt-bg").setDisplaySize(W, H)
+  /** Carnival booth: striped tent wall, bulb-lit valance, curtains, counter. */
   private drawBackground(W: number, H: number): void {
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0xb5651d, 0xb5651d, 0xd4a574, 0xd4a574, 1);
-    bg.fillRect(0, 0, W, H);
+    const stripe = 46;
+    for (let x = 0, i = 0; x < W; x += stripe, i++) {
+      bg.fillStyle(i % 2 === 0 ? hex("red") : hex("cream"), 1);
+      bg.fillRect(x, 0, stripe, H);
+    }
+    // soft glow in the middle so the prizes pop
+    bg.fillStyle(hex("yellow"), 0.18);
+    bg.fillEllipse(W / 2, H * 0.5, W * 0.9, H * 0.8);
 
-    // Sunburst rays from center
-    const cx = W / 2;
-    const cy = H * 0.55;
-    const rays = this.add.graphics();
-    rays.fillStyle(0xc87941, 0.35);
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      const a2 = ((i + 0.4) / 12) * Math.PI * 2;
-      const r = Math.max(W, H) * 1.2;
-      rays.fillTriangle(
-        cx,
-        cy,
-        cx + Math.cos(a) * r,
-        cy + Math.sin(a) * r,
-        cx + Math.cos(a2) * r,
-        cy + Math.sin(a2) * r,
-      );
+    // scalloped valance with light bulbs
+    const val = this.add.graphics();
+    val.fillStyle(hex("purple"), 1);
+    val.fillRect(0, 0, W, 36);
+    for (let x = 0; x < W + 40; x += 40) {
+      val.fillCircle(x + 20, 36, 20);
+    }
+    const bulbColors = ["yellow", "cream", "pink", "sky"] as const;
+    for (let x = 20, i = 0; x < W; x += 40, i++) {
+      const bulb = this.add
+        .circle(x, 52, 5, hex(bulbColors[i % bulbColors.length] ?? "yellow"))
+        .setAlpha(0.95);
+      this.tweens.add({
+        targets: bulb,
+        alpha: 0.35,
+        duration: 600,
+        delay: (i % 4) * 150,
+        yoyo: true,
+        repeat: -1,
+      });
     }
 
-    // Red curtain strips on sides
+    // side curtains with gold tie-backs
     const curtain = this.add.graphics();
-    curtain.fillStyle(0xcc2200, 0.88);
-    curtain.fillRect(0, 0, W * 0.1, H);
-    curtain.fillRect(W * 0.9, 0, W * 0.1, H);
-
-    // Gold stars on curtains
-    const stars = this.add.graphics();
-    stars.fillStyle(0xffd700, 1);
-    const positions = [
-      [W * 0.05, H * 0.15],
-      [W * 0.05, H * 0.4],
-      [W * 0.05, H * 0.65],
-      [W * 0.95, H * 0.15],
-      [W * 0.95, H * 0.4],
-      [W * 0.95, H * 0.65],
-    ];
-    for (const [sx, sy] of positions) {
-      if (sx !== undefined && sy !== undefined) {
-        stars.fillCircle(sx, sy, 7);
-      }
+    curtain.fillStyle(hex("red"), 1);
+    curtain.fillRect(0, 0, W * 0.07, H);
+    curtain.fillRect(W * 0.93, 0, W * 0.07, H);
+    curtain.fillStyle(0xc9333a, 1);
+    for (const x of [W * 0.02, W * 0.05, W * 0.95, W * 0.98]) {
+      curtain.fillRect(x - 2, 0, 4, H);
     }
+    curtain.fillStyle(hex("gold"), 1);
+    curtain.fillRoundedRect(0, H * 0.5, W * 0.08, 10, 5);
+    curtain.fillRoundedRect(W * 0.92, H * 0.5, W * 0.08, 10, 5);
+
+    // wooden counter along the bottom
+    const counter = this.add.graphics();
+    counter.fillStyle(hex("brownDark"), 1);
+    counter.fillRect(0, H - 34, W, 34);
+    counter.fillStyle(hex("brown"), 1);
+    counter.fillRect(0, H - 40, W, 10);
   }
 
   private computeLayout(W: number, H: number): void {
@@ -260,16 +270,16 @@ export class GameScene extends Scene {
     }
   }
 
-  // PLACEHOLDER: wooden shelf plank
-  // ASSETS: replace with this.add.image(x + w/2, y, "shelf").setDisplaySize(w, 14)
+  /** Wooden shelf plank with little brackets. */
   private drawShelf(x: number, y: number, w: number): void {
     const g = this.add.graphics();
-    g.fillStyle(0x8b5a2b, 1);
-    g.fillRect(x, y - 7, w, 14);
-    g.lineStyle(1.5, 0x5c3317, 0.9);
-    g.lineBetween(x, y - 7, x + w, y - 7);
-    g.lineStyle(1, 0xc4843c, 0.5);
-    g.lineBetween(x, y, x + w, y);
+    g.fillStyle(hex("brownDark"), 1);
+    g.fillRect(x + 20, y + 6, 10, 16);
+    g.fillRect(x + w - 30, y + 6, 10, 16);
+    g.fillStyle(hex("brownDark"), 1);
+    g.fillRoundedRect(x, y - 4, w, 14, 5);
+    g.fillStyle(hex("brown"), 1);
+    g.fillRoundedRect(x, y - 8, w, 12, 5);
   }
 
   private pickTargetKind(): TargetKind {
@@ -411,13 +421,13 @@ export class GameScene extends Scene {
         target.x,
         target.y - 30,
         `+${BONUS_TIME_SECONDS}s`,
-        "#44ee88",
+        PALETTE.grassDark,
       );
       playWaveClear();
     } else if (target.kind === "doublePoints") {
       this.doublePointsUntil = this.time.now + DOUBLE_POINTS_DURATION_MS;
       this.game.events.emit("ui-double-points", DOUBLE_POINTS_DURATION_MS);
-      this.spawnFloatingText(target.x, target.y - 30, "2x!", "#e040fb");
+      this.spawnFloatingText(target.x, target.y - 30, "2x!", PALETTE.purple);
       playWaveClear();
     } else if (this.streak === 5 || this.streak === 10) {
       playWaveClear();
@@ -439,36 +449,67 @@ export class GameScene extends Scene {
       target.x,
       target.y - 30,
       `-${TRAP_TIME_PENALTY}s`,
-      "#ff4444",
+      PALETTE.red,
     );
     this.cameras.main.flash(180, 200, 0, 0);
     playMiss();
     this.popAndRefill(target, cell);
   }
 
+  /** A ball arcs from the player's spot (bottom-left) to the prize. */
+  private throwBall(tx: number, ty: number): number {
+    const sx = this.scale.width * 0.06;
+    const sy = this.scale.height - 70;
+    const ball = this.add.image(sx, sy, "tt-ball").setDisplaySize(32, 32);
+    const peak = Math.min(sy, ty) - 80;
+    const duration = 240;
+    this.tweens.add({
+      targets: { t: 0 },
+      t: 1,
+      duration,
+      onUpdate: (_tw, o: { t: number }) => {
+        const t = o.t;
+        // quadratic bezier through a point above both ends
+        const mx = (sx + tx) / 2;
+        ball.x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * mx + t * t * tx;
+        ball.y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * peak + t * t * ty;
+        ball.angle = t * 540;
+      },
+      onComplete: () => ball.destroy(),
+    });
+    return duration;
+  }
+
   private popAndRefill(target: Target, cell: Cell): void {
-    // Pop animation
+    const hitDelay = this.throwBall(target.x, target.y);
+    if (target.kind !== "trap") this.tappy.cheer();
+    else this.tappy.sad();
+
+    // Pop animation once the ball lands
     this.tweens.add({
       targets: target,
       scaleX: 1.3,
       scaleY: 1.3,
       alpha: 0,
+      delay: hitDelay,
       duration: 200,
       ease: "Quad.Out",
       onComplete: () => target.destroy(),
     });
 
-    // Particle burst
-    const particles = this.add.particles(target.x, target.y, "tt-particle", {
-      lifespan: 320,
-      speed: { min: 30, max: 90 },
-      scale: { start: 0.5, end: 0 },
-      quantity: 7,
-      blendMode: "ADD",
-      emitting: false,
+    // Confetti burst on hit
+    this.time.delayedCall(hitDelay, () => {
+      const particles = this.add.particles(target.x, target.y, "tt-particle", {
+        lifespan: 500,
+        speed: { min: 60, max: 150 },
+        scale: { start: 0.6, end: 0 },
+        quantity: 12,
+        tint: [hex("yellow"), hex("pink"), hex("blue"), hex("green")],
+        emitting: false,
+      });
+      particles.explode(12);
+      this.time.delayedCall(550, () => particles.destroy());
     });
-    particles.explode(7);
-    this.time.delayedCall(350, () => particles.destroy());
 
     // Delayed refill - also checks cell.target is still empty, since a grid
     // shuffle landing in this window can refill the cell itself first;
@@ -492,14 +533,13 @@ export class GameScene extends Scene {
   ): void {
     const t = this.add
       .text(x, y, text, {
-        fontSize: "18px",
-        fontFamily: "monospace",
-        fontStyle: "bold",
+        ...kidText(22),
         color,
-        stroke: "#000000",
-        strokeThickness: 3,
+        stroke: PALETTE.cream,
+        strokeThickness: 5,
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setDepth(10);
     this.tweens.add({
       targets: t,
       y: y - 30,
@@ -517,21 +557,7 @@ export class GameScene extends Scene {
 
     const W = this.scale.width;
     const H = this.scale.height;
-    const banner = this.add
-      .text(W / 2, H * 0.42, "🔀 SHUFFLE!", {
-        fontSize: "30px",
-        fontFamily: "monospace",
-        color: "#ffdd44",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
-    this.tweens.add({
-      targets: banner,
-      alpha: 0,
-      y: H * 0.42 - 30,
-      duration: 900,
-      onComplete: () => banner.destroy(),
-    });
+    popBanner(this, W / 2, H * 0.42, "🔀 New prizes!", "yellow", 1100);
 
     for (const cell of this.cells) {
       if (cell.target !== null) {

@@ -11,6 +11,8 @@ import {
   untrack,
 } from "solid-js";
 
+import type { GameOverScene } from "./scenes/GameOverScene";
+
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
@@ -20,6 +22,10 @@ import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
 import { GamePickLayout } from "../components/GamePickLayout";
+import {
+  GameResultOverlay,
+  GameResultView,
+} from "../components/GameResultOverlay";
 import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
@@ -32,6 +38,7 @@ import {
   WordListOption,
 } from "../word-defender/systems/vocab-pool";
 import { createTypeRacerGame } from "./game-config";
+import { raceHeadline, RaceEnd, raceStars } from "./racer-result";
 import {
   createRacerRoom,
   finishRacerRoom,
@@ -97,11 +104,17 @@ export function TypeRacerModal(props: Props): JSXElement {
     }),
   );
 
+  const [result, setResult] = createSignal<{
+    view: GameResultView;
+    multiplayer: boolean;
+  } | null>(null);
+
   const startGame = async (multiplayerRoom?: RacerRoom): Promise<void> => {
     const opt = selected();
     const cpuWpm = difficulty().wpm;
     const onClose = props.onClose;
     const onResult = props.onResult;
+    setResult(null);
     setPhase("loading");
     const words = multiplayerRoom?.words ?? (await opt.getWords());
     setPhase("playing");
@@ -138,9 +151,35 @@ export function TypeRacerModal(props: Props): JSXElement {
     game.events.on("game-result", (data: { score: number; wave: number }) => {
       onResult?.(data.score, data.wave);
     });
+    game.events.on("game-over-screen", (r: RaceEnd) => {
+      setResult({
+        multiplayer: r.multiplayer === true,
+        view: {
+          headline: raceHeadline(r),
+          score: r.wpm,
+          scoreLabel: "words per minute",
+          stars: raceStars(r),
+          stats: [
+            { label: "accuracy", value: `${r.accuracy}%` },
+            { label: "words typed", value: String(r.wordsTyped) },
+            { label: "time", value: `${r.elapsed}s` },
+            {
+              label: r.playerWon ? "letters ahead" : "letters behind",
+              value: String(r.marginChars),
+            },
+          ],
+        },
+      });
+    });
     game.events.on("exit-game", () => {
       onClose();
     });
+  };
+
+  const playAgain = (): void => {
+    setResult(null);
+    const over = game?.scene.getScene("GameOver") as GameOverScene | null;
+    over?.playAgain();
   };
 
   const cleanup = (): void => {
@@ -150,6 +189,7 @@ export function TypeRacerModal(props: Props): JSXElement {
     }
     setVisualProgress(0);
     setRaceActive(false);
+    setResult(null);
     setPhase("pick");
   };
 
@@ -440,7 +480,7 @@ export function TypeRacerModal(props: Props): JSXElement {
 
         <Show when={phase() === "playing"}>
           <Show when={roomCode() !== undefined}>
-            <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
+            <div class="pointer-events-none absolute top-3 left-16 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
               <div class="font-bold text-main">Race {roomCode()}</div>
               <For each={players()}>
                 {(player, index) => (
@@ -472,6 +512,18 @@ export function TypeRacerModal(props: Props): JSXElement {
             }}
             class="h-full w-full"
           ></div>
+          <Show when={result()}>
+            {(r) => (
+              <GameResultOverlay
+                result={r().view}
+                onPlayAgain={r().multiplayer ? undefined : playAgain}
+                note={
+                  r().multiplayer ? "Waiting for the other racers…" : undefined
+                }
+                onExit={() => props.onClose()}
+              />
+            )}
+          </Show>
         </Show>
 
         <Show when={phase() === "results"}>

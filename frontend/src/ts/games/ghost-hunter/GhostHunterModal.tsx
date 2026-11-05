@@ -11,6 +11,8 @@ import {
   untrack,
 } from "solid-js";
 
+import type { GameOverScene } from "./scenes/GameOverScene";
+
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { LESSON_CHECKPOINT_MAX_WAVE } from "../../lessons/lesson-checkpoints";
@@ -22,6 +24,10 @@ import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
 import { GamePickLayout } from "../components/GamePickLayout";
+import {
+  GameResultOverlay,
+  GameResultView,
+} from "../components/GameResultOverlay";
 import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
@@ -29,6 +35,7 @@ import { groupWordListOptions } from "../components/groupWordListOptions";
 import { MULTIPLAYER_UNLOCK_HINT_GHOST } from "../components/multiplayer-unlock-hints";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
+import { waveAccuracy, WaveEnd, waveStars } from "../shared/wave-result";
 import {
   getWordListOptions,
   WordListOption,
@@ -57,6 +64,23 @@ import {
   subscribeGhostWorld,
   updateGhostPlayerPosition,
 } from "./ghost-multiplayer";
+
+const toView = (d: WaveEnd): GameResultView => ({
+  headline:
+    d.cleared === true
+      ? "Yard saved!"
+      : d.wave >= 6
+        ? "Ghost-catching hero!"
+        : "Great ghost catching!",
+  score: d.score,
+  stars: waveStars(d),
+  stats: [
+    { label: "wave reached", value: String(d.wave) },
+    { label: "accuracy", value: `${waveAccuracy(d)}%` },
+    { label: "ghosts caught", value: String(d.hits) },
+    { label: "missed keys", value: String(d.misses) },
+  ],
+});
 
 const OPTIONS = getWordListOptions();
 const MULTIPLAYER_OPTIONS = OPTIONS.slice(
@@ -91,6 +115,10 @@ export function GhostHunterModal(props: Props): JSXElement {
     "pick" | "loading" | "lobby" | "playing" | "results"
   >("pick");
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
+  const [result, setResult] = createSignal<{
+    view: GameResultView;
+    multiplayer: boolean;
+  } | null>(null);
   const [maxWave, setMaxWave] = createSignal<5 | 10>(5);
   const [roomCode, setRoomCode] = createSignal<string>();
   const [joinCode, setJoinCode] = createSignal("");
@@ -139,6 +167,7 @@ export function GhostHunterModal(props: Props): JSXElement {
     const onClose = props.onClose;
     const onResult = props.onResult;
     const multiplayerCode = roomCode();
+    setResult(null);
     setPhase("loading");
     const words = wordsOverride ?? (await selected().getWords());
     setPhase("playing");
@@ -229,9 +258,21 @@ export function GhostHunterModal(props: Props): JSXElement {
         );
       },
     );
+    game.events.on("game-over-screen", (d: WaveEnd) => {
+      setResult({
+        view: toView(d),
+        multiplayer: multiplayerCode !== undefined,
+      });
+    });
     game.events.on("exit-game", () => {
       onClose();
     });
+  };
+
+  const playAgain = (): void => {
+    setResult(null);
+    const over = game?.scene.getScene("GameOver") as GameOverScene | null;
+    over?.playAgain();
   };
 
   const cleanup = (): void => {
@@ -240,6 +281,7 @@ export function GhostHunterModal(props: Props): JSXElement {
       game = null;
     }
     setLocalPlayerPosition(0.5);
+    setResult(null);
     setPhase("pick");
   };
 
@@ -559,7 +601,7 @@ export function GhostHunterModal(props: Props): JSXElement {
 
         <Show when={phase() === "playing"}>
           <Show when={roomCode() !== undefined}>
-            <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
+            <div class="pointer-events-none absolute top-3 left-16 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
               <div class="font-bold text-main">Team room {roomCode()}</div>
               <For each={Object.values(room()?.players ?? {})}>
                 {(player) => (
@@ -629,6 +671,16 @@ export function GhostHunterModal(props: Props): JSXElement {
             }}
             class="h-full w-full"
           ></div>
+          <Show when={result()}>
+            {(r) => (
+              <GameResultOverlay
+                result={r().view}
+                onPlayAgain={r().multiplayer ? undefined : playAgain}
+                note={r().multiplayer ? "Waiting for your team…" : undefined}
+                onExit={() => props.onClose()}
+              />
+            )}
+          </Show>
         </Show>
 
         <Show when={phase() === "results"}>

@@ -1,6 +1,12 @@
 import { Scene, GameObjects, Structs } from "phaser";
 
+import { hex, PALETTE } from "../../shared/game-palette";
+import { HudChip, kidText, rowLayout } from "../../shared/phaser-ui";
 import { shuffleCyclic } from "../../word-defender/systems/vocab-pool";
+
+/** Kart drawn size; its seat lines up with the avatar the modal floats above it. */
+const KART_W = 84;
+const KART_H = 45;
 
 const QUEUE_SIZE = 12;
 const COUNTDOWN_MS = 3000;
@@ -37,8 +43,10 @@ export class GameScene extends Scene {
   private cpuProgress = 0;
 
   private trackG!: GameObjects.Graphics;
-  private playerCarG!: GameObjects.Graphics;
-  private cpuCarG!: GameObjects.Graphics;
+  private boostG!: GameObjects.Graphics;
+  private playerKart!: GameObjects.Image;
+  private cpuKart!: GameObjects.Image;
+  private cpuDriver: GameObjects.Image | null = null;
   private typedText!: GameObjects.Text;
   private wrongText!: GameObjects.Text;
   private remainText!: GameObjects.Text;
@@ -46,13 +54,14 @@ export class GameScene extends Scene {
   private futureText!: GameObjects.Text;
   private historyText!: GameObjects.Text;
   private caretRect!: GameObjects.Rectangle;
-  private wpmText!: GameObjects.Text;
-  private wordCountText!: GameObjects.Text;
+  private currentBg!: GameObjects.Graphics;
+  private wpmChip!: HudChip;
+  private wordChip!: HudChip;
   private cpuLabel!: GameObjects.Text;
   private youLabel!: GameObjects.Text;
   private countdownText!: GameObjects.Text;
-  private timerText!: GameObjects.Text;
-  private positionText!: GameObjects.Text;
+  private timerChip!: HudChip;
+  private positionChip!: HudChip;
 
   private spaceErrorMs = 0;
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -120,86 +129,89 @@ export class GameScene extends Scene {
     );
 
     this.trackG = this.add.graphics();
-    this.playerCarG = this.add.graphics();
-    this.cpuCarG = this.add.graphics();
+    this.boostG = this.add.graphics();
+    this.cpuKart = this.add
+      .image(0, 0, this.multiplayer ? "rc-kart-rival" : "rc-kart-cpu")
+      .setDisplaySize(KART_W, KART_H)
+      .setOrigin(0.5, 40 / 64);
+    if (!this.multiplayer) {
+      // Tappy drives the CPU kart in solo races
+      this.cpuDriver = this.add
+        .image(0, 0, "tappy-happy")
+        .setDisplaySize(26, 27)
+        .setOrigin(0.5, 1);
+      this.cpuKart.setDepth(1);
+    }
+    this.playerKart = this.add
+      .image(0, 0, "rc-kart-player")
+      .setDisplaySize(KART_W, KART_H)
+      .setOrigin(0.5, 40 / 64);
 
-    this.cpuLabel = this.add
-      .text(0, 0, "CPU", {
-        fontSize: "11px",
-        fontFamily: "monospace",
-        color: "#cc6655",
-      })
-      .setOrigin(0.5);
-    this.youLabel = this.add
-      .text(0, 0, "YOU", {
-        fontSize: "11px",
-        fontFamily: "monospace",
-        color: "#4477cc",
-      })
-      .setOrigin(0.5);
+    const label = (
+      text: string,
+      fill: string,
+      color: string,
+    ): GameObjects.Text =>
+      this.add
+        .text(0, 0, text, {
+          ...kidText(12, "ink"),
+          color,
+          backgroundColor: fill,
+          padding: { x: 7, y: 2 },
+        })
+        .setOrigin(0.5)
+        .setDepth(2);
+    this.cpuLabel = label(
+      this.multiplayer ? "CPU" : "Tappy",
+      PALETTE.red,
+      PALETTE.cream,
+    );
+    this.youLabel = label("YOU", PALETTE.blue, PALETTE.cream);
 
     this.drawTrack(W, H);
     this.drawCars(W, H);
 
-    const base = { fontSize: "30px", fontFamily: "monospace" };
+    // soft highlight behind the word being typed (drawn under the text)
+    this.currentBg = this.add.graphics();
+    const base = kidText(30, "ink");
     this.historyText = this.add
-      .text(0, 0, "", { ...base, color: "#555568", maxLines: 1 })
+      .text(0, 0, "", { ...base, color: PALETTE.grey, maxLines: 1 })
       .setOrigin(0, 0.5);
     this.typedText = this.add
-      .text(0, 0, "", { ...base, color: "#66ee88" })
+      .text(0, 0, "", { ...base, color: PALETTE.grassDark })
       .setOrigin(0, 0.5);
     this.wrongText = this.add
-      .text(0, 0, "", { ...base, color: "#ff5555", backgroundColor: "#330000" })
+      .text(0, 0, "", {
+        ...base,
+        color: PALETTE.red,
+        backgroundColor: PALETTE.blush,
+      })
       .setOrigin(0, 0.5);
     this.remainText = this.add
-      .text(0, 0, this.currentWord, { ...base, color: "#cccccc" })
+      .text(0, 0, this.currentWord, { ...base, color: PALETTE.ink })
       .setOrigin(0, 0.5);
     this.upcomingText = this.add
-      .text(0, 0, "", { ...base, color: "#77778a", maxLines: 1 })
+      .text(0, 0, "", { ...base, color: PALETTE.grey, maxLines: 1 })
       .setOrigin(0, 0.5);
     this.futureText = this.add
-      .text(0, 0, "", { ...base, color: "#77778a", maxLines: 1 })
+      .text(0, 0, "", { ...base, color: PALETTE.grey, maxLines: 1 })
       .setOrigin(0, 0.5);
     this.caretRect = this.add
-      .rectangle(0, 0, 3, 36, 0xffffff)
+      .rectangle(0, 0, 3, 36, hex("blue"))
       .setOrigin(0, 0.5);
 
-    this.wpmText = this.add
-      .text(0, 0, "WPM: —", {
-        fontSize: "12px",
-        fontFamily: "monospace",
-        color: "#666677",
-      })
-      .setOrigin(0, 1);
-    this.wordCountText = this.add
-      .text(0, 0, "Word 1", {
-        fontSize: "12px",
-        fontFamily: "monospace",
-        color: "#666677",
-      })
-      .setOrigin(1, 1);
-    this.timerText = this.add
-      .text(0, 0, `${this.durationSec}s`, {
-        fontSize: "18px",
-        fontFamily: "monospace",
-        color: "#ffdd66",
-      })
-      .setOrigin(0.5, 0);
-    this.positionText = this.add
-      .text(0, 0, "NECK AND NECK", {
-        fontSize: "14px",
-        fontFamily: "monospace",
-        color: "#cccccc",
-      })
-      .setOrigin(0.5, 0);
+    this.wpmChip = new HudChip(this, 0, 0, "🚀 WPM —");
+    this.wordChip = new HudChip(this, 0, 0, "Word 1");
+    this.timerChip = new HudChip(this, 0, 0, `⏱ ${this.durationSec}s`);
+    this.positionChip = new HudChip(this, 0, 0, "Neck and neck!").setColors(
+      "yellow",
+      "ink",
+    );
     this.countdownText = this.add
       .text(W / 2, H / 2, "3", {
-        fontSize: "64px",
-        fontFamily: "monospace",
-        fontStyle: "bold",
-        color: "#ffdd44",
-        stroke: "#111122",
-        strokeThickness: 8,
+        ...kidText(80, "yellow"),
+        stroke: PALETTE.ink,
+        strokeThickness: 12,
       })
       .setOrigin(0.5)
       .setDepth(20);
@@ -260,18 +272,19 @@ export class GameScene extends Scene {
     if (this.spaceErrorMs > 0) {
       this.spaceErrorMs -= delta;
       if (this.spaceErrorMs <= 0) {
-        this.remainText.setColor("#cccccc");
+        this.remainText.setColor(PALETTE.ink);
       }
     }
 
     if (elapsed > 1 && this.completedChars > 0) {
       const wpm = Math.round(this.completedChars / 5 / (elapsed / 60));
-      this.wpmText.setText(`WPM: ${wpm}`);
+      this.wpmChip.setLabel(`🚀 WPM ${wpm}`);
+      this.layoutChips(this.scale.width, this.scale.height);
     }
 
     this.caretRect.setVisible(Math.floor(performance.now() / 530) % 2 === 0);
-    this.timerText.setText(
-      `${Math.max(0, Math.ceil(this.durationSec - elapsed))}s`,
+    this.timerChip.setLabel(
+      `⏱ ${Math.max(0, Math.ceil(this.durationSec - elapsed))}s`,
     );
     const livePlayerProgress = Math.min(
       1,
@@ -298,11 +311,19 @@ export class GameScene extends Scene {
     if (Math.abs(distanceToTarget) < 0.0005) this.playerVelocity = 0;
 
     const gap = this.visualPlayerProgress - this.cpuProgress;
-    this.positionText
-      .setText(
-        gap > 0.035 ? "AHEAD" : gap < -0.035 ? "CATCH UP!" : "NECK AND NECK",
+    this.positionChip
+      .setLabel(
+        gap > 0.035
+          ? "You're ahead!"
+          : gap < -0.035
+            ? "Catch up!"
+            : "Neck and neck!",
       )
-      .setColor(gap > 0.035 ? "#66ee88" : gap < -0.035 ? "#ff7766" : "#ffdd66");
+      .setColors(
+        gap > 0.035 ? "green" : gap < -0.035 ? "red" : "yellow",
+        gap < -0.035 ? "cream" : "ink",
+      );
+    this.layoutChips(this.scale.width, this.scale.height);
     this.drawCars(this.scale.width, this.scale.height);
     if (_time - this.lastProgressEmitAt >= 50) {
       this.lastProgressEmitAt = _time;
@@ -362,13 +383,13 @@ export class GameScene extends Scene {
         this.wordQueue.push(this.popWord());
         this.typedBuffer = "";
         this.goodPrefix = 0;
-        this.wordCountText.setText(`Word ${this.wordCount + 1}`);
+        this.wordChip.setLabel(`Word ${this.wordCount + 1}`);
         this.refreshWordDisplay();
       } else {
         this.spaceErrorMs = 250;
         this.playerWobbleMs = 260;
         this.playerVelocity *= 0.45;
-        this.remainText.setColor("#ff4444");
+        this.remainText.setColor(PALETTE.red);
       }
       return;
     }
@@ -445,36 +466,77 @@ export class GameScene extends Scene {
   private drawTrack(W: number, H: number): void {
     const { roadY, roadH, laneH, margin, trackLen } = this.trackBounds(W, H);
     const finishX = margin + trackLen;
+    const g = this.trackG;
+    g.clear();
 
-    this.trackG.clear();
-    this.trackG.fillStyle(0x87ceeb, 1);
-    this.trackG.fillRect(0, 0, W, roadY);
-    this.trackG.fillStyle(0x3d4d3d, 1);
-    this.trackG.fillRect(0, roadY, W, roadH);
-    this.trackG.fillStyle(0xdddd44, 0.9);
-    this.trackG.fillRect(0, roadY, W, 3);
-    this.trackG.fillRect(0, roadY + roadH - 3, W, 3);
-    this.trackG.fillStyle(0xdddd44, 0.5);
-    for (let x = margin; x < finishX - 20; x += 32) {
-      this.trackG.fillRect(x, roadY + laneH - 2, 20, 4);
+    // stands with a cheering crowd above the track
+    g.fillStyle(hex("sky"), 1);
+    g.fillRect(0, 0, W, roadY);
+    g.fillStyle(hex("purple"), 1);
+    g.fillRect(0, roadY * 0.45, W, roadY * 0.55);
+    const crowd = [
+      "pink",
+      "yellow",
+      "blue",
+      "orange",
+      "green",
+      "cream",
+    ] as const;
+    for (let x = 8, i = 0; x < W; x += 14, i++) {
+      g.fillStyle(hex(crowd[i % crowd.length] ?? "pink"), 1);
+      g.fillCircle(x, roadY * 0.62 + ((i * 7) % 5), 5);
     }
+
+    // asphalt
+    g.fillStyle(0x5b6378, 1);
+    g.fillRect(0, roadY, W, roadH);
+
+    // red & white kerbs
+    const kerb = 8;
+    for (let x = 0, i = 0; x < W; x += 24, i++) {
+      g.fillStyle(i % 2 === 0 ? hex("red") : hex("cream"), 1);
+      g.fillRect(x, roadY, 24, kerb);
+      g.fillRect(x, roadY + roadH - kerb, 24, kerb);
+    }
+
+    // dashed lane line
+    g.fillStyle(hex("cream"), 0.8);
+    for (let x = margin; x < finishX - 20; x += 36) {
+      g.fillRect(x, roadY + laneH - 3, 22, 6);
+    }
+
+    // start line
+    g.fillStyle(hex("cream"), 0.9);
+    g.fillRect(margin - 4, roadY + kerb, 4, roadH - kerb * 2);
+
+    // checkered finish
     const checkSize = 10;
-    for (let row = 0; row < Math.ceil(roadH / checkSize); row++) {
+    for (let row = 0; row < Math.ceil((roadH - kerb * 2) / checkSize); row++) {
       for (let col = 0; col < 2; col++) {
-        this.trackG.fillStyle((row + col) % 2 === 0 ? 0x000000 : 0xffffff, 1);
-        this.trackG.fillRect(
+        g.fillStyle((row + col) % 2 === 0 ? hex("ink") : hex("cream"), 1);
+        g.fillRect(
           finishX + col * checkSize,
-          roadY + row * checkSize,
+          roadY + kerb + row * checkSize,
           checkSize,
-          checkSize,
+          Math.min(
+            checkSize,
+            roadY + roadH - kerb - (roadY + kerb + row * checkSize),
+          ),
         );
       }
     }
+
+    // grass field + the word dashboard card
     const panelY = roadY + roadH;
-    this.trackG.fillStyle(0x080816, 1);
-    this.trackG.fillRect(0, panelY, W, H - panelY);
-    this.trackG.lineStyle(1, 0x222233, 1);
-    this.trackG.lineBetween(0, panelY, W, panelY);
+    g.fillStyle(hex("grass"), 1);
+    g.fillRect(0, panelY, W, H - panelY);
+    const pad = Math.max(10, W * 0.03);
+    const cardY = panelY + 54;
+    const cardH = H - cardY - 58;
+    g.fillStyle(hex("grassDark"), 1);
+    g.fillRoundedRect(pad, cardY + 6, W - pad * 2, cardH, 22);
+    g.fillStyle(hex("cream"), 1);
+    g.fillRoundedRect(pad, cardY, W - pad * 2, cardH, 22);
   }
 
   private drawCars(W: number, H: number): void {
@@ -486,61 +548,58 @@ export class GameScene extends Scene {
     // word's correctly-typed prefix), not just once per completed word -
     // playerProgress itself stays word-granular for race-end/stat purposes.
     const playerX = margin + this.visualPlayerProgress * trackLen;
-
-    this.cpuCarG.clear();
-    this.playerCarG.clear();
-    this.drawCar(this.cpuCarG, 0xcc3322, cpuX, cpuY);
     const wobble =
       this.playerWobbleMs > 0 ? Math.sin(performance.now() / 22) * 5 : 0;
-    this.drawCar(
-      this.playerCarG,
-      this.boostMs > 0 ? 0x44aaff : 0x2266dd,
-      playerX,
-      playerY + wobble,
-    );
-    if (this.boostMs > 0) {
-      this.playerCarG.fillStyle(0xffaa22, 0.9);
-      this.playerCarG.fillTriangle(
-        playerX - 34,
-        playerY - 5 + wobble,
-        playerX - 34,
-        playerY + 6 + wobble,
-        playerX - 52 - Math.random() * 12,
-        playerY + wobble,
-      );
-    }
-    this.cpuLabel.setPosition(cpuX, cpuY - 34);
-    this.youLabel.setPosition(playerX, playerY - 34 + wobble);
-  }
 
-  private drawCar(
-    g: GameObjects.Graphics,
-    color: number,
-    x: number,
-    y: number,
-  ): void {
-    g.fillStyle(color, 1);
-    g.fillRect(x - 34, y - 10, 68, 20);
-    g.fillStyle(color, 0.75);
-    g.fillRect(x - 17, y - 28, 34, 19);
-    g.fillStyle(0x99ccff, 0.55);
-    g.fillRect(x - 13, y - 25, 26, 12);
-    g.fillStyle(0x1a1a1a, 1);
-    g.fillCircle(x - 22, y + 11, 8);
-    g.fillCircle(x + 22, y + 11, 8);
-    g.fillStyle(0x666666, 1);
-    g.fillCircle(x - 22, y + 11, 4);
-    g.fillCircle(x + 22, y + 11, 4);
+    this.cpuKart.setPosition(cpuX, cpuY);
+    this.cpuDriver?.setPosition(cpuX - 4, cpuY - 6);
+    this.playerKart.setPosition(playerX, playerY + wobble);
+
+    this.boostG.clear();
+    if (this.boostMs > 0) {
+      const y = playerY + wobble;
+      this.boostG.fillStyle(hex("orange"), 0.95);
+      this.boostG.fillTriangle(
+        playerX - 40,
+        y - 6,
+        playerX - 40,
+        y + 6,
+        playerX - 62 - Math.random() * 14,
+        y,
+      );
+      this.boostG.fillStyle(hex("yellow"), 1);
+      this.boostG.fillTriangle(
+        playerX - 40,
+        y - 3,
+        playerX - 40,
+        y + 3,
+        playerX - 52 - Math.random() * 8,
+        y,
+      );
+      this.boostG.lineStyle(3, hex("cream"), 0.7);
+      for (const dy of [-14, 0, 14]) {
+        const len = 18 + Math.random() * 16;
+        this.boostG.lineBetween(
+          playerX - 70 - len,
+          y + dy,
+          playerX - 70,
+          y + dy,
+        );
+      }
+    }
+    this.cpuLabel.setPosition(cpuX, cpuY - 40);
+    this.youLabel.setPosition(playerX, playerY - 46 + wobble);
   }
 
   private positionWordTexts(W: number, H: number): void {
     const { roadY, roadH } = this.trackBounds(W, H);
     const panelY = roadY + roadH;
-    const availableH = H - panelY;
-    const historyY = panelY + availableH * 0.2;
-    const wordY = panelY + availableH * 0.4;
-    const upcomingY = panelY + availableH * 0.6;
-    const wordLeft = Math.max(24, W * 0.08);
+    const cardY = panelY + 54;
+    const cardH = H - cardY - 58;
+    const historyY = cardY + cardH * 0.22;
+    const wordY = cardY + cardH * 0.5;
+    const upcomingY = cardY + cardH * 0.78;
+    const wordLeft = Math.max(28, W * 0.08);
     const wordWidth = Math.max(100, W - wordLeft * 2);
 
     this.historyText
@@ -569,15 +628,36 @@ export class GameScene extends Scene {
       wordLeft + this.typedText.width + this.wrongText.width,
       wordY,
     );
+    const currentW =
+      this.typedText.width + this.wrongText.width + this.remainText.width;
+    this.currentBg.clear();
+    this.currentBg.fillStyle(hex("yellow"), 0.45);
+    this.currentBg.fillRoundedRect(
+      wordLeft - 8,
+      wordY - 24,
+      currentW + 16,
+      48,
+      12,
+    );
   }
 
   private positionAll(W: number, H: number): void {
     this.positionWordTexts(W, H);
-    this.wpmText.setPosition(14, H - 10);
-    this.wordCountText.setPosition(W - 14, H - 10);
-    this.timerText.setPosition(W / 2, 12);
-    this.positionText.setPosition(W / 2, 38);
-    this.countdownText.setPosition(W / 2, H / 2);
+    this.layoutChips(W, H);
+    const { roadY, roadH } = this.trackBounds(W, H);
+    this.countdownText.setPosition(W / 2, roadY + roadH / 2);
+  }
+
+  /** Timer + race position above the card, WPM + word count below it. */
+  private layoutChips(W: number, H: number): void {
+    const { roadY, roadH } = this.trackBounds(W, H);
+    const topY = roadY + roadH + 27;
+    this.timerChip.setY(topY);
+    this.positionChip.setY(topY);
+    rowLayout([this.timerChip, this.positionChip], W / 2);
+    this.wpmChip.setY(H - 28);
+    this.wordChip.setY(H - 28);
+    rowLayout([this.wpmChip, this.wordChip], W / 2);
   }
 
   private removeKeyHandler(): void {

@@ -38,7 +38,6 @@ import {
   MINI_GAME_PAID_RUNS_PER_DAY,
 } from "./mini-game-reward";
 import { sfx } from "./mini-sounds";
-import { MuteButton } from "./MuteButton";
 import { StarRating } from "./StarRating";
 
 const OPTIONS = getWordListOptions();
@@ -125,9 +124,6 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
         // typed with the on-screen keyboard too, so no "connect a keyboard" hint
         needsKeyboard={false}
       >
-        <Show when={phase() === "playing"}>
-          <MuteButton class="absolute top-3 left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-sub-alt text-text hover:bg-text hover:text-bg" />
-        </Show>
         <Switch>
           <Match when={phase() === "pick"}>
             <GamePickLayout

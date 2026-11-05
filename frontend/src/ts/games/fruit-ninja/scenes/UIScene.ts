@@ -1,65 +1,69 @@
-import { Scene, GameObjects, Structs } from "phaser";
+import { Scene, Structs } from "phaser";
+
+import { HudChip, rowLayout } from "../../shared/phaser-ui";
+import { LIVES } from "./GameScene";
+
+/** Row below the page's mute/back buttons. */
+const ROW_Y = 74;
 
 export class UIScene extends Scene {
-  private waveText!: GameObjects.Text;
-  private scoreText!: GameObjects.Text;
-  private livesText!: GameObjects.Text;
-  private bufferText!: GameObjects.Text;
-  private streakText!: GameObjects.Text;
+  private waveChip!: HudChip;
+  private scoreChip!: HudChip;
+  private livesChip!: HudChip;
+  private bufferChip!: HudChip;
+  private streakChip!: HudChip;
 
   constructor() {
     super({ key: "UI", active: false });
   }
 
   create(): void {
-    const W = this.scale.width;
-    const H = this.scale.height;
+    this.waveChip = new HudChip(this, 0, ROW_Y, "Wave 1");
+    this.scoreChip = new HudChip(this, 0, ROW_Y, "⭐ 0");
+    // starts full: the first lives event fires before this scene exists
+    this.livesChip = new HudChip(this, 0, ROW_Y, "🍎".repeat(LIVES));
+    this.bufferChip = new HudChip(this, 0, 0, "").setVisible(false);
+    this.streakChip = new HudChip(this, 0, 0, "")
+      .setColors("orange", "cream")
+      .setVisible(false);
 
-    const top = { fontSize: "15px", fontFamily: "monospace", color: "#ffffff" };
-    const buf = {
-      fontSize: "18px",
-      fontFamily: "monospace",
-      color: "#ffffff",
-      backgroundColor: "#00000055",
-      padding: { x: 10, y: 4 },
-    };
-
-    this.waveText = this.add.text(12, 10, "Wave 1", top);
-    this.scoreText = this.add.text(12, 30, "Score: 0", top);
-    this.livesText = this.add
-      .text(W / 2, 10, "🍎 🍎 🍎 🍎 🍎 🍎 🍎 🍎", { ...top, color: "#ffdd44" })
-      .setOrigin(0.5, 0);
-    this.bufferText = this.add.text(W / 2, H - 16, "", buf).setOrigin(0.5, 1);
-    this.streakText = this.add
-      .text(W / 2, H - 50, "", {
-        fontSize: "13px",
-        fontFamily: "monospace",
-        color: "#ffcc00",
-      })
-      .setOrigin(0.5, 1);
-
-    this.scale.on("resize", (size: Structs.Size) => {
-      this.livesText.setX(size.width / 2);
-      this.bufferText.setX(size.width / 2).setY(size.height - 16);
-      this.streakText.setX(size.width / 2).setY(size.height - 50);
-    });
+    this.layout();
+    this.scale.on("resize", (_size: Structs.Size) => this.layout());
 
     this.game.events.on("ui-wave", (wave: number) => {
-      this.waveText.setText(`Wave ${wave}`);
+      this.waveChip.setLabel(`Wave ${wave}`);
+      this.layout();
     });
     this.game.events.on("ui-score", (score: number) => {
-      this.scoreText.setText(`Score: ${score}`);
+      this.scoreChip.setLabel(`⭐ ${score}`);
+      this.layout();
     });
     this.game.events.on("ui-lives", (lives: number) => {
-      this.livesText.setText("🍎 ".repeat(lives).trim() || "💀");
+      this.livesChip.setLabel(lives > 0 ? "🍎".repeat(lives) : "💔");
+      this.layout();
     });
     this.game.events.on("ui-buffer", (buf: string, locked: string | null) => {
-      this.bufferText.setText(buf.length > 0 ? `${buf}_` : "");
-      this.bufferText.setColor(locked !== null ? "#ffcc44" : "#ffffff");
+      this.bufferChip
+        .setLabel(buf.length > 0 ? `${buf}_` : "")
+        .setColors(locked !== null ? "yellow" : "cream", "ink")
+        .setVisible(buf.length > 0);
+      this.layout();
     });
     this.game.events.on("ui-streak", (streak: number) => {
-      this.streakText.setText(streak >= 5 ? `🔥 ${streak} streak!` : "");
+      this.streakChip
+        .setLabel(`🔥 ${streak} in a row!`)
+        .setVisible(streak >= 5);
+      this.layout();
     });
+  }
+
+  private layout(): void {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    rowLayout([this.waveChip, this.scoreChip, this.livesChip], W / 2);
+    // typed letters + streak sit bottom-centre, between Tappy and the cushion
+    this.bufferChip.setPosition(W / 2, H - 26);
+    this.streakChip.setPosition(W / 2, H - 64);
   }
 
   shutdown(): void {

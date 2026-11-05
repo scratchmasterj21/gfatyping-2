@@ -1,15 +1,21 @@
-import { Scene, GameObjects, Structs, Time } from "phaser";
+import { Scene, Structs, Time } from "phaser";
+
+import { HudChip, rowLayout } from "../../shared/phaser-ui";
+import { LOG_MAX_HP } from "./GameScene";
+
+/** Row below the page's mute/back buttons. */
+const ROW_Y = 74;
 
 export class UIScene extends Scene {
-  private waveText!: GameObjects.Text;
-  private scoreText!: GameObjects.Text;
-  private leftLogText!: GameObjects.Text;
-  private rightLogText!: GameObjects.Text;
-  private facingText!: GameObjects.Text;
-  private powerUpText!: GameObjects.Text;
-  private frozenText!: GameObjects.Text;
-  private bufferText!: GameObjects.Text;
-  private streakText!: GameObjects.Text;
+  private waveChip!: HudChip;
+  private scoreChip!: HudChip;
+  private leftLogChip!: HudChip;
+  private rightLogChip!: HudChip;
+  private facingChip!: HudChip;
+  private powerUpChip!: HudChip;
+  private frozenChip!: HudChip;
+  private bufferChip!: HudChip;
+  private streakChip!: HudChip;
   private frozenClearTimer: Time.TimerEvent | null = null;
 
   constructor() {
@@ -17,100 +23,112 @@ export class UIScene extends Scene {
   }
 
   create(): void {
-    const W = this.scale.width;
-    const H = this.scale.height;
-
-    const top = { fontSize: "15px", fontFamily: "monospace", color: "#aaaacc" };
-    const buf = {
-      fontSize: "18px",
-      fontFamily: "monospace",
-      color: "#ffffff",
-      backgroundColor: "#ffffff22",
-      padding: { x: 10, y: 4 },
-    };
-
-    this.waveText = this.add.text(12, 10, "Wave 1", top);
-    this.scoreText = this.add.text(12, 30, "Score: 0", top);
-    this.leftLogText = this.add.text(12, 50, "🪵".repeat(5), {
-      ...top,
-      color: "#d8a860",
-    });
-    this.rightLogText = this.add
-      .text(W - 12, 50, "🪵".repeat(5), { ...top, color: "#d8a860" })
-      .setOrigin(1, 0);
-    this.facingText = this.add
-      .text(W / 2, 10, "▶", { ...top, fontSize: "20px", color: "#ffdd44" })
-      .setOrigin(0.5, 0);
+    this.waveChip = new HudChip(this, 0, ROW_Y, "Wave 1");
+    this.scoreChip = new HudChip(this, 0, ROW_Y, "⭐ 0");
+    // start full: the first log events fire before this scene exists
+    this.leftLogChip = new HudChip(
+      this,
+      0,
+      ROW_Y + 38,
+      "🪵".repeat(LOG_MAX_HP),
+    );
+    this.rightLogChip = new HudChip(
+      this,
+      0,
+      ROW_Y + 38,
+      "🪵".repeat(LOG_MAX_HP),
+    );
+    this.facingChip = new HudChip(this, 0, ROW_Y + 38, "Looking ▶").setColors(
+      "yellow",
+      "ink",
+    );
     if (this.registry.get("bothSides") === true) {
-      this.facingText.setVisible(false);
+      this.facingChip.setVisible(false);
     }
-    this.powerUpText = this.add
-      .text(W / 2, 34, "", { ...top, fontSize: "14px", color: "#ffdd44" })
-      .setOrigin(0.5, 0);
-    this.frozenText = this.add
-      .text(W / 2, H / 2 - 110, "", {
-        fontSize: "24px",
-        fontFamily: "monospace",
-        color: "#88ddff",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
+    this.powerUpChip = new HudChip(this, 0, ROW_Y + 76, "")
+      .setColors("gold", "ink")
+      .setVisible(false);
+    this.frozenChip = new HudChip(this, 0, ROW_Y + 114, "❄️ Ghosts frozen!")
+      .setColors("sky", "ink")
+      .setVisible(false);
+    this.bufferChip = new HudChip(this, 0, 0, "").setVisible(false);
+    this.streakChip = new HudChip(this, 0, 0, "")
+      .setColors("orange", "cream")
+      .setVisible(false);
 
-    this.bufferText = this.add.text(W / 2, H - 16, "", buf).setOrigin(0.5, 1);
-    this.streakText = this.add
-      .text(W / 2, H - 50, "", {
-        fontSize: "13px",
-        fontFamily: "monospace",
-        color: "#ffaa00",
-      })
-      .setOrigin(0.5, 1);
-
-    this.scale.on("resize", (size: Structs.Size) => {
-      this.rightLogText.setX(size.width - 12);
-      this.facingText.setX(size.width / 2);
-      this.powerUpText.setX(size.width / 2);
-      this.frozenText.setX(size.width / 2).setY(size.height / 2 - 110);
-      this.bufferText.setX(size.width / 2).setY(size.height - 16);
-      this.streakText.setX(size.width / 2).setY(size.height - 50);
-    });
+    this.layout();
+    this.scale.on("resize", (_size: Structs.Size) => this.layout());
 
     this.game.events.on("ui-wave", (wave: number) => {
-      this.waveText.setText(`Wave ${wave}`);
+      this.waveChip.setLabel(`Wave ${wave}`);
+      this.layout();
     });
     this.game.events.on("ui-score", (score: number) => {
-      this.scoreText.setText(`Score: ${score}`);
+      this.scoreChip.setLabel(`⭐ ${score}`);
+      this.layout();
     });
     this.game.events.on("ui-log-left", (hp: number) => {
-      this.leftLogText.setText(hp > 0 ? "🪵".repeat(hp) : "💥 broken");
+      this.leftLogChip
+        .setLabel(hp > 0 ? "🪵".repeat(hp) : "💥 broken")
+        .setColors(hp > 0 ? "cream" : "red", hp > 0 ? "ink" : "cream");
+      this.layout();
     });
     this.game.events.on("ui-log-right", (hp: number) => {
-      this.rightLogText.setText(hp > 0 ? "🪵".repeat(hp) : "💥 broken");
+      this.rightLogChip
+        .setLabel(hp > 0 ? "🪵".repeat(hp) : "💥 broken")
+        .setColors(hp > 0 ? "cream" : "red", hp > 0 ? "ink" : "cream");
+      this.layout();
     });
     this.game.events.on("ui-facing", (facing: "left" | "right") => {
-      this.facingText.setText(facing === "left" ? "◀" : "▶");
+      this.facingChip.setLabel(facing === "left" ? "◀ Looking" : "Looking ▶");
+      this.layout();
     });
     this.game.events.on("ui-powerup", (kind: "freeze" | "tnt" | null) => {
       if (kind === null) {
-        this.powerUpText.setText("");
+        this.powerUpChip.setVisible(false);
       } else {
-        const icon = kind === "freeze" ? "❄️" : "🧨";
-        this.powerUpText.setText(`${icon} Press ENTER to use!`);
+        const icon = kind === "freeze" ? "❄️" : "🎆";
+        this.powerUpChip
+          .setLabel(`${icon} Press ENTER to use!`)
+          .setVisible(true);
       }
+      this.layout();
     });
     this.game.events.on("ui-frozen", (durationMs: number) => {
-      this.frozenText.setText("❄️ FROZEN!");
+      this.frozenChip.setVisible(true);
+      this.layout();
       this.frozenClearTimer?.remove();
       this.frozenClearTimer = this.time.delayedCall(durationMs, () => {
-        this.frozenText.setText("");
+        this.frozenChip.setVisible(false);
       });
     });
     this.game.events.on("ui-buffer", (buf: string, locked: string | null) => {
-      this.bufferText.setText(buf.length > 0 ? `${buf}_` : "");
-      this.bufferText.setColor(locked !== null ? "#ffcc44" : "#ffffff");
+      this.bufferChip
+        .setLabel(buf.length > 0 ? `${buf}_` : "")
+        .setColors(locked !== null ? "yellow" : "cream", "ink")
+        .setVisible(buf.length > 0);
+      this.layout();
     });
     this.game.events.on("ui-streak", (streak: number) => {
-      this.streakText.setText(streak >= 5 ? `🔥 ${streak} streak!` : "");
+      this.streakChip
+        .setLabel(`🔥 ${streak} in a row!`)
+        .setVisible(streak >= 5);
+      this.layout();
     });
+  }
+
+  private layout(): void {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    rowLayout([this.waveChip, this.scoreChip], W / 2);
+    // each side's barricade health sits on its own side
+    this.leftLogChip.setX(12 + this.leftLogChip.chipWidth / 2);
+    this.rightLogChip.setX(W - 12 - this.rightLogChip.chipWidth / 2);
+    this.facingChip.setX(W / 2);
+    this.powerUpChip.setX(W / 2);
+    this.frozenChip.setX(W / 2);
+    this.bufferChip.setPosition(W / 2, H - 26);
+    this.streakChip.setPosition(W / 2, H - 62);
   }
 
   shutdown(): void {

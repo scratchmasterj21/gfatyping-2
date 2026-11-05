@@ -1,17 +1,15 @@
 import { Scene, GameObjects } from "phaser";
 
+import { WordTag } from "../../shared/phaser-ui";
+
 export type PowerUpKind = "emp" | "nuke";
 
-const ICONS: Record<PowerUpKind, string> = { emp: "⚡", nuke: "☢️" };
-
-// PLACEHOLDER: emoji icon on a glowing disc — replace with a sprite. Drifts
-// down like a ship (same update-loop movement in GameScene) but reaching the
-// base costs nothing if uncollected - it's just a missed bonus.
+// Drifts down like a ship (same update-loop movement in GameScene) but
+// reaching the base costs nothing if uncollected - it's just a missed bonus.
 export class PowerUp extends GameObjects.Container {
   readonly word: string;
   readonly kind: PowerUpKind;
-  private labelTyped: GameObjects.Text;
-  private labelRemain: GameObjects.Text;
+  private tag: WordTag;
 
   constructor(
     scene: Scene,
@@ -24,40 +22,26 @@ export class PowerUp extends GameObjects.Container {
     this.word = word;
     this.kind = kind;
 
-    const glow = scene.add.graphics();
-    glow.fillStyle(kind === "emp" ? 0x66ccff : 0x66ff66, 0.3);
-    glow.fillCircle(0, 0, 28);
-    this.add(glow);
+    const orb = scene.add
+      .image(0, 0, kind === "emp" ? "wd-orb-emp" : "wd-orb-nuke")
+      .setDisplaySize(52, 52);
+    this.add(orb);
+    scene.tweens.add({
+      targets: orb,
+      scale: orb.scale * 1.12,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
 
-    const icon = scene.add
-      .text(0, 0, ICONS[kind], { fontSize: "30px" })
-      .setOrigin(0.5);
-    this.add(icon);
-
-    const textStyle = { fontSize: "14px", fontFamily: "monospace" };
-    this.labelTyped = scene.add
-      .text(0, 30, "", { ...textStyle, color: "#88ff88" })
-      .setOrigin(1, 0.5);
-    this.labelRemain = scene.add
-      .text(0, 30, word, { ...textStyle, color: "#ffffff" })
-      .setOrigin(0, 0.5);
-    this.add([this.labelTyped, this.labelRemain]);
-    this.positionLabels();
+    this.tag = new WordTag(scene, 0, 36, word, 16, "yellow");
+    this.add(this.tag);
 
     scene.add.existing(this);
   }
 
-  private positionLabels(): void {
-    const total = this.labelTyped.width + this.labelRemain.width;
-    const half = total / 2;
-    this.labelTyped.setX(-half + this.labelTyped.width);
-    this.labelRemain.setX(-half + this.labelTyped.width);
-  }
-
   updateTyped(typed: string): void {
-    const remain = this.word.slice(typed.length);
-    this.labelTyped.setText(typed);
-    this.labelRemain.setText(remain);
-    this.positionLabels();
+    this.tag.setTyped(typed);
   }
 }

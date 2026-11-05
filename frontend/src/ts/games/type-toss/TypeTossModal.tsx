@@ -11,6 +11,8 @@ import {
   untrack,
 } from "solid-js";
 
+import type { GameOverScene } from "./scenes/GameOverScene";
+
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
@@ -20,6 +22,10 @@ import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
 import { GamePickLayout } from "../components/GamePickLayout";
+import {
+  GameResultOverlay,
+  GameResultView,
+} from "../components/GameResultOverlay";
 import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
@@ -36,6 +42,7 @@ import {
   TYPE_TOSS_DIFFICULTIES,
   GameDifficulty,
 } from "./game-config";
+import { tossAccuracy, TossEnd, tossStars, tossWpm } from "./toss-result";
 import {
   createTossRoom,
   finishTossRoom,
@@ -48,6 +55,19 @@ import {
   TossRoom,
   updateTossPlayer,
 } from "./type-toss-multiplayer";
+
+const toView = (d: TossEnd): GameResultView => ({
+  headline: tossStars(d) >= 3 ? "Prize champion!" : "Time's up!",
+  score: d.score,
+  scoreLabel: "tickets",
+  stars: tossStars(d),
+  stats: [
+    { label: "prizes won", value: String(d.wordsTyped) },
+    { label: "words per minute", value: String(tossWpm(d)) },
+    { label: "accuracy", value: `${tossAccuracy(d)}%` },
+    { label: "missed", value: String(d.misses) },
+  ],
+});
 
 const OPTIONS = getWordListOptions();
 const GROUPS = groupWordListOptions(OPTIONS);
@@ -84,6 +104,10 @@ export function TypeTossModal(props: Props): JSXElement {
   const [room, setRoom] = createSignal<TossRoom>();
   const [roomBusy, setRoomBusy] = createSignal(false);
   const [avatarVisible, setAvatarVisible] = createSignal(false);
+  const [result, setResult] = createSignal<{
+    view: GameResultView;
+    multiplayer: boolean;
+  } | null>(null);
   let containerRef: HTMLDivElement | undefined;
   let game: Phaser.Game | null = null;
   let unsubscribeRoom: (() => void) | undefined;
@@ -104,6 +128,7 @@ export function TypeTossModal(props: Props): JSXElement {
   ): Promise<void> => {
     const onClose = props.onClose;
     const onResult = props.onResult;
+    setResult(null);
     setPhase("loading");
     const words = wordsOverride ?? (await selected().getWords());
     setPhase("playing");
@@ -158,9 +183,18 @@ export function TypeTossModal(props: Props): JSXElement {
         ) => void updateTossPlayer(multiplayerRoom.code, stats),
       );
     }
+    game.events.on("game-over-screen", (d: TossEnd) => {
+      setResult({ view: toView(d), multiplayer: d.multiplayer === true });
+    });
     game.events.on("exit-game", () => {
       onClose();
     });
+  };
+
+  const playAgain = (): void => {
+    setResult(null);
+    const over = game?.scene.getScene("GameOver") as GameOverScene | null;
+    over?.playAgain();
   };
 
   const cleanup = (): void => {
@@ -170,6 +204,7 @@ export function TypeTossModal(props: Props): JSXElement {
     }
     setPhase("pick");
     setAvatarVisible(false);
+    setResult(null);
   };
 
   const disconnectRoom = async (): Promise<void> => {
@@ -463,7 +498,7 @@ export function TypeTossModal(props: Props): JSXElement {
 
         <Show when={phase() === "playing"}>
           <Show when={roomCode() !== undefined}>
-            <div class="pointer-events-none absolute top-3 left-3 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
+            <div class="pointer-events-none absolute top-3 left-16 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
               <div class="font-bold text-main">Type Toss {roomCode()}</div>
               <For each={players()}>
                 {(player, index) => (
@@ -493,6 +528,18 @@ export function TypeTossModal(props: Props): JSXElement {
             }}
             class="h-full w-full"
           ></div>
+          <Show when={result()}>
+            {(r) => (
+              <GameResultOverlay
+                result={r().view}
+                onPlayAgain={r().multiplayer ? undefined : playAgain}
+                note={
+                  r().multiplayer ? "Waiting for the other players…" : undefined
+                }
+                onExit={() => props.onClose()}
+              />
+            )}
+          </Show>
         </Show>
 
         <Show when={phase() === "results"}>

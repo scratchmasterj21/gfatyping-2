@@ -1,17 +1,15 @@
 import { Scene, GameObjects } from "phaser";
 
+import { WordTag } from "../../shared/phaser-ui";
+
 export type PowerUpKind = "gust" | "golden";
 
-const ICONS: Record<PowerUpKind, string> = { gust: "🌪️", golden: "🎇" };
-
-// PLACEHOLDER: emoji icon on a glowing disc — replace with a sprite. Rises
-// like a normal balloon (same update-loop movement/escape handling in
+// Rises like a normal balloon (same update-loop movement/escape handling in
 // GameScene) but escaping costs nothing - it's just a missed bonus.
 export class PowerUp extends GameObjects.Container {
   readonly word: string;
   readonly kind: PowerUpKind;
-  private labelTyped: GameObjects.Text;
-  private labelRemain: GameObjects.Text;
+  private tag: WordTag;
 
   constructor(
     scene: Scene,
@@ -24,45 +22,30 @@ export class PowerUp extends GameObjects.Container {
     this.word = word;
     this.kind = kind;
 
-    const glow = scene.add.graphics();
-    glow.fillStyle(kind === "gust" ? 0x66ccff : 0xffdd44, 0.3);
-    glow.fillCircle(0, 0, 30);
-    this.add(glow);
+    const img =
+      kind === "gust"
+        ? scene.add.image(0, 0, "bp-gust").setDisplaySize(88, 66)
+        : scene.add
+            .image(0, 0, "bp-golden")
+            .setDisplaySize(76, 106)
+            .setOrigin(0.5, 40 / 112);
+    this.add(img);
+    scene.tweens.add({
+      targets: img,
+      scale: img.scale * 1.08,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut",
+    });
 
-    const icon = scene.add
-      .text(0, 0, ICONS[kind], { fontSize: "32px" })
-      .setOrigin(0.5);
-    this.add(icon);
-
-    const textStyle = {
-      fontSize: "15px",
-      fontFamily: "monospace",
-      stroke: "#00000088",
-      strokeThickness: 3,
-    };
-    this.labelTyped = scene.add
-      .text(0, -46, "", { ...textStyle, color: "#88ffaa" })
-      .setOrigin(1, 0.5);
-    this.labelRemain = scene.add
-      .text(0, -46, word, { ...textStyle, color: "#ffffff" })
-      .setOrigin(0, 0.5);
-    this.add([this.labelTyped, this.labelRemain]);
-    this.positionLabels();
+    this.tag = new WordTag(scene, 0, -58, word, 16, "yellow");
+    this.add(this.tag);
 
     scene.add.existing(this);
   }
 
-  private positionLabels(): void {
-    const total = this.labelTyped.width + this.labelRemain.width;
-    const half = total / 2;
-    this.labelTyped.setX(-half + this.labelTyped.width);
-    this.labelRemain.setX(-half + this.labelTyped.width);
-  }
-
   updateTyped(typed: string): void {
-    const remain = this.word.slice(typed.length);
-    this.labelTyped.setText(typed);
-    this.labelRemain.setText(remain);
-    this.positionLabels();
+    this.tag.setTyped(typed);
   }
 }
