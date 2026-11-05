@@ -368,8 +368,18 @@ export function RaceOverlay(): JSXElement {
       {/* Final standings modal. */}
       <Show when={showResults()}>
         <div class="fixed inset-0 z-60 flex items-center justify-center bg-bg/80 p-4">
-          <div class="grid w-full max-w-md gap-3 rounded-double bg-sub-alt p-6 font-kid">
-            <div class="flex items-center gap-3">
+          {/* max-h + scrolling list: a full class must never push the leave
+              button off-screen */}
+          <div class="relative flex max-h-full w-full max-w-md flex-col gap-3 rounded-double bg-sub-alt p-6 font-kid">
+            <button
+              type="button"
+              aria-label="Close race results"
+              class="absolute top-3 right-3 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-bg text-xl text-text hover:bg-text hover:text-bg"
+              onClick={() => void exitRace()}
+            >
+              <Fa icon="fa-times" />
+            </button>
+            <div class="flex shrink-0 items-center gap-3 pr-12">
               <Mascot mood="cheer" size={64} />
               <div class="text-2xl font-bold text-main">Race results</div>
             </div>
@@ -387,7 +397,7 @@ export function RaceOverlay(): JSXElement {
                   : `${TEAM_LABEL[tugOutcome(tugFinal()) as TugTeam]} wins! ${tugFinal().red} - ${tugFinal().blue}`}
               </div>
             </Show>
-            <div class="grid gap-1">
+            <div class="grid min-h-0 gap-1 overflow-y-auto overscroll-contain">
               <For each={standings()}>
                 {(s) => (
                   <div
@@ -438,7 +448,7 @@ export function RaceOverlay(): JSXElement {
             </div>
             <button
               type="button"
-              class="mt-2 cursor-pointer rounded bg-bg p-2 text-text hover:bg-text hover:text-bg"
+              class="mt-2 shrink-0 cursor-pointer rounded bg-bg p-2 text-text hover:bg-text hover:text-bg"
               onClick={() => void exitRace()}
             >
               leave race

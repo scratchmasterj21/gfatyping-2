@@ -289,28 +289,22 @@ export function EchoKeys(p: MiniGamePlayProps<EchoDifficulty>): JSXElement {
         </div>
 
         <div class="flex justify-center">
-          <Show
-            when={phase() === "turn"}
-            fallback={
-              <div class="flex min-h-15 items-center text-base font-bold text-game-cream/80">
-                <Fa icon="fa-eye" class="mr-1.5" />
-                Watch the keys light up…
-              </div>
+          {/* stays mounted between turns so the iPad keeps focus + keyboard */}
+          <MiniTypingInput
+            value=""
+            ref={(el) => {
+              inputEl = el;
+            }}
+            waiting={phase() !== "turn"}
+            placeholder={
+              phase() === "watch" ? "watch the keys…" : "repeat the keys"
             }
-          >
-            <MiniTypingInput
-              value=""
-              ref={(el) => {
-                inputEl = el;
-              }}
-              placeholder="repeat the keys"
-              onInput={(v) => {
-                const ch = v.slice(-1);
-                if (inputEl !== undefined) inputEl.value = "";
-                press(ch);
-              }}
-            />
-          </Show>
+            onInput={(v) => {
+              const ch = v.slice(-1);
+              if (inputEl !== undefined) inputEl.value = "";
+              press(ch);
+            }}
+          />
         </div>
       </div>
     </div>

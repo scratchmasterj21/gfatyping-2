@@ -169,6 +169,10 @@ export class RpgScene extends Scene {
     });
 
     this.keydownHandler = (event) => {
+      if (!this.sys.isActive()) {
+        this.removeDomListeners();
+        return;
+      }
       if (
         this.finished ||
         this.betweenWaves ||
@@ -263,6 +267,8 @@ export class RpgScene extends Scene {
     this.resizeHandler = () => this.draw();
     this.scale.on("resize", this.resizeHandler);
     this.events.once("shutdown", this.shutdown, this);
+    // game.destroy() (modal closed mid-run) skips "shutdown"
+    this.events.once("destroy", this.shutdown, this);
     if (document.hidden || !document.hasFocus()) this.pauseRun();
   }
 
@@ -1182,7 +1188,8 @@ export class RpgScene extends Scene {
     }
   }
 
-  private shutdown(): void {
+  /** Page-wide listeners: these must never outlive the scene. */
+  private removeDomListeners(): void {
     if (this.keydownHandler !== undefined) {
       document.removeEventListener("keydown", this.keydownHandler);
     }
@@ -1198,6 +1205,10 @@ export class RpgScene extends Scene {
     if (this.visibilityHandler !== undefined) {
       document.removeEventListener("visibilitychange", this.visibilityHandler);
     }
+  }
+
+  private shutdown(): void {
+    this.removeDomListeners();
     if (this.resizeHandler !== undefined) {
       this.scale.off("resize", this.resizeHandler);
     }

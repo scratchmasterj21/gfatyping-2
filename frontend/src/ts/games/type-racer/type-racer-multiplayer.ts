@@ -25,8 +25,14 @@ export type RacerPlayer = {
   progress: number;
   wpm: number;
   accuracy: number;
+  /** done racing: reached the line OR their time ran out */
   finished: boolean;
+  /** local clock - device clocks differ, don't rank by this */
   finishedAt: number;
+  /** actually typed the whole passage */
+  completed?: boolean;
+  /** ms from their own race start to the end of their race */
+  raceMs?: number;
 };
 
 export type RacerRoom = {
@@ -164,7 +170,8 @@ export async function finishRacerRoom(code: string): Promise<void> {
 
 export async function updateRacerPlayer(
   code: string,
-  stats: Pick<RacerPlayer, "progress" | "wpm" | "accuracy" | "finished">,
+  stats: Pick<RacerPlayer, "progress" | "wpm" | "accuracy" | "finished"> &
+    Pick<Partial<RacerPlayer>, "completed" | "raceMs">,
 ): Promise<void> {
   const user = currentUser();
   await update(playerRef(code, user.uid), {
@@ -173,6 +180,8 @@ export async function updateRacerPlayer(
     accuracy: Math.max(0, Math.min(100, stats.accuracy)),
     finished: stats.finished,
     finishedAt: stats.finished ? Date.now() : 0,
+    completed: stats.completed === true,
+    raceMs: Math.max(0, Math.round(stats.raceMs ?? 0)),
     online: true,
   });
 }

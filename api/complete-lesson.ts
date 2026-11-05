@@ -10,6 +10,10 @@ import { tokyoDateString } from "./_lib/time.js";
 // runs outside the frontend's Vite build, and these are small enough tables
 // that duplicating is safer than an untested cross-package import. Keep in
 // sync if the frontend versions change.
+// Students with no class (or an unrecognised one) used to get the old 30/45
+// teacher bar, which blocked fast G5/G6 kids at 1 star. Use a middle-grade
+// (G3) bar instead so a missing class never blocks unlocking.
+const NO_GRADE_STARS: [number, number] = [12, 22];
 const STAR_THRESHOLDS: Record<number, [number, number]> = {
   1: [8, 15],
   2: [10, 18],
@@ -148,7 +152,9 @@ type PracticeRewardCategory = "dailyChallenge" | "recommendation" | "adaptive";
 
 function starsForGrade(wpm: number, grade: number | undefined): number {
   const [two, three] =
-    grade !== undefined ? (STAR_THRESHOLDS[grade] ?? [30, 45]) : [30, 45];
+    grade !== undefined
+      ? (STAR_THRESHOLDS[grade] ?? NO_GRADE_STARS)
+      : NO_GRADE_STARS;
   if (wpm >= three) return 3;
   if (wpm >= two) return 2;
   return 1;

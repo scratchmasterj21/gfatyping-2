@@ -274,8 +274,9 @@ export function GemDig(props: {
       </Show>
 
       <div class="flex min-h-16 items-center justify-center">
+        {/* mounted through the countdown so the iPad keeps focus + keyboard */}
         <Show
-          when={canDig()}
+          when={!props.over && !props.me.finished}
           fallback={
             <div class="text-lg font-bold text-game-ink/70">
               {props.me.finished ? "Waiting for the others…" : ""}
@@ -286,7 +287,8 @@ export function GemDig(props: {
             value={typed()}
             onInput={onInput}
             wrong={wrong()}
-            placeholder={current()?.word}
+            waiting={!canDig()}
+            placeholder={canDig() ? current()?.word : "get ready…"}
           />
         </Show>
       </div>

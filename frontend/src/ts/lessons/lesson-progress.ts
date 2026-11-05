@@ -107,7 +107,11 @@ export function getActiveLesson(): string | null {
 
 // 2nd/3rd star WPM thresholds per grade. 1 star is always awarded on finish.
 // Younger grades get a far gentler bar so they aren't stuck at one star;
-// undefined (teacher / unassigned) keeps the original 30/45 standard.
+// undefined (teacher / no class) uses NO_GRADE_STARS.
+// Students with no class (or an unrecognised one) used to get the old 30/45
+// teacher bar, which blocked fast G5/G6 kids at 1 star. Use a middle-grade
+// (G3) bar instead so a missing class never blocks unlocking.
+const NO_GRADE_STARS: [number, number] = [12, 22];
 const STAR_THRESHOLDS: Record<number, [number, number]> = {
   1: [8, 15],
   2: [10, 18],
@@ -120,7 +124,9 @@ const STAR_THRESHOLDS: Record<number, [number, number]> = {
 /** Stars from WPM, scaled to the student's grade: 1 = completed, 2/3 = faster. */
 export function starsForGrade(wpm: number, grade: number | undefined): number {
   const [two, three] =
-    grade !== undefined ? (STAR_THRESHOLDS[grade] ?? [30, 45]) : [30, 45];
+    grade !== undefined
+      ? (STAR_THRESHOLDS[grade] ?? NO_GRADE_STARS)
+      : NO_GRADE_STARS;
   if (wpm >= three) return 3;
   if (wpm >= two) return 2;
   return 1;

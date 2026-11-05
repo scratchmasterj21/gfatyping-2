@@ -118,6 +118,8 @@ export class GameScene extends Scene {
     const W = this.scale.width;
     const H = this.scale.height;
     this.events.once("shutdown", this.shutdown, this);
+    // game.destroy() (modal closed / room finished mid-race) skips "shutdown"
+    this.events.once("destroy", this.shutdown, this);
     this.game.events.emit("type-racer-race-active", true);
     this.game.events.on(
       "type-racer-opponent",
@@ -219,6 +221,11 @@ export class GameScene extends Scene {
     this.positionAll(W, H);
     this.refreshWordDisplay();
     this.keydownHandler = (e: KeyboardEvent) => {
+      // never block Space for the rest of the site once this race is gone
+      if (!this.sys.isActive() || this.raceOver) {
+        this.removeKeyHandler();
+        return;
+      }
       if (e.key === " ") e.preventDefault();
       this.onKeyDown(e);
     };
@@ -682,6 +689,8 @@ export class GameScene extends Scene {
         wpm,
         accuracy,
         finished: true,
+        completed: this.playerProgress >= 1,
+        raceMs: elapsed * 1000,
       });
     }
     this.time.delayedCall(700, () => {

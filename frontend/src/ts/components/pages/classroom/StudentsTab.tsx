@@ -176,6 +176,19 @@ export function StudentsTab(): JSXElement {
           several students to update them together.
         </p>
       </div>
+      <Show when={unassignedCount() > 0}>
+        <button
+          type="button"
+          class="flex cursor-pointer items-center gap-2 rounded bg-bg px-3 py-2 text-left text-sm text-error"
+          onClick={() => setClassFilter(UNASSIGNED)}
+        >
+          <Fa icon="fa-exclamation-triangle" />
+          {unassignedCount()} student
+          {unassignedCount() === 1 ? " has" : "s have"} no class. Without a
+          class they get default lesson star goals instead of their grade goals.
+          Tap to see them.
+        </button>
+      </Show>
       <div class="grid gap-3">
         <div class="flex flex-wrap gap-2 text-sm">
           <Button

@@ -1,3 +1,4 @@
+import type { RacerPlayer } from "./type-racer-multiplayer";
 export type RaceEnd = {
   playerWon: boolean;
   wpm: number;
@@ -22,4 +23,25 @@ export function raceHeadline(r: RaceEnd): string {
   if (r.playerWon) return "You win! 🏆";
   if (r.marginChars <= PHOTO_FINISH_CHARS) return "Photo finish!";
   return "Nice race!";
+}
+
+/**
+ * Race standings: whoever typed the whole passage first (by their own race
+ * time, not the device clock), then everyone else by how far they got.
+ */
+export function rankRacers<
+  T extends Pick<
+    RacerPlayer,
+    "progress" | "wpm" | "finished" | "finishedAt" | "completed" | "raceMs"
+  >,
+>(players: T[]): T[] {
+  const done = (p: T): boolean => p.completed === true || p.progress >= 1;
+  const time = (p: T): number =>
+    p.raceMs !== undefined && p.raceMs > 0 ? p.raceMs : Infinity;
+  return [...players].sort((a, b) => {
+    if (done(a) !== done(b)) return done(a) ? -1 : 1;
+    if (done(a) && time(a) !== time(b)) return time(a) - time(b);
+    if (b.progress !== a.progress) return b.progress - a.progress;
+    return b.wpm - a.wpm;
+  });
 }

@@ -38,7 +38,7 @@ import {
   WordListOption,
 } from "../word-defender/systems/vocab-pool";
 import { createTypeRacerGame } from "./game-config";
-import { raceHeadline, RaceEnd, raceStars } from "./racer-result";
+import { raceHeadline, RaceEnd, raceStars, rankRacers } from "./racer-result";
 import {
   createRacerRoom,
   finishRacerRoom,
@@ -97,11 +97,7 @@ export function TypeRacerModal(props: Props): JSXElement {
   let lastProgressWrite = 0;
 
   const players = createMemo(() =>
-    Object.values(room()?.players ?? {}).sort((a, b) => {
-      if (a.finished && b.finished) return a.finishedAt - b.finishedAt;
-      if (a.finished !== b.finished) return a.finished ? -1 : 1;
-      return b.progress - a.progress;
-    }),
+    rankRacers(Object.values(room()?.players ?? {})),
   );
 
   const [result, setResult] = createSignal<{
@@ -140,7 +136,8 @@ export function TypeRacerModal(props: Props): JSXElement {
           stats: Pick<
             RacerPlayer,
             "progress" | "wpm" | "accuracy" | "finished"
-          >,
+          > &
+            Pick<Partial<RacerPlayer>, "completed" | "raceMs">,
         ) => {
           if (!stats.finished && Date.now() - lastProgressWrite < 200) return;
           lastProgressWrite = Date.now();

@@ -173,20 +173,21 @@ export function WordPong(props: {
         </Show>
       </div>
 
+      {/* stays mounted between turns so the iPad keeps focus + keyboard */}
       <div class="flex min-h-16 items-center justify-center">
-        <Show
-          when={mine()}
-          fallback={
-            <div class="text-lg font-bold text-game-cream/80">
-              {props.game.over ? "" : `${props.opponent.name} is typing…`}
-            </div>
-          }
-        >
+        <Show when={!props.game.over}>
           <MiniTypingInput
-            value={typed()}
+            value={mine() ? typed() : ""}
             onInput={onInput}
-            wrong={wrong()}
-            placeholder={waiting() ? "get ready…" : props.game.word}
+            wrong={mine() && wrong()}
+            waiting={!mine() || waiting()}
+            placeholder={
+              !mine()
+                ? `${props.opponent.name} is typing…`
+                : waiting()
+                  ? "get ready…"
+                  : props.game.word
+            }
           />
         </Show>
       </div>

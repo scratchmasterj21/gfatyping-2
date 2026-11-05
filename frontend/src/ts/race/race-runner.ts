@@ -298,11 +298,10 @@ export async function exitRace(): Promise<void> {
 
   localStorage.removeItem(RACE_STORAGE_KEY);
 
-  if (pin !== null) {
-    await leaveRace(pin);
-  }
-
+  // Close the race UI first: on a sleepy iPad connection the RTDB delete can
+  // take a long time, and students must never be stuck behind the results.
   resetRaceState();
+  if (pin !== null) void leaveRace(pin);
 
   // Restore the real settings the race overrode with nosave.
   if (launchedTest) {
