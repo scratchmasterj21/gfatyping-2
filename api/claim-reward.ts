@@ -36,6 +36,8 @@ const RECOMMENDED_GAME_IDS = new Set([
   "tower-climb",
   "snack-shop",
   "echo-keys",
+  "word-pong",
+  "gem-dig",
 ]);
 
 /** Mirrors frontend COLLECTION_CATEGORIES / COLLECTION_REWARD in avatar-items.ts. */

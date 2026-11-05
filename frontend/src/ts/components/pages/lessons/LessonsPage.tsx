@@ -45,6 +45,7 @@ import { FruitNinjaModal } from "../../../games/fruit-ninja/FruitNinjaModal";
 import { scaleGameScore } from "../../../games/game-difficulty-multiplier";
 import { startGame } from "../../../games/game-launcher";
 import { games } from "../../../games/games-data";
+import { GemDigModal } from "../../../games/gem-dig/GemDigModal";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
 import { SnackShopModal } from "../../../games/snack-shop/SnackShopModal";
 import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
@@ -52,6 +53,7 @@ import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
 import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
 import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
+import { WordPongModal } from "../../../games/word-pong/WordPongModal";
 import {
   checkpointLockMessage,
   checkpointProgressKey,
@@ -629,6 +631,8 @@ export function LessonsPage(): JSXElement {
   const [towerOpen, setTowerOpen] = createSignal(false);
   const [snackOpen, setSnackOpen] = createSignal(false);
   const [echoOpen, setEchoOpen] = createSignal(false);
+  const [pongOpen, setPongOpen] = createSignal(false);
+  const [digOpen, setDigOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1373,6 +1377,8 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "tower-climb") setTowerOpen(true);
     else if (gameId === "snack-shop") setSnackOpen(true);
     else if (gameId === "echo-keys") setEchoOpen(true);
+    else if (gameId === "word-pong") setPongOpen(true);
+    else if (gameId === "gem-dig") setDigOpen(true);
   };
 
   const launchGame = (
@@ -2023,9 +2029,13 @@ export function LessonsPage(): JSXElement {
                       each={games.filter(
                         (g) =>
                           g.type === "builtin" &&
-                          ["type-toss", "type-racer", "ghost-hunter"].includes(
-                            g.id,
-                          ),
+                          [
+                            "word-pong",
+                            "gem-dig",
+                            "type-toss",
+                            "type-racer",
+                            "ghost-hunter",
+                          ].includes(g.id),
                       )}
                     >
                       {(game) => {
@@ -2036,6 +2046,7 @@ export function LessonsPage(): JSXElement {
                               ? "home-words"
                               : "all-keys-1";
                         const locked = () =>
+                          !["word-pong", "gem-dig"].includes(game.id) &&
                           !isCurrentUserAdmin() &&
                           isLessonLocked(requiredLesson);
                         return (
@@ -2173,6 +2184,30 @@ export function LessonsPage(): JSXElement {
           onResult={(score, wave) => {
             void recordGameScore("echo-keys", score);
             claimRecommendedGame("echo-keys", score, wave);
+          }}
+        />
+        <WordPongModal
+          open={pongOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setPongOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("word-pong", score);
+            claimRecommendedGame("word-pong", score, 1);
+          }}
+        />
+        <GemDigModal
+          open={digOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setDigOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("gem-dig", score);
+            claimRecommendedGame("gem-dig", score, 1);
           }}
         />
         <BalloonPopModal

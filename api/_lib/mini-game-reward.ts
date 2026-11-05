@@ -8,6 +8,8 @@ export const MINI_GAME_IDS = [
   "tower-climb",
   "snack-shop",
   "echo-keys",
+  "word-pong",
+  "gem-dig",
 ] as const;
 export type MiniGameId = (typeof MINI_GAME_IDS)[number];
 
@@ -16,6 +18,10 @@ export const MINI_GAME_SCORE_PER_COIN: Record<MiniGameId, number> = {
   "tower-climb": 40,
   "snack-shop": 60,
   "echo-keys": 30,
+  // 10 per point won + 30 for a win: a 7-point win (100) caps at 8 coins
+  "word-pong": 12,
+  // 5 per block, 10 per gem, +30 for first: a full winning dig (~170) caps at 8
+  "gem-dig": 22,
 };
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;

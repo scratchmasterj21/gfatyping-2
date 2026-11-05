@@ -22,7 +22,9 @@ export type BuiltinGame = {
     | "typing-rpg"
     | "tower-climb"
     | "snack-shop"
-    | "echo-keys";
+    | "echo-keys"
+    | "word-pong"
+    | "gem-dig";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -36,6 +38,22 @@ export type Game = FunboxGame | BuiltinGame;
  * with `nosave` so they never persist across reloads.
  */
 export const games: Game[] = [
+  {
+    type: "builtin",
+    id: "word-pong",
+    name: "Word Ping-Pong",
+    description:
+      "Type the word on the ball to hit it back - play Tappy or a friend!",
+    icon: "fa-table-tennis",
+  },
+  {
+    type: "builtin",
+    id: "gem-dig",
+    name: "Gem Dig",
+    description:
+      "Type words to dig down for gems - race Tappy or up to 7 friends!",
+    icon: "fa-gem",
+  },
   {
     type: "builtin",
     id: "tower-climb",

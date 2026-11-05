@@ -3,7 +3,12 @@ import { invalidateCoinQueries } from "../../queries/coins";
 import { isAuthenticated } from "../../states/core";
 
 // Mirrors api/_lib/mini-game-reward.ts (display only - the server decides).
-export type MiniGameId = "tower-climb" | "snack-shop" | "echo-keys";
+export type MiniGameId =
+  | "tower-climb"
+  | "snack-shop"
+  | "echo-keys"
+  | "word-pong"
+  | "gem-dig";
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 

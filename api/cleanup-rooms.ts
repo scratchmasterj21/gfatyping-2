@@ -13,7 +13,13 @@ import { getAdminApp } from "./_lib/admin.js";
  * docs. Race history (raceHistory) is never touched.
  */
 const STALE_MS = 3 * 60 * 60 * 1000;
-const ROOM_ROOTS = ["racerRooms", "tossRooms", "ghostRooms"] as const;
+const ROOM_ROOTS = [
+  "racerRooms",
+  "tossRooms",
+  "ghostRooms",
+  "pongRooms",
+  "digRooms",
+] as const;
 /** Firestore deletes per run - plenty for a school, keeps a run cheap. */
 const MAX_RACE_DOCS = 100;
 

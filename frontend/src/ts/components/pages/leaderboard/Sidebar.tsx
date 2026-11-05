@@ -234,6 +234,8 @@ export function Sidebar(props: {
             { id: "tower-climb", text: "tower climb", icon: "fa-building" },
             { id: "snack-shop", text: "snack shop", icon: "fa-cookie-bite" },
             { id: "echo-keys", text: "echo keys", icon: "fa-lightbulb" },
+            { id: "word-pong", text: "ping-pong", icon: "fa-table-tennis" },
+            { id: "gem-dig", text: "gem dig", icon: "fa-gem" },
           ]}
         />
       </Show>

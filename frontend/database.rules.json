@@ -51,6 +51,67 @@
         }
       }
     },
+    "pongRooms": {
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('pongRooms').child($code).child('status').val() == 'lobby') || data.exists())",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && (newData.child('side').val() == 'left' || newData.child('side').val() == 'right') && newData.child('online').isBoolean())"
+          }
+        },
+        "game": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('pongRooms').child($code).child('players').child(auth.uid).exists() && root.child('pongRooms').child($code).child('status').val() == 'playing'",
+          ".validate": "newData.hasChildren(['seq', 'toSide', 'word', 'score', 'sentAt', 'speedMs']) && (!data.exists() || newData.child('seq').val() == data.child('seq').val() + 1) && newData.child('word').isString() && newData.child('word').val().length <= 30"
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          }
+        }
+      }
+    },
+    "digRooms": {
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('digRooms').child($code).child('status').val() == 'lobby') || data.exists())",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('online').isBoolean() && newData.child('depth').isNumber() && newData.child('depth').val() >= 0 && newData.child('depth').val() <= 20 && (!data.exists() || newData.child('depth').val() >= data.child('depth').val()) && newData.child('gems').isNumber() && newData.child('gems').val() >= 0 && newData.child('gems').val() <= newData.child('depth').val())",
+            "finishedMs": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.parent().child('depth').val() == 20"
+            }
+          }
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "seed": {
+          ".validate": "newData.isNumber() && (!data.exists() || newData.val() == data.val())"
+        },
+        "startedAt": { ".validate": "newData.isNumber()" },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          }
+        }
+      }
+    },
     "racerRooms": {
       ".indexOn": ["createdAt"],
       "$code": {
