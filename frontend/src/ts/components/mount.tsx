@@ -37,6 +37,7 @@ import { TestModesNotice } from "./pages/test/modes-notice/TestModesNotice";
 import { ResultsLessonActions } from "./pages/test/ResultsLessonActions";
 import { SideImagePanels } from "./pages/test/SideImagePanels";
 import { TestConfig } from "./pages/test/TestConfig";
+import { TypingBuddy } from "./pages/test/TypingBuddy";
 import { Popups } from "./popups/Popups";
 import { RaceOverlay } from "./race/RaceOverlay";
 
@@ -75,6 +76,7 @@ const components: Record<string, () => JSXElement> = {
   friendspage: () => <FriendsPage />,
   blockedusers: () => <BlockedUsers />,
   sideimagepanels: () => <SideImagePanels />,
+  typingbuddy: () => <TypingBuddy />,
   notfoundpage: () => <NotFoundPage />,
 };
 

@@ -256,6 +256,11 @@ function snapshotToday(): ActivityDay {
   return parseActivityDays(getSnapshot()?.activityDays)[tokyoDate()] ?? {};
 }
 
+/** Reactive: ⭐⭐ lessons passed today on this device (not yet in the snapshot). */
+export function myLocalTodayLessons(): string[] {
+  return freshLocal().lessons;
+}
+
 /** Reactive: lessons passed + game seconds today for the signed-in user. */
 export function myToday(): { lessonsPassed: number; gameSec: number } {
   const snap = snapshotToday();

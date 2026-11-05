@@ -7,6 +7,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { callApi } from "../api-client";
+import { ActivityDays, parseActivityDays } from "../classroom/activity";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { DEFAULT_GARDEN_THEME_ID } from "./garden-themes";
@@ -58,6 +59,19 @@ export type HouseState = {
   gardenStored: Record<string, true>;
   gardenTouchOrder: string[];
   gardenThemeId: string;
+  /** daily practice counters - drive plant growth and pet moods */
+  activity: ActivityDays;
+  lastStarLessonDate?: string;
+  trophies: HouseTrophies;
+};
+
+/** Earned-only things shown on the room's trophy shelf. */
+export type HouseTrophies = {
+  /** lesson achievement ids (lessons/achievements.ts) */
+  achievements: string[];
+  lessonStars: number;
+  raceWins: number;
+  raceBestWpm: number;
 };
 
 export function emptyHouseState(): HouseState {
@@ -75,8 +89,13 @@ export function emptyHouseState(): HouseState {
     gardenStored: {},
     gardenTouchOrder: [],
     gardenThemeId: DEFAULT_GARDEN_THEME_ID,
+    activity: {},
+    trophies: { achievements: [], lessonStars: 0, raceWins: 0, raceBestWpm: 0 },
   };
 }
+
+const num = (v: unknown): number =>
+  typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
 
 export async function getHouseState(uid: string): Promise<HouseState> {
   const snap = await getDoc(userRef(uid));
@@ -109,6 +128,21 @@ export async function getHouseState(uid: string): Promise<HouseState> {
       (data?.["gardenTouchOrder"] as string[] | undefined) ?? [],
     gardenThemeId:
       (data?.["gardenTheme"] as string | undefined) ?? DEFAULT_GARDEN_THEME_ID,
+    activity: parseActivityDays(data?.["activityDays"]),
+    lastStarLessonDate:
+      typeof data?.["lastStarLessonDate"] === "string"
+        ? data["lastStarLessonDate"]
+        : undefined,
+    trophies: {
+      achievements: Array.isArray(data?.["achievements"])
+        ? (data["achievements"] as unknown[]).filter(
+            (x): x is string => typeof x === "string",
+          )
+        : [],
+      lessonStars: num(data?.["lessonStars"]),
+      raceWins: num(data?.["raceWins"]),
+      raceBestWpm: num(data?.["raceBestWpm"]),
+    },
   };
 }
 

@@ -10,7 +10,12 @@ import {
 } from "solid-js";
 
 import { getEquippedAvatar } from "../../avatar/avatar-state";
-import { GARDEN_ITEMS } from "../../house/garden-items";
+import { myLocalTodayLessons } from "../../games/game-access";
+import {
+  GARDEN_ITEMS,
+  isGrowingPlant,
+  plantLook,
+} from "../../house/garden-items";
 import {
   DEFAULT_GARDEN_THEME_ID,
   getGardenTheme,
@@ -36,6 +41,7 @@ import {
   DEFAULT_HOUSE_THEME_ID,
   getHouseTheme,
 } from "../../house/house-themes";
+import { PracticeMood, summarizePractice } from "../../house/practice-state";
 import { PET_ITEMS, PetItem } from "../../pet-shop/pet-items";
 import { getPetState } from "../../pet-shop/pet-state";
 import { queryClient } from "../../queries";
@@ -53,6 +59,7 @@ import { Avatar } from "../common/Avatar";
 import { Button } from "../common/Button";
 import { Fa } from "../common/Fa";
 import { PetSprite } from "../common/PetSprite";
+import { TrophyShelf } from "./TrophyShelf";
 
 const ROAM_INTERVAL_MS = 4500;
 const POSITION_WRITE_DEBOUNCE_MS = 400;
@@ -60,6 +67,14 @@ const MIN_ITEM_SCALE = 0.5;
 const MAX_ITEM_SCALE = 2.5;
 /** Odds a walking pet idles for one interval instead of picking a new waypoint. */
 const REST_CHANCE = 0.35;
+/** Practice mood changes how much pets nap (see practice-state.ts). */
+const MOOD_REST_CHANCE: Partial<Record<PracticeMood, number>> = {
+  great: 0.1,
+  sleepy: 0.6,
+  droopy: 0.85,
+};
+/** On a great day, chance per roam tick that a pet does a trick. */
+const TRICK_CHANCE = 0.4;
 /** Odds a walking pet's next waypoint is near the avatar rather than anywhere on the floor. */
 const FOLLOW_AVATAR_CHANCE = 0.2;
 
@@ -163,6 +178,8 @@ function RoamingPet(props: {
   item: PetItem;
   /** Supplied by the room so waypoints can steer around furniture and occasionally head for the avatar - both need state this component doesn't own. */
   pickPos: (item: PetItem) => { x: number; y: number };
+  /** from real practice: sleepy/droopy pets nap more, "great" does tricks */
+  mood: PracticeMood;
 }): JSXElement {
   // props.item is a stable <For> key that never changes for this instance.
   // oxlint-disable-next-line solid/reactivity -- one-time initial value only
@@ -172,10 +189,13 @@ function RoamingPet(props: {
   const [reacting, setReacting] = createSignal(false);
   // Walkers pause for a beat between roams instead of pacing nonstop.
   const [resting, setResting] = createSignal(false);
+  const [tricking, setTricking] = createSignal(false);
   let reactTimeout: ReturnType<typeof setTimeout> | null = null;
+  let trickTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onCleanup(() => {
     if (reactTimeout !== null) clearTimeout(reactTimeout);
+    if (trickTimeout !== null) clearTimeout(trickTimeout);
   });
 
   createEffect(() => {
@@ -186,7 +206,18 @@ function RoamingPet(props: {
         setResting(false);
         return;
       }
-      if (props.item.movement === "walk" && Math.random() < REST_CHANCE) {
+      if (props.mood === "great" && Math.random() < TRICK_CHANCE) {
+        setTricking(true);
+        if (trickTimeout !== null) clearTimeout(trickTimeout);
+        trickTimeout = setTimeout(() => setTricking(false), 1400);
+        return;
+      }
+      const restChance = MOOD_REST_CHANCE[props.mood] ?? REST_CHANCE;
+      // flyers/swimmers can't "sit", but a droopy one still slows right down
+      if (
+        (props.item.movement === "walk" || props.mood === "droopy") &&
+        Math.random() < restChance
+      ) {
         setResting(true);
         return;
       }
@@ -264,17 +295,27 @@ function RoamingPet(props: {
         <Show when={reacting()}>
           <div class="pointer-events-none absolute -top-4 text-lg">❤️</div>
         </Show>
-        <Show when={resting() && !reacting()}>
+        <Show when={resting() && !reacting() && !tricking()}>
           <div class="pointer-events-none absolute -top-4 text-sm opacity-70">
             💤
           </div>
         </Show>
-        <PetSprite
-          species={props.item.species}
-          sizePx={props.item.sizePx}
-          facingLeft={facingLeft()}
-          resting={resting()}
-        />
+        <Show when={tricking() && !reacting()}>
+          <div class="pointer-events-none absolute -top-5 text-lg">⭐</div>
+        </Show>
+        <div
+          class={cn(
+            tricking() && "motion-safe:animate-bounce",
+            props.mood === "droopy" && !tricking() && "opacity-80",
+          )}
+        >
+          <PetSprite
+            species={props.item.species}
+            sizePx={props.item.sizePx}
+            facingLeft={facingLeft()}
+            resting={resting()}
+          />
+        </div>
         <Show when={props.item.movement === "walk"}>
           <div
             class="bg-black/20 -mt-1 rounded-full blur-[2px]"
@@ -446,6 +487,43 @@ export function HouseModal(): JSXElement {
 
   const refresh = (): void => {
     void queryClient.invalidateQueries({ queryKey: ["houseState"] });
+  };
+
+  // Garden growth + pet moods come from real practice (⭐⭐ lessons).
+  const practice = createMemo(() =>
+    summarizePractice({
+      activity: houseQuery.data?.activity,
+      lastStarLessonDate: houseQuery.data?.lastStarLessonDate,
+      extraTodayLessons: myLocalTodayLessons(),
+    }),
+  );
+  const ownsPets = (): boolean =>
+    Object.keys(petQuery.data?.ownedPets ?? {}).length > 0;
+  const practiceMessage = (): string => {
+    const p = practice();
+    if (houseScene() === "garden") {
+      if (p.drooping) {
+        return "🥀 Your plants are droopy! Get ⭐⭐ on a lesson today to perk them up.";
+      }
+      if (p.plantStage === 3) {
+        return "🌸 Your garden is blooming! Keep getting ⭐⭐ to keep it that way.";
+      }
+      return `🌱 Your garden grows each day you get ⭐⭐ on a lesson - ${p.plantStage}/3 days to full bloom!`;
+    }
+    const who = ownsPets() ? "your pets" : "your avatar";
+    if (p.mood === "great") {
+      return `🎉 Amazing! ⭐⭐ on ${p.todayStarLessons} lessons today - ${who} ${ownsPets() ? "are" : "is"} doing tricks!`;
+    }
+    if (p.mood === "happy") {
+      return `😊 You practiced today - ${who} ${ownsPets() ? "are" : "is"} happy! Get ⭐⭐ on 3 lessons for a trick.`;
+    }
+    if (p.mood === "droopy") {
+      return `💤 ${ownsPets() ? "Your pets miss" : "Your avatar misses"} you! Get ⭐⭐ on a lesson today.`;
+    }
+    if (p.mood === "sleepy") {
+      return `😴 ${ownsPets() ? "Your pets are" : "Your avatar is"} sleepy. Get ⭐⭐ on a lesson to wake ${ownsPets() ? "them" : "it"} up!`;
+    }
+    return `⭐ Get ⭐⭐ on a lesson to make ${who} happy!`;
   };
 
   // Local copy of item positions, seeded once from the fetched layout (not
@@ -816,7 +894,11 @@ export function HouseModal(): JSXElement {
   // enough to keep it going, so the avatar looks energetic; a lapsed streak
   // (0) shows a sleepy face instead. Reuses the existing "sleepy" face art
   // from the avatar shop rather than drawing a new expression.
-  const isEnergetic = (): boolean => (getSnapshot()?.streak ?? 0) > 0;
+  const isEnergetic = (): boolean => {
+    const mood = practice().mood;
+    if (mood === "new") return (getSnapshot()?.streak ?? 0) > 0;
+    return mood === "great" || mood === "happy";
+  };
 
   const [pos, setPos] = createSignal(randomRoamPos());
   const [celebrating, setCelebrating] = createSignal(false);
@@ -994,6 +1076,17 @@ export function HouseModal(): JSXElement {
         </div>
 
         <div
+          class={cn(
+            "rounded-xl px-4 py-2 text-center font-kid text-base font-semibold",
+            practice().drooping || practice().mood === "droopy"
+              ? "bg-sub-alt text-text"
+              : "bg-game-gold/90 text-game-ink",
+          )}
+        >
+          {practiceMessage()}
+        </div>
+
+        <div
           ref={roomRef}
           data-house-room
           class="relative h-112 w-full touch-none overflow-hidden rounded-xl"
@@ -1033,9 +1126,13 @@ export function HouseModal(): JSXElement {
               Object.keys(houseQuery.data?.ownedItems ?? {}).length === 0
             }
           >
-            <div class="absolute inset-x-0 top-4 text-center text-sm text-sub">
+            <div class="absolute inset-x-0 top-20 text-center text-sm text-sub">
               Your room is empty — visit the shop to decorate it!
             </div>
+          </Show>
+
+          <Show when={houseScene() === "room" ? houseQuery.data : undefined}>
+            {(data) => <TrophyShelf trophies={data().trophies} />}
           </Show>
 
           <For each={sortedFurniture()}>
@@ -1079,13 +1176,40 @@ export function HouseModal(): JSXElement {
                 >
                   <div class="relative">
                     <div
+                      class={cn(
+                        "origin-bottom transition-[filter,transform] duration-700",
+                        houseScene() === "garden" &&
+                          isGrowingPlant(item.id) &&
+                          practice().drooping &&
+                          "rotate-12 grayscale-[0.7]",
+                      )}
                       style={{
-                        "font-size": `${item.sizePx * effectiveScale(item)}px`,
+                        "font-size": `${
+                          item.sizePx *
+                          effectiveScale(item) *
+                          (houseScene() === "garden"
+                            ? plantLook(item, practice().plantStage).sizeFactor
+                            : 1)
+                        }px`,
                         "line-height": "1",
                       }}
                     >
-                      {item.emoji}
+                      {houseScene() === "garden"
+                        ? plantLook(item, practice().plantStage).emoji
+                        : item.emoji}
                     </div>
+                    <Show
+                      when={
+                        houseScene() === "garden" &&
+                        isGrowingPlant(item.id) &&
+                        practice().plantStage === 3 &&
+                        !practice().drooping
+                      }
+                    >
+                      <div class="pointer-events-none absolute -top-2 -right-2 text-base motion-safe:animate-pulse">
+                        ✨
+                      </div>
+                    </Show>
                     <div
                       class="bg-black/20 mx-auto -mt-1 rounded-full blur-[2px]"
                       style={{
@@ -1132,7 +1256,11 @@ export function HouseModal(): JSXElement {
                     petQuery.data?.storedPets[item.id] !== true
                   }
                 >
-                  <RoamingPet item={item} pickPos={pickPetPos} />
+                  <RoamingPet
+                    item={item}
+                    pickPos={pickPetPos}
+                    mood={practice().mood}
+                  />
                 </Show>
               )}
             </For>

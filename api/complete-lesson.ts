@@ -389,6 +389,8 @@ export default async function handler(
           userRef,
           {
             ...activity,
+            // kept past the 14-day activity window: drooping gardens/pets
+            ...(countsForGames ? { lastStarLessonDate: today } : {}),
             ...questUpdate,
             ...(practiceReward > 0
               ? { practiceRewardDates: nextRewardDates }

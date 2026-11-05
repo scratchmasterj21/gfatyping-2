@@ -78,3 +78,30 @@ export const GARDEN_ITEMS: HouseItem[] = [
     slot: { xPct: 46, yPct: 82 },
   },
 ];
+
+/** Garden items that grow (and droop) with practice - see practice-state.ts. */
+const GROWING_GARDEN_IDS = new Set([
+  "garden-flower",
+  "garden-bush",
+  "garden-carrots",
+  "garden-tree",
+  "garden-pond",
+]);
+
+export function isGrowingPlant(id: string): boolean {
+  return GROWING_GARDEN_IDS.has(id);
+}
+
+/** What a growing plant looks like at a growth stage (0 seedling - 3 bloom). */
+export function plantLook(
+  item: { id: string; emoji: string },
+  stage: 0 | 1 | 2 | 3,
+): { emoji: string; sizeFactor: number } {
+  if (!GROWING_GARDEN_IDS.has(item.id)) {
+    return { emoji: item.emoji, sizeFactor: 1 };
+  }
+  if (stage === 0) return { emoji: "🌱", sizeFactor: 0.45 };
+  if (stage === 1) return { emoji: "🌱", sizeFactor: 0.7 };
+  if (stage === 2) return { emoji: item.emoji, sizeFactor: 0.75 };
+  return { emoji: item.emoji, sizeFactor: 1 };
+}

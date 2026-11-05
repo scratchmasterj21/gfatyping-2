@@ -21,6 +21,7 @@ import * as TestLogic from "../../test/test-logic";
 import { isFunboxActiveWithProperty } from "../../test/funbox/list";
 import { Config } from "../../config/store";
 import { flash } from "../../events/keymap";
+import { typedCharEvent } from "../../events/test";
 import * as WeakSpot from "../../test/weak-spot";
 import * as CompositionState from "../../legacy-states/composition";
 import {
@@ -215,6 +216,7 @@ export async function onInsertText(options: OnInsertTextParams): Promise<void> {
   if (Config.keymapMode === "react") {
     flash(data, correct);
   }
+  typedCharEvent.dispatch({ correct });
 
   if (removeLastChar) {
     replaceInputElementLastValueChar("");
