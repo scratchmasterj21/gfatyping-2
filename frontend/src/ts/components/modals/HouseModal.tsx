@@ -5,6 +5,7 @@ import {
   createSignal,
   For,
   JSXElement,
+  on,
   onCleanup,
   Show,
 } from "solid-js";
@@ -28,9 +29,19 @@ import {
   HouseSpriteItem,
 } from "../../house/house-items";
 import {
+  HOUSE_ROOMS,
+  HouseRoom,
+  isRoomUnlocked,
+  roomOfItem,
+  RoomId,
+  setItemRoom,
+} from "../../house/house-rooms";
+import {
   housePlace,
   houseScene,
+  houseRoom,
   houseVisit,
+  setHouseRoom,
   setHouseScene,
   setHouseVisit,
 } from "../../house/house-scene";
@@ -397,6 +408,8 @@ function SpriteItem(props: {
   onResizePointerDown: (e: PointerEvent) => void;
   onBringToFront: () => void;
   onImageReady: () => void;
+  /** set when there's another unlocked room to move it to */
+  onMoveRoom?: () => void;
 }): JSXElement {
   return (
     <RoomAnchor
@@ -456,6 +469,22 @@ function SpriteItem(props: {
           >
             <Fa icon="fa-layer-group" />
           </div>
+          <Show when={props.onMoveRoom}>
+            {(move) => (
+              <div
+                data-item-control
+                class="absolute -top-1 -right-1 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-sub bg-bg text-[9px] text-sub opacity-70 hover:opacity-100"
+                title="Move to another room"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  move()();
+                }}
+              >
+                <Fa icon="fa-door-open" />
+              </div>
+            )}
+          </Show>
         </Show>
       </div>
     </RoomAnchor>
@@ -467,6 +496,48 @@ export function HouseModal(): JSXElement {
   /** Whose house is shown: a visited classmate's (view-only) or your own. */
   const viewUid = (): string | null => houseVisit()?.uid ?? getUserId();
   const visiting = (): boolean => houseVisit() !== undefined;
+  // ---- extra rooms ----
+  // rooms moved on this device since the last load (optimistic)
+  const [movedRooms, setMovedRooms] = createSignal<Record<string, RoomId>>({});
+  // new house (visit / back home): start in its living room
+  createEffect(
+    on(
+      viewUid,
+      () => {
+        setMovedRooms({});
+        setHouseRoom("living");
+      },
+      { defer: true },
+    ),
+  );
+  const roomUnlocked = (room: HouseRoom): boolean =>
+    isRoomUnlocked(room, houseQuery.data?.trophies.achievements ?? []);
+  /** the selected room, or the living room if it's locked for this house */
+  const currentRoom = (): RoomId => {
+    const room = HOUSE_ROOMS.find((r) => r.id === houseRoom());
+    return room !== undefined && roomUnlocked(room) ? room.id : "living";
+  };
+  const itemRoom = (id: string): RoomId =>
+    movedRooms()[id] ?? roomOfItem(houseQuery.data?.itemRooms ?? {}, id);
+  const otherUnlockedRooms = (): HouseRoom[] =>
+    HOUSE_ROOMS.filter((r) => r.id !== currentRoom() && roomUnlocked(r));
+  const [movingId, setMovingId] = createSignal<string | null>(null);
+  const moveItemTo = async (itemId: string, room: RoomId): Promise<void> => {
+    const uid = getUserId();
+    setMovingId(null);
+    if (uid === null || visiting()) return;
+    setMovedRooms((prev) => ({ ...prev, [itemId]: room }));
+    try {
+      await setItemRoom(uid, itemId, room);
+      void queryClient.invalidateQueries({ queryKey: ["houseState"] });
+    } catch (error) {
+      setMovedRooms((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([k]) => k !== itemId)),
+      );
+      showErrorNotification("Could not move that", { error });
+    }
+  };
+
   // street data is cached 5 min; visited houses come from that cache
   const visitStaleMs = (): number => (visiting() ? 5 * 60 * 1000 : 0);
 
@@ -642,7 +713,12 @@ export function HouseModal(): JSXElement {
       ? getGardenTheme(
           houseQuery.data?.gardenThemeId ?? DEFAULT_GARDEN_THEME_ID,
         )
-      : getHouseTheme(houseQuery.data?.themeId ?? DEFAULT_HOUSE_THEME_ID);
+      : getHouseTheme(
+          currentRoom() === "living"
+            ? (houseQuery.data?.themeId ?? DEFAULT_HOUSE_THEME_ID)
+            : (houseQuery.data?.roomThemes[currentRoom()] ??
+                DEFAULT_HOUSE_THEME_ID),
+        );
 
   const isGardenOwned = (id: string): boolean => {
     const item = GARDEN_ITEMS.find((entry) => entry.id === id);
@@ -655,7 +731,8 @@ export function HouseModal(): JSXElement {
     }
     return (
       houseQuery.data?.ownedItems[id] === true &&
-      houseQuery.data?.storedItems[id] !== true
+      houseQuery.data?.storedItems[id] !== true &&
+      itemRoom(id) === currentRoom()
     );
   };
 
@@ -1097,6 +1174,46 @@ export function HouseModal(): JSXElement {
             Class street
           </button>
         </div>
+        <Show when={houseScene() === "room"}>
+          <div class="flex flex-wrap gap-2" role="group" aria-label="Rooms">
+            <For each={HOUSE_ROOMS}>
+              {(room) => (
+                <button
+                  type="button"
+                  class={cn(
+                    "flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 font-kid text-sm font-bold whitespace-nowrap",
+                    currentRoom() === room.id
+                      ? "bg-text text-bg"
+                      : roomUnlocked(room)
+                        ? "cursor-pointer bg-sub-alt text-text"
+                        : "cursor-not-allowed bg-sub-alt text-sub opacity-70",
+                  )}
+                  aria-pressed={currentRoom() === room.id}
+                  title={
+                    roomUnlocked(room)
+                      ? room.name
+                      : `🔒 ${room.goal ?? ""} to unlock`
+                  }
+                  onClick={() => {
+                    if (!roomUnlocked(room)) {
+                      showNoticeNotification(
+                        `🔒 ${room.goal ?? ""} to unlock the ${room.name}!`,
+                      );
+                      return;
+                    }
+                    setDraggingId(null);
+                    setResizingId(null);
+                    setMovingId(null);
+                    setHouseRoom(room.id);
+                  }}
+                >
+                  <span>{roomUnlocked(room) ? room.emoji : "🔒"}</span>
+                  {room.name}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
         <Show when={!visiting() && houseScene() !== "street"}>
           <div class="flex items-center justify-end gap-3">
             <div class="flex items-center gap-1.5 font-bold text-main">
@@ -1217,17 +1334,26 @@ export function HouseModal(): JSXElement {
             <Show
               when={
                 houseScene() === "room" &&
-                Object.keys(houseQuery.data?.ownedItems ?? {}).length === 0
+                sortedFurniture().length === 0 &&
+                sortedSmallItems().length === 0
               }
             >
-              <div class="absolute inset-x-0 top-20 text-center text-sm text-sub">
+              <div class="absolute inset-x-0 top-20 px-4 text-center text-sm text-sub">
                 {visiting()
                   ? "This room is still empty!"
-                  : "Your room is empty — visit the shop to decorate it!"}
+                  : currentRoom() === "living"
+                    ? "Your room is empty — visit the shop to decorate it!"
+                    : "This room is empty! Buy furniture here, or move some in with the door button in edit room."}
               </div>
             </Show>
 
-            <Show when={houseScene() === "room" ? houseQuery.data : undefined}>
+            <Show
+              when={
+                houseScene() === "room" && currentRoom() === "living"
+                  ? houseQuery.data
+                  : undefined
+              }
+            >
               {(data) => <TrophyShelf trophies={data().trophies} />}
             </Show>
 
@@ -1251,6 +1377,13 @@ export function HouseModal(): JSXElement {
                       }
                       onBringToFront={() => bringToFront(item.id)}
                       onImageReady={onImageReady}
+                      onMoveRoom={
+                        houseScene() === "room" &&
+                        !visiting() &&
+                        otherUnlockedRooms().length > 0
+                          ? () => setMovingId(item.id)
+                          : undefined
+                      }
                     />
                   );
                 }
@@ -1337,6 +1470,26 @@ export function HouseModal(): JSXElement {
                         >
                           <Fa icon="fa-layer-group" />
                         </div>
+                        <Show
+                          when={
+                            houseScene() === "room" &&
+                            !visiting() &&
+                            otherUnlockedRooms().length > 0
+                          }
+                        >
+                          <div
+                            data-item-control
+                            class="absolute -top-1 -right-1 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-sub bg-bg text-[9px] text-sub opacity-70 hover:opacity-100"
+                            title="Move to another room"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setMovingId(item.id);
+                            }}
+                          >
+                            <Fa icon="fa-door-open" />
+                          </div>
+                        </Show>
                       </Show>
                     </div>
                   </RoomAnchor>
@@ -1344,7 +1497,7 @@ export function HouseModal(): JSXElement {
               }}
             </For>
 
-            <Show when={houseScene() === "room"}>
+            <Show when={houseScene() === "room" && currentRoom() === "living"}>
               <For each={PET_ITEMS}>
                 {(item) => (
                   <Show
@@ -1398,6 +1551,35 @@ export function HouseModal(): JSXElement {
               </div>
             </Anime>
 
+            {/* "Move to another room" picker (edit mode) */}
+            <Show when={movingId()}>
+              {(id) => (
+                <div class="absolute inset-x-0 bottom-3 z-[5000] flex justify-center px-3">
+                  <div class="flex flex-wrap items-center justify-center gap-2 rounded-xl bg-game-cream px-3 py-2 font-kid text-sm font-semibold text-game-ink shadow-lg">
+                    Move this to:
+                    <For each={otherUnlockedRooms()}>
+                      {(room) => (
+                        <button
+                          type="button"
+                          class="cursor-pointer rounded-full bg-game-gold px-3 py-1 text-game-ink hover:opacity-90"
+                          onClick={() => void moveItemTo(id(), room.id)}
+                        >
+                          {room.emoji} {room.name}
+                        </button>
+                      )}
+                    </For>
+                    <button
+                      type="button"
+                      class="cursor-pointer rounded-full bg-game-ink/10 px-3 py-1 text-game-ink hover:bg-game-ink/20"
+                      onClick={() => setMovingId(null)}
+                    >
+                      cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Show>
+
             {/* Small decor always renders above furniture/avatar/pets - see sortedSmallItems. */}
             <Show when={houseScene() === "room"}>
               <For each={sortedSmallItems()}>
@@ -1416,6 +1598,13 @@ export function HouseModal(): JSXElement {
                       }
                       onBringToFront={() => bringToFront(item.id)}
                       onImageReady={onImageReady}
+                      onMoveRoom={
+                        houseScene() === "room" &&
+                        !visiting() &&
+                        otherUnlockedRooms().length > 0
+                          ? () => setMovingId(item.id)
+                          : undefined
+                      }
                     />
                   );
                 }}

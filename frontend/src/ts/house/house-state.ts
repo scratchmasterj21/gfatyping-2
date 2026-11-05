@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { callApi } from "../api-client";
 import { ActivityDays, parseActivityDays } from "../classroom/activity";
+import { isRoomId, RoomId } from "./house-rooms";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { DEFAULT_GARDEN_THEME_ID } from "./garden-themes";
@@ -65,6 +66,10 @@ export type HouseState = {
   trophies: HouseTrophies;
   /** Japan date of the last finished house chore */
   choreDate?: string;
+  /** itemId -> extra room it was moved to (missing = living room) */
+  itemRooms: Record<string, RoomId>;
+  /** wallpaper per extra room (the living room uses themeId) */
+  roomThemes: Partial<Record<RoomId, string>>;
 };
 
 /** Earned-only things shown on the room's trophy shelf. */
@@ -93,7 +98,27 @@ export function emptyHouseState(): HouseState {
     gardenThemeId: DEFAULT_GARDEN_THEME_ID,
     activity: {},
     trophies: { achievements: [], lessonStars: 0, raceWins: 0, raceBestWpm: 0 },
+    itemRooms: {},
+    roomThemes: {},
   };
+}
+
+function roomMap(raw: unknown): Record<string, RoomId> {
+  if (raw === null || typeof raw !== "object") return {};
+  const out: Record<string, RoomId> = {};
+  for (const [id, room] of Object.entries(raw as Record<string, unknown>)) {
+    if (isRoomId(room)) out[id] = room;
+  }
+  return out;
+}
+
+function themeMap(raw: unknown): Partial<Record<RoomId, string>> {
+  if (raw === null || typeof raw !== "object") return {};
+  const out: Partial<Record<RoomId, string>> = {};
+  for (const [room, theme] of Object.entries(raw as Record<string, unknown>)) {
+    if (isRoomId(room) && typeof theme === "string") out[room] = theme;
+  }
+  return out;
 }
 
 const num = (v: unknown): number =>
@@ -145,6 +170,8 @@ export function houseStateFromDoc(
       typeof data?.["houseChoreDate"] === "string"
         ? data["houseChoreDate"]
         : undefined,
+    itemRooms: roomMap(data?.["houseItemRooms"]),
+    roomThemes: themeMap(data?.["houseRoomThemes"]),
     trophies: {
       achievements: Array.isArray(data?.["achievements"])
         ? (data["achievements"] as unknown[]).filter(

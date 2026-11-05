@@ -24,6 +24,8 @@ const AVATAR_CATEGORIES = new Set([
 ]);
 const AVATAR_SHAPES = new Set(["round", "square", "oval", "hexagon", "cloud"]);
 const OUTFIT_SLOTS = new Set(["1", "2", "3"]);
+/** Rooms besides the living room - mirrors house/house-rooms.ts. */
+const EXTRA_ROOMS = new Set(["bedroom", "kitchen", "playroom"]);
 const HOUSE_THEME_IDS = new Set([
   "plain",
   "cozy-wood",
@@ -107,6 +109,7 @@ export default async function handler(
     shape?: unknown;
     slot?: unknown;
     equipped?: unknown;
+    room?: unknown;
   };
   const app = getAdminApp();
   const userRef = app.firestore().collection("users").doc(auth.uid);
@@ -362,6 +365,29 @@ export default async function handler(
           throw new Error("Item not owned");
         }
         tx.set(userRef, { houseTheme: body.itemId }, { merge: true });
+        return {};
+      }
+
+      // Wallpaper for an extra room (the living room uses houseTheme).
+      if (body.target === "roomTheme") {
+        if (
+          typeof body.room !== "string" ||
+          !EXTRA_ROOMS.has(body.room) ||
+          typeof body.itemId !== "string" ||
+          !HOUSE_THEME_IDS.has(body.itemId)
+        ) {
+          throw new Error("Invalid room theme");
+        }
+        const owned =
+          (data["ownedHouseItems"] as Record<string, true> | undefined) ?? {};
+        if (body.itemId !== "plain" && owned[body.itemId] !== true) {
+          throw new Error("Item not owned");
+        }
+        tx.set(
+          userRef,
+          { houseRoomThemes: { [body.room]: body.itemId } },
+          { merge: true },
+        );
         return {};
       }
 

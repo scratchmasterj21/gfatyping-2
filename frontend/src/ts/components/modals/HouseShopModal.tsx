@@ -13,7 +13,8 @@ import {
   HouseItem,
   HouseSpriteItem,
 } from "../../house/house-items";
-import { housePlace, houseScene } from "../../house/house-scene";
+import { selectRoomTheme, setItemRoom } from "../../house/house-rooms";
+import { housePlace, houseRoom, houseScene } from "../../house/house-scene";
 import { HOUSE_SMALL_ITEMS } from "../../house/house-small-items";
 import { HOUSE_SPRITE_ITEMS } from "../../house/house-sprite-items";
 import {
@@ -92,13 +93,22 @@ export function HouseShopModal(): JSXElement {
       showErrorNotification(result.reason ?? "Couldn't buy that");
       return;
     }
+    // new furniture appears in the room you're shopping from
+    if (!garden() && houseRoom() !== "living") {
+      await setItemRoom(uid, item.id, houseRoom()).catch(() => undefined);
+    }
     refresh();
   };
 
   const handleToggleStored = async (id: string): Promise<void> => {
     const uid = getUserId();
     if (uid === null) return;
-    await setItemStored(uid, id, !isStored(id), housePlace());
+    const placing = isStored(id);
+    await setItemStored(uid, id, !placing, housePlace());
+    // taking something out of storage puts it in the room you're in
+    if (placing && !garden()) {
+      await setItemRoom(uid, id, houseRoom()).catch(() => undefined);
+    }
     refresh();
   };
 
@@ -121,12 +131,24 @@ export function HouseShopModal(): JSXElement {
   const activeThemeId = (): string =>
     garden()
       ? (stateQuery.data?.gardenThemeId ?? DEFAULT_GARDEN_THEME_ID)
-      : (stateQuery.data?.themeId ?? DEFAULT_HOUSE_THEME_ID);
+      : houseRoom() === "living"
+        ? (stateQuery.data?.themeId ?? DEFAULT_HOUSE_THEME_ID)
+        : (stateQuery.data?.roomThemes[houseRoom()] ?? DEFAULT_HOUSE_THEME_ID);
+
+  /** wallpaper goes on the room you're in (garden: the sky) */
+  const applyTheme = async (uid: string, themeId: string): Promise<void> => {
+    const room = houseRoom();
+    if (!garden() && room !== "living") {
+      await selectRoomTheme(room, themeId);
+    } else {
+      await selectHouseTheme(uid, themeId, housePlace());
+    }
+  };
 
   const handleSelectTheme = async (themeId: string): Promise<void> => {
     const uid = getUserId();
     if (uid === null) return;
-    await selectHouseTheme(uid, themeId, housePlace());
+    await applyTheme(uid, themeId);
     refresh();
   };
 
@@ -142,7 +164,7 @@ export function HouseShopModal(): JSXElement {
       showErrorNotification(result.reason ?? "Couldn't buy that");
       return;
     }
-    await selectHouseTheme(uid, theme.id, housePlace());
+    await applyTheme(uid, theme.id);
     refresh();
   };
 

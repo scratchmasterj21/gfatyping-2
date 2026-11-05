@@ -50,7 +50,7 @@ service cloud.firestore {
         // lessons-vs-games counters (api/_lib/activity.ts) - teachers and
         // the game unlock rules rely on them, so students can't edit them
         'activityDays', 'lastStarLessonDate',
-        'houseChoreDate', 'houseChoresDone'
+        'houseChoreDate', 'houseChoresDone', 'houseRoomThemes'
       ];
     }
 
