@@ -1,3 +1,4 @@
+import type { ActivityDays } from "../classroom/activity";
 import { User, UserProfileDetails } from "@monkeytype/schemas/users";
 import { getDefaultConfig } from "./default-config";
 import { Mode } from "@monkeytype/schemas/shared";
@@ -70,6 +71,8 @@ export type Snapshot = Omit<
   isPremium: boolean;
   streakHourOffset?: number;
   classId?: string;
+  /** per-day lesson/game activity (see classroom/activity.ts) */
+  activityDays?: ActivityDays;
   xp: number;
   testActivity?: ModifiableTestActivityCalendar;
   testActivityByYear?: { [key: string]: TestActivityCalendar };

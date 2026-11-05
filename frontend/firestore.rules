@@ -46,7 +46,10 @@ service cloud.firestore {
         'gardenTheme',
         'questsWeekId', 'questProgress', 'questsClaimed', 'questDedupe',
         'raceBestWpm', 'raceBestWpmAcc', 'raceBestAcc', 'raceBestAccWpm',
-        'raceTotalRaces', 'raceWins'
+        'raceTotalRaces', 'raceWins',
+        // lessons-vs-games counters (api/_lib/activity.ts) - teachers and
+        // the game unlock rules rely on them, so students can't edit them
+        'activityDays'
       ];
     }
 

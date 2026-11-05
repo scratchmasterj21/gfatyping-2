@@ -10,6 +10,7 @@ import {
 import { createSignal } from "solid-js";
 
 import { callApi } from "../api-client";
+import { noteLessonPassed } from "../games/game-access";
 import { configEvent } from "../events/config";
 import { getAuthenticatedUser, getDb } from "../firebase";
 import { findLesson, lessonGroups, lessonOrder } from "./lessons-data";
@@ -273,6 +274,7 @@ export async function recordCompletion(
       return result;
     }
 
+    if (result.passed === true) noteLessonPassed(lessonId);
     const newStars = result.stars ?? 0;
     const wasFirst3Star = (prev.stars ?? 0) < 3 && newStars === 3;
 
@@ -766,6 +768,7 @@ setOnLessonSynced((uid, payload, result) => {
       payload.correctChars ?? {},
     );
   }
+  if (result.passed === true) noteLessonPassed(payload.lessonId);
   const newStars = result.stars ?? 0;
   const wasFirst3Star =
     payload.prevStars !== undefined && payload.prevStars < 3 && newStars === 3;

@@ -5,6 +5,8 @@ import {
   createSignal,
   For,
   JSXElement,
+  on,
+  onCleanup,
   Show,
 } from "solid-js";
 
@@ -42,8 +44,21 @@ import { getAuthenticatedUser } from "../../../firebase";
 import { BalloonPopModal } from "../../../games/balloon-pop/BalloonPopModal";
 import { EchoKeysModal } from "../../../games/echo-keys/EchoKeysModal";
 import { FruitNinjaModal } from "../../../games/fruit-ninja/FruitNinjaModal";
+import {
+  checkGameAccess,
+  GameAccess,
+  gameLockMessage,
+  getGameAccess,
+  myToday,
+  resolvePolicy,
+} from "../../../games/game-access";
 import { scaleGameScore } from "../../../games/game-difficulty-multiplier";
 import { startGame } from "../../../games/game-launcher";
+import {
+  flushPendingGameSession,
+  startGameSession,
+  stopGameSession,
+} from "../../../games/game-session";
 import { games } from "../../../games/games-data";
 import { GemDigModal } from "../../../games/gem-dig/GemDigModal";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
@@ -184,6 +199,45 @@ function GameButton(props: {
           : props.description}
       </div>
     </button>
+  );
+}
+
+/** Why games are locked (or how much bonus time is left), above the tabs. */
+function GameAccessBanner(props: {
+  access: GameAccess;
+  policy: { mode: string; earnLessons: number };
+  lessonsPassed: number;
+}): JSXElement {
+  const text = (): string | undefined => {
+    const a = props.access;
+    if (a.allowed) {
+      return a.bonusLeftMin !== undefined
+        ? `🎁 Your teacher gave you game time! ${a.bonusLeftMin} min left today.`
+        : undefined;
+    }
+    if (a.reason === "earn") {
+      return `🎮 Pass ${props.policy.earnLessons} lessons today to unlock games - ${Math.min(props.lessonsPassed, props.policy.earnLessons)}/${props.policy.earnLessons} done!`;
+    }
+    if (a.reason === "off") {
+      return "⏸️ Your teacher turned games off for now. Keep practicing your lessons!";
+    }
+    return undefined;
+  };
+  return (
+    <Show when={text()}>
+      {(t) => (
+        <div
+          class={cn(
+            "mb-4 rounded-double px-4 py-3 font-kid text-lg font-semibold",
+            props.access.allowed
+              ? "bg-game-gold text-game-ink"
+              : "bg-sub-alt text-text",
+          )}
+        >
+          {t()}
+        </div>
+      )}
+    </Show>
   );
 }
 
@@ -1070,6 +1124,22 @@ export function LessonsPage(): JSXElement {
     enabled: isOpen() && isAuthenticated() && classId() !== undefined,
     staleTime: 1000 * 60 * 30,
   }));
+  // ---- teacher game controls (schoolConfig/gameAccess) ----
+  const gameAccessQuery = useQuery(() => ({
+    queryKey: ["gameAccess"],
+    queryFn: getGameAccess,
+    enabled: isOpen() && isAuthenticated() && !isCurrentUserAdmin(),
+    staleTime: 1000 * 60 * 5,
+  }));
+  const gamePolicy = createMemo(() =>
+    resolvePolicy(gameAccessQuery.data, classId(), getAuthenticatedUser()?.uid),
+  );
+  /** Free-play access; no game id = the games section as a whole. */
+  const gameAccess = (gameId?: string): GameAccess =>
+    isCurrentUserAdmin()
+      ? { allowed: true }
+      : checkGameAccess(gameId, gamePolicy(), myToday());
+
   const classGoal = createMemo(() => {
     const id = classId();
     if (id === undefined) return undefined;
@@ -1360,6 +1430,11 @@ export function LessonsPage(): JSXElement {
   };
 
   const openBuiltinGame = (gameId: string, recommended = false): void => {
+    const access = gameAccess(gameId);
+    if (!access.allowed) {
+      showNoticeNotification(gameLockMessage(access));
+      return;
+    }
     if (gameId === "typing-rpg" && !rpgUnlocked()) {
       showNoticeNotification(
         "Unlock the All Keys lessons to play Typing Quest",
@@ -1380,6 +1455,34 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "word-pong") setPongOpen(true);
     else if (gameId === "gem-dig") setDigOpen(true);
   };
+
+  // Time in free-play games, for the teacher's activity view. Lesson
+  // checkpoint games use their own modals and aren't counted here.
+  const openFreeGame = createMemo((): string | undefined => {
+    if (defenderOpen()) return "word-defender";
+    if (balloonOpen()) return "balloon-pop";
+    if (racerOpen()) return "type-racer";
+    if (ghostOpen()) return "ghost-hunter";
+    if (fruitNinjaOpen()) return "fruit-ninja";
+    if (typeTossOpen()) return "type-toss";
+    if (rpgOpen()) return "typing-rpg";
+    if (towerOpen()) return "tower-climb";
+    if (snackOpen()) return "snack-shop";
+    if (echoOpen()) return "echo-keys";
+    if (pongOpen()) return "word-pong";
+    if (digOpen()) return "gem-dig";
+    return undefined;
+  });
+  createEffect(
+    on(openFreeGame, (id) => {
+      if (id === undefined) stopGameSession();
+      else startGameSession(id);
+    }),
+  );
+  onCleanup(stopGameSession);
+  createEffect(() => {
+    if (isOpen() && isAuthenticated()) flushPendingGameSession();
+  });
 
   const launchGame = (
     gameId: string,
@@ -1946,6 +2049,11 @@ export function LessonsPage(): JSXElement {
               <p class="mb-4 text-sub">
                 Play solo, challenge classmates, or check your game rewards.
               </p>
+              <GameAccessBanner
+                access={gameAccess()}
+                policy={gamePolicy()}
+                lessonsPassed={myToday().lessonsPassed}
+              />
               <div
                 role="tablist"
                 aria-label="Game categories"
@@ -2013,7 +2121,15 @@ export function LessonsPage(): JSXElement {
                           description={game.description}
                           icon={game.icon}
                           recommended={recommendedGameId() === game.id}
-                          locked={game.id === "typing-rpg" && !rpgUnlocked()}
+                          locked={
+                            (game.id === "typing-rpg" && !rpgUnlocked()) ||
+                            !gameAccess(game.id).allowed
+                          }
+                          lockedMessage={
+                            gameAccess(game.id).allowed
+                              ? undefined
+                              : gameLockMessage(gameAccess(game.id))
+                          }
                           onClick={() => launchGame(game.id)}
                         />
                       )}
@@ -2045,17 +2161,23 @@ export function LessonsPage(): JSXElement {
                             : game.id === "type-toss"
                               ? "home-words"
                               : "all-keys-1";
-                        const locked = () =>
+                        const lessonLocked = () =>
                           !["word-pong", "gem-dig"].includes(game.id) &&
                           !isCurrentUserAdmin() &&
                           isLessonLocked(requiredLesson);
+                        const locked = () =>
+                          lessonLocked() || !gameAccess(game.id).allowed;
                         return (
                           <GameButton
                             name={game.name}
                             description={game.description}
                             icon={game.icon}
                             locked={locked()}
-                            lockedMessage="🔒 Complete the required typing lessons to play together"
+                            lockedMessage={
+                              gameAccess(game.id).allowed
+                                ? "🔒 Complete the required typing lessons to play together"
+                                : gameLockMessage(gameAccess(game.id))
+                            }
                             onClick={() => {
                               if (!locked()) launchGame(game.id, "together");
                             }}

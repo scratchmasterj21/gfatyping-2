@@ -24,6 +24,7 @@ export type PendingLessonPayload = {
 
 export type PendingLessonSyncResult = {
   ok: boolean;
+  passed?: boolean;
   stars?: number;
   coinsAwarded?: number;
   newlyCompletedQuests?: { name: string; coinReward: number }[];

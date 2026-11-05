@@ -40,6 +40,7 @@ type StoredUser = {
   avatarUrl?: string;
   addedAt: number;
   classId?: string;
+  activityDays?: unknown;
   xp?: number;
   personalBests?: unknown;
   lbMemory?: unknown;
@@ -108,6 +109,7 @@ export const get: Handler = async (ctx) => {
     avatarUrl,
     addedAt,
     classId: stored.classId,
+    activityDays: stored.activityDays,
     personalBests: stored.personalBests ?? emptyPersonalBests(),
     banned: false,
     verified: true,

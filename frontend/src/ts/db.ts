@@ -36,6 +36,7 @@ import { setXpBarData } from "./states/header";
 import { FunboxMetadata } from "@monkeytype/funbox";
 import { __nonReactive } from "./collections/tags";
 import { fetchUserFromApi } from "./ape/user";
+import { parseActivityDays } from "./classroom/activity";
 import { SnapshotInitError } from "./utils/snapshot-init-error";
 import { updateTagsInFilterStorage } from "./states/result-filters";
 
@@ -132,6 +133,9 @@ export async function initSnapshot(): Promise<Snapshot | false> {
     snap.details = userData.profileDetails;
     snap.avatarUrl = (userData as { avatarUrl?: string }).avatarUrl;
     snap.classId = (userData as { classId?: string }).classId;
+    snap.activityDays = parseActivityDays(
+      (userData as { activityDays?: unknown }).activityDays,
+    );
     snap.addedAt = userData.addedAt;
     snap.inventory = userData.inventory;
     snap.xp = userData.xp ?? 0;

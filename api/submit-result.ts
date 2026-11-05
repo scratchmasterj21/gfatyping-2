@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 import { getAdminApp } from "./_lib/admin.js";
+import { activityUpdate } from "./_lib/activity.js";
 import { verifyStudent } from "./_lib/auth.js";
 import { tokyoDateString, tokyoDayId, tokyoWeekId } from "./_lib/time.js";
 import { qualifiesForFastMode } from "./_lib/typing-quest-reward.js";
@@ -526,6 +527,7 @@ export default async function handler(
         tx.set(
           userRef,
           stripUndefined({
+            ...activityUpdate(user, { t: activeSeconds }),
             personalBests,
             xp: newXp,
             streak,

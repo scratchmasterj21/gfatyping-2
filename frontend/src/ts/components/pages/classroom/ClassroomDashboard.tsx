@@ -78,6 +78,7 @@ import { EmptyState } from "../../common/EmptyState";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
+import { ActivityTab } from "./ActivityTab";
 import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
 
@@ -104,6 +105,7 @@ const CLASSROOM_QUERY_STALE_MS = 5 * 60 * 1000;
 const TabSchema = z.enum([
   "students",
   "progress",
+  "activity",
   "assignments",
   "wordlists",
   "passages",
@@ -115,6 +117,7 @@ type Tab = z.infer<typeof TabSchema>;
 
 const CLASS_TABS = new Set<Tab>([
   "progress",
+  "activity",
   "assignments",
   "races",
   "announcements",
@@ -2741,6 +2744,7 @@ export function ClassroomDashboard(): JSXElement {
   const REFRESH_KEYS: Record<Tab, string[]> = {
     students: ["students"],
     progress: ["progress"],
+    activity: ["activity"],
     assignments: ["assignments"],
     wordlists: ["wordlists"],
     passages: ["passages"],
@@ -2751,11 +2755,14 @@ export function ClassroomDashboard(): JSXElement {
   const refreshAll = async (): Promise<void> => {
     setRefreshing(true);
     try {
-      await Promise.all(
-        REFRESH_KEYS[tab()].map(async (key) =>
+      await Promise.all([
+        ...REFRESH_KEYS[tab()].map(async (key) =>
           queryClient.invalidateQueries({ queryKey: ["classroom", key] }),
         ),
-      );
+        ...(tab() === "activity"
+          ? [queryClient.invalidateQueries({ queryKey: ["gameAccess"] })]
+          : []),
+      ]);
     } finally {
       setRefreshing(false);
     }
@@ -2835,6 +2842,9 @@ export function ClassroomDashboard(): JSXElement {
                 {tabButton("progress", "Student progress", {
                   icon: "fa-chart-line",
                 })}
+                {tabButton("activity", "Lessons vs games", {
+                  icon: "fa-gamepad",
+                })}
               </>,
             )}
             {tabGroup(
@@ -2888,6 +2898,11 @@ export function ClassroomDashboard(): JSXElement {
           <Show when={tab() === "students"}>
             <div class={panelClass}>
               <StudentsTab />
+            </div>
+          </Show>
+          <Show when={tab() === "activity" && classroomOpen()}>
+            <div class={panelClass}>
+              <ActivityTab classId={selectedClass()} />
             </div>
           </Show>
           <Show when={tab() === "progress"}>

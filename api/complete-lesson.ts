@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
+import { activityUpdate } from "./_lib/activity.js";
 import { verifyStudent } from "./_lib/auth.js";
 import { tokyoDateString } from "./_lib/time.js";
 
@@ -375,9 +376,15 @@ export default async function handler(
           { merge: true },
         );
 
+        const activity = activityUpdate(
+          userData,
+          { l: activeSeconds },
+          { passedLessonId: passed ? lessonId : undefined },
+        );
         tx.set(
           userRef,
           {
+            ...activity,
             ...questUpdate,
             ...(practiceReward > 0
               ? { practiceRewardDates: nextRewardDates }

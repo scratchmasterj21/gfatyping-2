@@ -2,7 +2,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
+import { activityUpdate } from "./_lib/activity.js";
 import { verifyStudent } from "./_lib/auth.js";
+import { tokyoDateString } from "./_lib/time.js";
 
 // Mirrors LESSON_CHECKPOINT_COMPLETE_WAVE in lesson-checkpoints.ts.
 const COMPLETE_WAVE = 3;
@@ -14,6 +16,23 @@ const GAME_IDS = new Set([
 ]);
 const KEY_PATTERN =
   /^game:[a-z0-9]+(?:-[a-z0-9]+)*:(balloon-pop|word-defender|type-toss|ghost-hunter)$/;
+// Free-play games (Lessons page > Games) whose time is tracked for teachers.
+const FREE_PLAY_IDS = new Set([
+  "word-defender",
+  "balloon-pop",
+  "type-racer",
+  "ghost-hunter",
+  "fruit-ninja",
+  "type-toss",
+  "typing-rpg",
+  "tower-climb",
+  "snack-shop",
+  "echo-keys",
+  "word-pong",
+  "gem-dig",
+]);
+/** One session can't count for more than this (tab left open, etc). */
+const MAX_SESSION_SECONDS = 30 * 60;
 const MAX_SCORE = 1_000_000;
 const MAX_WAVE = 50;
 
@@ -36,6 +55,12 @@ export default async function handler(
   const auth = await verifyStudent(req);
   if (!auth.ok) {
     res.status(auth.status).json({ message: auth.message });
+    return;
+  }
+
+  const sessionBody = (req.body as { session?: unknown }).session;
+  if (sessionBody !== undefined) {
+    await saveGameSession(auth.uid, sessionBody, res);
     return;
   }
 
@@ -104,6 +129,60 @@ export default async function handler(
     res.status(200).json({ ok: true });
   } catch (e) {
     console.error("save-game-result failed:", e);
+    res.status(500).json({ ok: false, reason: "Something went wrong" });
+  }
+}
+
+/**
+ * Time spent in a free-play game, for the teacher's activity view and the
+ * bonus-game-time budget. Body: { session: { gameId, seconds, opened } }.
+ */
+async function saveGameSession(
+  uid: string,
+  raw: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  const session = (raw ?? {}) as {
+    gameId?: unknown;
+    seconds?: unknown;
+    opened?: unknown;
+  };
+  const seconds = Number(session.seconds);
+  if (
+    typeof session.gameId !== "string" ||
+    !FREE_PLAY_IDS.has(session.gameId) ||
+    !Number.isFinite(seconds) ||
+    seconds < 0 ||
+    (session.opened !== undefined && typeof session.opened !== "boolean")
+  ) {
+    res.status(400).json({ ok: false, reason: "Invalid game session" });
+    return;
+  }
+  const db = getAdminApp().firestore();
+  const userRef = db.collection("users").doc(uid);
+  try {
+    const gameSecondsToday = await db.runTransaction(
+      async (tx: admin.firestore.Transaction) => {
+        const snap = await tx.get(userRef);
+        const data = snap.data();
+        const add = Math.min(MAX_SESSION_SECONDS, Math.round(seconds));
+        tx.set(
+          userRef,
+          activityUpdate(data, {
+            g: add,
+            gp: session.opened === true ? 1 : 0,
+          }),
+          { merge: true },
+        );
+        const days = data?.["activityDays"] as
+          | Record<string, { g?: number }>
+          | undefined;
+        return (days?.[tokyoDateString()]?.g ?? 0) + add;
+      },
+    );
+    res.status(200).json({ ok: true, gameSecondsToday });
+  } catch (e) {
+    console.error("save-game-result (session) failed:", e);
     res.status(500).json({ ok: false, reason: "Something went wrong" });
   }
 }
