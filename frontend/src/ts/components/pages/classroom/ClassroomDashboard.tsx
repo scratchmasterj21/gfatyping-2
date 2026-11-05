@@ -69,6 +69,7 @@ import {
   showNoticeNotification,
   showSuccessNotification,
 } from "../../../states/notifications";
+import { showSimpleModal } from "../../../states/simple-modal";
 import { cn } from "../../../utils/cn";
 import { download } from "../../../utils/misc";
 import { Avatar } from "../../common/Avatar";
@@ -479,6 +480,37 @@ function ProgressTab(props: {
     } finally {
       setRewardingUid(null);
     }
+  };
+
+  /** One write per student; asks first because it can't be undone. */
+  const giveCoinsBulk = (
+    rowsToPay: StudentProgressRow[],
+    who: string,
+  ): void => {
+    const amount = coinAmount();
+    if (rowsToPay.length === 0 || amount <= 0) return;
+    const uids = rowsToPay.map((r) => r.uid);
+    showSimpleModal({
+      title: `Give ${amount} coins to ${uids.length} student${uids.length === 1 ? "" : "s"}?`,
+      text: `${who}: ${amount * uids.length} coins in total.`,
+      buttonText: "give coins",
+      execFn: async () => {
+        const results = await Promise.allSettled(
+          uids.map(async (uid) => awardCoins(uid, amount)),
+        );
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed > 0) console.error("bulk coins failed", results);
+        return failed === 0
+          ? {
+              status: "success",
+              message: `Gave ${amount} coins to ${uids.length} students`,
+            }
+          : {
+              status: "error",
+              message: `Gave coins to ${uids.length - failed} of ${uids.length} students - ${failed} failed`,
+            };
+      },
+    });
   };
 
   const dateRange = (): { start: number; end: number } => ({
@@ -950,8 +982,30 @@ function ProgressTab(props: {
                 }
               />
             </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button
+                text={`give to selected (${selectedForCert().size})`}
+                fa={{ icon: "fa-check-square" }}
+                disabled={selectedForCert().size === 0}
+                onClick={() =>
+                  giveCoinsBulk(
+                    props.rows.filter((r) => selectedForCert().has(r.uid)),
+                    "Selected students",
+                  )
+                }
+              />
+              <Button
+                text={`give to whole class (${props.rows.length})`}
+                fa={{ icon: "fa-users" }}
+                disabled={props.rows.length === 0}
+                onClick={() =>
+                  giveCoinsBulk(props.rows, `Everyone in ${props.classId}`)
+                }
+              />
+            </div>
             <p class="text-xs text-sub">
-              Give coins to one student with the coin button on their row.
+              Tick students with the checkboxes in the table (the top box
+              selects everyone shown), or use the coin button on one row.
             </p>
           </div>
         </Show>
@@ -1139,7 +1193,7 @@ function ProgressTab(props: {
                         <input
                           type="checkbox"
                           checked={selectedForCert().has(row.uid)}
-                          aria-label={`Select ${row.name} for certificates`}
+                          aria-label={`Select ${row.name}`}
                           onChange={() => toggleCertSelect(row.uid)}
                         />
                       </td>
