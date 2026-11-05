@@ -238,6 +238,13 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     halo: { category: "hat", requiresAchievement: "accuracy-perfect" },
     wizard: { category: "hat", requiresAchievement: "speed-50" },
     crown: { category: "hat", requiresAchievement: "streak-30" },
+    "grad-cap": { category: "hat", requiresAchievement: "lessons-25" },
+    medal: { category: "accessory", requiresAchievement: "streak-7" },
+    "checkered-bg": { category: "background", requiresAchievement: "races-10" },
+    "lightning-highlight": {
+      category: "highlight",
+      requiresAchievement: "speed-30",
+    },
     pumpkin: { category: "hat", price: 60, seasonal: true },
     santa: { category: "hat", price: 60, seasonal: true },
     glasses: { category: "accessory", price: 30 },

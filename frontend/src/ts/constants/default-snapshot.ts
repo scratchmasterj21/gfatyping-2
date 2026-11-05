@@ -73,6 +73,8 @@ export type Snapshot = Omit<
   classId?: string;
   /** per-day lesson/game activity (see classroom/activity.ts) */
   activityDays?: ActivityDays;
+  /** class race wins (written by the teacher's race host) */
+  raceWins?: number;
   xp: number;
   testActivity?: ModifiableTestActivityCalendar;
   testActivityByYear?: { [key: string]: TestActivityCalendar };

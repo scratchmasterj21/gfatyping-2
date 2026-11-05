@@ -2,7 +2,10 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 
 import { getAdminApp } from "./_lib/admin.js";
-import { qualifiesForAchievement } from "./_lib/achievements.js";
+import {
+  countBuiltInLessonsCompleted,
+  qualifiesForAchievement,
+} from "./_lib/achievements.js";
 import { verifyStudent } from "./_lib/auth.js";
 import {
   CATALOGS,
@@ -130,6 +133,11 @@ export default async function handler(
   const selectedField = SELECTED_FIELD[shopId];
 
   try {
+    // lesson-count unlocks need a subcollection count, done outside the
+    // transaction (only for those items - one read per completed lesson)
+    const lessonsCompleted = item.requiresAchievement?.startsWith("lessons-")
+      ? await countBuiltInLessonsCompleted(userRef)
+      : undefined;
     await db.runTransaction(async (tx: admin.firestore.Transaction) => {
       const snap = await tx.get(userRef);
       const data = snap.exists ? snap.data() : {};
@@ -150,7 +158,11 @@ export default async function handler(
       if (item.requiresAchievement !== undefined) {
         // Badges are displayed client-side, but the free claim is authorized
         // from protected PB/streak fields so a forged badge grants nothing.
-        if (!qualifiesForAchievement(data ?? {}, item.requiresAchievement)) {
+        if (
+          !qualifiesForAchievement(data ?? {}, item.requiresAchievement, {
+            lessonsCompleted,
+          })
+        ) {
           throw new BuyError("Achievement not earned yet");
         }
         tx.set(userRef, update, { merge: true });

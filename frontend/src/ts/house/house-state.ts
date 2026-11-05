@@ -63,6 +63,8 @@ export type HouseState = {
   activity: ActivityDays;
   lastStarLessonDate?: string;
   trophies: HouseTrophies;
+  /** Japan date of the last finished house chore */
+  choreDate?: string;
 };
 
 /** Earned-only things shown on the room's trophy shelf. */
@@ -138,6 +140,10 @@ export function houseStateFromDoc(
     lastStarLessonDate:
       typeof data?.["lastStarLessonDate"] === "string"
         ? data["lastStarLessonDate"]
+        : undefined,
+    choreDate:
+      typeof data?.["houseChoreDate"] === "string"
+        ? data["houseChoreDate"]
         : undefined,
     trophies: {
       achievements: Array.isArray(data?.["achievements"])

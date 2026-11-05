@@ -94,6 +94,13 @@ export const AVATAR_ITEMS: AvatarItem[] = [
     name: "Crown",
     requiresAchievement: "streak-30",
   },
+  // earned-only: can't be bought (see api/_lib/achievements.ts)
+  {
+    id: "grad-cap",
+    category: "hat",
+    name: "Grad Cap",
+    requiresAchievement: "lessons-25",
+  },
   {
     id: "pumpkin",
     category: "hat",
@@ -118,6 +125,12 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   { id: "freckles", category: "accessory", name: "Freckles", price: 25 },
   { id: "headphones", category: "accessory", name: "Headphones", price: 45 },
   { id: "scarf", category: "accessory", name: "Scarf", price: 40 },
+  {
+    id: "medal",
+    category: "accessory",
+    name: "Gold Medal",
+    requiresAchievement: "streak-7",
+  },
   { id: "sleepy", category: "face", name: "Sleepy", price: 25 },
   { id: "wink", category: "face", name: "Wink", price: 25 },
   { id: "surprised", category: "face", name: "Surprised", price: 25 },
@@ -131,11 +144,24 @@ export const AVATAR_ITEMS: AvatarItem[] = [
   { id: "waves-bg", category: "background", name: "Waves", price: 45 },
   { id: "rainbow-bg", category: "background", name: "Rainbow", price: 55 },
   {
+    id: "checkered-bg",
+    category: "background",
+    name: "Race Flag",
+    requiresAchievement: "races-10",
+  },
+  {
     id: "hearts-bg",
     category: "background",
     name: "Heart Confetti",
     price: 45,
     seasonMonths: [2],
+  },
+  {
+    id: "lightning-highlight",
+    category: "highlight",
+    name: "Lightning Glow",
+    requiresAchievement: "speed-30",
+    value: "#ffe066",
   },
   {
     id: "gold-highlight",

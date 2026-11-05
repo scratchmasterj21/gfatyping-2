@@ -68,6 +68,7 @@ import { Button } from "../common/Button";
 import { Fa } from "../common/Fa";
 import { PetSprite } from "../common/PetSprite";
 import { ClassStreet } from "./ClassStreet";
+import { HouseChorePanel } from "./HouseChorePanel";
 import { TrophyShelf } from "./TrophyShelf";
 
 const ROAM_INTERVAL_MS = 4500;
@@ -1168,6 +1169,11 @@ export function HouseModal(): JSXElement {
           >
             {practiceMessage()}
           </div>
+          <Show when={houseScene() === "room" && houseQuery.data}>
+            {(data) => (
+              <HouseChorePanel choreDate={data().choreDate} onDone={refresh} />
+            )}
+          </Show>
         </Show>
 
         <Show

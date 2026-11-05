@@ -41,6 +41,7 @@ type StoredUser = {
   addedAt: number;
   classId?: string;
   activityDays?: unknown;
+  raceWins?: number;
   xp?: number;
   personalBests?: unknown;
   lbMemory?: unknown;
@@ -110,6 +111,7 @@ export const get: Handler = async (ctx) => {
     addedAt,
     classId: stored.classId,
     activityDays: stored.activityDays,
+    raceWins: stored.raceWins,
     personalBests: stored.personalBests ?? emptyPersonalBests(),
     banned: false,
     verified: true,

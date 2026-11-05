@@ -78,6 +78,7 @@ export function Avatar(props: {
   const color = (): string => props.color ?? "#94a3b8";
   const size = (): number => props.size ?? 96;
   const gradId = `avatar-sheen-${createUniqueId()}`;
+  const bgClipId = `avatar-bg-clip-${createUniqueId()}`;
   // border-radius rounds the SVG's own box to a circle so the box-shadow ring
   // traces the drawn avatar's circular shape instead of a square bounding box.
   const highlightStyle = ():
@@ -179,6 +180,21 @@ export function Avatar(props: {
             <path
               d="M 78 78 C 78 75 74 75 74 78 C 74 75 70 75 70 78 C 70 81 74 84 74 86 C 74 84 78 81 78 78 Z"
               fill="#ffc9de"
+            ></path>
+          </Show>
+          <Show when={props.background === "checkered-bg"}>
+            <defs>
+              <clipPath id={bgClipId}>
+                <circle cx="50" cy="50" r="48"></circle>
+              </clipPath>
+            </defs>
+            <circle cx="50" cy="50" r="48" fill="#f8f9fa"></circle>
+            <path
+              // oxlint-disable-next-line react/no-unknown-property -- SVG attribute in Solid
+              clip-path={`url(#${bgClipId})`}
+              d="M 2 2 h 16 v 16 h -16 Z M 34 2 h 16 v 16 h -16 Z M 66 2 h 16 v 16 h -16 Z M 18 18 h 16 v 16 h -16 Z M 50 18 h 16 v 16 h -16 Z M 82 18 h 16 v 16 h -16 Z M 2 34 h 16 v 16 h -16 Z M 34 34 h 16 v 16 h -16 Z M 66 34 h 16 v 16 h -16 Z M 18 50 h 16 v 16 h -16 Z M 50 50 h 16 v 16 h -16 Z M 82 50 h 16 v 16 h -16 Z M 2 66 h 16 v 16 h -16 Z M 34 66 h 16 v 16 h -16 Z M 66 66 h 16 v 16 h -16 Z M 18 82 h 16 v 16 h -16 Z M 50 82 h 16 v 16 h -16 Z M 82 82 h 16 v 16 h -16 Z"
+              fill="#343a40"
+              opacity="0.8"
             ></path>
           </Show>
           <Show when={props.background === "grid-bg"}>
@@ -939,6 +955,27 @@ export function Avatar(props: {
               <circle cx="13" cy="58" r="2.5" fill="#ffd43b"></circle>
               <circle cx="87" cy="58" r="2.5" fill="#ffd43b"></circle>
             </Show>
+            <Show when={props.accessory === "medal"}>
+              <path
+                d="M 42 72 L 50 84 L 58 72"
+                stroke="#e64980"
+                stroke-width="3.5"
+                fill="none"
+                stroke-linejoin="round"
+              ></path>
+              <circle
+                cx="50"
+                cy="87"
+                r="5.5"
+                fill="#fcc419"
+                stroke="#e67700"
+                stroke-width="1.2"
+              ></circle>
+              <path
+                d="M 50 83.8 L 51 86.2 L 53.4 86.4 L 51.6 88 L 52.1 90.4 L 50 89.1 L 47.9 90.4 L 48.4 88 L 46.6 86.4 L 49 86.2 Z"
+                fill="#fff3bf"
+              ></path>
+            </Show>
             <Show when={props.accessory === "necklace"}>
               <path
                 d="M 38 74 Q 50 82 62 74"
@@ -1046,6 +1083,26 @@ export function Avatar(props: {
                 opacity="0.9"
               ></path>
               <circle cx="50" cy="4" r="3.5" fill="#ffd43b"></circle>
+            </Show>
+            <Show when={props.hat === "grad-cap"}>
+              <path
+                d="M 34 20 L 34 29 Q 50 36 66 29 L 66 20 Z"
+                fill="#343a40"
+              ></path>
+              <path
+                d="M 20 18 L 50 7 L 80 18 L 50 27 Z"
+                fill="#212529"
+                stroke="rgba(255,255,255,0.15)"
+                stroke-width="1"
+              ></path>
+              <path
+                d="M 50 17 L 73 21 L 74 31"
+                stroke="#fcc419"
+                stroke-width="1.8"
+                fill="none"
+              ></path>
+              <circle cx="50" cy="17" r="1.8" fill="#fcc419"></circle>
+              <circle cx="74" cy="32" r="2.2" fill="#fcc419"></circle>
             </Show>
             <Show when={props.hat === "crown"}>
               <path

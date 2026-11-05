@@ -133,6 +133,7 @@ export async function initSnapshot(): Promise<Snapshot | false> {
     snap.details = userData.profileDetails;
     snap.avatarUrl = (userData as { avatarUrl?: string }).avatarUrl;
     snap.classId = (userData as { classId?: string }).classId;
+    snap.raceWins = (userData as { raceWins?: number }).raceWins ?? 0;
     snap.activityDays = parseActivityDays(
       (userData as { activityDays?: unknown }).activityDays,
     );

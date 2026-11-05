@@ -99,6 +99,44 @@ async function claimCollection(
   }
 }
 
+/** Coins for today's house chore (typing a few themed words). */
+const HOUSE_CHORE_COINS = 5;
+
+/**
+ * Once per Tokyo day: the daily typing chore in My House. One read + one
+ * write; houseChoreDate is an economy field so it can't be reset by hand.
+ */
+async function claimHouseChore(
+  uid: string,
+  res: VercelResponse,
+): Promise<void> {
+  const db = getAdminApp().firestore();
+  const userRef = db.collection("users").doc(uid);
+  const today = tokyoDateString();
+  try {
+    const claimed = await db.runTransaction(
+      async (tx: admin.firestore.Transaction) => {
+        const data = (await tx.get(userRef)).data() ?? {};
+        if (data["houseChoreDate"] === today) return false;
+        tx.set(
+          userRef,
+          {
+            houseChoreDate: today,
+            houseChoresDone: admin.firestore.FieldValue.increment(1),
+            coins: admin.firestore.FieldValue.increment(HOUSE_CHORE_COINS),
+          },
+          { merge: true },
+        );
+        return true;
+      },
+    );
+    res.status(200).json({ claimed, coins: claimed ? HOUSE_CHORE_COINS : 0 });
+  } catch (e) {
+    console.error("claim-reward (houseChore) failed:", e);
+    res.status(500).json({ claimed: false, coins: 0 });
+  }
+}
+
 /**
  * Per-run coins for the solo mini games, capped to a few paid runs per game
  * per Tokyo day (see _lib/mini-game-reward.ts). One read + one write.
@@ -191,6 +229,10 @@ export default async function handler(
       )
       .map(([id]) => id);
     await claimCollection(auth.uid, category, "ownedCostumes", required, res);
+    return;
+  }
+  if (body.type === "houseChore") {
+    await claimHouseChore(auth.uid, res);
     return;
   }
   if (body.type === "miniGame") {

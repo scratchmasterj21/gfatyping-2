@@ -353,6 +353,13 @@ export const achievements: Achievement[] = [
     earned: ({ lessonProgress }) => lessonsCompleted(lessonProgress) >= 10,
   },
   {
+    id: "races-10",
+    name: "Race champion",
+    description: "Win 10 class races",
+    icon: "fa-flag-checkered",
+    earned: ({ snapshot }) => (snapshot.raceWins ?? 0) >= 10,
+  },
+  {
     id: "lessons-25",
     name: "Scholar",
     description: "Complete 25 lessons",
