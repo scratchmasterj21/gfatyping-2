@@ -20,6 +20,7 @@ import {
 import { CLASS_IDS } from "../../../constants/classes";
 import { Confetti } from "../../../games/mini/Confetti";
 import { lessonGroups } from "../../../lessons/lessons-data";
+import { queryClient } from "../../../queries";
 import {
   addPoints,
   BLITZ_REVEAL_MS,
@@ -30,6 +31,15 @@ import {
   rankAnswers,
   roundPoints,
 } from "../../../race/blitz";
+import {
+  CHAMP_ROUNDS,
+  Championship,
+  ChampRoundPlan,
+  pickRoundWords,
+  previousRanks,
+  rankChampionship,
+  scoreRound,
+} from "../../../race/championship";
 import {
   createRace,
   deleteRace,
@@ -52,6 +62,9 @@ import {
   writeBlitzScores,
   writeBlitzState,
   writeTugTotals,
+  crownChampion,
+  listChampions,
+  setChampionship,
 } from "../../../race/race-db";
 import {
   isTimedFormat,
@@ -70,12 +83,25 @@ import {
   tugOutcome,
   tugWinMargin,
 } from "../../../race/tug";
-import { showErrorNotification } from "../../../states/notifications";
+import {
+  showErrorNotification,
+  showSuccessNotification,
+} from "../../../states/notifications";
 import { cn } from "../../../utils/cn";
 import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 import { Mascot } from "../../common/Mascot";
 import { Page } from "../../common/Page";
+import {
+  contentProblem,
+  contentSource,
+  defaultRounds,
+  RoundDraft,
+} from "./champ-setup";
+import { ChampionReveal } from "./ChampionReveal";
+import { ChampionshipBoard } from "./ChampionshipBoard";
+import { ChampionshipSetup } from "./ChampionshipSetup";
+import { HallOfChampions } from "./HallOfChampions";
 
 const COUNTDOWN_MS = 4000;
 const HOST_STORAGE_KEY = "gfa_hosted_race";
@@ -728,6 +754,11 @@ export function RaceHostPage(): JSXElement {
   const [duration, setDuration] = createSignal(30);
   const [classId, setClassId] = createSignal("none");
   const [busy, setBusy] = createSignal(false);
+  // Class Championship setup
+  const [mode, setMode] = createSignal<"race" | "championship">("race");
+  const [champRounds, setChampRounds] =
+    createSignal<RoundDraft[]>(defaultRounds());
+  const [sameWords, setSameWords] = createSignal(false);
 
   let saved = false;
   let runTimer: ReturnType<typeof setTimeout> | null = null;
@@ -907,6 +938,200 @@ export function RaceHostPage(): JSXElement {
       setHostedPin(pin);
     } catch (e) {
       showErrorNotification("Failed to create race", { error: e });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Class Championship ----
+  const champ = (): Championship | undefined => race()?.championship;
+  const champRows = createMemo(() => rankChampionship(champ()?.scores ?? {}));
+  const champPrevious = createMemo(() => previousRanks(champ()?.scores ?? {}));
+  const champScored = (): boolean => {
+    const c = champ();
+    return c !== undefined && c.scoredRounds > c.current;
+  };
+  const champLastRound = (): boolean => {
+    const c = champ();
+    return c !== undefined && c.current + 1 >= c.rounds.length;
+  };
+
+  const championsQuery = useQuery(() => ({
+    queryKey: ["champions", classId()],
+    queryFn: async () => listChampions(classId()),
+    enabled: isCurrentUserAdmin() && classId() !== "none",
+    staleTime: 5 * 60 * 1000,
+  }));
+
+  /** The rounds the teacher picked, with each round's words. */
+  const champPlans = (): ChampRoundPlan[] | undefined => {
+    const drafts = champRounds().filter((r) => r.enabled);
+    const first = drafts[0];
+    if (first === undefined) return undefined;
+    for (const [i, d] of drafts.entries()) {
+      const content = sameWords() ? first.content : d.content;
+      if (i > 0 && sameWords()) continue;
+      const problem = contentProblem(content);
+      if (problem !== undefined) {
+        showErrorNotification(
+          `${CHAMP_ROUNDS[d.kind].title} round: ${problem}`,
+        );
+        return undefined;
+      }
+    }
+    return drafts.map((d) => {
+      const content = sameWords() ? first.content : d.content;
+      return {
+        kind: d.kind,
+        source: contentSource(content),
+        // random words already come in the chosen count
+        ...(content.kind !== "random" && content.limit > 0
+          ? { limit: content.limit }
+          : {}),
+        ...(d.kind === "speed" ? { durationSec: d.durationSec } : {}),
+      };
+    });
+  };
+
+  const roundTokens = async (
+    plan: ChampRoundPlan,
+  ): Promise<{ tokens: string[]; label: string }> => {
+    const resolved = await resolveRaceTokens(plan.source);
+    if (resolved.tokens.length === 0) {
+      throw new Error("That content produced no words");
+    }
+    const keepOrder = plan.source.type === "passage";
+    const tokens =
+      plan.source.type === "random"
+        ? resolved.tokens
+        : pickRoundWords(resolved.tokens, plan.limit, keepOrder);
+    const label =
+      plan.limit !== undefined && resolved.tokens.length > plan.limit
+        ? `${resolved.label} (${tokens.length} words)`
+        : resolved.label;
+    return {
+      tokens,
+      label: `${CHAMP_ROUNDS[plan.kind].emoji} ${CHAMP_ROUNDS[plan.kind].title} · ${label}`,
+    };
+  };
+
+  const createChampionship = async (): Promise<void> => {
+    if (classId() === "none") {
+      showErrorNotification("Pick the class for the championship");
+      return;
+    }
+    const plans = champPlans();
+    const first = plans?.[0];
+    if (plans === undefined || first === undefined) return;
+    setBusy(true);
+    try {
+      const { tokens, label } = await roundTokens(first);
+      const pin = await createRace({
+        format: CHAMP_ROUNDS[first.kind].format,
+        tokens,
+        contentLabel: label,
+        durationSec: first.durationSec,
+        classId: classId(),
+      });
+      await setChampionship(pin, {
+        classId: classId(),
+        rounds: plans,
+        current: 0,
+        scoredRounds: 0,
+        scores: {},
+      });
+      saved = false;
+      setHostedPin(pin);
+    } catch (e) {
+      showErrorNotification("Failed to create championship", { error: e });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Add each finished round to the points table (once). A short wait lets
+  // the last students' final results land first.
+  let scoringTimer: ReturnType<typeof setTimeout> | null = null;
+  onCleanup(() => {
+    if (scoringTimer !== null) clearTimeout(scoringTimer);
+  });
+  createEffect(() => {
+    const pin = hostedPin();
+    const r = race();
+    const c = r?.championship;
+    if (
+      pin === null ||
+      r === null ||
+      c === undefined ||
+      r.status !== "finished" ||
+      c.scoredRounds > c.current ||
+      scoringTimer !== null
+    ) {
+      return;
+    }
+    scoringTimer = setTimeout(() => {
+      scoringTimer = null;
+      const latest = race();
+      const lc = latest?.championship;
+      if (latest === null || lc === undefined || lc.scoredRounds > lc.current) {
+        return;
+      }
+      const roundStandings = rankParticipants(participants(), latest.format);
+      void setChampionship(pin, {
+        ...lc,
+        scores: scoreRound(lc.scores, roundStandings, latest.format),
+        scoredRounds: lc.current + 1,
+      }).catch((e: unknown) =>
+        showErrorNotification("Failed to add up points", { error: e }),
+      );
+    }, 2500);
+  });
+
+  const nextChampRound = async (): Promise<void> => {
+    const pin = hostedPin();
+    const r = race();
+    const c = r?.championship;
+    if (pin === null || r === null || c === undefined) return;
+    const plan = c.rounds[c.current + 1];
+    if (plan === undefined) return;
+    setBusy(true);
+    try {
+      const { tokens, label } = await roundTokens(plan);
+      clearTimers();
+      const uids = participants().map((p) => p.uid);
+      await setChampionship(pin, { ...c, current: c.current + 1 });
+      await restartRace(pin, {
+        round: r.round + 1,
+        format: CHAMP_ROUNDS[plan.kind].format,
+        tokens,
+        contentLabel: label,
+        durationSec: plan.durationSec,
+      });
+      await resetAllParticipants(pin, uids);
+      saved = false;
+    } catch (e) {
+      showErrorNotification("Failed to start the next round", { error: e });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const crown = async (): Promise<void> => {
+    const pin = hostedPin();
+    const c = champ();
+    if (pin === null || c === undefined || c.crowned === true || busy()) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const record = await crownChampion(c.classId, champRows());
+      await setChampionship(pin, { ...c, crowned: true });
+      void queryClient.invalidateQueries({ queryKey: ["champions"] });
+      if (record !== null) {
+        showSuccessNotification(`👑 ${record.name} is the Class Champion!`);
+      }
+    } catch (e) {
+      showErrorNotification("Failed to crown the champion", { error: e });
     } finally {
       setBusy(false);
     }
@@ -1216,8 +1441,11 @@ export function RaceHostPage(): JSXElement {
   });
   const tugStandings = createMemo(() => withTeams(standings(), race()?.teams));
   const tugFinalTotals = createMemo(() => standingTotals(tugStandings()));
+  // championship rounds pay nothing per round - coins come at the crowning
   const coinsFor = (st: RaceStanding): number =>
-    standingCoins(st, race()?.format, tugStandings());
+    champ() !== undefined
+      ? 0
+      : standingCoins(st, race()?.format, tugStandings());
   const tugWinner = (): TugTeam | null => {
     const o = tugOutcome(tugFinalTotals());
     return o === "draw" ? null : o;
@@ -1273,7 +1501,54 @@ export function RaceHostPage(): JSXElement {
                   </p>
                 </div>
               </div>
-              {setupFields()}
+              <div class="grid grid-cols-2 gap-3">
+                <For
+                  each={
+                    [
+                      ["race", "🏁 Class race", "One race, any format"],
+                      [
+                        "championship",
+                        "🏆 Class Championship",
+                        "Several rounds - crown the class champion",
+                      ],
+                    ] as const
+                  }
+                >
+                  {([value, title, hint]) => (
+                    <button
+                      type="button"
+                      class={cn(
+                        "press-3d grid justify-items-center gap-1 rounded-double p-4 text-center",
+                        mode() === value
+                          ? "bg-main text-bg"
+                          : "bg-bg text-text hover:bg-sub/20",
+                      )}
+                      aria-pressed={mode() === value}
+                      onClick={() => setMode(value)}
+                    >
+                      <span class="text-xl font-bold">{title}</span>
+                      <span
+                        class={cn(
+                          "text-sm",
+                          mode() === value ? "text-bg/80" : "text-sub",
+                        )}
+                      >
+                        {hint}
+                      </span>
+                    </button>
+                  )}
+                </For>
+              </div>
+              <Show when={mode() === "championship"} fallback={setupFields()}>
+                <ChampionshipSetup
+                  rounds={champRounds()}
+                  onRounds={setChampRounds}
+                  sameWords={sameWords()}
+                  onSameWords={setSameWords}
+                  wordLists={wordLists()}
+                  passages={passages()}
+                />
+              </Show>
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-sm font-bold tracking-wide text-sub uppercase">
                   Class
@@ -1283,7 +1558,9 @@ export function RaceHostPage(): JSXElement {
                   value={classId()}
                   onChange={(e) => setClassId(e.currentTarget.value)}
                 >
-                  <option value="none">Any class</option>
+                  <option value="none">
+                    {mode() === "championship" ? "Pick a class…" : "Any class"}
+                  </option>
                   <For each={CLASS_IDS}>
                     {(c) => <option value={c}>{c}</option>}
                   </For>
@@ -1294,18 +1571,58 @@ export function RaceHostPage(): JSXElement {
                   chunky
                   size="lg"
                   active
-                  text={busy() ? "Creating…" : "Create race"}
-                  fa={{ icon: "fa-flag-checkered" }}
-                  onClick={() => void create()}
+                  text={
+                    busy()
+                      ? "Creating…"
+                      : mode() === "championship"
+                        ? "Create championship"
+                        : "Create race"
+                  }
+                  fa={{
+                    icon:
+                      mode() === "championship"
+                        ? "fa-trophy"
+                        : "fa-flag-checkered",
+                  }}
+                  onClick={() =>
+                    void (mode() === "championship"
+                      ? createChampionship()
+                      : create())
+                  }
                   disabled={busy()}
                 />
               </div>
+              <Show when={classId() !== "none"}>
+                <HallOfChampions
+                  classId={classId()}
+                  champions={championsQuery.data ?? []}
+                />
+              </Show>
             </div>
           </Show>
 
           {/* CONTROL PANEL (projector view) */}
           <Show when={hostedPin() !== null}>
             <div class="mx-auto grid w-full max-w-5xl gap-5">
+              <Show when={champ()}>
+                {(c) => (
+                  <div class="flex flex-wrap items-center justify-center gap-2 rounded-double bg-game-gold px-4 py-2 text-center text-lg font-bold text-game-ink">
+                    🏆 {c().classId} Class Championship · Round{" "}
+                    {Math.min(c().current + 1, c().rounds.length)} of{" "}
+                    {c().rounds.length}:
+                    <span>
+                      {
+                        CHAMP_ROUNDS[c().rounds[c().current]?.kind ?? "speed"]
+                          .emoji
+                      }{" "}
+                      {
+                        CHAMP_ROUNDS[c().rounds[c().current]?.kind ?? "speed"]
+                          .title
+                      }
+                    </span>
+                  </div>
+                )}
+              </Show>
               {/* lobby */}
               <Show when={race()?.status === "lobby"}>
                 <div class="grid justify-items-center gap-4 rounded-double bg-game-night p-6 text-center shadow-xl sm:p-8">
@@ -1581,30 +1898,124 @@ export function RaceHostPage(): JSXElement {
                   </div>
                 </div>
 
-                <div class="grid gap-4 rounded-double bg-sub-alt p-5">
-                  <div class="text-xl font-bold text-text">
-                    Race again with the same players
+                <Show when={champ()}>
+                  {(c) => (
+                    <div class="relative grid gap-5 overflow-hidden rounded-double bg-sub-alt p-6">
+                      <Show
+                        when={c().crowned === true}
+                        fallback={
+                          <Show
+                            when={champScored()}
+                            fallback={
+                              <div class="flex items-center gap-3 text-lg text-sub">
+                                <Mascot mood="thinking" size={48} />
+                                Adding up the points…
+                              </div>
+                            }
+                          >
+                            <ChampionshipBoard
+                              rows={champRows()}
+                              previous={champPrevious()}
+                              roundsPlayed={c().scoredRounds}
+                              roundsTotal={c().rounds.length}
+                              roundKinds={c().rounds.map((r) => r.kind)}
+                            />
+                            <div class="flex flex-wrap gap-3">
+                              <Show
+                                when={!champLastRound()}
+                                fallback={
+                                  <Button
+                                    chunky
+                                    size="lg"
+                                    active
+                                    text={
+                                      busy()
+                                        ? "Crowning…"
+                                        : "👑 Crown the champion!"
+                                    }
+                                    onClick={() => void crown()}
+                                    disabled={busy()}
+                                  />
+                                }
+                              >
+                                {(() => {
+                                  const next =
+                                    CHAMP_ROUNDS[
+                                      c().rounds[c().current + 1]?.kind ??
+                                        "final"
+                                    ];
+                                  return (
+                                    <Button
+                                      chunky
+                                      size="lg"
+                                      active
+                                      text={
+                                        busy()
+                                          ? "Getting ready…"
+                                          : `Next round: ${next.emoji} ${next.title}`
+                                      }
+                                      fa={{ icon: "fa-arrow-right" }}
+                                      onClick={() => void nextChampRound()}
+                                      disabled={busy()}
+                                    />
+                                  );
+                                })()}
+                              </Show>
+                            </div>
+                          </Show>
+                        }
+                      >
+                        <Confetti />
+                        <ChampionReveal
+                          rows={champRows()}
+                          classId={c().classId}
+                        />
+                        <ChampionshipBoard
+                          rows={champRows()}
+                          previous={{}}
+                          roundsPlayed={c().scoredRounds}
+                          roundsTotal={c().rounds.length}
+                          roundKinds={c().rounds.map((r) => r.kind)}
+                        />
+                        <div>
+                          <Button
+                            chunky
+                            size="lg"
+                            text="Close championship"
+                            fa={{ icon: "fa-check" }}
+                            onClick={() => void close()}
+                          />
+                        </div>
+                      </Show>
+                    </div>
+                  )}
+                </Show>
+                <Show when={champ() === undefined}>
+                  <div class="grid gap-4 rounded-double bg-sub-alt p-5">
+                    <div class="text-xl font-bold text-text">
+                      Race again with the same players
+                    </div>
+                    {setupFields()}
+                    <div class="flex flex-wrap gap-3">
+                      <Button
+                        chunky
+                        size="lg"
+                        active
+                        text={busy() ? "Restarting…" : "Race again"}
+                        fa={{ icon: "fa-redo" }}
+                        onClick={() => void raceAgain()}
+                        disabled={busy()}
+                      />
+                      <Button
+                        chunky
+                        size="lg"
+                        text="Close race"
+                        fa={{ icon: "fa-check" }}
+                        onClick={() => void close()}
+                      />
+                    </div>
                   </div>
-                  {setupFields()}
-                  <div class="flex flex-wrap gap-3">
-                    <Button
-                      chunky
-                      size="lg"
-                      active
-                      text={busy() ? "Restarting…" : "Race again"}
-                      fa={{ icon: "fa-redo" }}
-                      onClick={() => void raceAgain()}
-                      disabled={busy()}
-                    />
-                    <Button
-                      chunky
-                      size="lg"
-                      text="Close race"
-                      fa={{ icon: "fa-check" }}
-                      onClick={() => void close()}
-                    />
-                  </div>
-                </div>
+                </Show>
               </Show>
             </div>
           </Show>

@@ -4,6 +4,7 @@ import { For, JSXElement, Show } from "solid-js";
 import { getClassStreet, StreetHouse } from "../../house/class-street";
 import { HOUSE_THEMES } from "../../house/house-themes";
 import { summarizePractice } from "../../house/practice-state";
+import { listChampions } from "../../race/race-db";
 import { getUserId } from "../../states/core";
 import { getSnapshot } from "../../states/snapshot";
 import { cn } from "../../utils/cn";
@@ -32,6 +33,14 @@ export function ClassStreet(props: {
     enabled: props.open && classId() !== undefined,
     staleTime: STREET_STALE_MS,
   }));
+  // the newest Class Champion gets a crown on their house
+  const championsQuery = useQuery(() => ({
+    queryKey: ["champions", classId()],
+    queryFn: async () => listChampions(classId() ?? ""),
+    enabled: props.open && classId() !== undefined,
+    staleTime: STREET_STALE_MS,
+  }));
+  const championUid = (): string | undefined => championsQuery.data?.[0]?.uid;
 
   // the free "plain" wall follows the site theme (often dark) - use a
   // friendly cream outside instead
@@ -70,6 +79,14 @@ export function ClassStreet(props: {
                   aria-label={h.isMe ? "Your house" : `Visit ${h.name}'s house`}
                   onClick={() => props.onVisit(h)}
                 >
+                  <Show when={h.uid === championUid()}>
+                    <div
+                      class="-mb-2 text-3xl drop-shadow motion-safe:animate-bounce"
+                      title="Class Champion"
+                    >
+                      👑
+                    </div>
+                  </Show>
                   {/* roof */}
                   <div
                     class={cn(

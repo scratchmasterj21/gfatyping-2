@@ -79,6 +79,8 @@ export type HouseTrophies = {
   lessonStars: number;
   raceWins: number;
   raceBestWpm: number;
+  /** Class Championships won */
+  championWins: number;
 };
 
 export function emptyHouseState(): HouseState {
@@ -97,7 +99,13 @@ export function emptyHouseState(): HouseState {
     gardenTouchOrder: [],
     gardenThemeId: DEFAULT_GARDEN_THEME_ID,
     activity: {},
-    trophies: { achievements: [], lessonStars: 0, raceWins: 0, raceBestWpm: 0 },
+    trophies: {
+      achievements: [],
+      lessonStars: 0,
+      raceWins: 0,
+      raceBestWpm: 0,
+      championWins: 0,
+    },
     itemRooms: {},
     roomThemes: {},
   };
@@ -181,6 +189,7 @@ export function houseStateFromDoc(
       lessonStars: num(data?.["lessonStars"]),
       raceWins: num(data?.["raceWins"]),
       raceBestWpm: num(data?.["raceBestWpm"]),
+      championWins: num(data?.["championWins"]),
     },
   };
 }

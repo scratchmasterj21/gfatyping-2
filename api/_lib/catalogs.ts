@@ -73,6 +73,7 @@ export const TITLE_ACHIEVEMENTS: Readonly<Record<string, string>> = {
   "accuracy-ace": "accuracy-perfect",
   "streak-star": "streak-30",
   "streak-legend": "streak-60",
+  "class-champion": "class-champion",
 };
 
 export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
@@ -239,6 +240,10 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     wizard: { category: "hat", requiresAchievement: "speed-50" },
     crown: { category: "hat", requiresAchievement: "streak-30" },
     "grad-cap": { category: "hat", requiresAchievement: "lessons-25" },
+    "champion-crown": {
+      category: "hat",
+      requiresAchievement: "class-champion",
+    },
     medal: { category: "accessory", requiresAchievement: "streak-7" },
     "checkered-bg": { category: "background", requiresAchievement: "races-10" },
     "lightning-highlight": {

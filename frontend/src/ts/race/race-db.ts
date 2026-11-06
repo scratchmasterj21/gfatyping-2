@@ -23,6 +23,7 @@ import {
   orderBy,
   query,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 
@@ -48,6 +49,7 @@ import {
 } from "./race-types";
 import { BlitzAnswer, blitzCoins, BlitzState } from "./blitz";
 import { tugCoins, tugOutcome, TugTotals } from "./tug";
+import { ChampRow, championshipCoins, Championship } from "./championship";
 
 /** Description of what a race should be run on, resolved into tokens at create time. */
 export type RaceContentSource =
@@ -592,6 +594,8 @@ export function standingCoins(
 async function updateRaceStats(
   standings: RaceStanding[],
   format: RaceFormat,
+  /** championship rounds: bests only - prizes come when the champion is crowned */
+  rewards = true,
 ): Promise<void> {
   const outcome =
     format === "tug" ? tugOutcome(standingTotals(standings)) : null;
@@ -609,8 +613,9 @@ async function updateRaceStats(
         s.finalAcc > (prev.raceBestAcc ?? 0)
           ? { raceBestAcc: s.finalAcc, raceBestAccWpm: s.finalWpm }
           : {};
-      const coinsEarned = standingCoins(s, format, standings);
-      const won = outcome === null ? s.rank === 1 : outcome === s.team;
+      const coinsEarned = rewards ? standingCoins(s, format, standings) : 0;
+      const won =
+        rewards && (outcome === null ? s.rank === 1 : outcome === s.team);
 
       await setDoc(
         ref,
@@ -650,7 +655,118 @@ export async function saveHistory(
     ),
   };
   await setDoc(ref, clean(record));
-  await updateRaceStats(record.standings, race.format);
+  await updateRaceStats(
+    record.standings,
+    race.format,
+    race.championship === undefined,
+  );
+}
+
+// ---- Class Championship ----
+
+/** Deep copy without undefined fields (Firestore rejects them). */
+function dropUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v: unknown) => dropUndefined(v)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v !== undefined) out[k] = dropUndefined(v);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+/** Host: replace the race's championship state (rounds + points). */
+export async function setChampionship(
+  pin: string,
+  championship: Championship,
+): Promise<void> {
+  await updateDoc(raceDoc(pin), {
+    championship: dropUndefined(championship),
+  });
+}
+
+/** A crowned Class Champion (hall of champions). */
+export type ChampionRecord = {
+  id: string;
+  classId: string;
+  uid: string;
+  name: string;
+  avatarUrl?: string;
+  points: number;
+  wins: number;
+  players: number;
+  crownedAt: number;
+  podium: { uid: string; name: string; points: number }[];
+};
+
+function championsCol(): CollectionReference {
+  return collection(getDb(), "champions");
+}
+
+/**
+ * Host: pay the championship prizes and record the champion. Coins for the
+ * podium (and a few for everyone who scored); the champion's championWins
+ * unlocks the crown, title and trophy. Admin-only (firestore.rules).
+ */
+export async function crownChampion(
+  classId: string,
+  ranked: ChampRow[],
+): Promise<ChampionRecord | null> {
+  const champion = ranked[0];
+  if (champion === undefined || champion.points === 0) return null;
+  const crownedAt = Date.now();
+  await Promise.all(
+    ranked.map(async (row) => {
+      const coins = championshipCoins(row);
+      const isChampion = row.uid === champion.uid;
+      if (coins === 0 && !isChampion) return;
+      await setDoc(
+        doc(getDb(), "users", row.uid),
+        {
+          ...(coins > 0 ? { coins: increment(coins) } : {}),
+          ...(isChampion
+            ? { championWins: increment(1), lastChampionAt: crownedAt }
+            : {}),
+        },
+        { merge: true },
+      );
+    }),
+  );
+  const ref = doc(championsCol());
+  const record: ChampionRecord = {
+    id: ref.id,
+    classId,
+    uid: champion.uid,
+    name: champion.name,
+    ...(champion.avatarUrl !== undefined
+      ? { avatarUrl: champion.avatarUrl }
+      : {}),
+    points: champion.points,
+    wins: champion.wins,
+    players: ranked.filter((r) => r.points > 0).length,
+    crownedAt,
+    podium: ranked
+      .slice(0, 3)
+      .map((r) => ({ uid: r.uid, name: r.name, points: r.points })),
+  };
+  await setDoc(ref, record);
+  return record;
+}
+
+/** Past champions of a class, newest first (one small query, no index). */
+export async function listChampions(
+  classId: string,
+): Promise<ChampionRecord[]> {
+  const snap = await getDocs(
+    query(championsCol(), where("classId", "==", classId)),
+  );
+  return snap.docs
+    .map((d) => d.data() as ChampionRecord)
+    .sort((a, b) => b.crownedAt - a.crownedAt);
 }
 
 /** Delete the live race and all participant docs (post-race cleanup). */

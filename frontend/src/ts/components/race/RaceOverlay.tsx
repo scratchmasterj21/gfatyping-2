@@ -12,6 +12,11 @@ import {
 import { getAuthenticatedUser } from "../../firebase";
 import { BLITZ_POINTS, BlitzState } from "../../race/blitz";
 import {
+  Championship,
+  ChampRow,
+  rankChampionship,
+} from "../../race/championship";
+import {
   standingCoins,
   standingTotals,
   submitBlitzAnswer,
@@ -118,7 +123,19 @@ export function RaceOverlay(): JSXElement {
     ),
   );
   const coinsFor = (s: RaceStanding): number =>
-    standingCoins(s, getCurrentRace()?.format, standings());
+    getCurrentRace()?.championship !== undefined
+      ? 0
+      : standingCoins(s, getCurrentRace()?.format, standings());
+
+  // ---- Class Championship: my overall place ----
+  const champ = (): Championship | undefined => getCurrentRace()?.championship;
+  const champTable = createMemo(() => rankChampionship(champ()?.scores ?? {}));
+  const myChampRow = (): ChampRow | undefined =>
+    champTable().find((r) => r.uid === selfUid());
+  const champScored = (): boolean => {
+    const c = champ();
+    return c !== undefined && c.scoredRounds > c.current;
+  };
 
   // ---- Tug of War ----
   const isTug = (): boolean => getCurrentRace()?.format === "tug";
@@ -381,8 +398,45 @@ export function RaceOverlay(): JSXElement {
             </button>
             <div class="flex shrink-0 items-center gap-3 pr-12">
               <Mascot mood="cheer" size={64} />
-              <div class="text-2xl font-bold text-main">Race results</div>
+              <div class="text-2xl font-bold text-main">
+                {champ() !== undefined ? "Round results" : "Race results"}
+              </div>
             </div>
+            <Show when={champ()}>
+              {(c) => (
+                <div class="shrink-0 rounded-xl bg-game-gold px-3 py-2 text-center text-base font-bold text-game-ink">
+                  <Show
+                    when={c().crowned === true}
+                    fallback={
+                      <Show
+                        when={champScored() && myChampRow()}
+                        fallback={<>🏆 Adding up the championship points…</>}
+                      >
+                        {(row) => (
+                          <>
+                            🏆 Championship: you&apos;re #{row().rank} with{" "}
+                            {row().points} points!{" "}
+                            {c().current + 1 < c().rounds.length
+                              ? "Stay here - the next round is coming!"
+                              : "Waiting for the champion to be crowned…"}
+                          </>
+                        )}
+                      </Show>
+                    }
+                  >
+                    👑 {champTable()[0]?.name ?? ""} is the Class Champion!
+                    <Show when={myChampRow()}>
+                      {(row) => (
+                        <>
+                          {" "}
+                          You finished #{row().rank} with {row().points} points.
+                        </>
+                      )}
+                    </Show>
+                  </Show>
+                </div>
+              )}
+            </Show>
             <Show when={isTug()}>
               <div
                 class={cn(

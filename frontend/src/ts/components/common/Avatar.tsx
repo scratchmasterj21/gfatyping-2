@@ -1084,6 +1084,34 @@ export function Avatar(props: {
               ></path>
               <circle cx="50" cy="4" r="3.5" fill="#ffd43b"></circle>
             </Show>
+            <Show when={props.hat === "champion-crown"}>
+              <path
+                d="M 24 30 L 28 8 L 39 20 L 50 2 L 61 20 L 72 8 L 76 30 Z"
+                fill="#ffd43b"
+                stroke="#e67700"
+                stroke-width="1.6"
+                stroke-linejoin="round"
+              ></path>
+              <rect
+                x="24"
+                y="26"
+                width="52"
+                height="6"
+                rx="2"
+                fill="#fab005"
+                stroke="#e67700"
+                stroke-width="1.2"
+              ></rect>
+              <circle cx="50" cy="20" r="3.4" fill="#e03131"></circle>
+              <circle cx="36" cy="27" r="1.8" fill="#4dabf7"></circle>
+              <circle cx="64" cy="27" r="1.8" fill="#4dabf7"></circle>
+              <circle cx="28" cy="8" r="2" fill="#fff3bf"></circle>
+              <circle cx="72" cy="8" r="2" fill="#fff3bf"></circle>
+              <path
+                d="M 50 -3 L 51.4 0 L 54.6 0.3 L 52.2 2.4 L 52.9 5.6 L 50 4 L 47.1 5.6 L 47.8 2.4 L 45.4 0.3 L 48.6 0 Z"
+                fill="#fff3bf"
+              ></path>
+            </Show>
             <Show when={props.hat === "grad-cap"}>
               <path
                 d="M 34 20 L 34 29 Q 50 36 66 29 L 66 20 Z"

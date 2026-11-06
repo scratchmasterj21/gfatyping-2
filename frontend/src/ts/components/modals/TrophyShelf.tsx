@@ -21,7 +21,8 @@ export function TrophyShelf(props: { trophies: HouseTrophies }): JSXElement {
   const isEmpty = (): boolean =>
     earned().length === 0 &&
     props.trophies.lessonStars === 0 &&
-    props.trophies.raceWins === 0;
+    props.trophies.raceWins === 0 &&
+    props.trophies.championWins === 0;
 
   return (
     <div
@@ -47,6 +48,19 @@ export function TrophyShelf(props: { trophies: HouseTrophies }): JSXElement {
               </span>
             }
           >
+            <Show when={props.trophies.championWins > 0}>
+              <span
+                class="text-3xl leading-none drop-shadow"
+                title="Class Champion"
+              >
+                👑
+              </span>
+              <Show when={props.trophies.championWins > 1}>
+                <span class="pb-1 text-xs font-bold text-game-ink/80">
+                  ×{props.trophies.championWins}
+                </span>
+              </Show>
+            </Show>
             <Show when={props.trophies.lessonStars > 0}>
               <span class="rounded-md bg-game-gold px-1.5 py-0.5 text-xs font-bold text-game-ink shadow">
                 ⭐ {props.trophies.lessonStars}
@@ -98,6 +112,11 @@ export function TrophyShelf(props: { trophies: HouseTrophies }): JSXElement {
             <span class="rounded-full bg-game-gold px-2 py-0.5 font-bold">
               ⭐ {props.trophies.lessonStars} lesson stars
             </span>
+            <Show when={props.trophies.championWins > 0}>
+              <span class="rounded-full bg-game-gold px-2 py-0.5 font-bold">
+                👑 Class Champion ×{props.trophies.championWins}
+              </span>
+            </Show>
             <Show when={props.trophies.raceWins > 0}>
               <span class="rounded-full bg-game-sky px-2 py-0.5 font-bold">
                 🏁 {props.trophies.raceWins} race wins

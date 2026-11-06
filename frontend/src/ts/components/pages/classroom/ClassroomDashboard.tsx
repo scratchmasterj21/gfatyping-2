@@ -61,7 +61,7 @@ import { CLASS_IDS, GRADES } from "../../../constants/classes";
 import { useLocalStorage } from "../../../hooks/useLocalStorage";
 import { lessonGroups } from "../../../lessons/lessons-data";
 import { queryClient } from "../../../queries";
-import { listHistoryForClass } from "../../../race/race-db";
+import { listChampions, listHistoryForClass } from "../../../race/race-db";
 import { RaceHistory } from "../../../race/race-types";
 import { getActivePage, getUserId } from "../../../states/core";
 import {
@@ -79,6 +79,7 @@ import { EmptyState } from "../../common/EmptyState";
 import { Fa, FaProps } from "../../common/Fa";
 import { H2 } from "../../common/Headers";
 import { Page } from "../../common/Page";
+import { HallOfChampions } from "../race/HallOfChampions";
 import { ActivityTab } from "./ActivityTab";
 import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
@@ -2759,6 +2760,12 @@ export function ClassroomDashboard(): JSXElement {
     enabled: tabOn("races"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
+  const championsQuery = useQuery(() => ({
+    queryKey: ["champions", selectedClass()],
+    queryFn: async () => listChampions(selectedClass()),
+    enabled: tabOn("races"),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
+  }));
 
   const announcementsQuery = useQuery(() => ({
     queryKey: ["classroom", "announcements"],
@@ -2997,6 +3004,12 @@ export function ClassroomDashboard(): JSXElement {
           </Show>
           <Show when={tab() === "races"}>
             <div class={panelClass}>
+              <div class="mb-6">
+                <HallOfChampions
+                  classId={selectedClass()}
+                  champions={championsQuery.data ?? []}
+                />
+              </div>
               <RacesTab races={races()} loading={racesQuery.isPending} />
             </div>
           </Show>

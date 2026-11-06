@@ -4,7 +4,8 @@ export type TitleId =
   | "speedy"
   | "accuracy-ace"
   | "streak-star"
-  | "streak-legend";
+  | "streak-legend"
+  | "class-champion";
 
 export type TitleItem = {
   id: TitleId;
@@ -44,6 +45,13 @@ export const TITLES: TitleItem[] = [
     icon: "fa-crown",
     achievement: "streak-60",
     hint: "Practice 60 days in a row",
+  },
+  {
+    id: "class-champion",
+    label: "Class Champion",
+    icon: "fa-trophy",
+    achievement: "class-champion",
+    hint: "Win a Class Championship",
   },
 ];
 

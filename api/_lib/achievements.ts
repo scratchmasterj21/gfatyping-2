@@ -26,6 +26,11 @@ export function qualifiesForAchievement(
   if (achievementId === "lessons-25") {
     return (extra.lessonsCompleted ?? 0) >= 25;
   }
+  if (achievementId === "class-champion") {
+    // championWins is only writable by the teacher account (firestore.rules)
+    const wins = user["championWins"];
+    return typeof wins === "number" && wins >= 1;
+  }
   if (achievementId === "races-10") {
     // raceWins is only writable by the teacher account (firestore.rules)
     const wins = user["raceWins"];

@@ -1,3 +1,4 @@
+import type { Championship } from "./championship";
 /**
  * Shared types for the live class race feature. A race is a short, teacher-run
  * multiplayer typing event built entirely on Firestore real-time listeners.
@@ -56,6 +57,8 @@ export type Race = {
   /** epoch ms when status actually became "running"; used for timed countdown */
   runningAt?: number;
   finishedAt?: number;
+  /** Class Championship: rounds + running points (see championship.ts) */
+  championship?: Championship;
 };
 
 export type RaceParticipant = {

@@ -75,6 +75,8 @@ export type Snapshot = Omit<
   activityDays?: ActivityDays;
   /** class race wins (written by the teacher's race host) */
   raceWins?: number;
+  /** Class Championships won (written by the teacher's host page) */
+  championWins?: number;
   xp: number;
   testActivity?: ModifiableTestActivityCalendar;
   testActivityByYear?: { [key: string]: TestActivityCalendar };

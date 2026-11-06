@@ -50,7 +50,8 @@ service cloud.firestore {
         // lessons-vs-games counters (api/_lib/activity.ts) - teachers and
         // the game unlock rules rely on them, so students can't edit them
         'activityDays', 'lastStarLessonDate',
-        'houseChoreDate', 'houseChoresDone', 'houseRoomThemes'
+        'houseChoreDate', 'houseChoresDone', 'houseRoomThemes',
+        'championWins', 'lastChampionAt'
       ];
     }
 
@@ -169,6 +170,12 @@ service cloud.firestore {
       allow delete: if isDomainUser()
         && resource.data.uid == request.auth.uid;
       allow update: if false;
+    }
+
+    // --- Class Championship winners (hall of champions) ---
+    match /champions/{id} {
+      allow read: if isDomainUser();
+      allow write: if isAdminUser();
     }
 
     // --- school-wide config (side images, etc.) ---

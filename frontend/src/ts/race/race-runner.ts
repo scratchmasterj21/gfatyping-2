@@ -117,7 +117,10 @@ export async function tryReconnectRace(): Promise<void> {
 
   try {
     const race = await getRace(savedPin);
-    if (race === null || race.status === "finished") {
+    // a championship between rounds is "finished" but not over yet
+    const championshipOngoing =
+      race?.championship !== undefined && race.championship.crowned !== true;
+    if (race === null || (race.status === "finished" && !championshipOngoing)) {
       localStorage.removeItem(RACE_STORAGE_KEY);
       return;
     }

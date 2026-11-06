@@ -102,6 +102,12 @@ export const AVATAR_ITEMS: AvatarItem[] = [
     requiresAchievement: "lessons-25",
   },
   {
+    id: "champion-crown",
+    category: "hat",
+    name: "Champion Crown",
+    requiresAchievement: "class-champion",
+  },
+  {
     id: "pumpkin",
     category: "hat",
     name: "Pumpkin Hat",
