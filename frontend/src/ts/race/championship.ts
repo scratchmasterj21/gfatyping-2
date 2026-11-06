@@ -1,44 +1,23 @@
-import type { RaceContentSource } from "./race-db";
-import type { RaceFormat, RaceStanding } from "./race-types";
+import type {
+  ChampRoundKind,
+  ChampScore,
+  RaceFormat,
+  RaceStanding,
+} from "./race-types";
+
+// types live in race-types.ts (no import cycle); re-exported for callers
+export type {
+  ChampRoundKind,
+  ChampRoundPlan,
+  ChampScore,
+  Championship,
+} from "./race-types";
 
 /**
  * Class Championship: several rounds of different race formats in one room
  * (same PIN). Each round gives points by place; the highest total is the
  * Class Champion. Lives on the race doc (`championship`), host-written.
  */
-
-export type ChampRoundKind = "speed" | "accuracy" | "blitz" | "final";
-
-export type ChampRoundPlan = {
-  kind: ChampRoundKind;
-  source: RaceContentSource;
-  /** use only this many words (0 / missing = all) - see pickRoundWords */
-  limit?: number;
-  /** speed round only: 30 or 60 */
-  durationSec?: number;
-};
-
-export type ChampScore = {
-  name: string;
-  avatarUrl?: string;
-  points: number;
-  /** rounds won (1st place) */
-  wins: number;
-  /** place in each scored round (0 = didn't take part) */
-  places: number[];
-};
-
-export type Championship = {
-  classId: string;
-  rounds: ChampRoundPlan[];
-  /** index of the round being played / last played */
-  current: number;
-  /** rounds already added to `scores` (keeps scoring idempotent) */
-  scoredRounds: number;
-  scores: Record<string, ChampScore>;
-  /** set once the champion is crowned and prizes are paid */
-  crowned?: boolean;
-};
 
 export const CHAMP_ROUNDS: Record<
   ChampRoundKind,

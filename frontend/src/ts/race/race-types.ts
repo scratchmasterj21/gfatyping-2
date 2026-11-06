@@ -1,4 +1,3 @@
-import type { Championship } from "./championship";
 /**
  * Shared types for the live class race feature. A race is a short, teacher-run
  * multiplayer typing event built entirely on Firestore real-time listeners.
@@ -167,3 +166,46 @@ export function rankParticipants(
     words: p.wordIndex,
   }));
 }
+
+/** What a race/round types (resolved to tokens by race-db). */
+export type RaceContentSource =
+  | { type: "random"; count: number }
+  | { type: "custom"; text: string }
+  | { type: "lesson"; lessonId: string }
+  | { type: "wordlist"; wordListId: string }
+  | { type: "passage"; passageId: string };
+
+// ---- Class Championship (logic in championship.ts) ----
+
+export type ChampRoundKind = "speed" | "accuracy" | "blitz" | "final";
+
+export type ChampRoundPlan = {
+  kind: ChampRoundKind;
+  source: RaceContentSource;
+  /** use only this many words (0 / missing = all) - see pickRoundWords */
+  limit?: number;
+  /** speed round only: 30 or 60 */
+  durationSec?: number;
+};
+
+export type ChampScore = {
+  name: string;
+  avatarUrl?: string;
+  points: number;
+  /** rounds won (1st place) */
+  wins: number;
+  /** place in each scored round (0 = didn't take part) */
+  places: number[];
+};
+
+export type Championship = {
+  classId: string;
+  rounds: ChampRoundPlan[];
+  /** index of the round being played / last played */
+  current: number;
+  /** rounds already added to `scores` (keeps scoring idempotent) */
+  scoredRounds: number;
+  scores: Record<string, ChampScore>;
+  /** set once the champion is crowned and prizes are paid */
+  crowned?: boolean;
+};

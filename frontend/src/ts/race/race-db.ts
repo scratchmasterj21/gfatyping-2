@@ -46,18 +46,15 @@ import {
   RaceStanding,
   rankParticipants,
   TugTeam,
+  Championship,
+  RaceContentSource,
 } from "./race-types";
 import { BlitzAnswer, blitzCoins, BlitzState } from "./blitz";
 import { tugCoins, tugOutcome, TugTotals } from "./tug";
-import { ChampRow, championshipCoins, Championship } from "./championship";
+import { ChampRow, championshipCoins } from "./championship";
 
 /** Description of what a race should be run on, resolved into tokens at create time. */
-export type RaceContentSource =
-  | { type: "random"; count: number }
-  | { type: "custom"; text: string }
-  | { type: "lesson"; lessonId: string }
-  | { type: "wordlist"; wordListId: string }
-  | { type: "passage"; passageId: string };
+export type { RaceContentSource } from "./race-types";
 
 function raceDoc(pin: string): DocumentReference {
   return doc(getDb(), "races", pin);
