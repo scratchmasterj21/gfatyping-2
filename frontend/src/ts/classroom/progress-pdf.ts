@@ -10,12 +10,13 @@ import {
   stillNeeds,
 } from "./certificate-levels";
 import { displayChar } from "./progress-format";
+import { buildReportComment } from "./report-comment";
 
 /**
  * Printable progress reports (A4 portrait) for parents and teachers.
  * Student report: an overview page (key results, certificate level,
- * curriculum progress, this period, habits, keys to practise, teacher's
- * comments and signatures) plus a lesson-by-lesson page. The class report
+ * curriculum progress, this period, habits, keys to practise and automatic
+ * teacher's comments) plus a lesson-by-lesson page. The class report
  * adds a summary page of the whole class in front.
  */
 
@@ -394,26 +395,26 @@ function addOverviewPage(
     .map(([k]) => k);
   y = keyChips(doc, y + 1, keys);
 
-  // comments + signatures
+  // automatic comments, written from the results above
   y = sectionTitle(doc, y + 2, "Teacher's comments");
-  const sy = PAGE_H - 26; // signature lines
-  const boxH = Math.max(28, sy - 14 - (y - 2));
+  const comment = buildReportComment({
+    row,
+    activity,
+    totalLessons: lessonDetails.length,
+  });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const lines = doc.splitTextToSize(comment, CONTENT_W - 12) as string[];
+  const lineH = 5.2;
+  const boxH = lines.length * lineH + 9;
+  doc.setFillColor(...CARD);
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.3);
-  doc.roundedRect(M, y - 2, CONTENT_W, boxH, 2, 2, "S");
-  for (let ly = y + 7; ly < y - 2 + boxH - 3; ly += 8) {
-    doc.setDrawColor(235, 235, 240);
-    doc.line(M + 4, ly, PAGE_W - M - 4, ly);
-  }
-  doc.setDrawColor(...MUTED);
-  doc.setLineWidth(0.3);
-  doc.line(M, sy, M + 70, sy);
-  doc.line(PAGE_W - M - 70, sy, PAGE_W - M, sy);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  setColor(doc, MUTED);
-  doc.text("Teacher", M, sy + 4.5);
-  doc.text("Parent / Guardian", PAGE_W - M - 70, sy + 4.5);
+  doc.roundedRect(M, y - 2, CONTENT_W, boxH, 2, 2, "FD");
+  doc.setFillColor(...BRAND);
+  doc.rect(M, y + 1, 1.2, boxH - 6, "F");
+  setColor(doc, INK);
+  doc.text(lines, M + 6, y + 4.5, { lineHeightFactor: 1.45 });
 }
 
 function addLessonPage(
