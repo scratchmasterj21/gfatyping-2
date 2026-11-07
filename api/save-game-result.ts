@@ -30,6 +30,7 @@ const FREE_PLAY_IDS = new Set([
   "echo-keys",
   "word-pong",
   "gem-dig",
+  "four-row",
 ]);
 /** One session can't count for more than this (tab left open, etc). */
 const MAX_SESSION_SECONDS = 30 * 60;

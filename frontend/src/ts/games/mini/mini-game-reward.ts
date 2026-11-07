@@ -8,7 +8,8 @@ export type MiniGameId =
   | "snack-shop"
   | "echo-keys"
   | "word-pong"
-  | "gem-dig";
+  | "gem-dig"
+  | "four-row";
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 

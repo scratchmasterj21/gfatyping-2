@@ -24,6 +24,7 @@ export const GAME_LABELS: Record<string, string> = {
   "echo-keys": "Echo Keys",
   "word-pong": "Word Ping-Pong",
   "gem-dig": "Gem Dig",
+  "four-row": "Four in a Row",
 };
 
 const GAME_ORDER = [
@@ -39,6 +40,7 @@ const GAME_ORDER = [
   "echo-keys",
   "word-pong",
   "gem-dig",
+  "four-row",
 ];
 
 function ScoreBoard(props: {

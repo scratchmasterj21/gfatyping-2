@@ -236,6 +236,7 @@ export function Sidebar(props: {
             { id: "echo-keys", text: "echo keys", icon: "fa-lightbulb" },
             { id: "word-pong", text: "ping-pong", icon: "fa-table-tennis" },
             { id: "gem-dig", text: "gem dig", icon: "fa-gem" },
+            { id: "four-row", text: "four in a row", icon: "fa-th" },
           ]}
         />
       </Show>

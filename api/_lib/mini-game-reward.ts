@@ -10,6 +10,7 @@ export const MINI_GAME_IDS = [
   "echo-keys",
   "word-pong",
   "gem-dig",
+  "four-row",
 ] as const;
 export type MiniGameId = (typeof MINI_GAME_IDS)[number];
 
@@ -22,6 +23,8 @@ export const MINI_GAME_SCORE_PER_COIN: Record<MiniGameId, number> = {
   "word-pong": 12,
   // 5 per block, 10 per gem, +30 for first: a full winning dig (~170) caps at 8
   "gem-dig": 22,
+  // 30 per board + 30 for the match + 2 per piece: a 2-0 win (~120) caps at 8
+  "four-row": 15,
 };
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;

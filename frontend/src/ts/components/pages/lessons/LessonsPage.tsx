@@ -43,6 +43,7 @@ import { gradeOf } from "../../../constants/classes";
 import { getAuthenticatedUser } from "../../../firebase";
 import { BalloonPopModal } from "../../../games/balloon-pop/BalloonPopModal";
 import { EchoKeysModal } from "../../../games/echo-keys/EchoKeysModal";
+import { FourRowModal } from "../../../games/four-row/FourRowModal";
 import { FruitNinjaModal } from "../../../games/fruit-ninja/FruitNinjaModal";
 import {
   checkGameAccess,
@@ -687,6 +688,7 @@ export function LessonsPage(): JSXElement {
   const [echoOpen, setEchoOpen] = createSignal(false);
   const [pongOpen, setPongOpen] = createSignal(false);
   const [digOpen, setDigOpen] = createSignal(false);
+  const [fourOpen, setFourOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1454,6 +1456,7 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "echo-keys") setEchoOpen(true);
     else if (gameId === "word-pong") setPongOpen(true);
     else if (gameId === "gem-dig") setDigOpen(true);
+    else if (gameId === "four-row") setFourOpen(true);
   };
 
   // Time in free-play games, for the teacher's activity view. Lesson
@@ -1471,6 +1474,7 @@ export function LessonsPage(): JSXElement {
     if (echoOpen()) return "echo-keys";
     if (pongOpen()) return "word-pong";
     if (digOpen()) return "gem-dig";
+    if (fourOpen()) return "four-row";
     return undefined;
   });
   createEffect(
@@ -2148,6 +2152,7 @@ export function LessonsPage(): JSXElement {
                           [
                             "word-pong",
                             "gem-dig",
+                            "four-row",
                             "type-toss",
                             "type-racer",
                             "ghost-hunter",
@@ -2162,7 +2167,9 @@ export function LessonsPage(): JSXElement {
                               ? "home-words"
                               : "all-keys-1";
                         const lessonLocked = () =>
-                          !["word-pong", "gem-dig"].includes(game.id) &&
+                          !["word-pong", "gem-dig", "four-row"].includes(
+                            game.id,
+                          ) &&
                           !isCurrentUserAdmin() &&
                           isLessonLocked(requiredLesson);
                         const locked = () =>
@@ -2330,6 +2337,18 @@ export function LessonsPage(): JSXElement {
           onResult={(score) => {
             void recordGameScore("gem-dig", score);
             claimRecommendedGame("gem-dig", score, 1);
+          }}
+        />
+        <FourRowModal
+          open={fourOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setFourOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("four-row", score);
+            claimRecommendedGame("four-row", score, 1);
           }}
         />
         <BalloonPopModal
