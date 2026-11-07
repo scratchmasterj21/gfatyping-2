@@ -10,6 +10,8 @@ import { tokyoDateString } from "./time.js";
  *   lx - ids of lessons passed with 2+ stars on that attempt (distinct)
  *   g  - seconds in free-play games
  *   gp - free-play games opened
+ * Also stamps `lastActiveAt` (ms) - the teacher's "last online" time. It
+ * rides along with the activity write, so it costs nothing extra.
  * Mirrors frontend/src/ts/classroom/activity.ts.
  */
 export type ActivityDelta = Partial<Record<"t" | "l" | "g" | "gp", number>>;
@@ -25,7 +27,7 @@ export function activityUpdate(
   userData: Record<string, unknown> | undefined,
   delta: ActivityDelta,
   options: { passedLessonId?: string; now?: number } = {},
-): { activityDays: Record<string, unknown> } {
+): { activityDays: Record<string, unknown>; lastActiveAt: number } {
   const now = options.now ?? Date.now();
   const today = tokyoDateString(now);
   const oldest = tokyoDateString(now - (KEEP_DAYS - 1) * 86_400_000);
@@ -46,5 +48,5 @@ export function activityUpdate(
       if (date < oldest) days[date] = admin.firestore.FieldValue.delete();
     }
   }
-  return { activityDays: days };
+  return { activityDays: days, lastActiveAt: now };
 }

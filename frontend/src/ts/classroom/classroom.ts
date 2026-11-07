@@ -96,6 +96,8 @@ export type StoredUserDoc = {
   classId?: string;
   graduated?: boolean;
   rollover?: StudentRollover;
+  /** last lesson / test / game activity, ms (api/_lib/activity.ts) */
+  lastActiveAt?: number;
   timeTyping?: number;
   completedTests?: number;
   streak?: {

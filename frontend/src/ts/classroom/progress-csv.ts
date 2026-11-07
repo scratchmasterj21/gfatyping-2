@@ -13,9 +13,13 @@ function csvCell(value: string | number): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-function isoDate(ts: number): string {
+/** "2026-11-07 14:05" (local time) */
+function isoDateTime(ts: number): string {
   if (ts <= 0) return "";
-  return localDateString(new Date(ts));
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${localDateString(d)} ${hh}:${mm}`;
 }
 
 /**
@@ -71,7 +75,7 @@ export function buildProgressCsv(
       formatWeakKeys(row.weakKeys),
       row.completedTests,
       Math.round(row.timeTyping / 60),
-      isoDate(row.lastActive),
+      isoDateTime(row.lastActive),
       done,
       assignments.length,
       ...assignments.map((a) =>

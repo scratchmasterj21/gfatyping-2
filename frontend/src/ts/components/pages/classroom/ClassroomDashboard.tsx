@@ -132,6 +132,25 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
+/** "12 min ago", "today 2:15 PM", "yesterday 9:03 AM", "Mon 9:03 AM", "Nov 3, 10:20 AM" */
+function formatLastActive(ts: number, now = Date.now()): string {
+  if (ts <= 0) return "never";
+  const mins = Math.floor((now - ts) / 60_000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const d = new Date(ts);
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const startMs = dayStart.getTime();
+  if (ts >= startMs) return `today ${time}`;
+  if (ts >= startMs - 86_400_000) return `yesterday ${time}`;
+  if (ts >= startMs - 6 * 86_400_000) {
+    return `${d.toLocaleDateString([], { weekday: "short" })} ${time}`;
+  }
+  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
+}
+
 function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)}m`;
 }
@@ -810,7 +829,9 @@ function ProgressTab(props: {
                 {(r) => (
                   <div class="flex justify-between gap-2 text-sm text-text">
                     <span class="truncate">{r.name}</span>
-                    <span class="text-sub">{formatDate(r.lastActive)}</span>
+                    <span class="text-sub">
+                      {formatLastActive(r.lastActive)}
+                    </span>
                   </div>
                 )}
               </For>
@@ -1259,7 +1280,7 @@ function ProgressTab(props: {
                           isGoneQuiet(row) ? "Hasn't practiced in 2+ days" : ""
                         }
                       >
-                        {formatDate(row.lastActive)}
+                        {formatLastActive(row.lastActive)}
                       </td>
                       <td class="p-1 text-right whitespace-nowrap lg:p-2">
                         <Button

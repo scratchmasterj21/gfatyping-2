@@ -541,7 +541,11 @@ export async function getClassProgress(
         xp: d.xp ?? 0,
         timeTyping: d.timeTyping ?? 0,
         completedTests: d.completedTests ?? 0,
-        lastActive: d.streak?.lastResultTimestamp ?? 0,
+        // last typing result, or any lesson/game activity (lastActiveAt)
+        lastActive: Math.max(
+          d.streak?.lastResultTimestamp ?? 0,
+          d.lastActiveAt ?? 0,
+        ),
         lessonsCompleted,
         lessonAttempts,
         lessonTime,
