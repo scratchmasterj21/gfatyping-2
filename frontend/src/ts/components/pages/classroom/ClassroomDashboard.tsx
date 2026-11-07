@@ -127,6 +127,35 @@ const CLASS_TABS = new Set<Tab>([
   "announcements",
 ]);
 
+/**
+ * PDF previews open in a new tab. The tab must be opened right away, inside
+ * the tap - browsers (Safari/iPad especially) block tabs opened after an
+ * await. So: open a "Building..." tab first, build the PDF, then show it
+ * there. If the tab was blocked anyway, the PDF downloads instead.
+ */
+function openPreviewTab(): Window | null {
+  const win = window.open("", "_blank");
+  if (win !== null) {
+    win.document.title = "Building report…";
+    win.document.body.style.cssText =
+      "font-family:sans-serif;padding:2rem;color:#555";
+    win.document.body.textContent = "Building the report…";
+  }
+  return win;
+}
+
+function showPdfInTab(
+  win: Window | null,
+  doc: import("jspdf").jsPDF,
+  fallbackName: string,
+): void {
+  if (win !== null && !win.closed) {
+    win.location.href = String(doc.output("bloburl"));
+  } else {
+    doc.save(fallbackName);
+  }
+}
+
 function formatDate(ts: number): string {
   if (ts <= 0) return "never";
   return new Date(ts).toLocaleDateString();
@@ -577,10 +606,12 @@ function ProgressTab(props: {
   const previewStudentPdf = async (row: StudentProgressRow): Promise<void> => {
     if (previewingUid() !== null) return;
     setPreviewingUid(row.uid);
+    const win = openPreviewTab();
     try {
       const doc = await buildStudentPdfDoc(row);
-      window.open(doc.output("bloburl"), "_blank");
+      showPdfInTab(win, doc, `progress-${props.classId}-${row.name}.pdf`);
     } catch (e) {
+      win?.close();
       showErrorNotification("Failed to preview PDF report");
       console.error(e);
     } finally {
@@ -618,30 +649,34 @@ function ProgressTab(props: {
     void downloadAllPdf();
   };
 
+  const buildClassPdfDoc = async (): Promise<import("jspdf").jsPDF> => {
+    const range = dateRange();
+    const uids = props.rows.map((r) => r.uid);
+    const [activity, lessonDetailsEntries, { buildClassReportPdf }] =
+      await Promise.all([
+        getClassActivity(uids, range.start, range.end),
+        Promise.all(
+          uids.map(
+            async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
+          ),
+        ),
+        import("../../../classroom/progress-pdf"),
+      ]);
+    return buildClassReportPdf({
+      classId: props.classId,
+      rows: props.rows,
+      activityByUid: activity,
+      lessonDetailsByUid: Object.fromEntries(lessonDetailsEntries),
+      assignments: props.assignments,
+      range,
+    });
+  };
+
   const downloadAllPdf = async (): Promise<void> => {
     if (downloadingAll() || props.rows.length === 0) return;
     setDownloadingAll(true);
     try {
-      const range = dateRange();
-      const uids = props.rows.map((r) => r.uid);
-      const [activity, lessonDetailsEntries, { buildClassReportPdf }] =
-        await Promise.all([
-          getClassActivity(uids, range.start, range.end),
-          Promise.all(
-            uids.map(
-              async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
-            ),
-          ),
-          import("../../../classroom/progress-pdf"),
-        ]);
-      const doc = buildClassReportPdf({
-        classId: props.classId,
-        rows: props.rows,
-        activityByUid: activity,
-        lessonDetailsByUid: Object.fromEntries(lessonDetailsEntries),
-        assignments: props.assignments,
-        range,
-      });
+      const doc = await buildClassPdfDoc();
       doc.save(`progress-${props.classId}.pdf`);
     } catch (e) {
       showErrorNotification("Failed to build PDF reports");
@@ -654,29 +689,12 @@ function ProgressTab(props: {
   const previewAllPdf = async (): Promise<void> => {
     if (previewingAll() || props.rows.length === 0) return;
     setPreviewingAll(true);
+    const win = openPreviewTab();
     try {
-      const range = dateRange();
-      const uids = props.rows.map((r) => r.uid);
-      const [activity, lessonDetailsEntries, { buildClassReportPdf }] =
-        await Promise.all([
-          getClassActivity(uids, range.start, range.end),
-          Promise.all(
-            uids.map(
-              async (uid) => [uid, await getStudentLessonDetails(uid)] as const,
-            ),
-          ),
-          import("../../../classroom/progress-pdf"),
-        ]);
-      const doc = buildClassReportPdf({
-        classId: props.classId,
-        rows: props.rows,
-        activityByUid: activity,
-        lessonDetailsByUid: Object.fromEntries(lessonDetailsEntries),
-        assignments: props.assignments,
-        range,
-      });
-      window.open(doc.output("bloburl"), "_blank");
+      const doc = await buildClassPdfDoc();
+      showPdfInTab(win, doc, `progress-${props.classId}.pdf`);
     } catch (e) {
+      win?.close();
       showErrorNotification("Failed to preview PDF reports");
       console.error(e);
     } finally {
