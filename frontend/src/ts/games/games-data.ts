@@ -25,7 +25,8 @@ export type BuiltinGame = {
     | "echo-keys"
     | "word-pong"
     | "gem-dig"
-    | "four-row";
+    | "four-row"
+    | "word-bomb";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -62,6 +63,14 @@ export const games: Game[] = [
     description:
       "Type a column's word to drop your piece - get 4 in a row to win!",
     icon: "fa-th",
+  },
+  {
+    type: "builtin",
+    id: "word-bomb",
+    name: "Word Bomb",
+    description:
+      "Type the word to pass the bomb before it goes BOOM - up to 6 players!",
+    icon: "fa-bomb",
   },
   {
     type: "builtin",

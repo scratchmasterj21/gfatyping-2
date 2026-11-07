@@ -9,7 +9,8 @@ export type MiniGameId =
   | "echo-keys"
   | "word-pong"
   | "gem-dig"
-  | "four-row";
+  | "four-row"
+  | "word-bomb";
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 

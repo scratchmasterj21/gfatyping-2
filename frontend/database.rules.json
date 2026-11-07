@@ -106,6 +106,36 @@
         }
       }
     },
+    "bombRooms": {
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('bombRooms').child($code).child('status').val() == 'lobby') || data.exists())",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('online').isBoolean())"
+          }
+        },
+        "typing": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('bombRooms').child($code).child('players').child(auth.uid).exists() && root.child('bombRooms').child($code).child('status').val() == 'playing' && root.child('bombRooms').child($code).child('game').child('holder').val() == auth.uid",
+          ".validate": "newData.hasChildren(['seq', 'text']) && newData.child('seq').isNumber() && newData.child('text').isString() && newData.child('text').val().length <= 30"
+        },
+        "game": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('bombRooms').child($code).child('players').child(auth.uid).exists() && root.child('bombRooms').child($code).child('status').val() == 'playing'",
+          ".validate": "newData.hasChildren(['seq', 'order', 'lives', 'holder', 'word', 'roundStartAt', 'fuseEndAt']) && (!data.exists() || newData.child('seq').val() == data.child('seq').val() + 1) && newData.child('word').isString() && newData.child('word').val().length <= 30"
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "difficultyLabel": {
+          ".validate": "newData.val() == 'Easy' || newData.val() == 'Medium' || newData.val() == 'Hard'"
+        }
+      }
+    },
     "digRooms": {
       ".indexOn": ["createdAt"],
       "$code": {

@@ -72,6 +72,27 @@ export const sfx = {
     tone(1319, 1319, 0.25, "square", 0.08, 0.08);
   }),
   finish: guard(playBossDefeated),
+  /** a clock tick (Word Bomb fuse) */
+  tick: guard(() => tone(1400, 1200, 0.04, "square", 0.05)),
+  /** an explosion: a noise burst plus a low thump */
+  boom: guard(() => {
+    const c = audio();
+    if (c === null) return;
+    const seconds = 0.7;
+    const buffer = c.createBuffer(1, c.sampleRate * seconds, c.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) ** 2;
+    }
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    const g = c.createGain();
+    g.gain.value = 0.35;
+    src.connect(g);
+    g.connect(c.destination);
+    src.start();
+    tone(160, 40, 0.6, "sawtooth", 0.25);
+  }),
   /** a musical note; higher index = higher pitch */
   note: (index: number): void => {
     if (muted()) return;

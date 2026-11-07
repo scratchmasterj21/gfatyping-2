@@ -39,6 +39,7 @@ const RECOMMENDED_GAME_IDS = new Set([
   "word-pong",
   "gem-dig",
   "four-row",
+  "word-bomb",
 ]);
 
 /** Mirrors frontend COLLECTION_CATEGORIES / COLLECTION_REWARD in avatar-items.ts. */

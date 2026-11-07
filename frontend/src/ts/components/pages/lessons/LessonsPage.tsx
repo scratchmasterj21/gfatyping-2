@@ -68,6 +68,7 @@ import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
 import { TypeTossModal } from "../../../games/type-toss/TypeTossModal";
 import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
+import { WordBombModal } from "../../../games/word-bomb/WordBombModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
 import { WordPongModal } from "../../../games/word-pong/WordPongModal";
 import {
@@ -689,6 +690,7 @@ export function LessonsPage(): JSXElement {
   const [pongOpen, setPongOpen] = createSignal(false);
   const [digOpen, setDigOpen] = createSignal(false);
   const [fourOpen, setFourOpen] = createSignal(false);
+  const [bombOpen, setBombOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1457,6 +1459,7 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "word-pong") setPongOpen(true);
     else if (gameId === "gem-dig") setDigOpen(true);
     else if (gameId === "four-row") setFourOpen(true);
+    else if (gameId === "word-bomb") setBombOpen(true);
   };
 
   // Time in free-play games, for the teacher's activity view. Lesson
@@ -1475,6 +1478,7 @@ export function LessonsPage(): JSXElement {
     if (pongOpen()) return "word-pong";
     if (digOpen()) return "gem-dig";
     if (fourOpen()) return "four-row";
+    if (bombOpen()) return "word-bomb";
     return undefined;
   });
   createEffect(
@@ -2153,6 +2157,7 @@ export function LessonsPage(): JSXElement {
                             "word-pong",
                             "gem-dig",
                             "four-row",
+                            "word-bomb",
                             "type-toss",
                             "type-racer",
                             "ghost-hunter",
@@ -2167,9 +2172,12 @@ export function LessonsPage(): JSXElement {
                               ? "home-words"
                               : "all-keys-1";
                         const lessonLocked = () =>
-                          !["word-pong", "gem-dig", "four-row"].includes(
-                            game.id,
-                          ) &&
+                          ![
+                            "word-pong",
+                            "gem-dig",
+                            "four-row",
+                            "word-bomb",
+                          ].includes(game.id) &&
                           !isCurrentUserAdmin() &&
                           isLessonLocked(requiredLesson);
                         const locked = () =>
@@ -2349,6 +2357,18 @@ export function LessonsPage(): JSXElement {
           onResult={(score) => {
             void recordGameScore("four-row", score);
             claimRecommendedGame("four-row", score, 1);
+          }}
+        />
+        <WordBombModal
+          open={bombOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setBombOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("word-bomb", score);
+            claimRecommendedGame("word-bomb", score, 1);
           }}
         />
         <BalloonPopModal
