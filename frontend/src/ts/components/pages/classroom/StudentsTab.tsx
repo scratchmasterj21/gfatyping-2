@@ -6,6 +6,14 @@ import {
   setStudentClass,
   Student,
 } from "../../../classroom/classroom";
+import {
+  applyRollover,
+  lastRolloverAt,
+  planRollover,
+  restoreGraduate,
+  studentsInRollover,
+  undoRollover,
+} from "../../../classroom/rollover";
 import { CLASS_IDS } from "../../../constants/classes";
 import { queryClient } from "../../../queries";
 import {
@@ -19,6 +27,7 @@ import { Fa } from "../../common/Fa";
 
 const studentsQueryKey = ["classroom", "students"];
 const UNASSIGNED = "unassigned";
+const GRADUATED = "graduated";
 const CLASS_FILTER_ALL = "all";
 
 const selectClass =
@@ -39,10 +48,18 @@ export function StudentsTab(): JSXElement {
   const [savingUid, setSavingUid] = createSignal<string | null>(null);
   const [savedUid, setSavedUid] = createSignal<string | null>(null);
 
-  const students = createMemo(() => studentsQuery.data ?? []);
+  const everyone = createMemo(() => studentsQuery.data ?? []);
+  /** current students (graduates are kept but hidden unless asked for) */
+  const students = createMemo(() =>
+    everyone().filter((s) => s.graduated !== true),
+  );
+  const graduates = createMemo(() =>
+    everyone().filter((s) => s.graduated === true),
+  );
   const unassignedCount = createMemo(
     () => students().filter((student) => student.classId === undefined).length,
   );
+  const rolloverAt = createMemo(() => lastRolloverAt(everyone()));
 
   const invalidate = async (): Promise<void> => {
     await queryClient.invalidateQueries({ queryKey: studentsQueryKey });
@@ -51,7 +68,7 @@ export function StudentsTab(): JSXElement {
   const filtered = createMemo<Student[]>(() => {
     const term = search().trim().toLowerCase();
     const cf = classFilter();
-    let list = students()
+    let list = (cf === GRADUATED ? graduates() : students())
       .slice()
       .sort((a, b) => {
         const ca = a.classId ?? "";
@@ -59,7 +76,9 @@ export function StudentsTab(): JSXElement {
         if (ca !== cb) return ca.localeCompare(cb);
         return a.name.localeCompare(b.name);
       });
-    if (cf === UNASSIGNED) {
+    if (cf === GRADUATED) {
+      // already the graduates
+    } else if (cf === UNASSIGNED) {
       list = list.filter((s) => (s.classId ?? UNASSIGNED) === UNASSIGNED);
     } else if (cf !== CLASS_FILTER_ALL) {
       list = list.filter((s) => s.classId === cf);
@@ -104,7 +123,13 @@ export function StudentsTab(): JSXElement {
     setSavingUid(uid);
     setSavedUid(null);
     try {
-      await setStudentClass(uid, value === UNASSIGNED ? null : value);
+      const target = value === UNASSIGNED ? null : value;
+      if (everyone().find((s) => s.uid === uid)?.graduated === true) {
+        if (value === GRADUATED) return;
+        await restoreGraduate(uid, target);
+      } else {
+        await setStudentClass(uid, target);
+      }
       await invalidate();
       setSavedUid(uid);
       window.setTimeout(() => {
@@ -167,6 +192,66 @@ export function StudentsTab(): JSXElement {
     }
   };
 
+  const startNewYear = (): void => {
+    const plan = planRollover(students());
+    if (plan.moves.length === 0) {
+      showErrorNotification("No students in classes to move up");
+      return;
+    }
+    const lines = plan.byClass
+      .map(
+        (c) =>
+          `${c.from} → ${c.to ?? "graduated 🎓"}: ${c.count} student${c.count === 1 ? "" : "s"}`,
+      )
+      .join("<br>");
+    showSimpleModal({
+      title: "Start the new school year?",
+      text: `Every student moves up one grade and keeps their class letter:<br><br>${lines}<br><br>G6 students graduate: they're hidden from classes and rankings, but their account, coins, house and lessons stay. You can undo this for 30 days.`,
+      textAllowHtml: true,
+      buttonText: `move ${plan.moves.length} students up`,
+      execFn: async () => {
+        try {
+          await applyRollover(plan);
+          await invalidate();
+          return {
+            status: "success",
+            message: `Moved ${plan.moves.length} students up a grade`,
+          };
+        } catch (e) {
+          await invalidate();
+          return {
+            status: "error",
+            message: `Something went wrong - check the class list (${String(e)})`,
+          };
+        }
+      },
+    });
+  };
+
+  const undoNewYear = (): void => {
+    const at = rolloverAt();
+    if (at === undefined) return;
+    const count = studentsInRollover(everyone(), at).length;
+    showSimpleModal({
+      title: "Undo the new school year?",
+      text: `${count} students go back to the class they were in on ${new Date(at).toLocaleDateString()}, and graduates come back. Class changes you made since then for these students will be replaced.`,
+      buttonText: "undo move-up",
+      execFn: async () => {
+        try {
+          const n = await undoRollover(everyone(), at);
+          await invalidate();
+          return { status: "success", message: `Put ${n} students back` };
+        } catch (e) {
+          await invalidate();
+          return {
+            status: "error",
+            message: `Could not undo every student (${String(e)})`,
+          };
+        }
+      },
+    });
+  };
+
   return (
     <section class="grid gap-4 rounded bg-sub-alt p-4 md:p-6">
       <div>
@@ -203,6 +288,14 @@ export function StudentsTab(): JSXElement {
             text={`Unassigned ${unassignedCount()}`}
             onClick={() => setClassFilter(UNASSIGNED)}
           />
+          <Show when={graduates().length > 0}>
+            <Button
+              variant="text"
+              active={classFilter() === GRADUATED}
+              text={`Graduated ${graduates().length}`}
+              onClick={() => setClassFilter(GRADUATED)}
+            />
+          </Show>
         </div>
         <div class="flex gap-2">
           <input
@@ -220,6 +313,9 @@ export function StudentsTab(): JSXElement {
             <option value={CLASS_FILTER_ALL}>all classes</option>
             <option value={UNASSIGNED}>unassigned</option>
             <For each={CLASS_IDS}>{(c) => <option value={c}>{c}</option>}</For>
+            <Show when={graduates().length > 0}>
+              <option value={GRADUATED}>graduated</option>
+            </Show>
           </select>
         </div>
 
@@ -292,7 +388,11 @@ export function StudentsTab(): JSXElement {
                         <div class="flex items-center gap-2">
                           <select
                             class={selectClass}
-                            value={student.classId ?? UNASSIGNED}
+                            value={
+                              student.graduated === true
+                                ? GRADUATED
+                                : (student.classId ?? UNASSIGNED)
+                            }
                             disabled={savingUid() !== null || busy()}
                             onChange={(e) =>
                               void assignOne(student.uid, e.currentTarget.value)
@@ -302,6 +402,9 @@ export function StudentsTab(): JSXElement {
                             <For each={CLASS_IDS}>
                               {(c) => <option value={c}>{c}</option>}
                             </For>
+                            <Show when={student.graduated === true}>
+                              <option value={GRADUATED}>graduated 🎓</option>
+                            </Show>
                           </select>
                           <Show when={savingUid() === student.uid}>
                             <Fa icon="fa-spinner" spin class="text-sub" />
@@ -335,6 +438,33 @@ export function StudentsTab(): JSXElement {
             />
           </div>
         </Show>
+      </div>
+
+      <div class="grid gap-2 rounded bg-bg p-4">
+        <h4 class="flex items-center gap-2 text-lg text-text">
+          <Fa icon="fa-graduation-cap" />
+          new school year
+        </h4>
+        <p class="text-sm text-sub">
+          At the start of the year, move every student up one grade (G3A → G4A).
+          G6 students graduate. Coins, houses, avatars and lessons all stay.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <Button
+            text="move everyone up a grade..."
+            disabled={busy() || studentsQuery.isLoading}
+            onClick={startNewYear}
+          />
+          <Show when={rolloverAt()}>
+            {(at) => (
+              <Button
+                variant="text"
+                text={`undo move-up from ${new Date(at()).toLocaleDateString()}`}
+                onClick={undoNewYear}
+              />
+            )}
+          </Show>
+        </div>
       </div>
     </section>
   );

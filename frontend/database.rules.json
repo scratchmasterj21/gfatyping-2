@@ -21,6 +21,7 @@
       ".write": "auth != null && auth.token.email_verified == true && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)"
     },
     "tossRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -52,6 +53,7 @@
       }
     },
     "pongRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -81,6 +83,7 @@
       }
     },
     "fourRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -107,6 +110,7 @@
       }
     },
     "bombRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -137,6 +141,7 @@
       }
     },
     "digRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -169,6 +174,7 @@
       }
     },
     "racerRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -200,6 +206,7 @@
       }
     },
     "ghostRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],
       "$code": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
@@ -231,6 +238,7 @@
       }
     },
     "classRaces": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       "$pin": {
         ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
         ".write": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",

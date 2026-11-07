@@ -22,7 +22,14 @@ export type Student = {
   xp: number;
   avatarUrl?: string;
   classId?: string;
+  /** moved on after G6 (see rollover.ts); hidden from class lists */
+  graduated?: boolean;
+  /** the last new-school-year move, so it can be undone */
+  rollover?: StudentRollover;
 };
+
+/** Where a student was before the last new-school-year move. */
+export type StudentRollover = { from: string; at: number };
 
 export type ClassroomScope = "class" | "grade" | "school";
 export type ClassroomMetric =
@@ -87,6 +94,8 @@ export type StoredUserDoc = {
   selectedTitle?: string;
   xp?: number;
   classId?: string;
+  graduated?: boolean;
+  rollover?: StudentRollover;
   timeTyping?: number;
   completedTests?: number;
   streak?: {
@@ -131,6 +140,8 @@ function toStudent(userDoc: StudentDoc): Student {
     xp: userDoc.xp ?? 0,
     avatarUrl: userDoc.avatarUrl,
     classId: userDoc.classId ?? undefined,
+    ...(userDoc.graduated === true ? { graduated: true } : {}),
+    ...(userDoc.rollover !== undefined ? { rollover: userDoc.rollover } : {}),
   };
 }
 

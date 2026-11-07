@@ -8,6 +8,7 @@ import {
   StudentActivity,
   summarizeActivity,
 } from "../../../classroom/activity";
+import { buildWeeklySummary } from "../../../classroom/weekly-summary";
 import {
   checkGameAccess,
   EARN_LESSONS_DEFAULT,
@@ -134,6 +135,27 @@ export function ActivityTab(props: { classId: string }): JSXElement {
       .sort((a, b) => Number(b.flagged) - Number(a.flagged)),
   );
 
+  const [summaryOpen, setSummaryOpen] = createSignal(false);
+  const summary = createMemo(() =>
+    buildWeeklySummary(props.classId, activityQuery.data ?? [], {
+      ...(classPolicy().mode === "earn"
+        ? { earnLessons: classPolicy().earnLessons ?? EARN_LESSONS_DEFAULT }
+        : {}),
+    }),
+  );
+  // the teacher may edit the text before copying
+  const [summaryBox, setSummaryBox] = createSignal<HTMLTextAreaElement>();
+  const copySummary = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(summaryBox()?.value ?? summary());
+      showSuccessNotification("Copied - paste it into ClassDojo");
+    } catch (error) {
+      showErrorNotification("Could not copy - select the text and copy it", {
+        error,
+      });
+    }
+  };
+
   return (
     <section class="grid gap-4">
       <div>
@@ -144,6 +166,43 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           lessons). Counting started Nov 5, 2026. Updates every 5 minutes - use
           refresh for the latest.
         </p>
+      </div>
+
+      {/* weekly post for parents / students */}
+      <div class="grid gap-3 rounded bg-bg p-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="mr-1 font-semibold text-text">
+            📋 Weekly summary for ClassDojo
+          </span>
+          <button
+            type="button"
+            class={chip(summaryOpen())}
+            disabled={activityQuery.isPending}
+            onClick={() => setSummaryOpen((v) => !v)}
+          >
+            {summaryOpen() ? "Hide" : "Make this week's post"}
+          </button>
+        </div>
+        <Show when={summaryOpen()}>
+          <p class="text-sm text-sub">
+            Last 7 days for {props.classId}, first names only. Edit it if you
+            like, then copy and paste it into ClassDojo.
+          </p>
+          <textarea
+            ref={setSummaryBox}
+            class="min-h-64 w-full rounded bg-sub-alt p-3 font-sans text-sm text-text outline-none focus:ring-2 focus:ring-sub"
+            value={summary()}
+          ></textarea>
+          <div>
+            <button
+              type="button"
+              class={chip(true)}
+              onClick={() => void copySummary()}
+            >
+              <Fa icon="fa-copy" /> Copy
+            </button>
+          </div>
+        </Show>
       </div>
 
       {/* class controls */}

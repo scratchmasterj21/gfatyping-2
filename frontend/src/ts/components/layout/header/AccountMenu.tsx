@@ -4,6 +4,7 @@ import { get as getServerConfiguration } from "../../../ape/server-configuration
 import { signOut } from "../../../auth";
 import { showModal } from "../../../states/modals";
 import { getSnapshot } from "../../../states/snapshot";
+import { isEasyRead, setEasyRead } from "../../../utils/easy-read";
 import { Button } from "../../common/Button";
 import { NotificationBubble } from "../../common/NotificationBubble";
 
@@ -83,6 +84,17 @@ export function AccountMenu(props: Props): JSXElement {
           }}
           href="/certificate"
           router-link
+        />
+        <Button
+          text={isEasyRead() ? "Easy reading: on ✓" : "Easy reading: off"}
+          class={buttonClass}
+          fa={{
+            icon: "fa-glasses",
+            fixedWidth: true,
+          }}
+          onClick={() => {
+            setEasyRead(!isEasyRead());
+          }}
         />
         <Button
           text="Account settings"

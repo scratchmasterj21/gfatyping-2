@@ -83,6 +83,7 @@ import { HallOfChampions } from "../race/HallOfChampions";
 import { ActivityTab } from "./ActivityTab";
 import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
+import { UsageTab } from "./UsageTab";
 
 const inputClass =
   "w-full rounded border border-sub-alt bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
@@ -114,6 +115,7 @@ const TabSchema = z.enum([
   "races",
   "images",
   "announcements",
+  "usage",
 ]);
 type Tab = z.infer<typeof TabSchema>;
 
@@ -2812,6 +2814,7 @@ export function ClassroomDashboard(): JSXElement {
     races: ["races"],
     images: [],
     announcements: ["announcements"],
+    usage: ["usage"],
   };
   const refreshAll = async (): Promise<void> => {
     setRefreshing(true);
@@ -2930,6 +2933,9 @@ export function ClassroomDashboard(): JSXElement {
                 {tabButton("announcements", "Announcements", {
                   icon: "fa-bullhorn",
                 })}
+                {tabButton("usage", "Free plan", {
+                  icon: "fa-tachometer-alt",
+                })}
               </>,
             )}
           </div>
@@ -2959,6 +2965,11 @@ export function ClassroomDashboard(): JSXElement {
           <Show when={tab() === "students"}>
             <div class={panelClass}>
               <StudentsTab />
+            </div>
+          </Show>
+          <Show when={tab() === "usage" && classroomOpen()}>
+            <div class={panelClass}>
+              <UsageTab />
             </div>
           </Show>
           <Show when={tab() === "activity" && classroomOpen()}>
