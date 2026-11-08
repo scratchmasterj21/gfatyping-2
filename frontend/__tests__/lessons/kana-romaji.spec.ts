@@ -58,6 +58,17 @@ describe("romaji spellings", () => {
     ["ふぉんと", "fonto"],
     ["うぇぶ", "webu"],
     ["ちょうし", "tyousi"],
+    ["ぢ", "di"],
+    ["てぢか", "tedika"],
+    ["いぇ", "ye"],
+    ["いぇ", "ixe"],
+    ["くぁ", "kwa"],
+    ["くぁ", "qa"],
+    ["つぃ", "tsi"],
+    ["とぅ", "twu"],
+    ["でゅ", "dhu"],
+    ["ふゅ", "fyu"],
+    ["ぎぇ", "gye"],
   ])("%s ← %s", (word, romaji) => {
     expect(accepts(word, romaji)).toBe(true);
   });
