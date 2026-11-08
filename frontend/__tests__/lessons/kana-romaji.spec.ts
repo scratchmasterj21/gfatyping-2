@@ -85,7 +85,9 @@ describe("mistakes (contest style: fix it before moving on)", () => {
     for (const k of "sakura") s = typeKey(s, k);
     expect(s.finished).toBe(true);
     expect(s.correctKana).toBe(3);
-    expect(s.states[0]).toEqual(["wrong", "correct", "correct"]);
+    // fixed, so it's back to normal - but the mistake still counts
+    expect(s.states[0]).toEqual(["correct", "correct", "correct"]);
+    expect(s.wrongKana).toBe(1);
     expect(Math.round(kanaAccuracy(s))).toBe(75);
   });
 

@@ -257,7 +257,7 @@ export type UnitState = "todo" | "correct" | "wrong";
 
 export type KanaRunState = {
   words: KanaUnit[][];
-  /** per word, per unit ("wrong" = typed, but with a mistake on the way) */
+  /** per word, per unit ("wrong" = a wrong key on it that isn't fixed yet) */
   states: UnitState[][];
   wordIndex: number;
   unitIndex: number;
@@ -333,7 +333,8 @@ function completeUnit(s: KanaRunState, softN: boolean): KanaRunState {
   const size = unit?.kana.length ?? 1;
   const states = s.states.map((w, i) =>
     i === s.wordIndex
-      ? w.map((st, j) => (j === s.unitIndex && st !== "wrong" ? "correct" : st))
+      ? // fixed: back to normal (the mistake is still counted)
+        w.map((st, j) => (j === s.unitIndex ? "correct" : st))
       : w,
   );
   const done: KanaRunState = {

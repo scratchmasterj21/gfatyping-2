@@ -1,4 +1,5 @@
 import {
+  batch,
   createEffect,
   createSignal,
   JSXElement,
@@ -82,10 +83,14 @@ export function KanaPracticeModal(): JSXElement {
   const start = async (): Promise<void> => {
     const p = practice();
     if (p === null) return;
-    setResult(null);
-    setNote(undefined);
-    setStartedAt(null);
-    setRun(null);
+    // all at once: clearing the result while the old timer still read 0s
+    // made the "time's up" check fire again (Play again needed 2 taps)
+    batch(() => {
+      setStartedAt(null);
+      setRun(null);
+      setNote(undefined);
+      setResult(null);
+    });
     try {
       const words =
         p.mode === "contest" ? await contestWords() : await p.lesson.generate();

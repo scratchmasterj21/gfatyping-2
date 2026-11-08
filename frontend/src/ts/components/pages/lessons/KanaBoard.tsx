@@ -4,6 +4,10 @@ import { hintFor, KanaRunState, UnitState } from "../../../lessons/kana-romaji";
 import { cn } from "../../../utils/cn";
 
 const unitClass = (state: UnitState, current: boolean): string => {
+  // a wrong key on the current kana: red until it's fixed
+  if (current && state === "wrong") {
+    return "rounded-md bg-game-red text-game-cream";
+  }
   if (current) return "rounded-md bg-game-yellow text-game-ink";
   if (state === "correct") return "text-game-ink/30";
   if (state === "wrong") return "text-game-red underline decoration-2";
