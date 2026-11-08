@@ -10,7 +10,10 @@ export type MiniGameId =
   | "word-pong"
   | "gem-dig"
   | "four-row"
-  | "word-bomb";
+  | "word-bomb"
+  | "karuta"
+  | "goldfish"
+  | "shiritori";
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 

@@ -63,6 +63,9 @@ import {
 import { games } from "../../../games/games-data";
 import { GemDigModal } from "../../../games/gem-dig/GemDigModal";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
+import { GoldfishModal } from "../../../games/kana/GoldfishModal";
+import { KarutaModal } from "../../../games/kana/KarutaModal";
+import { ShiritoriModal } from "../../../games/kana/ShiritoriModal";
 import { SnackShopModal } from "../../../games/snack-shop/SnackShopModal";
 import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
@@ -122,6 +125,7 @@ import {
 } from "../../../lessons/lessons-data";
 import { japaneseLessonGroups } from "../../../lessons/lessons-data-jp";
 import { getActivePage, isAuthenticated } from "../../../states/core";
+import { openKanaPractice } from "../../../states/kana-practice";
 import { ModalId, showModal } from "../../../states/modals";
 import {
   showErrorNotification,
@@ -140,6 +144,7 @@ import { H2, H3 } from "../../common/Headers";
 import { Page } from "../../common/Page";
 import { RankRow } from "../leaderboard/RankRow";
 import { AdventureMap, MapStopState } from "./AdventureMap";
+import { KanaPracticeModal } from "./KanaPracticeModal";
 import { LessonCard } from "./LessonCard";
 import { LessonGroupSection } from "./LessonGroupSection";
 import { LessonHero } from "./LessonHero";
@@ -691,6 +696,9 @@ export function LessonsPage(): JSXElement {
   const [digOpen, setDigOpen] = createSignal(false);
   const [fourOpen, setFourOpen] = createSignal(false);
   const [bombOpen, setBombOpen] = createSignal(false);
+  const [karutaOpen, setKarutaOpen] = createSignal(false);
+  const [goldfishOpen, setGoldfishOpen] = createSignal(false);
+  const [shiritoriOpen, setShiritoriOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1460,6 +1468,9 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "gem-dig") setDigOpen(true);
     else if (gameId === "four-row") setFourOpen(true);
     else if (gameId === "word-bomb") setBombOpen(true);
+    else if (gameId === "karuta") setKarutaOpen(true);
+    else if (gameId === "goldfish") setGoldfishOpen(true);
+    else if (gameId === "shiritori") setShiritoriOpen(true);
   };
 
   // Time in free-play games, for the teacher's activity view. Lesson
@@ -1479,6 +1490,9 @@ export function LessonsPage(): JSXElement {
     if (digOpen()) return "gem-dig";
     if (fourOpen()) return "four-row";
     if (bombOpen()) return "word-bomb";
+    if (karutaOpen()) return "karuta";
+    if (goldfishOpen()) return "goldfish";
+    if (shiritoriOpen()) return "shiritori";
     return undefined;
   });
   createEffect(
@@ -2006,7 +2020,7 @@ export function LessonsPage(): JSXElement {
         <section>
           <LessonsCollapsibleHeader
             sectionId="japanese"
-            text="Japanese — Romaji"
+            text="Japanese — Romaji (hiragana)"
             icon="fa-language"
             collapsed={collapsed}
             onToggle={toggle}
@@ -2014,9 +2028,54 @@ export function LessonsPage(): JSXElement {
           <Show when={!collapsed().has("japanese")}>
             <div id="lessons-section-japanese">
               <p class="mb-4 text-sub">
-                Learn Japanese typing in romaji. Free practice - try these in
-                any order.
+                Hiragana on screen - type it in romaji, just like the Maipaso
+                contest. Free practice - try these in any order.
               </p>
+              <button
+                type="button"
+                class="mb-6 flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-sub-alt bg-sub-alt p-4 text-left shadow-md transition-all hover:-translate-y-0.5 hover:border-main hover:shadow-lg"
+                onClick={() => openKanaPractice({ mode: "contest" })}
+              >
+                <span class="text-4xl" lang="ja">
+                  あ
+                </span>
+                <span class="grid gap-1">
+                  <span class="text-lg font-bold text-text">
+                    Maipaso practice - Romaji (60 seconds)
+                  </span>
+                  <span class="text-sm text-sub">
+                    Type as many hiragana words as you can in 60 seconds.
+                    Contest goal: 160 kana. No hints - just like the real
+                    contest!
+                  </span>
+                </span>
+              </button>
+              <H3 fa={{ icon: "fa-gamepad" }} text="Romaji games" />
+              <p class="mb-3 text-em-sm text-sub">
+                Play solo or with friends - hiragana on screen, typed in romaji.
+              </p>
+              <div class="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <For
+                  each={games.filter((g) =>
+                    ["karuta", "goldfish", "shiritori"].includes(g.id),
+                  )}
+                >
+                  {(game) => (
+                    <GameButton
+                      name={game.name}
+                      description={game.description}
+                      icon={game.icon}
+                      locked={!gameAccess(game.id).allowed}
+                      lockedMessage={gameLockMessage(gameAccess(game.id))}
+                      onClick={() => {
+                        if (gameAccess(game.id).allowed) {
+                          launchGame(game.id, "solo");
+                        }
+                      }}
+                    />
+                  )}
+                </For>
+              </div>
               <div class="grid gap-6">
                 <For each={japaneseLessonGroups}>
                   {(group) => (
@@ -2158,6 +2217,9 @@ export function LessonsPage(): JSXElement {
                             "gem-dig",
                             "four-row",
                             "word-bomb",
+                            "karuta",
+                            "goldfish",
+                            "shiritori",
                             "type-toss",
                             "type-racer",
                             "ghost-hunter",
@@ -2177,6 +2239,9 @@ export function LessonsPage(): JSXElement {
                             "gem-dig",
                             "four-row",
                             "word-bomb",
+                            "karuta",
+                            "goldfish",
+                            "shiritori",
                           ].includes(game.id) &&
                           !isCurrentUserAdmin() &&
                           isLessonLocked(requiredLesson);
@@ -2359,6 +2424,43 @@ export function LessonsPage(): JSXElement {
             claimRecommendedGame("four-row", score, 1);
           }}
         />
+        <KarutaModal
+          open={karutaOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setKarutaOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("karuta", score);
+            claimRecommendedGame("karuta", score, 1);
+          }}
+        />
+        <GoldfishModal
+          open={goldfishOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setGoldfishOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("goldfish", score);
+            claimRecommendedGame("goldfish", score, 1);
+          }}
+        />
+        <ShiritoriModal
+          open={shiritoriOpen()}
+          initialMode={gameLaunchMode()}
+          onClose={() => {
+            setShiritoriOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score) => {
+            void recordGameScore("shiritori", score);
+            claimRecommendedGame("shiritori", score, 1);
+          }}
+        />
+        <KanaPracticeModal />
         <WordBombModal
           open={bombOpen()}
           initialMode={gameLaunchMode()}

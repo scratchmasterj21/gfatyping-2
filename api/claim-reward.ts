@@ -40,6 +40,9 @@ const RECOMMENDED_GAME_IDS = new Set([
   "gem-dig",
   "four-row",
   "word-bomb",
+  "karuta",
+  "goldfish",
+  "shiritori",
 ]);
 
 /** Mirrors frontend COLLECTION_CATEGORIES / COLLECTION_REWARD in avatar-items.ts. */

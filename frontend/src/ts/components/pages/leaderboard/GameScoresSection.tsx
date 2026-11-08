@@ -26,6 +26,10 @@ export const GAME_LABELS: Record<string, string> = {
   "gem-dig": "Gem Dig",
   "four-row": "Four in a Row",
   "word-bomb": "Word Bomb",
+  "maipaso-romaji": "Romaji 60s (Maipaso)",
+  karuta: "Karuta Battle",
+  goldfish: "Goldfish Scooping",
+  shiritori: "Shiritori Bomb",
 };
 
 const GAME_ORDER = [
@@ -43,6 +47,10 @@ const GAME_ORDER = [
   "gem-dig",
   "four-row",
   "word-bomb",
+  "maipaso-romaji",
+  "karuta",
+  "goldfish",
+  "shiritori",
 ];
 
 function ScoreBoard(props: {

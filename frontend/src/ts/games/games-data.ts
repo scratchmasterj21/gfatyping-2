@@ -26,7 +26,10 @@ export type BuiltinGame = {
     | "word-pong"
     | "gem-dig"
     | "four-row"
-    | "word-bomb";
+    | "word-bomb"
+    | "karuta"
+    | "goldfish"
+    | "shiritori";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -71,6 +74,30 @@ export const games: Game[] = [
     description:
       "Type the word to pass the bomb before it goes BOOM - up to 6 players!",
     icon: "fa-bomb",
+  },
+  {
+    type: "builtin",
+    id: "karuta",
+    name: "Karuta Battle",
+    description:
+      "Romaji: see the picture, type the hiragana card first to take it!",
+    icon: "fa-clone",
+  },
+  {
+    type: "builtin",
+    id: "goldfish",
+    name: "Goldfish Scooping",
+    description:
+      "Romaji: type the hiragana on the goldfish to scoop them - 60 seconds!",
+    icon: "fa-fish",
+  },
+  {
+    type: "builtin",
+    id: "shiritori",
+    name: "Shiritori Bomb",
+    description:
+      "Romaji: keep the word chain going and pass the bomb before it blows!",
+    icon: "fa-link",
   },
   {
     type: "builtin",

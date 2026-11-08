@@ -238,6 +238,10 @@ export function Sidebar(props: {
             { id: "gem-dig", text: "gem dig", icon: "fa-gem" },
             { id: "four-row", text: "four in a row", icon: "fa-th" },
             { id: "word-bomb", text: "word bomb", icon: "fa-bomb" },
+            { id: "maipaso-romaji", text: "romaji 60s", icon: "fa-language" },
+            { id: "karuta", text: "karuta", icon: "fa-clone" },
+            { id: "goldfish", text: "goldfish", icon: "fa-fish" },
+            { id: "shiritori", text: "shiritori", icon: "fa-link" },
           ]}
         />
       </Show>
