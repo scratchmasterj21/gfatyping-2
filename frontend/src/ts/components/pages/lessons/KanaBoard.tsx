@@ -83,6 +83,11 @@ export function KanaBoard(props: {
                   );
                 }}
               </For>
+              <Show when={isCurrentWord() && props.run.awaitingSpace}>
+                <span class="ml-1 animate-pulse self-center rounded-md bg-game-yellow px-2 py-0.5 font-mono text-sm font-bold text-game-ink motion-reduce:animate-none">
+                  space ␣
+                </span>
+              </Show>
             </div>
           );
         }}

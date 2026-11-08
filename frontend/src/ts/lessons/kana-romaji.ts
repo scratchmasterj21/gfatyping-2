@@ -4,8 +4,9 @@
  * fu/hu, ji/zi, ja/jya/zya, nn/n'/n before a consonant, doubled consonants
  * for small っ (kitte, matcha/macha), and kya or ki+xya for combos.
  *
- * A wrong key marks the current kana as a mistake and moves on to the next
- * kana (the teacher's choice). Pure - the screen just renders the state.
+ * Like the contest: a wrong key counts as a mistake but doesn't move on -
+ * the student must type the right key - and after a word is finished they
+ * press space to go to the next word. Pure - the screen renders the state.
  */
 
 const BASE: Record<string, string[]> = {
@@ -256,29 +257,31 @@ export type UnitState = "todo" | "correct" | "wrong";
 
 export type KanaRunState = {
   words: KanaUnit[][];
-  /** per word, per unit */
+  /** per word, per unit ("wrong" = typed, but with a mistake on the way) */
   states: UnitState[][];
   wordIndex: number;
   unitIndex: number;
   /** romaji typed so far for the current unit */
   buffer: string;
-  /** kana typed correctly / missed (combos count as 2, っか as 2) */
+  /** kana typed (combos count as 2, っか as 2) */
   correctKana: number;
+  /** wrong keys pressed (不正解数) */
   wrongKana: number;
   /** correct romaji keystrokes (for words per minute) */
   correctKeys: number;
   finished: boolean;
+  /** the word is typed - waiting for space to go to the next one */
+  awaitingSpace: boolean;
+  /** space is needed between words (lessons, Maipaso practice) */
+  requireSpace: boolean;
   /** last unit was ん typed as a single "n": one extra n or ' is ignored */
   softN: boolean;
-  /**
-   * The kana just skipped by a wrong key, and what was typed of it. The
-   * student usually finishes typing it anyway - those keys are ignored, so
-   * one typo counts as one mistake instead of a chain of them.
-   */
-  skipped?: { spellings: string[]; buffer: string };
 };
 
-export function newKanaRun(words: string[]): KanaRunState {
+export function newKanaRun(
+  words: string[],
+  options: { requireSpace?: boolean } = {},
+): KanaRunState {
   const units = words.map(kanaUnits).filter((w) => w.length > 0);
   return {
     words: units,
@@ -290,43 +293,79 @@ export function newKanaRun(words: string[]): KanaRunState {
     wrongKana: 0,
     correctKeys: 0,
     finished: units.length === 0,
+    awaitingSpace: false,
+    requireSpace: options.requireSpace === true,
     softN: false,
   };
 }
 
 export function currentUnit(s: KanaRunState): KanaUnit | undefined {
+  if (s.awaitingSpace) return undefined;
   return s.words[s.wordIndex]?.[s.unitIndex];
 }
 
-function advance(s: KanaRunState, result: UnitState): KanaRunState {
-  const states = s.states.map((w, i) =>
-    i === s.wordIndex ? w.map((st, j) => (j === s.unitIndex ? result : st)) : w,
-  );
-  const unit = currentUnit(s);
-  const size = unit?.kana.length ?? 1;
-  let wordIndex = s.wordIndex;
-  let unitIndex = s.unitIndex + 1;
-  if (unitIndex >= (s.words[wordIndex]?.length ?? 0)) {
-    wordIndex += 1;
-    unitIndex = 0;
-  }
+function mistake(s: KanaRunState): KanaRunState {
+  const states = s.awaitingSpace
+    ? s.states
+    : s.states.map((w, i) =>
+        i === s.wordIndex
+          ? w.map((st, j) => (j === s.unitIndex ? "wrong" : st))
+          : w,
+      );
+  return { ...s, states, wrongKana: s.wrongKana + 1, softN: false };
+}
+
+function nextWord(s: KanaRunState): KanaRunState {
+  const wordIndex = s.wordIndex + 1;
   return {
     ...s,
-    states,
     wordIndex,
-    unitIndex,
+    unitIndex: 0,
     buffer: "",
-    correctKana: s.correctKana + (result === "correct" ? size : 0),
-    wrongKana: s.wrongKana + (result === "wrong" ? size : 0),
+    awaitingSpace: false,
     finished: wordIndex >= s.words.length,
   };
+}
+
+/** The current unit is typed: mark it and move on. */
+function completeUnit(s: KanaRunState, softN: boolean): KanaRunState {
+  const unit = currentUnit(s);
+  const size = unit?.kana.length ?? 1;
+  const states = s.states.map((w, i) =>
+    i === s.wordIndex
+      ? w.map((st, j) => (j === s.unitIndex && st !== "wrong" ? "correct" : st))
+      : w,
+  );
+  const done: KanaRunState = {
+    ...s,
+    states,
+    buffer: "",
+    correctKana: s.correctKana + size,
+    unitIndex: s.unitIndex + 1,
+    softN,
+  };
+  const wordLength = s.words[s.wordIndex]?.length ?? 0;
+  if (done.unitIndex < wordLength) return done;
+  const isLastWord = s.wordIndex >= s.words.length - 1;
+  if (s.requireSpace && !isLastWord) return { ...done, awaitingSpace: true };
+  return nextWord(done);
 }
 
 /** One key from the keyboard. */
 export function typeKey(s: KanaRunState, rawKey: string): KanaRunState {
   if (s.finished) return s;
   const key = rawKey.toLowerCase();
-  if (key.length !== 1 || key === " ") return s;
+  if (key.length !== 1) return s;
+
+  if (s.awaitingSpace) {
+    if (key === " ") return nextWord({ ...s, softN: false });
+    if (s.softN && (key === "n" || key === "'")) return { ...s, softN: false };
+    return mistake(s);
+  }
+  if (key === " ") {
+    // no space in the middle of a word (single-word games ignore it)
+    return s.requireSpace ? mistake(s) : s;
+  }
   const unit = currentUnit(s);
   if (unit === undefined) return s;
 
@@ -336,36 +375,17 @@ export function typeKey(s: KanaRunState, rawKey: string): KanaRunState {
   }
 
   const next = s.buffer + key;
-  if (!unit.spellings.some((sp) => sp.startsWith(next))) {
-    // still finishing the kana that was skipped? ignore those keys
-    const sk = s.skipped;
-    if (sk !== undefined && s.buffer === "") {
-      const rest = sk.buffer + key;
-      if (sk.spellings.some((sp) => sp.startsWith(rest))) {
-        const done = sk.spellings.includes(rest);
-        const { skipped: _drop, ...without } = s;
-        void _drop;
-        return done ? without : { ...s, skipped: { ...sk, buffer: rest } };
-      }
-    }
-    const { skipped: _old, ...base } = s;
-    void _old;
-    return {
-      ...advance(base, "wrong"),
-      softN: false,
-      skipped: { spellings: unit.spellings, buffer: s.buffer },
-    };
-  }
-  const { skipped: _clear, ...clean } = s;
-  void _clear;
-  const typed = { ...clean, buffer: next, correctKeys: s.correctKeys + 1 };
+  if (!unit.spellings.some((sp) => sp.startsWith(next))) return mistake(s);
+  const typed = {
+    ...s,
+    buffer: next,
+    correctKeys: s.correctKeys + 1,
+    softN: false,
+  };
   if (unit.spellings.includes(next)) {
-    return {
-      ...advance(typed, "correct"),
-      softN: unit.kana === "ん" && next === "n",
-    };
+    return completeUnit(typed, unit.kana === "ん" && next === "n");
   }
-  return { ...typed, softN: false };
+  return typed;
 }
 
 /** Words per minute on romaji keystrokes (5 keys = 1 word), like the lessons. */

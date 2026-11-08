@@ -59,7 +59,13 @@ export function GameResultOverlay(props: {
         <Show when={props.note}>
           <div class="text-sm font-semibold text-sub">{props.note}</div>
         </Show>
-        <div class="flex flex-wrap justify-center gap-3">
+        {/* pointerdown is cancelled so tapping a button doesn't pull focus
+            off the game's typing box: on iPad the box grabs focus back, the
+            keyboard moves the page, and the tap was lost (needed 2 taps) */}
+        <div
+          class="flex flex-wrap justify-center gap-3"
+          onPointerDown={(e) => e.preventDefault()}
+        >
           <Show when={props.onPlayAgain}>
             {(play) => (
               <Button

@@ -89,7 +89,7 @@ export function KanaPracticeModal(): JSXElement {
     try {
       const words =
         p.mode === "contest" ? await contestWords() : await p.lesson.generate();
-      setRun(newKanaRun(words));
+      setRun(newKanaRun(words, { requireSpace: true }));
     } catch (error) {
       showErrorNotification("Could not load the words", { error });
       closeKanaPractice();
@@ -282,7 +282,9 @@ export function KanaPracticeModal(): JSXElement {
               placeholder={
                 startedAt() === null
                   ? "type the romaji to start"
-                  : "type the romaji"
+                  : run()?.awaitingSpace === true
+                    ? "press space ␣"
+                    : "type the romaji"
               }
             />
           </div>
