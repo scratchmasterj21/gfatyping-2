@@ -1,111 +1,237 @@
-import { LessonGroup, realWords } from "./lessons-data";
+import { getLanguage } from "../utils/json-data";
+import { LessonGroup } from "./lessons-data";
+
+/**
+ * Japanese lessons: hiragana on screen, romaji from the keyboard (like the
+ * Maipaso romaji contest). They run on the hiragana screen
+ * (KanaPracticeModal), not the typing test - see isKanaLesson().
+ */
 
 function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-/**
- * Build `count` romaji tokens, each made of `min`..`max` random syllables from
- * the given set (e.g. ["ka","ki"] -> "kaki", "ki", "kika"). Practices typing
- * romaji syllables in flowing combinations rather than in isolation.
- */
-function syllableDrill(
-  syllables: string[],
-  { count, min, max }: { count: number; min: number; max: number },
-): string[] {
-  const tokens: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const len = randInt(min, max);
-    let token = "";
-    for (let j = 0; j < len; j++) {
-      token += syllables[randInt(0, syllables.length - 1)] as string;
-    }
-    tokens.push(token);
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j] as T, out[i] as T];
   }
-  return tokens;
+  return out;
 }
 
-const VOWELS = ["a", "i", "u", "e", "o"];
-const K_ROW = ["ka", "ki", "ku", "ke", "ko"];
-const S_ROW = ["sa", "shi", "su", "se", "so"];
-const T_ROW = ["ta", "chi", "tsu", "te", "to"];
-const N_ROW = ["na", "ni", "nu", "ne", "no"];
-const H_ROW = ["ha", "hi", "fu", "he", "ho"];
-const M_ROW = ["ma", "mi", "mu", "me", "mo"];
-const Y_ROW = ["ya", "yu", "yo"];
-const R_ROW = ["ra", "ri", "ru", "re", "ro"];
-const W_N = ["wa", "wo", "n"];
+/**
+ * `count` practice "words", each `min`..`max` random kana from the set
+ * (e.g. ["か","き"] -> "かき", "き", "きか").
+ */
+function kanaDrill(
+  kana: string[],
+  { count, min, max }: { count: number; min: number; max: number },
+): string[] {
+  const words: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const len = randInt(min, max);
+    let word = "";
+    for (let j = 0; j < len; j++) {
+      word += kana[randInt(0, kana.length - 1)] as string;
+    }
+    words.push(word);
+  }
+  return words;
+}
+
+const VOWELS = ["あ", "い", "う", "え", "お"];
+const K_ROW = ["か", "き", "く", "け", "こ"];
+const S_ROW = ["さ", "し", "す", "せ", "そ"];
+const T_ROW = ["た", "ち", "つ", "て", "と"];
+const N_ROW = ["な", "に", "ぬ", "ね", "の"];
+const H_ROW = ["は", "ひ", "ふ", "へ", "ほ"];
+const M_ROW = ["ま", "み", "む", "め", "も"];
+const Y_ROW = ["や", "ゆ", "よ"];
+const R_ROW = ["ら", "り", "る", "れ", "ろ"];
+const W_N = ["わ", "を", "ん"];
 const VOICED = [
-  "ga",
-  "gi",
-  "gu",
-  "ge",
-  "go",
-  "za",
-  "ji",
-  "zu",
-  "ze",
-  "zo",
-  "da",
-  "de",
-  "do",
-  "ba",
-  "bi",
-  "bu",
-  "be",
-  "bo",
-  "pa",
-  "pi",
-  "pu",
-  "pe",
-  "po",
+  "が",
+  "ぎ",
+  "ぐ",
+  "げ",
+  "ご",
+  "ざ",
+  "じ",
+  "ず",
+  "ぜ",
+  "ぞ",
+  "だ",
+  "で",
+  "ど",
+  "ば",
+  "び",
+  "ぶ",
+  "べ",
+  "ぼ",
+  "ぱ",
+  "ぴ",
+  "ぷ",
+  "ぺ",
+  "ぽ",
 ];
-const YOON = [
-  "kya",
-  "kyu",
-  "kyo",
-  "sha",
-  "shu",
-  "sho",
-  "cha",
-  "chu",
-  "cho",
-  "nya",
-  "nyu",
-  "nyo",
-  "rya",
-  "ryu",
-  "ryo",
+const COMBOS = [
+  "きゃ",
+  "きゅ",
+  "きょ",
+  "しゃ",
+  "しゅ",
+  "しょ",
+  "ちゃ",
+  "ちゅ",
+  "ちょ",
+  "にゃ",
+  "にゅ",
+  "にょ",
+  "りゃ",
+  "りゅ",
+  "りょ",
+  "じゃ",
+  "じゅ",
+  "じょ",
 ];
+const SMALL_TSU = [
+  "がっこう",
+  "きって",
+  "ざっし",
+  "まっすぐ",
+  "いっぱい",
+  "きっぷ",
+  "せっけん",
+  "はっぱ",
+  "ねっこ",
+  "らっぱ",
+  "こっぷ",
+  "まっちゃ",
+  "しっぽ",
+  "みっつ",
+  "よっつ",
+  "やっつ",
+  "ろっく",
+  "さっか",
+  "けっか",
+  "がっき",
+];
+
+/** Words that aren't right for children, and grammar bits that aren't words. */
+const SKIP_WORDS = new Set([
+  "しぬ",
+  "なぐる",
+  "げり",
+  "しり",
+  "ける",
+  "きも",
+  "おれ",
+  "そうだ",
+  "だろう",
+  "および",
+  "かも",
+  "それとも",
+  "だの",
+  "つつ",
+  "ながら",
+  "ならびに",
+  "なり",
+  "ので",
+  "または",
+  "かしら",
+  "こそ",
+  "さえ",
+  "すら",
+  "くらい",
+  "ぐらい",
+  "だけ",
+  "だって",
+  "どころ",
+  "など",
+  "なら",
+  "なんか",
+  "なんて",
+  "ばかり",
+  "ばっかり",
+  "ます",
+  "たい",
+  "せる",
+  "れる",
+  "ない",
+  "から",
+  "より",
+  "しか",
+  "でも",
+  "まで",
+  "それに",
+  "なぜなら",
+  "しかし",
+  "そして",
+]);
+
+/** The hiragana word list, child-friendly, 2+ kana. */
+export async function hiraganaWords(
+  filter: (word: string) => boolean = () => true,
+): Promise<string[]> {
+  const data = await getLanguage("japanese_hiragana");
+  const words = data.words.filter(
+    (w) =>
+      w.length >= 2 &&
+      !w.startsWith("っ") &&
+      !SKIP_WORDS.has(w) &&
+      /^[ぁ-ゟ]+$/.test(w) &&
+      filter(w),
+  );
+  return shuffle([...new Set(words)]);
+}
+
+async function wordLesson(
+  count: number,
+  filter?: (word: string) => boolean,
+): Promise<string[]> {
+  const words = await hiraganaWords(filter);
+  const out = words.slice(0, count);
+  while (out.length > 0 && out.length < count) {
+    out.push(...out.slice(0, count - out.length));
+  }
+  return out;
+}
+
+/** Words for the 60-second Maipaso-style practice (plenty, so they never run out). */
+export async function contestWords(): Promise<string[]> {
+  const words = await hiraganaWords((w) => w.length <= 7);
+  return [...words, ...shuffle(words)].slice(0, 300);
+}
 
 export const japaneseLessonGroups: LessonGroup[] = [
   {
     id: "jp-hiragana-1",
-    name: "Hiragana sounds 1",
+    name: "Hiragana 1",
     icon: "fa-language",
-    description: "Vowels and the k / s rows in romaji",
+    description: "Vowels and the か / さ rows",
     lessons: [
       {
         id: "jp-vowels",
-        name: "Vowels (a i u e o)",
-        generate: () => syllableDrill(VOWELS, { count: 30, min: 2, max: 4 }),
+        name: "Vowels (あいうえお)",
+        generate: () => kanaDrill(VOWELS, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-k-row",
-        name: "K row (ka ki ku ke ko)",
-        generate: () => syllableDrill(K_ROW, { count: 28, min: 2, max: 3 }),
+        name: "か row (かきくけこ)",
+        generate: () => kanaDrill(K_ROW, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-s-row",
-        name: "S row (sa shi su se so)",
-        generate: () => syllableDrill(S_ROW, { count: 28, min: 2, max: 3 }),
+        name: "さ row (さしすせそ)",
+        generate: () => kanaDrill(S_ROW, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-aks",
-        name: "Mix: vowels + k + s",
+        name: "Mix: あ + か + さ",
         generate: () =>
-          syllableDrill([...VOWELS, ...K_ROW, ...S_ROW], {
-            count: 32,
+          kanaDrill([...VOWELS, ...K_ROW, ...S_ROW], {
+            count: 22,
             min: 2,
             max: 3,
           }),
@@ -114,36 +240,36 @@ export const japaneseLessonGroups: LessonGroup[] = [
   },
   {
     id: "jp-hiragana-2",
-    name: "Hiragana sounds 2",
+    name: "Hiragana 2",
     icon: "fa-language",
-    description: "The t / n / h / m rows in romaji",
+    description: "The た / な / は / ま rows",
     lessons: [
       {
         id: "jp-t-row",
-        name: "T row (ta chi tsu te to)",
-        generate: () => syllableDrill(T_ROW, { count: 28, min: 2, max: 3 }),
+        name: "た row (たちつてと)",
+        generate: () => kanaDrill(T_ROW, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-n-row",
-        name: "N row (na ni nu ne no)",
-        generate: () => syllableDrill(N_ROW, { count: 28, min: 2, max: 3 }),
+        name: "な row (なにぬねの)",
+        generate: () => kanaDrill(N_ROW, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-h-row",
-        name: "H row (ha hi fu he ho)",
-        generate: () => syllableDrill(H_ROW, { count: 28, min: 2, max: 3 }),
+        name: "は row (はひふへほ)",
+        generate: () => kanaDrill(H_ROW, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-m-row",
-        name: "M row (ma mi mu me mo)",
-        generate: () => syllableDrill(M_ROW, { count: 28, min: 2, max: 3 }),
+        name: "ま row (まみむめも)",
+        generate: () => kanaDrill(M_ROW, { count: 20, min: 2, max: 3 }),
       },
       {
         id: "jp-tnhm",
-        name: "Mix: t + n + h + m",
+        name: "Mix: た + な + は + ま",
         generate: () =>
-          syllableDrill([...T_ROW, ...N_ROW, ...H_ROW, ...M_ROW], {
-            count: 34,
+          kanaDrill([...T_ROW, ...N_ROW, ...H_ROW, ...M_ROW], {
+            count: 24,
             min: 2,
             max: 3,
           }),
@@ -152,35 +278,40 @@ export const japaneseLessonGroups: LessonGroup[] = [
   },
   {
     id: "jp-hiragana-3",
-    name: "Hiragana sounds 3",
+    name: "Hiragana 3",
     icon: "fa-language",
-    description: "y / r / w-n rows, voiced sounds, and combos",
+    description: "や / ら / わ rows, ん, dakuten, combos and small っ",
     lessons: [
       {
         id: "jp-yrw",
-        name: "Y / R / W-N rows",
+        name: "や / ら / わ rows and ん",
         generate: () =>
-          syllableDrill([...Y_ROW, ...R_ROW, ...W_N], {
-            count: 30,
+          kanaDrill([...Y_ROW, ...R_ROW, ...W_N], {
+            count: 22,
             min: 2,
             max: 3,
           }),
       },
       {
         id: "jp-voiced",
-        name: "Voiced (ga za da ba pa)",
-        generate: () => syllableDrill(VOICED, { count: 32, min: 2, max: 3 }),
+        name: "Dakuten (が ざ だ ば ぱ)",
+        generate: () => kanaDrill(VOICED, { count: 22, min: 2, max: 3 }),
       },
       {
         id: "jp-yoon",
-        name: "Combos (kya shu cho)",
-        generate: () => syllableDrill(YOON, { count: 28, min: 1, max: 2 }),
+        name: "Combos (きゃ しゅ ちょ)",
+        generate: () => kanaDrill(COMBOS, { count: 20, min: 1, max: 2 }),
+      },
+      {
+        id: "jp-small-tsu",
+        name: "Small っ (がっこう)",
+        generate: () => shuffle(SMALL_TSU),
       },
       {
         id: "jp-all-sounds",
         name: "All sounds mix",
         generate: () =>
-          syllableDrill(
+          kanaDrill(
             [
               ...VOWELS,
               ...K_ROW,
@@ -192,8 +323,9 @@ export const japaneseLessonGroups: LessonGroup[] = [
               ...Y_ROW,
               ...R_ROW,
               ...W_N,
+              ...VOICED,
             ],
-            { count: 36, min: 2, max: 3 },
+            { count: 26, min: 2, max: 3 },
           ),
       },
     ],
@@ -202,17 +334,22 @@ export const japaneseLessonGroups: LessonGroup[] = [
     id: "jp-words",
     name: "Japanese words",
     icon: "fa-book",
-    description: "Real Japanese words written in romaji",
+    description: "Real words in hiragana - like the Maipaso contest",
     lessons: [
       {
         id: "jp-words-1",
-        name: "Common words",
-        generate: async () => realWords("japanese_romaji", 40),
+        name: "Short words",
+        generate: async () => wordLesson(25, (w) => w.length <= 3),
       },
       {
         id: "jp-words-2",
-        name: "Expanded 1k",
-        generate: async () => realWords("japanese_romaji_1k", 45),
+        name: "Longer words",
+        generate: async () => wordLesson(25, (w) => w.length >= 4),
+      },
+      {
+        id: "jp-words-3",
+        name: "Mixed words",
+        generate: async () => wordLesson(30),
       },
     ],
   },

@@ -8,6 +8,7 @@ import {
   setCustomTextIndicator,
 } from "../states/core";
 import { showErrorNotification } from "../states/notifications";
+import { isKanaLesson, openKanaPractice } from "../states/kana-practice";
 import * as CustomText from "../test/custom-text";
 import { Lesson } from "./lessons-data";
 import {
@@ -100,6 +101,10 @@ export async function startLesson(
   lesson: Lesson,
   rewardCategory?: PracticeRewardCategory,
 ): Promise<void> {
+  if (isKanaLesson(lesson)) {
+    openKanaPractice({ mode: "lesson", lesson });
+    return;
+  }
   let tokens: string[];
   try {
     tokens = await lesson.generate();

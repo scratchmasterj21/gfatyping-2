@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 
 import { Config } from "../config/store";
+import { isKanaLesson, openKanaPractice } from "../states/kana-practice";
 import { showModal } from "../states/modals";
 import { startLesson } from "./lesson-launcher";
 import { PracticeRewardCategory } from "./lesson-progress";
@@ -24,6 +25,11 @@ export function launchLessonWithIntro(
   lesson: Lesson,
   rewardCategory?: PracticeRewardCategory,
 ): void {
+  // Japanese lessons: hiragana on screen, typed in romaji
+  if (isKanaLesson(lesson)) {
+    openKanaPractice({ mode: "lesson", lesson });
+    return;
+  }
   const hasNewKeys = lesson.newKeys !== undefined && lesson.newKeys !== "";
   if (Config.lessonIntros && hasNewKeys) {
     setIntroLesson(lesson);

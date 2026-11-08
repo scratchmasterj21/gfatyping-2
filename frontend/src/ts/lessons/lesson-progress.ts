@@ -794,3 +794,39 @@ configEvent.subscribe((data) => {
     setActiveLessonId(null);
   }
 });
+
+/**
+ * Save a finished hiragana (romaji) lesson. Those run on their own screen,
+ * not the typing test, so there's no test event - the screen passes its own
+ * speed (romaji keys) and accuracy (kana). Same server path as other lessons.
+ */
+export async function recordKanaLessonResult(
+  lessonId: string,
+  stats: { wpm: number; acc: number; seconds: number },
+): Promise<LessonCompletionResult | undefined> {
+  if (!isAuthenticated()) return undefined;
+  try {
+    const result = await callApi<LessonCompletionResult>(
+      "/api/complete-lesson",
+      {
+        lessonId,
+        wpm: Math.min(200, Math.max(0, stats.wpm)),
+        acc: Math.min(100, Math.max(0, stats.acc)),
+        testDuration: Math.min(600, Math.max(0, stats.seconds)),
+        incompleteTestSeconds: 0,
+        afkDuration: 0,
+      },
+    );
+    if (!result.ok) return result;
+    if (result.countsForGames === true) noteLessonPassed(lessonId);
+    if ((result.coinsAwarded ?? 0) > 0) invalidateCoinQueries();
+    void queryClient.invalidateQueries({ queryKey: ["lessonProgress"] });
+    void queryClient.invalidateQueries({ queryKey: ["userLessonStats"] });
+    void queryClient.invalidateQueries({ queryKey: ["weeklyQuests"] });
+    celebrateCompletedQuests(result.newlyCompletedQuests ?? []);
+    return result;
+  } catch (e) {
+    console.error("Failed to save kana lesson:", e);
+    return undefined;
+  }
+}
