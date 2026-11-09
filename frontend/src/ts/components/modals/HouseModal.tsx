@@ -1354,7 +1354,9 @@ export function HouseModal(): JSXElement {
                   : undefined
               }
             >
-              {(data) => <TrophyShelf trophies={data().trophies} />}
+              {(data) => (
+                <TrophyShelf trophies={data().trophies} ownerUid={viewUid()} />
+              )}
             </Show>
 
             <For each={sortedFurniture()}>

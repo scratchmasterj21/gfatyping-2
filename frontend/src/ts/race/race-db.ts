@@ -766,6 +766,16 @@ export async function listChampions(
     .sort((a, b) => b.crownedAt - a.crownedAt);
 }
 
+/** Every championship a student has won (any class, any year), newest first. */
+export async function listChampionWinsFor(
+  uid: string,
+): Promise<ChampionRecord[]> {
+  const snap = await getDocs(query(championsCol(), where("uid", "==", uid)));
+  return snap.docs
+    .map((d) => d.data() as ChampionRecord)
+    .sort((a, b) => b.crownedAt - a.crownedAt);
+}
+
 /** Delete the live race and all participant docs (post-race cleanup). */
 export async function deleteRace(pin: string): Promise<void> {
   await clearParticipants(pin);

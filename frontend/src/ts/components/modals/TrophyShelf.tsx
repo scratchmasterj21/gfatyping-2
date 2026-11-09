@@ -1,8 +1,11 @@
+import { useQuery } from "@tanstack/solid-query";
 import { createSignal, For, JSXElement, Show } from "solid-js";
 
 import { HouseTrophies } from "../../house/house-state";
 import { ACHIEVEMENTS } from "../../lessons/achievements";
+import { listChampionWinsFor } from "../../race/race-db";
 import { cn } from "../../utils/cn";
+import { schoolYearLabel, schoolYearOf } from "../../utils/school-year";
 import { Fa } from "../common/Fa";
 
 /** Most achievement badges drawn on the shelf itself; the rest are in the list. */
@@ -12,8 +15,23 @@ const SHELF_BADGES = 5;
  * Earned-only trophies on the room wall: lesson achievements, total stars
  * and race results. Not buyable, not movable - tap to see the full list.
  */
-export function TrophyShelf(props: { trophies: HouseTrophies }): JSXElement {
+export function TrophyShelf(props: {
+  trophies: HouseTrophies;
+  /** whose house - to list their championship wins */
+  ownerUid?: string | null;
+}): JSXElement {
   const [open, setOpen] = createSignal(false);
+  // the student's own championship history - it follows them to new classes
+  const winsQuery = useQuery(() => ({
+    queryKey: ["championWins", props.ownerUid],
+    queryFn: async () => listChampionWinsFor(props.ownerUid ?? ""),
+    enabled:
+      open() &&
+      props.trophies.championWins > 0 &&
+      props.ownerUid !== undefined &&
+      props.ownerUid !== null,
+    staleTime: 5 * 60 * 1000,
+  }));
   const earned = () =>
     ACHIEVEMENTS.filter((a) => props.trophies.achievements.includes(a.id));
   const shelfBadges = () => earned().slice(-SHELF_BADGES).reverse();
@@ -128,6 +146,22 @@ export function TrophyShelf(props: { trophies: HouseTrophies }): JSXElement {
               </span>
             </Show>
           </div>
+          <Show when={(winsQuery.data ?? []).length > 0}>
+            <div class="grid gap-1">
+              <For each={winsQuery.data}>
+                {(w) => (
+                  <div class="flex items-center gap-2 rounded-lg bg-game-gold/40 px-2 py-1 text-sm">
+                    <span>👑</span>
+                    <span class="font-bold">Class Champion</span>
+                    <span class="text-game-ink/70">
+                      {w.classId} · {schoolYearLabel(schoolYearOf(w.crownedAt))}{" "}
+                      · {new Date(w.crownedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
           <div class="text-xs font-semibold text-game-ink/70">
             {earned().length} of {ACHIEVEMENTS.length} trophies earned
           </div>

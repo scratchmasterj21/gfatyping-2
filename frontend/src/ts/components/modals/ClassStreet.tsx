@@ -8,6 +8,7 @@ import { listChampions } from "../../race/race-db";
 import { getUserId } from "../../states/core";
 import { getSnapshot } from "../../states/snapshot";
 import { cn } from "../../utils/cn";
+import { currentSchoolYear, schoolYearOf } from "../../utils/school-year";
 import { Avatar } from "../common/Avatar";
 
 const STREET_STALE_MS = 5 * 60 * 1000;
@@ -33,14 +34,18 @@ export function ClassStreet(props: {
     enabled: props.open && classId() !== undefined,
     staleTime: STREET_STALE_MS,
   }));
-  // the newest Class Champion gets a crown on their house
+  // this school year's newest Class Champion gets a crown on their house
   const championsQuery = useQuery(() => ({
     queryKey: ["champions", classId()],
     queryFn: async () => listChampions(classId() ?? ""),
     enabled: props.open && classId() !== undefined,
     staleTime: STREET_STALE_MS,
   }));
-  const championUid = (): string | undefined => championsQuery.data?.[0]?.uid;
+  // only this school year's champion - last year's moved up a grade
+  const championUid = (): string | undefined =>
+    championsQuery.data?.find(
+      (c) => schoolYearOf(c.crownedAt) === currentSchoolYear(),
+    )?.uid;
 
   // the free "plain" wall follows the site theme (often dark) - use a
   // friendly cream outside instead
