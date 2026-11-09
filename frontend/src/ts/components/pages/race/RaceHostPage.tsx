@@ -62,6 +62,7 @@ import {
   writeBlitzScores,
   writeBlitzState,
   writeTugTotals,
+  ChampionRecord,
   crownChampion,
   listChampions,
   setChampionship,
@@ -92,6 +93,7 @@ import { Button } from "../../common/Button";
 import { Fa } from "../../common/Fa";
 import { Mascot } from "../../common/Mascot";
 import { Page } from "../../common/Page";
+import { CertificateButtons } from "./CertificateButtons";
 import {
   contentProblem,
   contentSource,
@@ -1116,6 +1118,9 @@ export function RaceHostPage(): JSXElement {
     }
   };
 
+  // the record from this session's crowning, for the certificate buttons
+  const [crowned, setCrowned] = createSignal<ChampionRecord | null>(null);
+
   const crown = async (): Promise<void> => {
     const pin = hostedPin();
     const c = champ();
@@ -1124,7 +1129,12 @@ export function RaceHostPage(): JSXElement {
     }
     setBusy(true);
     try {
-      const record = await crownChampion(c.classId, champRows());
+      const record = await crownChampion(
+        c.classId,
+        champRows(),
+        c.rounds.length,
+      );
+      setCrowned(record);
       await setChampionship(pin, { ...c, crowned: true });
       void queryClient.invalidateQueries({ queryKey: ["champions"] });
       if (record !== null) {
@@ -1970,6 +1980,14 @@ export function RaceHostPage(): JSXElement {
                           rows={champRows()}
                           classId={c().classId}
                         />
+                        <Show when={crowned()}>
+                          {(record) => (
+                            <div class="flex flex-wrap items-center justify-center gap-2 font-kid">
+                              <span class="text-sub">Print certificates:</span>
+                              <CertificateButtons record={record()} />
+                            </div>
+                          )}
+                        </Show>
                         <ChampionshipBoard
                           rows={champRows()}
                           previous={{}}

@@ -9,6 +9,7 @@ import {
   schoolYearOf,
 } from "../../../utils/school-year";
 import { Fa } from "../../common/Fa";
+import { CertificateButtons } from "./CertificateButtons";
 
 function PersonAvatar(props: { url?: string; size?: string }): JSXElement {
   return (
@@ -107,6 +108,7 @@ export function HallOfChampions(props: {
                         {c.points} pts · {c.players} players ·{" "}
                         {new Date(c.crownedAt).toLocaleDateString()}
                       </span>
+                      <CertificateButtons record={c} />
                     </div>
                   );
                 }}

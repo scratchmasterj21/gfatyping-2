@@ -19,10 +19,16 @@ import {
   stillNeeds,
 } from "../../../classroom/certificate-levels";
 import { getAuthenticatedUser } from "../../../firebase";
+import {
+  getChampionRecord,
+  listPodiumFinishesFor,
+  podiumPlace,
+} from "../../../race/race-db";
 import { getActivePage } from "../../../states/core";
 import { Button } from "../../common/Button";
 import { Page } from "../../common/Page";
 import { CertificateCard, formatLongDate } from "./CertificateCard";
+import { ChampionCertificateCard } from "./ChampionCertificateCard";
 
 // margin:0 removes the browser-injected URL / date / page-number headers.
 // The certificate keeps its colours when printed (print-color-adjust).
@@ -98,6 +104,30 @@ export function CertificatePage(): JSXElement {
 
   const [pickedLevelId, setPickedLevelId] = createSignal<string | undefined>();
 
+  // ?champion=<id>&place=1|2|3 - a Class Championship certificate
+  const championId = createMemo(() => search().get("champion") ?? undefined);
+  const championPlace = createMemo((): 1 | 2 | 3 => {
+    const p = Number(search().get("place"));
+    return p === 2 || p === 3 ? p : 1;
+  });
+  const championQuery = useQuery(() => ({
+    queryKey: ["championRecord", championId()],
+    queryFn: async () => getChampionRecord(championId() ?? ""),
+    enabled: getActivePage() === "certificate" && championId() !== undefined,
+    staleTime: 5 * 60 * 1000,
+  }));
+  // this student's podium finishes, listed under their level certificates
+  const podiumQuery = useQuery(() => ({
+    queryKey: ["podiumFinishes", uid()],
+    queryFn: async () => listPodiumFinishesFor(uid()),
+    enabled:
+      getActivePage() === "certificate" &&
+      uid() !== "" &&
+      batch() === undefined &&
+      championId() === undefined,
+    staleTime: 5 * 60 * 1000,
+  }));
+
   const summary = useQuery(() => ({
     queryKey: ["certificate", uid()],
     queryFn: async () => getStudentSummary(uid()),
@@ -150,7 +180,37 @@ export function CertificatePage(): JSXElement {
           )}
         </Show>
 
-        <Show when={batch() === undefined}>
+        <Show when={championId() !== undefined}>
+          <Show
+            when={championQuery.data}
+            fallback={
+              <div class="text-center text-sub print:hidden">
+                {championQuery.isLoading
+                  ? "loading..."
+                  : "Could not find that championship."}
+              </div>
+            }
+          >
+            {(record) => (
+              <Show
+                when={record().podium[championPlace() - 1]}
+                fallback={
+                  <div class="text-center text-sub print:hidden">
+                    Nobody finished in that place.
+                  </div>
+                }
+              >
+                <ChampionCertificateCard
+                  id="gfaCertificate"
+                  record={record()}
+                  place={championPlace()}
+                />
+              </Show>
+            )}
+          </Show>
+        </Show>
+
+        <Show when={batch() === undefined && championId() === undefined}>
           <Show
             when={summary.data}
             fallback={
@@ -226,6 +286,34 @@ export function CertificatePage(): JSXElement {
                     data={data()}
                     level={shown()}
                   />
+                  <Show when={(podiumQuery.data ?? []).length > 0}>
+                    <div class="grid gap-2 print:hidden">
+                      <div class="text-center text-sm text-sub">
+                        Championship certificates
+                      </div>
+                      <div class="flex flex-wrap justify-center gap-2">
+                        <For each={podiumQuery.data}>
+                          {(r) => {
+                            const place = podiumPlace(r, uid());
+                            return (
+                              <a
+                                class="rounded-lg bg-sub-alt px-3 py-2 text-text hover:bg-main hover:text-bg"
+                                href={`/certificate?champion=${r.id}&place=${place}`}
+                              >
+                                {place === 1
+                                  ? "👑 Class Champion"
+                                  : place === 2
+                                    ? "🥈 Runner-up"
+                                    : "🥉 Third place"}{" "}
+                                · {r.classId} ·{" "}
+                                {new Date(r.crownedAt).toLocaleDateString()}
+                              </a>
+                            );
+                          }}
+                        </For>
+                      </div>
+                    </div>
+                  </Show>
                 </>
               );
             }}

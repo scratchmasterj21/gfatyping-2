@@ -697,7 +697,12 @@ export type ChampionRecord = {
   wins: number;
   players: number;
   crownedAt: number;
-  podium: { uid: string; name: string; points: number }[];
+  /** 1st, 2nd, 3rd (wins = rounds won; missing on older records) */
+  podium: { uid: string; name: string; points: number; wins?: number }[];
+  /** podium uids, so a student can find their own podium finishes */
+  podiumUids?: string[];
+  /** rounds in the championship (missing on older records) */
+  rounds?: number;
 };
 
 function championsCol(): CollectionReference {
@@ -712,6 +717,7 @@ function championsCol(): CollectionReference {
 export async function crownChampion(
   classId: string,
   ranked: ChampRow[],
+  rounds?: number,
 ): Promise<ChampionRecord | null> {
   const champion = ranked[0];
   if (champion === undefined || champion.points === 0) return null;
@@ -747,8 +753,19 @@ export async function crownChampion(
     players: ranked.filter((r) => r.points > 0).length,
     crownedAt,
     podium: ranked
+      .filter((r) => r.points > 0)
       .slice(0, 3)
-      .map((r) => ({ uid: r.uid, name: r.name, points: r.points })),
+      .map((r) => ({
+        uid: r.uid,
+        name: r.name,
+        points: r.points,
+        wins: r.wins,
+      })),
+    podiumUids: ranked
+      .filter((r) => r.points > 0)
+      .slice(0, 3)
+      .map((r) => r.uid),
+    ...(rounds !== undefined ? { rounds } : {}),
   };
   await setDoc(ref, record);
   return record;
@@ -764,6 +781,31 @@ export async function listChampions(
   return snap.docs
     .map((d) => d.data() as ChampionRecord)
     .sort((a, b) => b.crownedAt - a.crownedAt);
+}
+
+export async function getChampionRecord(
+  id: string,
+): Promise<ChampionRecord | null> {
+  const snap = await getDoc(doc(championsCol(), id));
+  return snap.exists() ? (snap.data() as ChampionRecord) : null;
+}
+
+/** Championships where a student finished 1st, 2nd or 3rd, newest first. */
+export async function listPodiumFinishesFor(
+  uid: string,
+): Promise<ChampionRecord[]> {
+  const snap = await getDocs(
+    query(championsCol(), where("podiumUids", "array-contains", uid)),
+  );
+  return snap.docs
+    .map((d) => d.data() as ChampionRecord)
+    .sort((a, b) => b.crownedAt - a.crownedAt);
+}
+
+/** 1, 2 or 3 for a student on a championship's podium (0 = not on it). */
+export function podiumPlace(record: ChampionRecord, uid: string): number {
+  const i = record.podium.findIndex((p) => p.uid === uid);
+  return i < 0 ? 0 : i + 1;
 }
 
 /** Every championship a student has won (any class, any year), newest first. */
