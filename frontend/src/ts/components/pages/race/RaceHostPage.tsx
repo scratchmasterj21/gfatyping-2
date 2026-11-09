@@ -862,6 +862,29 @@ export function RaceHostPage(): JSXElement {
   const isConnected = (p: RaceParticipant): boolean =>
     p.finished || (p.lastSeen ?? 0) > Date.now() - DISCONNECT_MS;
 
+  /**
+   * Run `then` once the students' final results are in. Races that end on
+   * the clock (timed, Tug of War) end for everyone at once, and each
+   * student's final speed arrives a moment later from their own screen -
+   * saving straight away recorded everyone at 0 wpm (no bests, no coins,
+   * wrong winner). Waits until every connected student has submitted, or
+   * RESULTS_WAIT_MS at most.
+   */
+  const RESULTS_WAIT_MS = 12_000;
+  const whenResultsIn = (format: RaceFormat, then: () => void): void => {
+    const clock = format === "timed" || format === "tug";
+    const deadline = Date.now() + (clock ? RESULTS_WAIT_MS : 0);
+    const check = (): void => {
+      const waiting = participants().some((p) => !p.finished && isConnected(p));
+      if (clock && waiting && Date.now() < deadline) {
+        setTimeout(check, 500);
+        return;
+      }
+      then();
+    };
+    setTimeout(check, clock ? 1500 : 0);
+  };
+
   const checkAutoFinish = (): void => {
     const r = race();
     if (r === null || r.status !== "running") return;
@@ -894,7 +917,14 @@ export function RaceHostPage(): JSXElement {
 
     if (r !== null && r.status === "finished" && !saved) {
       saved = true;
-      void saveHistory(r, participants());
+      // runs later on purpose: reads the latest race/participants then
+      // oxlint-disable-next-line solid/reactivity
+      whenResultsIn(r.format, () => {
+        // restarted meanwhile? those standings belong to the new race
+        const cur = race();
+        if (cur === null || cur.createdAt !== r.createdAt) return;
+        void saveHistory(cur, participants());
+      });
     }
   });
 
@@ -1072,21 +1102,29 @@ export function RaceHostPage(): JSXElement {
       return;
     }
     scoringTimer = setTimeout(() => {
-      scoringTimer = null;
-      const latest = race();
-      const lc = latest?.championship;
-      if (latest === null || lc === undefined || lc.scoredRounds > lc.current) {
-        return;
-      }
-      const roundStandings = rankParticipants(participants(), latest.format);
-      void setChampionship(pin, {
-        ...lc,
-        scores: scoreRound(lc.scores, roundStandings, latest.format),
-        scoredRounds: lc.current + 1,
-      }).catch((e: unknown) =>
-        showErrorNotification("Failed to add up points", { error: e }),
-      );
-    }, 2500);
+      // runs later on purpose: reads the latest race/participants then
+      // oxlint-disable-next-line solid/reactivity
+      whenResultsIn(r.format, () => {
+        scoringTimer = null;
+        const latest = race();
+        const lc = latest?.championship;
+        if (
+          latest === null ||
+          lc === undefined ||
+          lc.scoredRounds > lc.current
+        ) {
+          return;
+        }
+        const roundStandings = rankParticipants(participants(), latest.format);
+        void setChampionship(pin, {
+          ...lc,
+          scores: scoreRound(lc.scores, roundStandings, latest.format),
+          scoredRounds: lc.current + 1,
+        }).catch((e: unknown) =>
+          showErrorNotification("Failed to add up points", { error: e }),
+        );
+      });
+    }, 1000);
   });
 
   const nextChampRound = async (): Promise<void> => {
