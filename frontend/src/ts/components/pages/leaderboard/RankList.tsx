@@ -6,7 +6,7 @@ import { cn } from "../../../utils/cn";
 import { RankRow, RankRowVariant } from "./RankRow";
 
 export function RankList(props: {
-  type: "speed" | "xp" | "racewpm" | "raceacc";
+  type: "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
   entries: TableEntry[];
   friendsOnly: boolean;
   compactXp?: boolean;

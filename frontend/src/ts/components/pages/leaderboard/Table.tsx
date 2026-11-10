@@ -33,7 +33,7 @@ type XpEntry = XpLeaderboardEntry;
 
 export function Table(
   props: {
-    type: "speed" | "xp" | "racewpm" | "raceacc";
+    type: "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
     entries: TableEntry[];
     friendsOnly: boolean;
     hideHeader?: true;
@@ -100,6 +100,9 @@ export function Table(
   const raceAccColumns = createMemo(() =>
     getRaceAccColumns({ userOverride: props.userOverride }),
   );
+  const raceStatColumns = createMemo(() =>
+    getRaceStatColumns({ userOverride: props.userOverride }),
+  );
 
   // Students always get the friendly card list; the wide data table stays
   // for teachers on large screens.
@@ -126,7 +129,11 @@ export function Table(
 
   const dataTable = () => (
     <Show
-      when={props.type === "racewpm" || props.type === "raceacc"}
+      when={
+        props.type === "racewpm" ||
+        props.type === "raceacc" ||
+        props.type === "racestat"
+      }
       fallback={
         <Show
           when={props.type === "speed"}
@@ -150,7 +157,13 @@ export function Table(
     >
       <DataTable
         {...commonProps()}
-        columns={props.type === "raceacc" ? raceAccColumns() : raceColumns()}
+        columns={
+          props.type === "racestat"
+            ? raceStatColumns()
+            : props.type === "raceacc"
+              ? raceAccColumns()
+              : raceColumns()
+        }
         data={props.entries.slice(skipTop()) as RaceLeaderboardEntry[]}
         noDataRow={{ content: <NoEntriesFound type={props.type} /> }}
       />
@@ -177,7 +190,7 @@ export function Table(
 }
 
 function NoEntriesFound(props: {
-  type: "speed" | "xp" | "racewpm" | "raceacc";
+  type: "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
 }): JSXElement {
   const message = () =>
     props.type === "speed"
@@ -562,6 +575,44 @@ function getRaceColumns({
     }),
   ];
 
+  return columns.map((it) => ({ ...it, enableSorting: false }));
+}
+
+/** Wins / Blitz / Tug / champions / races played: the one number + races. */
+function getRaceStatColumns({
+  userOverride,
+}: {
+  userOverride?: Accessor<JSXElement>;
+}): DataTableColumnDef<RaceLeaderboardEntry>[] {
+  const defineColumn = createColumnHelper<RaceLeaderboardEntry>().accessor;
+  const columns: DataTableColumnDef<RaceLeaderboardEntry>[] = [
+    rankColumn(false) as DataTableColumnDef<RaceLeaderboardEntry>,
+    userColumn({ userOverride }) as DataTableColumnDef<RaceLeaderboardEntry>,
+    defineColumn("stat", {
+      header: "score",
+      cell: (info) => (
+        <span>
+          {info.getValue() ?? 0} {info.row.original.statLabel ?? ""}
+        </span>
+      ),
+      meta: { align: "right" },
+    }),
+    defineColumn("totalRaces", {
+      header: () => (
+        <>
+          <div>races</div>
+          <div class="text-em-xs opacity-50">wins</div>
+        </>
+      ),
+      cell: (info) => (
+        <>
+          <div>{info.getValue()}</div>
+          <div class="text-sub">{info.row.original.wins}</div>
+        </>
+      ),
+      meta: { align: "right" },
+    }),
+  ];
   return columns.map((it) => ({ ...it, enableSorting: false }));
 }
 

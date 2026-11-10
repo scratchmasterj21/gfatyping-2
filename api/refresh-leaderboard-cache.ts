@@ -13,7 +13,37 @@ const DEFAULT_WPM_MODE2: WpmMode2 = "30";
 const DOMAIN = "@felice.ed.jp";
 const ADMIN_EMAIL = "john.limpiada@felice.ed.jp";
 
-type ClassroomMetric = "xp" | "xpAllTime" | "wpm" | "racewpm" | "raceacc";
+/** The extra race boards - mirrors frontend/src/ts/classroom/race-boards.ts. */
+const RACE_STAT_BOARDS = {
+  racewins: { label: "wins", value: (d: StoredUserDoc) => d.raceWins ?? 0 },
+  raceblitz: {
+    label: "pts",
+    value: (d: StoredUserDoc) => d.raceBestBlitz ?? 0,
+  },
+  racetug: {
+    label: "words",
+    value: (d: StoredUserDoc) => d.raceBestTug ?? 0,
+  },
+  racechamps: {
+    label: "titles",
+    value: (d: StoredUserDoc) => d.championWins ?? 0,
+  },
+  raceplayed: {
+    label: "races",
+    value: (d: StoredUserDoc) => d.raceTotalRaces ?? 0,
+  },
+} as const;
+type RaceStatMetric = keyof typeof RACE_STAT_BOARDS;
+const isRaceStatMetric = (m: string): m is RaceStatMetric =>
+  Object.prototype.hasOwnProperty.call(RACE_STAT_BOARDS, m);
+
+type ClassroomMetric =
+  | "xp"
+  | "xpAllTime"
+  | "wpm"
+  | "racewpm"
+  | "raceacc"
+  | RaceStatMetric;
 
 type StoredPersonalBest = {
   wpm?: number;
@@ -58,6 +88,9 @@ type StoredUserDoc = {
   raceBestAccWpm?: number;
   raceTotalRaces?: number;
   raceWins?: number;
+  raceBestBlitz?: number;
+  raceBestTug?: number;
+  championWins?: number;
   lessonStars?: number;
 };
 
@@ -86,7 +119,19 @@ type CachedResult = {
 
 /** Firestore rejects `undefined` fields (e.g. a student with no avatarUrl). */
 function withoutUndefined(record: CachedResult): CachedResult {
-  return JSON.parse(JSON.stringify(record)) as CachedResult;
+  return dropUndefined(record) as CachedResult;
+}
+
+function dropUndefined(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(dropUndefined);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, dropUndefined(v)]),
+    );
+  }
+  return value;
 }
 
 function getAdminApp(): admin.app.App {
@@ -119,6 +164,29 @@ function rankStudents(
   metric: ClassroomMetric,
   wpmMode2: WpmMode2,
 ): { count: number; pageSize: number; entries: unknown[] } {
+  if (isRaceStatMetric(metric)) {
+    const board = RACE_STAT_BOARDS[metric];
+    const ranked = students
+      .filter((d) => board.value(d) > 0)
+      .sort(
+        (a, b) => board.value(b) - board.value(a) || a.uid.localeCompare(b.uid),
+      )
+      .map((d) => ({
+        uid: d.uid,
+        name: d.name ?? "",
+        avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
+        bestRaceWpm: d.raceBestWpm ?? 0,
+        bestRaceAcc: d.raceBestWpmAcc ?? 0,
+        totalRaces: d.raceTotalRaces ?? 0,
+        wins: d.raceWins ?? 0,
+        stat: board.value(d),
+        statLabel: board.label,
+      }));
+    const entries = competitionRank(ranked, (d) => d.stat);
+    return { count: entries.length, pageSize: entries.length, entries };
+  }
+
   if (metric === "racewpm") {
     const ranked = students
       .filter((d) => (d.raceTotalRaces ?? 0) > 0)
@@ -302,7 +370,10 @@ export default async function handler(
   } else if (
     (scope !== "grade" && scope !== "school") ||
     typeof metric !== "string" ||
-    !["xp", "xpAllTime", "wpm", "racewpm", "raceacc"].includes(metric) ||
+    !(
+      ["xp", "xpAllTime", "wpm", "racewpm", "raceacc"].includes(metric) ||
+      isRaceStatMetric(metric)
+    ) ||
     (scope === "grade" && typeof grade !== "string") ||
     (metric === "wpm" &&
       mode2Param !== undefined &&

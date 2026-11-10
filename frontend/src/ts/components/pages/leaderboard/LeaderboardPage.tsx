@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/solid-query";
 import { createEffect, createSignal, JSXElement, Show } from "solid-js";
 
 import { ClassroomScope } from "../../../classroom/classroom";
+import { isRaceStatMetric } from "../../../classroom/race-boards";
 import { getSnapshot, updateLbMemory } from "../../../db";
 import { createEffectOn } from "../../../hooks/effects";
 import { PageName } from "../../../pages/page";
@@ -61,6 +62,9 @@ export function LeaderboardPage(): JSXElement {
       return `${xp < 1000 ? xp.toFixed(0) : abbreviateNumber(xp)} XP`;
     }
     if ("bestRaceWpm" in entry) {
+      if (tableType() === "racestat") {
+        return `${entry.stat ?? 0} ${entry.statLabel ?? ""}`.trim();
+      }
       return tableType() === "raceacc"
         ? `${Math.round(entry.bestRaceAcc)}% acc`
         : `${Math.round(entry.bestRaceWpm)} WPM`;
@@ -93,13 +97,14 @@ export function LeaderboardPage(): JSXElement {
     isClassroom() &&
     (getSelection() as ClassroomSelectionType).metric === "games";
 
-  const tableType = (): "speed" | "xp" | "racewpm" | "raceacc" => {
+  const tableType = (): "speed" | "xp" | "racewpm" | "raceacc" | "racestat" => {
     const sel = getSelection();
     if (isClassroomType(sel.type)) {
       const metric = (sel as ClassroomSelectionType).metric;
       if (metric === "wpm") return "speed";
       if (metric === "racewpm") return "racewpm";
       if (metric === "raceacc") return "raceacc";
+      if (isRaceStatMetric(metric)) return "racestat";
       return "xp";
     }
     return sel.type === "weekly" ? "xp" : "speed";

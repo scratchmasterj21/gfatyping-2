@@ -528,6 +528,10 @@ type RaceStatsDoc = {
   raceBestAccWpm?: number;
   raceTotalRaces?: number;
   raceWins?: number;
+  /** best Word Blitz points in one round */
+  raceBestBlitz?: number;
+  /** most words pulled in one Tug of War */
+  raceBestTug?: number;
 };
 
 const RACE_PARTICIPATION_COINS = 5;
@@ -610,6 +614,16 @@ async function updateRaceStats(
         s.finalAcc > (prev.raceBestAcc ?? 0)
           ? { raceBestAcc: s.finalAcc, raceBestAccWpm: s.finalWpm }
           : {};
+      // Blitz points / Tug words live in `words` (the participant's wordIndex)
+      const score = s.words ?? 0;
+      const bestBlitz =
+        format === "blitz" && score > (prev.raceBestBlitz ?? 0)
+          ? { raceBestBlitz: score }
+          : {};
+      const bestTug =
+        format === "tug" && score > (prev.raceBestTug ?? 0)
+          ? { raceBestTug: score }
+          : {};
       const coinsEarned = rewards ? standingCoins(s, format, standings) : 0;
       const won =
         rewards && (outcome === null ? s.rank === 1 : outcome === s.team);
@@ -619,6 +633,8 @@ async function updateRaceStats(
         {
           ...bestWpm,
           ...bestAcc,
+          ...bestBlitz,
+          ...bestTug,
           raceTotalRaces: increment(1),
           raceWins: increment(won ? 1 : 0),
           ...(coinsEarned > 0 ? { coins: increment(coinsEarned) } : {}),

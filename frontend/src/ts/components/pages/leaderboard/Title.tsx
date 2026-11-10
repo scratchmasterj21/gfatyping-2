@@ -4,6 +4,10 @@ import { format as dateFormat } from "date-fns/format";
 import { createMemo, JSXElement, Show } from "solid-js";
 
 import {
+  isRaceStatMetric,
+  RACE_STAT_BOARDS,
+} from "../../../classroom/race-boards";
+import {
   ClassroomSelectionType,
   isClassroomType,
   Selection,
@@ -30,15 +34,17 @@ export function Title(props: {
       const metric =
         cs.metric === "wpm"
           ? "Typing speed"
-          : cs.metric === "racewpm"
-            ? "Race speed"
-            : cs.metric === "raceacc"
-              ? "Race accuracy"
-              : cs.metric === "games"
-                ? "Game scores"
-                : cs.metric === "xpAllTime"
-                  ? "All-time XP"
-                  : "Weekly XP";
+          : isRaceStatMetric(cs.metric)
+            ? RACE_STAT_BOARDS[cs.metric].name
+            : cs.metric === "racewpm"
+              ? "Race speed"
+              : cs.metric === "raceacc"
+                ? "Race accuracy"
+                : cs.metric === "games"
+                  ? "Game scores"
+                  : cs.metric === "xpAllTime"
+                    ? "All-time XP"
+                    : "Weekly XP";
       const scope =
         cs.type === "class"
           ? (cs.classId ?? "Your class")
@@ -135,13 +141,15 @@ export function Title(props: {
         ? "total XP"
         : selection.metric === "wpm"
           ? "best typing speed"
-          : selection.metric === "racewpm"
-            ? "best race speed"
-            : selection.metric === "raceacc"
-              ? "best race accuracy"
-              : selection.metric === "games"
-                ? "game high scores"
-                : "XP this week";
+          : isRaceStatMetric(selection.metric)
+            ? RACE_STAT_BOARDS[selection.metric].rankedBy
+            : selection.metric === "racewpm"
+              ? "best race speed"
+              : selection.metric === "raceacc"
+                ? "best race accuracy"
+                : selection.metric === "games"
+                  ? "game high scores"
+                  : "XP this week";
     return `${scope}, ranked by ${metric}.`;
   });
 

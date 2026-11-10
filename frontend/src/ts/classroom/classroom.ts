@@ -14,6 +14,11 @@ import {
 
 import { gradeOf } from "../constants/classes";
 import { getDb, getIdToken } from "../firebase";
+import {
+  isRaceStatMetric,
+  RACE_STAT_BOARDS,
+  RaceStatMetric,
+} from "./race-boards";
 
 export type Student = {
   uid: string;
@@ -37,7 +42,8 @@ export type ClassroomMetric =
   | "xpAllTime"
   | "wpm"
   | "racewpm"
-  | "raceacc";
+  | "raceacc"
+  | RaceStatMetric;
 
 export type RaceLeaderboardEntry = {
   uid: string;
@@ -49,6 +55,9 @@ export type RaceLeaderboardEntry = {
   totalRaces: number;
   wins: number;
   rank: number;
+  /** the extra race boards (wins, Blitz, Tug...): the ranked number + unit */
+  stat?: number;
+  statLabel?: string;
 };
 
 export type ClassroomLeaderboardData = {
@@ -119,6 +128,9 @@ export type StoredUserDoc = {
   raceBestAccWpm?: number;
   raceTotalRaces?: number;
   raceWins?: number;
+  raceBestBlitz?: number;
+  raceBestTug?: number;
+  championWins?: number;
 };
 
 type StudentDoc = StoredUserDoc & { uid: string };
@@ -254,6 +266,32 @@ export async function getClassroomLeaderboard(options: {
         (d) => gradeOf(d.classId as string) === options.grade,
       );
     }
+  }
+
+  if (isRaceStatMetric(options.metric)) {
+    const board = RACE_STAT_BOARDS[options.metric];
+    const sorted = students
+      .filter((d) => board.value(d) > 0)
+      .sort(
+        (a, b) => board.value(b) - board.value(a) || a.uid.localeCompare(b.uid),
+      )
+      .map((d) => ({
+        uid: d.uid,
+        name: d.name ?? "",
+        avatarUrl: d.avatarUrl,
+        title: d.selectedTitle,
+        bestRaceWpm: d.raceBestWpm ?? 0,
+        bestRaceAcc: d.raceBestWpmAcc ?? 0,
+        totalRaces: d.raceTotalRaces ?? 0,
+        wins: d.raceWins ?? 0,
+        stat: board.value(d),
+        statLabel: board.label,
+      }));
+    const ranked: RaceLeaderboardEntry[] = competitionRank(
+      sorted,
+      (entry) => entry.stat,
+    );
+    return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
   if (options.metric === "racewpm") {

@@ -14,7 +14,7 @@ import { Mascot } from "../../common/Mascot";
 import { RankDisplay } from "./RankDisplay";
 
 export function SelfSummaryCard(props: {
-  type: "speed" | "xp" | "racewpm" | "raceacc";
+  type: "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
   data?: TableEntry | null;
   classroomRank?: number;
   classroomPrimaryLabel?: string;
@@ -67,6 +67,9 @@ export function SelfSummaryCard(props: {
       return `${format().typingSpeed(d.wpm, { showDecimalPlaces: true })} ${format().typingSpeedUnit} · ${format().percentage(d.acc, { showDecimalPlaces: true })} acc`;
     }
     if ("bestRaceWpm" in props.data) {
+      if (props.type === "racestat") {
+        return `${props.data.stat ?? 0} ${props.data.statLabel ?? ""}`.trim();
+      }
       return props.type === "raceacc"
         ? `${Math.round(props.data.bestRaceAcc)}% acc`
         : `${Math.round(props.data.bestRaceWpm)} WPM`;

@@ -37,6 +37,11 @@ export const ClassroomMetricSchema = z.enum([
   "wpm",
   "racewpm",
   "raceacc",
+  "racewins",
+  "raceblitz",
+  "racetug",
+  "racechamps",
+  "raceplayed",
   "games",
 ]);
 export type ClassroomMetric = z.infer<typeof ClassroomMetricSchema>;

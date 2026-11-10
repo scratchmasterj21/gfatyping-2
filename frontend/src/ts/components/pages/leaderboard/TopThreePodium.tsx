@@ -18,7 +18,7 @@ const STEP_HEIGHT: Record<number, string> = {
 };
 
 export function TopThreePodium(props: {
-  type: "speed" | "xp" | "racewpm" | "raceacc";
+  type: "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
   entries: TableEntry[];
   friendsOnly: boolean;
   compactXp?: boolean;

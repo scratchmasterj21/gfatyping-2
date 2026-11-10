@@ -21,7 +21,7 @@ export type RankRowVariant =
   | { kind: "gameScore"; name: string; uid: string; score: number }
   | {
       kind: "entry";
-      type: "speed" | "xp" | "racewpm" | "raceacc";
+      type: "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
       entry: TableEntry;
       friendsOnly: boolean;
       compactXp?: boolean;
@@ -64,6 +64,13 @@ export function rankRowStats(v: RankRowVariant): RankRowStats {
     };
   }
   const e = entry as RaceLeaderboardEntry;
+  if (v.type === "racestat") {
+    return {
+      primary: `${e.stat ?? 0} ${e.statLabel ?? ""}`.trim(),
+      secondary:
+        e.statLabel === "races" ? `${e.wins} wins` : `${e.totalRaces} races`,
+    };
+  }
   if (v.type === "raceacc") {
     return {
       primary: `${Math.round(e.bestRaceAcc)}%`,

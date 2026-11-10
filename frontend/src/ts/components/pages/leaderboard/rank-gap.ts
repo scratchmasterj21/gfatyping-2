@@ -1,12 +1,13 @@
 import type { TableEntry } from "./table-entry";
 
-export type RankingType = "speed" | "xp" | "racewpm" | "raceacc";
+export type RankingType = "speed" | "xp" | "racewpm" | "raceacc" | "racestat";
 
 function scoreOf(entry: TableEntry, type: RankingType): number | undefined {
   if (type === "xp" && "totalXp" in entry) return entry.totalXp;
   if (type === "speed" && "wpm" in entry) return entry.wpm;
   if (type === "racewpm" && "bestRaceWpm" in entry) return entry.bestRaceWpm;
   if (type === "raceacc" && "bestRaceAcc" in entry) return entry.bestRaceAcc;
+  if (type === "racestat" && "stat" in entry) return entry.stat;
   return undefined;
 }
 
@@ -15,6 +16,7 @@ const UNIT: Record<RankingType, string> = {
   speed: "WPM",
   racewpm: "WPM",
   raceacc: "%",
+  racestat: "",
 };
 
 /**
@@ -37,7 +39,10 @@ export function gapToNextLabel(
   if (mine === undefined || theirs === undefined) return undefined;
   // floor + 1 so the student actually passes, not ties
   const gap = Math.max(1, Math.floor(theirs - mine) + 1);
-  const unit = UNIT[type];
+  const unit =
+    type === "racestat" && "statLabel" in self
+      ? (self.statLabel ?? "")
+      : UNIT[type];
   const amount = unit === "%" ? `${gap}%` : `${gap} ${unit}`;
   return `${amount} more to pass ${ahead.name}`;
 }

@@ -4,6 +4,10 @@ import { Mode } from "@monkeytype/schemas/shared";
 import { Accessor, For, JSXElement, Show } from "solid-js";
 
 import { isCurrentUserAdmin } from "../../../auth";
+import {
+  RACE_STAT_BOARDS,
+  RACE_STAT_METRICS,
+} from "../../../classroom/race-boards";
 import { CLASS_IDS, gradeOf, GRADES } from "../../../constants/classes";
 import { isAuthenticated } from "../../../states/core";
 import {
@@ -198,6 +202,12 @@ export function Sidebar(props: {
               icon: "fa-bullseye",
               description: "Best race accuracy",
             },
+            ...RACE_STAT_METRICS.map((id) => ({
+              id,
+              text: RACE_STAT_BOARDS[id].name,
+              icon: RACE_STAT_BOARDS[id].icon,
+              description: RACE_STAT_BOARDS[id].description,
+            })),
             {
               id: "games",
               text: "Games",
