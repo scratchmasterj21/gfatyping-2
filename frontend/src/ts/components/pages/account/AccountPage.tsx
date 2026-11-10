@@ -17,10 +17,11 @@ import { downloadResultsCSV } from "../../../utils/misc";
 import AsyncContent from "../../common/AsyncContent";
 import { Button } from "../../common/Button";
 import { Page } from "../../common/Page";
+import { AchievementsSummary } from "./AchievementsSummary";
 import { Charts } from "./Charts";
 import { Filters } from "./Filters";
-import { KidProgress } from "./KidProgress";
 import { MyProfile } from "./MyProfile";
+import { StatsDashboard } from "./StatsDashboard";
 import { Table } from "./Table";
 import { TestStats } from "./TestStats";
 import { VerifyNotice } from "./VerifyNotice";
@@ -62,8 +63,9 @@ export function AccountPage(): JSXElement {
     <Page id="account" needsAuthentication>
       <div class="flex flex-col gap-8">
         <VerifyNotice />
-        <MyProfile />
-        <KidProgress results={resultsQuery() ?? []} />
+        <StatsDashboard results={resultsQuery() ?? []} />
+        <MyProfile part="top" />
+        <AchievementsSummary />
         <Button
           variant="text"
           text={showGrownUp() ? "Hide grown-up stats" : "Grown-up stats"}
@@ -72,6 +74,7 @@ export function AccountPage(): JSXElement {
         />
 
         <Show when={showGrownUp()}>
+          <MyProfile part="bests" />
           <Filters filters={filters} onChangeFilters={setFilters} />
 
           <Show

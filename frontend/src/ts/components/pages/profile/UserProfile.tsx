@@ -28,40 +28,54 @@ import { UserDetails } from "./UserDetails";
 export function UserProfile(props: {
   profile: UserProfileType;
   isAccountPage?: true;
+  /**
+   * Account page only: "top" = header + practice calendar (the kid
+   * dashboard covers goals and achievements); "bests" = leaderboard spots
+   * and personal-best tables (under Grown-up stats). Omit for everything.
+   */
+  part?: "top" | "bests";
 }): JSXElement {
+  const showTop = (): boolean => props.part !== "bests";
+  const showBests = (): boolean => props.part !== "top";
   return (
     <div class="grid w-full gap-8">
-      <UserDetails
-        profile={props.profile}
-        isAccountPage={props.isAccountPage}
-      />
-      <Show when={props.isAccountPage}>
+      <Show when={showTop()}>
+        <UserDetails
+          profile={props.profile}
+          isAccountPage={props.isAccountPage}
+        />
+      </Show>
+      <Show when={props.isAccountPage && props.part === undefined}>
         <GradeGoal />
       </Show>
-      <Show when={props.isAccountPage}>
+      <Show when={props.isAccountPage && props.part === undefined}>
         <AchievementsPanel />
       </Show>
-      <Show when={!props.profile.banned && !props.profile.lbOptOut}>
+      <Show
+        when={showBests() && !props.profile.banned && !props.profile.lbOptOut}
+      >
         <LeaderboardPosition
           top15={props.profile.allTimeLbs?.time?.["15"]?.["english"]}
           top60={props.profile.allTimeLbs?.time?.["60"]?.["english"]}
         />
       </Show>
-      <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <PbTable
-          mode="time"
-          mode2={["15", "30", "60", "120"]}
-          pbs={props.profile.personalBests.time}
-          isAccountPage={props.isAccountPage}
-        />
-        <PbTable
-          mode="words"
-          mode2={["10", "25", "50", "100"]}
-          pbs={props.profile.personalBests.words}
-          isAccountPage={props.isAccountPage}
-        />
-      </div>
-      <Show when={props.profile.lbOptOut}>
+      <Show when={showBests()}>
+        <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+          <PbTable
+            mode="time"
+            mode2={["15", "30", "60", "120"]}
+            pbs={props.profile.personalBests.time}
+            isAccountPage={props.isAccountPage}
+          />
+          <PbTable
+            mode="words"
+            mode2={["10", "25", "50", "100"]}
+            pbs={props.profile.personalBests.words}
+            isAccountPage={props.isAccountPage}
+          />
+        </div>
+      </Show>
+      <Show when={showBests() && props.profile.lbOptOut}>
         <span class="text-center text-xs text-sub">
           Note: This account has opted out of the leaderboards, meaning their
           results aren&apos;t verified by the anticheat system and may not be
@@ -69,10 +83,12 @@ export function UserProfile(props: {
         </span>
       </Show>
 
-      <ActivityCalendar
-        testActivity={props.profile.testActivity}
-        isAccountPage={props.isAccountPage}
-      />
+      <Show when={showTop()}>
+        <ActivityCalendar
+          testActivity={props.profile.testActivity}
+          isAccountPage={props.isAccountPage}
+        />
+      </Show>
     </div>
   );
 }

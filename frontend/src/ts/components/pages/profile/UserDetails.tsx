@@ -62,7 +62,10 @@ export function UserDetails(props: {
       <div
         class={cn(
           "grid items-center gap-4 p-4",
-          variant() === "basic" && "md:grid-cols-[17.5rem_auto_1fr]",
+          variant() === "basic" &&
+            (props.isAccountPage === true
+              ? "grid-cols-1"
+              : "md:grid-cols-[17.5rem_auto_1fr]"),
           variant() === "hasBioOrKeyboard" &&
             "sm:grid-cols-2 md:grid-cols-[17.5rem_auto_auto_auto_1fr] lg:grid-cols-[17.5rem_auto_1fr_auto_2fr]",
           variant() === "hasSocials" &&
@@ -79,10 +82,13 @@ export function UserDetails(props: {
         <Show when={variant() === "full" || variant() === "hasBioOrKeyboard"}>
           <BioAndKeyboard details={props.profile.details} variant={variant()} />
         </Show>
-        <TypingStats
-          typingStats={props.profile.typingStats}
-          variant={variant()}
-        />
+        {/* the account page's kid dashboard shows friendlier stats */}
+        <Show when={props.isAccountPage !== true}>
+          <TypingStats
+            typingStats={props.profile.typingStats}
+            variant={variant()}
+          />
+        </Show>
         <Show when={variant() === "full" || variant() === "hasSocials"}>
           <Socials
             socials={props.profile.details?.socialProfiles}
