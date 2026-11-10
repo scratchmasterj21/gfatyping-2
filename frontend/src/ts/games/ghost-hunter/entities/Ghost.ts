@@ -9,6 +9,8 @@ export class Ghost extends GameObjects.Container {
   readonly side: "left" | "right";
   /** Ghost King (boss wave): hits left, counting this word */
   readonly boss: { hp: number; maxHp: number } | null;
+  /** scene time (ms) until which the Ghost King stands still after a hit */
+  staggeredUntil = 0;
   private ghostImg: GameObjects.Image;
   private tag: WordTag;
   private bobPhase: number;

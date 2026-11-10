@@ -40,8 +40,10 @@ const WORLD_SNAPSHOT_INTERVAL_MS = 250;
 const BOSS_EVERY = 5;
 /** The Ghost King walks this much slower than normal ghosts. */
 const BOSS_SPEED_FACTOR = 0.5;
-/** Each word typed pushes the Ghost King back this far, px. */
-const BOSS_KNOCKBACK = 70;
+/** Each word typed nudges the Ghost King back this far, px... */
+const BOSS_KNOCKBACK = 15;
+/** ...and makes him stagger (stand still) this long, ms. */
+const BOSS_STAGGER_MS = 400;
 /** Logs the Ghost King reaches take this many hits. */
 const BOSS_LOG_DAMAGE = 2;
 const BOSS_BONUS = 100;
@@ -372,6 +374,7 @@ export class GameScene extends Scene {
       const ghost = this.ghosts[i];
       if (ghost === undefined) continue;
       if (ghost.isFrozen()) continue; // paused - still typeable via refreshTargeting above
+      if (ghost.staggeredUntil > this.time.now) continue; // Ghost King reeling from a hit
       const step =
         (ghost.boss === null ? speed : speed * BOSS_SPEED_FACTOR) * dt;
       ghost.x += ghost.side === "left" ? step : -step;
@@ -859,11 +862,13 @@ export class GameScene extends Scene {
     x: number,
     hp: number,
     maxHp: number,
-  ): void {
+  ): Ghost {
     const active = new Set(this.ghosts.map((g) => g.word));
     const word = this.tryNextWord(active) ?? "boo";
     const y = (this.lawnTop + this.lawnBottom) / 2;
-    this.ghosts.push(new Ghost(this, x, y, word, side, { hp, maxHp }));
+    const ghost = new Ghost(this, x, y, word, side, { hp, maxHp });
+    this.ghosts.push(ghost);
+    return ghost;
   }
 
   private startWave(): void {
@@ -932,7 +937,13 @@ export class GameScene extends Scene {
           ghost.side === "left"
             ? Math.max(-50, ghost.x - BOSS_KNOCKBACK)
             : Math.min(W + 50, ghost.x + BOSS_KNOCKBACK);
-        this.spawnBoss(ghost.side, x, ghost.boss.hp - 1, ghost.boss.maxHp);
+        const king = this.spawnBoss(
+          ghost.side,
+          x,
+          ghost.boss.hp - 1,
+          ghost.boss.maxHp,
+        );
+        king.staggeredUntil = this.time.now + BOSS_STAGGER_MS;
         this.cameras.main.shake(120, 0.006);
       } else {
         this.score += BOSS_BONUS;
