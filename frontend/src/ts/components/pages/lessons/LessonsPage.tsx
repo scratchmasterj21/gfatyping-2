@@ -60,7 +60,11 @@ import {
   startGameSession,
   stopGameSession,
 } from "../../../games/game-session";
-import { games } from "../../../games/games-data";
+import {
+  BuiltinGame,
+  GAME_WORD_SOURCE_GROUPS,
+  games,
+} from "../../../games/games-data";
 import { GemDigModal } from "../../../games/gem-dig/GemDigModal";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
 import { GoldfishModal } from "../../../games/kana/GoldfishModal";
@@ -207,6 +211,32 @@ function GameButton(props: {
           : props.description}
       </div>
     </button>
+  );
+}
+
+/** Game cards split into sections by where their words come from. */
+function GamesByWordSource(props: {
+  games: BuiltinGame[];
+  children: (game: BuiltinGame) => JSXElement;
+}): JSXElement {
+  return (
+    <div class="grid gap-6">
+      <For each={GAME_WORD_SOURCE_GROUPS}>
+        {(group) => (
+          <Show when={props.games.some((g) => g.words === group.id)}>
+            <div>
+              <H3 fa={{ icon: group.icon }} text={group.title} />
+              <p class="mb-3 text-em-sm text-sub">{group.description}</p>
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <For each={props.games.filter((g) => g.words === group.id)}>
+                  {(game) => props.children(game)}
+                </For>
+              </div>
+            </div>
+          </Show>
+        )}
+      </For>
+    </div>
   );
 }
 
@@ -2184,94 +2214,94 @@ export function LessonsPage(): JSXElement {
                 aria-labelledby={`games-tab-${gamesTab()}`}
               >
                 <Show when={gamesTab() === "solo"}>
-                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <For each={games.filter((g) => g.type === "builtin")}>
-                      {(game) => (
-                        <GameButton
-                          name={game.name}
-                          description={game.description}
-                          icon={game.icon}
-                          recommended={recommendedGameId() === game.id}
-                          locked={
-                            (game.id === "typing-rpg" && !rpgUnlocked()) ||
-                            !gameAccess(game.id).allowed
-                          }
-                          lockedMessage={
-                            gameAccess(game.id).allowed
-                              ? undefined
-                              : gameLockMessage(gameAccess(game.id))
-                          }
-                          onClick={() => launchGame(game.id)}
-                        />
-                      )}
-                    </For>
-                  </div>
+                  <GamesByWordSource
+                    games={games.filter(
+                      (g): g is BuiltinGame => g.type === "builtin",
+                    )}
+                  >
+                    {(game) => (
+                      <GameButton
+                        name={game.name}
+                        description={game.description}
+                        icon={game.icon}
+                        recommended={recommendedGameId() === game.id}
+                        locked={
+                          (game.id === "typing-rpg" && !rpgUnlocked()) ||
+                          !gameAccess(game.id).allowed
+                        }
+                        lockedMessage={
+                          gameAccess(game.id).allowed
+                            ? undefined
+                            : gameLockMessage(gameAccess(game.id))
+                        }
+                        onClick={() => launchGame(game.id)}
+                      />
+                    )}
+                  </GamesByWordSource>
                 </Show>
                 <Show when={gamesTab() === "multiplayer"}>
                   <p class="mb-3 text-sub">
                     Create a room or join friends with a code.
                   </p>
-                  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <For
-                      each={games.filter(
-                        (g) =>
-                          g.type === "builtin" &&
-                          [
-                            "word-pong",
-                            "gem-dig",
-                            "four-row",
-                            "word-bomb",
-                            "karuta",
-                            "goldfish",
-                            "shiritori",
-                            "type-toss",
-                            "type-racer",
-                            "ghost-hunter",
-                            "monster-raid",
-                          ].includes(g.id),
-                      )}
-                    >
-                      {(game) => {
-                        const requiredLesson =
-                          game.id === "type-racer"
-                            ? "home-middle"
-                            : game.id === "type-toss"
-                              ? "home-words"
-                              : "all-keys-1";
-                        const lessonLocked = () =>
-                          ![
-                            "word-pong",
-                            "gem-dig",
-                            "four-row",
-                            "word-bomb",
-                            "karuta",
-                            "goldfish",
-                            "shiritori",
-                            "monster-raid",
-                          ].includes(game.id) &&
-                          !isCurrentUserAdmin() &&
-                          isLessonLocked(requiredLesson);
-                        const locked = () =>
-                          lessonLocked() || !gameAccess(game.id).allowed;
-                        return (
-                          <GameButton
-                            name={game.name}
-                            description={game.description}
-                            icon={game.icon}
-                            locked={locked()}
-                            lockedMessage={
-                              gameAccess(game.id).allowed
-                                ? "🔒 Complete the required typing lessons to play together"
-                                : gameLockMessage(gameAccess(game.id))
-                            }
-                            onClick={() => {
-                              if (!locked()) launchGame(game.id, "together");
-                            }}
-                          />
-                        );
-                      }}
-                    </For>
-                  </div>
+                  <GamesByWordSource
+                    games={games.filter(
+                      (g): g is BuiltinGame =>
+                        g.type === "builtin" &&
+                        [
+                          "word-pong",
+                          "gem-dig",
+                          "four-row",
+                          "word-bomb",
+                          "karuta",
+                          "goldfish",
+                          "shiritori",
+                          "type-toss",
+                          "type-racer",
+                          "ghost-hunter",
+                          "monster-raid",
+                        ].includes(g.id),
+                    )}
+                  >
+                    {(game) => {
+                      const requiredLesson =
+                        game.id === "type-racer"
+                          ? "home-middle"
+                          : game.id === "type-toss"
+                            ? "home-words"
+                            : "all-keys-1";
+                      const lessonLocked = () =>
+                        ![
+                          "word-pong",
+                          "gem-dig",
+                          "four-row",
+                          "word-bomb",
+                          "karuta",
+                          "goldfish",
+                          "shiritori",
+                          "monster-raid",
+                        ].includes(game.id) &&
+                        !isCurrentUserAdmin() &&
+                        isLessonLocked(requiredLesson);
+                      const locked = () =>
+                        lessonLocked() || !gameAccess(game.id).allowed;
+                      return (
+                        <GameButton
+                          name={game.name}
+                          description={game.description}
+                          icon={game.icon}
+                          locked={locked()}
+                          lockedMessage={
+                            gameAccess(game.id).allowed
+                              ? "🔒 Complete the required typing lessons to play together"
+                              : gameLockMessage(gameAccess(game.id))
+                          }
+                          onClick={() => {
+                            if (!locked()) launchGame(game.id, "together");
+                          }}
+                        />
+                      );
+                    }}
+                  </GamesByWordSource>
                 </Show>
                 <Show when={gamesTab() === "rewards"}>
                   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">

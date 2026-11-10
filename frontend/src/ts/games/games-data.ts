@@ -34,7 +34,38 @@ export type BuiltinGame = {
   name: string;
   description: string;
   icon: FaSolidIcon;
+  /** where the words come from: lesson word lists, easy/medium/hard, or kana */
+  words: GameWordSource;
 };
+
+export type GameWordSource = "lessons" | "levels" | "romaji";
+
+/** Game list sections, in display order. */
+export const GAME_WORD_SOURCE_GROUPS: {
+  id: GameWordSource;
+  title: string;
+  description: string;
+  icon: FaSolidIcon;
+}[] = [
+  {
+    id: "lessons",
+    title: "Practice your lesson words",
+    description: "Pick any typing lesson's words to play with.",
+    icon: "fa-book-open",
+  },
+  {
+    id: "levels",
+    title: "Easy, medium or hard",
+    description: "Choose a level - the game picks the words.",
+    icon: "fa-signal",
+  },
+  {
+    id: "romaji",
+    title: "Romaji games",
+    description: "Hiragana on screen, typed in romaji.",
+    icon: "fa-language",
+  },
+];
 
 export type Game = FunboxGame | BuiltinGame;
 
@@ -51,6 +82,7 @@ export const games: Game[] = [
     description:
       "Type the word on the ball to hit it back - play Tappy or a friend!",
     icon: "fa-table-tennis",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -59,6 +91,7 @@ export const games: Game[] = [
     description:
       "Type words to dig down for gems - race Tappy or up to 7 friends!",
     icon: "fa-gem",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -67,6 +100,7 @@ export const games: Game[] = [
     description:
       "Type a column's word to drop your piece - get 4 in a row to win!",
     icon: "fa-th",
+    words: "levels",
   },
   {
     type: "builtin",
@@ -75,6 +109,7 @@ export const games: Game[] = [
     description:
       "Type the word to pass the bomb before it goes BOOM - up to 6 players!",
     icon: "fa-bomb",
+    words: "levels",
   },
   {
     type: "builtin",
@@ -83,6 +118,7 @@ export const games: Game[] = [
     description:
       "Romaji: see the picture, type the hiragana card first to take it!",
     icon: "fa-clone",
+    words: "romaji",
   },
   {
     type: "builtin",
@@ -91,6 +127,7 @@ export const games: Game[] = [
     description:
       "Romaji: type the hiragana on the goldfish to scoop them - 60 seconds!",
     icon: "fa-fish",
+    words: "romaji",
   },
   {
     type: "builtin",
@@ -99,6 +136,7 @@ export const games: Game[] = [
     description:
       "Romaji: keep the word chain going and pass the bomb before it blows!",
     icon: "fa-link",
+    words: "romaji",
   },
   {
     type: "builtin",
@@ -107,6 +145,7 @@ export const games: Game[] = [
     description:
       "Type each word to help Tappy climb - careful typing earns double jumps!",
     icon: "fa-building",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -114,6 +153,7 @@ export const games: Game[] = [
     name: "Snack Shop",
     description: "Type customers' orders before they get tired of waiting!",
     icon: "fa-cookie-bite",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -121,6 +161,7 @@ export const games: Game[] = [
     name: "Echo Keys",
     description: "Watch Tappy's key pattern, then repeat it from memory!",
     icon: "fa-lightbulb",
+    words: "levels",
   },
   {
     type: "builtin",
@@ -129,6 +170,7 @@ export const games: Game[] = [
     description:
       "Explore a forest, defeat monsters by typing, and find the treasure!",
     icon: "fa-map",
+    words: "levels",
   },
   {
     type: "builtin",
@@ -137,6 +179,7 @@ export const games: Game[] = [
     description:
       "Type as many words as you can before time runs out — shoot the shelf targets!",
     icon: "fa-hourglass",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -144,6 +187,7 @@ export const games: Game[] = [
     name: "Fruit Ninja",
     description: "Type the words on falling fruits before they hit the ground!",
     icon: "fa-lemon",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -151,6 +195,7 @@ export const games: Game[] = [
     name: "Type Racer",
     description: "Race the CPU — type words to speed ahead!",
     icon: "fa-car",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -159,6 +204,7 @@ export const games: Game[] = [
     description:
       "Team up with friends and type to beat monsters and a big boss!",
     icon: "fa-dragon",
+    words: "levels",
   },
   {
     type: "builtin",
@@ -167,6 +213,7 @@ export const games: Game[] = [
     description:
       "Ghosts swarm from both sides — type their words before they reach you!",
     icon: "fa-ghost",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -174,6 +221,7 @@ export const games: Game[] = [
     name: "Balloon Pop",
     description: "Type the words on balloons before they float away!",
     icon: "fa-circle",
+    words: "lessons",
   },
   {
     type: "builtin",
@@ -181,6 +229,7 @@ export const games: Game[] = [
     name: "Word Defender",
     description: "Type the words on enemy ships before they reach your base!",
     icon: "fa-rocket",
+    words: "lessons",
   },
   {
     type: "funbox",
