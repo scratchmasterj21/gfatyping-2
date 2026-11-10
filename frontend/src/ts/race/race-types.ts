@@ -209,3 +209,8 @@ export type Championship = {
   /** set once the champion is crowned and prizes are paid */
   crowned?: boolean;
 };
+
+/** Formats that count toward the Race speed / Race accuracy boards. */
+export function isSpeedRaceFormat(format: RaceFormat | undefined): boolean {
+  return format === "finish" || format === "timed" || format === "accuracy";
+}

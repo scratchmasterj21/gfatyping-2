@@ -40,6 +40,7 @@ import {
   generatePin,
   isTimedFormat,
   Race,
+  isSpeedRaceFormat,
   RaceFormat,
   RaceHistory,
   RaceParticipant,
@@ -615,12 +616,15 @@ async function updateRaceStats(
       const snap = await getDoc(ref);
       const prev = snap.exists() ? (snap.data() as RaceStatsDoc) : {};
 
+      // Race speed / accuracy boards: speed races only - Tug of War is a
+      // long home-row game and Blitz has no speed, so they'd skew it
+      const speedRace = isSpeedRaceFormat(format);
       const bestWpm =
-        s.finalWpm > (prev.raceBestWpm ?? 0)
+        speedRace && s.finalWpm > (prev.raceBestWpm ?? 0)
           ? { raceBestWpm: s.finalWpm, raceBestWpmAcc: s.finalAcc }
           : {};
       const bestAcc =
-        s.finalAcc > (prev.raceBestAcc ?? 0)
+        speedRace && s.finalAcc > (prev.raceBestAcc ?? 0)
           ? { raceBestAcc: s.finalAcc, raceBestAccWpm: s.finalWpm }
           : {};
       // Blitz points / Tug words live in `words` (the participant's wordIndex)

@@ -189,7 +189,7 @@ function rankStudents(
 
   if (metric === "racewpm") {
     const ranked = students
-      .filter((d) => (d.raceTotalRaces ?? 0) > 0)
+      .filter((d) => (d.raceBestWpm ?? 0) > 0) // has a speed-race result
       .sort(
         (a, b) =>
           (b.raceBestWpm ?? 0) - (a.raceBestWpm ?? 0) ||
@@ -211,7 +211,7 @@ function rankStudents(
 
   if (metric === "raceacc") {
     const ranked = students
-      .filter((d) => (d.raceTotalRaces ?? 0) > 0)
+      .filter((d) => (d.raceBestWpm ?? 0) > 0) // has a speed-race result
       .sort(
         (a, b) =>
           (b.raceBestAcc ?? 0) - (a.raceBestAcc ?? 0) ||

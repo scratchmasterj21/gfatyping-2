@@ -296,7 +296,7 @@ export async function getClassroomLeaderboard(options: {
 
   if (options.metric === "racewpm") {
     const sorted = students
-      .filter((d) => (d.raceTotalRaces ?? 0) > 0)
+      .filter((d) => (d.raceBestWpm ?? 0) > 0) // has a speed-race result
       .sort(
         (a, b) =>
           (b.raceBestWpm ?? 0) - (a.raceBestWpm ?? 0) ||
@@ -321,7 +321,7 @@ export async function getClassroomLeaderboard(options: {
 
   if (options.metric === "raceacc") {
     const sorted = students
-      .filter((d) => (d.raceTotalRaces ?? 0) > 0)
+      .filter((d) => (d.raceBestWpm ?? 0) > 0) // has a speed-race result
       .sort(
         (a, b) =>
           (b.raceBestAcc ?? 0) - (a.raceBestAcc ?? 0) ||
