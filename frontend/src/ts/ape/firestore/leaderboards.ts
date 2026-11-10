@@ -55,16 +55,16 @@ export function currentWeekId(weeksBefore: number): number {
   );
 }
 
-function competitionRanks<T>(
+function denseRanks<T>(
   entries: T[],
   score: (entry: T) => number,
 ): Array<T & { rank: number }> {
   let previousScore: number | undefined;
   let rank = 0;
-  return entries.map((entry, index) => {
+  return entries.map((entry) => {
     const currentScore = score(entry);
     if (previousScore === undefined || currentScore !== previousScore) {
-      rank = index + 1;
+      rank += 1;
     }
     previousScore = currentScore;
     return { ...entry, rank };
@@ -266,10 +266,7 @@ export const get: Handler = async (ctx) => {
     ? sorted.filter((entry) => entry.uid !== ADMIN_UID)
     : sorted;
   const start = page * pageSize;
-  const entries = competitionRanks(all, (e) => e.wpm).slice(
-    start,
-    start + pageSize,
-  );
+  const entries = denseRanks(all, (e) => e.wpm).slice(start, start + pageSize);
 
   return ok({ count: all.length, pageSize, entries });
 };
@@ -297,7 +294,7 @@ export const getRank: Handler = async (ctx) => {
   const index = all.findIndex((e) => e.uid === uid);
   if (index === -1) return ok(null);
 
-  return ok(competitionRanks(all, (e) => e.wpm)[index]);
+  return ok(denseRanks(all, (e) => e.wpm)[index]);
 };
 
 // --- daily ---
@@ -327,10 +324,7 @@ export const getDaily: Handler = async (ctx) => {
   const dayId = currentDayId(q.daysBefore === 1 ? 1 : 0);
   const all = await getSortedSpeedEntries(dailyEntriesCol(dayId, key));
   const start = page * pageSize;
-  const entries = competitionRanks(all, (e) => e.wpm).slice(
-    start,
-    start + pageSize,
-  );
+  const entries = denseRanks(all, (e) => e.wpm).slice(start, start + pageSize);
 
   return ok({ count: all.length, pageSize, entries, minWpm: 0 });
 };
@@ -356,7 +350,7 @@ export const getDailyRank: Handler = async (ctx) => {
   const index = all.findIndex((e) => e.uid === uid);
   if (index === -1) return ok(null);
 
-  return ok(competitionRanks(all, (e) => e.wpm)[index]);
+  return ok(denseRanks(all, (e) => e.wpm)[index]);
 };
 
 // --- weekly xp ---
@@ -378,7 +372,7 @@ export const getWeeklyXp: Handler = async (ctx) => {
   const weekId = currentWeekId(q.weeksBefore === 1 ? 1 : 0);
   const all = await getSortedWeeklyEntries(weeklyEntriesCol(weekId));
   const start = page * pageSize;
-  const entries = competitionRanks(all, (e) => e.totalXp).slice(
+  const entries = denseRanks(all, (e) => e.totalXp).slice(
     start,
     start + pageSize,
   );
@@ -396,5 +390,5 @@ export const getWeeklyXpRank: Handler = async (ctx) => {
   const index = all.findIndex((e) => e.uid === uid);
   if (index === -1) return ok(null);
 
-  return ok(competitionRanks(all, (e) => e.totalXp)[index]);
+  return ok(denseRanks(all, (e) => e.totalXp)[index]);
 };

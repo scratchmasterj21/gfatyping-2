@@ -40,7 +40,7 @@ function PlayerBadge(props: {
     <div
       class={cn(
         "flex min-w-0 items-center gap-2",
-        props.right === true && "flex-row-reverse",
+        props.right === true && "flex-row-reverse short:flex-row",
       )}
     >
       <div
@@ -58,11 +58,21 @@ function PlayerBadge(props: {
           {(uid) => <UserAvatar uid={uid()} class="h-11 w-11" />}
         </Show>
       </div>
-      <div class={cn("min-w-0", props.right === true && "text-right")}>
+      <div
+        class={cn(
+          "min-w-0",
+          props.right === true && "text-right short:text-left",
+        )}
+      >
         <div class="truncate text-base font-bold text-game-cream">
           {props.player.name}
         </div>
-        <div class={cn("flex gap-1", props.right === true && "justify-end")}>
+        <div
+          class={cn(
+            "flex gap-1",
+            props.right === true && "justify-end short:justify-start",
+          )}
+        >
           <For each={Array.from({ length: BOARDS_TO_WIN })}>
             {(_, i) => (
               <span
@@ -188,16 +198,16 @@ export function FourRow(props: {
   };
 
   return (
-    <div class="relative flex h-full flex-col items-center gap-3 bg-linear-to-b from-game-night to-game-dusk p-3 pt-16 font-kid sm:p-4 sm:pt-16">
-      {/* players + boards won */}
-      <div class="grid w-full max-w-xl grid-cols-[1fr_auto_1fr] items-center gap-2">
+    <div class="relative flex h-full flex-col items-center gap-3 bg-linear-to-b from-game-night to-game-dusk p-3 pt-16 font-kid sm:p-4 sm:pt-16 short:grid short:grid-cols-[15rem_1fr] short:grid-rows-[auto_auto_1fr] short:items-start short:gap-x-6">
+      {/* players + boards won (a side panel on short screens) */}
+      <div class="grid w-full max-w-xl grid-cols-[1fr_auto_1fr] items-center gap-2 short:grid-cols-1 short:gap-3">
         <PlayerBadge
           player={props.me}
           disc={props.myDisc}
           wins={props.game.wins[props.myDisc]}
           done={iMoved() && !pausing()}
         />
-        <div class="text-center text-sm font-bold text-game-cream/80">
+        <div class="text-center text-sm font-bold text-game-cream/80 short:order-first short:text-left">
           Board {props.game.boardNo}
           <div class="text-xs font-normal">best of 3</div>
         </div>
@@ -210,31 +220,43 @@ export function FourRow(props: {
         />
       </div>
 
-      <div class="w-full max-w-xl">
+      <div class="w-full max-w-xl short:col-start-1">
         <TimeBar remaining={remaining()} total={props.game.roundMs / 1000} />
       </div>
 
       {/* the board */}
       <div
-        class="relative min-h-0 w-full max-w-xl flex-1"
+        class="relative min-h-0 w-full max-w-xl flex-1 short:col-start-2 short:row-span-3 short:row-start-1 short:h-full short:max-w-none"
         style={{ "container-type": "size" }}
       >
         <div
           class="mx-auto flex h-full flex-col justify-center"
-          // as big as fits: full width, or the height minus the word row
-          style={{ width: "min(100%, calc((100cqh - 3rem) * 7 / 6))" }}
+          // as big as fits: full width, or the height minus the word rows
+          style={{ width: "min(100%, calc((100cqh - 4.75rem) * 7 / 6))" }}
         >
-          <div class="grid grid-cols-7 gap-1 pb-2 sm:gap-2">
+          {/* words zig-zag on two lines so long ones get room on small screens */}
+          <div class="grid grid-cols-7 gap-1 px-1.5 pb-2 sm:gap-2 sm:px-2.5">
             <For each={Array.from({ length: COLS }, (_, c) => c)}>
               {(col) => {
                 const word = (): string => props.game.words[col] ?? "";
                 const active = (): boolean => target() === col && canType();
                 return (
-                  <div class="flex min-h-9 items-end justify-center">
+                  <div
+                    class={cn(
+                      "relative flex h-16 justify-center",
+                      col % 2 === 0 ? "items-start" : "items-end",
+                    )}
+                  >
+                    <span
+                      class={cn(
+                        "absolute bottom-0 left-1/2 w-0.5 -translate-x-1/2 bg-game-cream/30",
+                        col % 2 === 0 ? "top-8" : "hidden",
+                      )}
+                    ></span>
                     <Show when={word() !== "" && !showingLast()}>
                       <span
                         class={cn(
-                          "max-w-full truncate rounded-lg px-1 py-0.5 text-center font-mono text-sm font-bold shadow-[0_3px_0_rgb(0_0_0/0.25)] sm:px-2 sm:text-lg",
+                          "relative z-10 rounded-lg px-1.5 py-0.5 text-center font-mono text-base leading-tight font-bold whitespace-nowrap shadow-[0_3px_0_rgb(0_0_0/0.25)] sm:px-2 sm:text-lg",
                           active()
                             ? "scale-110 bg-game-yellow text-game-ink"
                             : canType()
@@ -306,7 +328,7 @@ export function FourRow(props: {
       </div>
 
       {/* stays mounted between rounds so the iPad keeps focus + keyboard */}
-      <div class="flex min-h-16 w-full items-center justify-center">
+      <div class="flex min-h-16 w-full items-center justify-center short:col-start-1">
         <Show when={!props.game.over}>
           <MiniTypingInput
             value={canType() ? typed() : ""}
@@ -320,7 +342,7 @@ export function FourRow(props: {
                   ? `${props.opponent.name} is typing…`
                   : !roundOpen(props.game, props.now)
                     ? "time's up!"
-                    : "type a column's word"
+                    : "type a word"
             }
           />
         </Show>

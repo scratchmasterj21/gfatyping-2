@@ -221,16 +221,16 @@ export function weeklyWpm(
   return userDoc.weeklyPeriod?.wpm?.[mode2] ?? null;
 }
 
-function competitionRank<T>(
+function denseRank<T>(
   sorted: T[],
   score: (entry: T) => number,
 ): Array<T & { rank: number }> {
   let previous: number | undefined;
   let rank = 0;
-  return sorted.map((entry, index) => {
+  return sorted.map((entry) => {
     const current = score(entry);
     if (previous === undefined || current !== previous) {
-      rank = index + 1;
+      rank += 1;
     }
     previous = current;
     return { ...entry, rank };
@@ -287,7 +287,7 @@ export async function getClassroomLeaderboard(options: {
         stat: board.value(d),
         statLabel: board.label,
       }));
-    const ranked: RaceLeaderboardEntry[] = competitionRank(
+    const ranked: RaceLeaderboardEntry[] = denseRank(
       sorted,
       (entry) => entry.stat,
     );
@@ -312,7 +312,7 @@ export async function getClassroomLeaderboard(options: {
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
       }));
-    const ranked: RaceLeaderboardEntry[] = competitionRank(
+    const ranked: RaceLeaderboardEntry[] = denseRank(
       sorted,
       (entry) => entry.bestRaceWpm,
     );
@@ -337,7 +337,7 @@ export async function getClassroomLeaderboard(options: {
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
       }));
-    const ranked: RaceLeaderboardEntry[] = competitionRank(
+    const ranked: RaceLeaderboardEntry[] = denseRank(
       sorted,
       (entry) => entry.bestRaceAcc,
     );
@@ -368,7 +368,7 @@ export async function getClassroomLeaderboard(options: {
     const ranked: (LeaderboardEntry & {
       avatarUrl?: string;
       title?: string;
-    })[] = competitionRank(sorted, (entry) => entry.wpm);
+    })[] = denseRank(sorted, (entry) => entry.wpm);
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
@@ -388,7 +388,7 @@ export async function getClassroomLeaderboard(options: {
     const ranked: (XpLeaderboardEntry & {
       avatarUrl?: string;
       title?: string;
-    })[] = competitionRank(sorted, (entry) => entry.totalXp);
+    })[] = denseRank(sorted, (entry) => entry.totalXp);
     return { count: ranked.length, pageSize: ranked.length, entries: ranked };
   }
 
@@ -411,7 +411,7 @@ export async function getClassroomLeaderboard(options: {
   const ranked: (XpLeaderboardEntry & {
     avatarUrl?: string;
     title?: string;
-  })[] = competitionRank(sorted, (entry) => entry.totalXp);
+  })[] = denseRank(sorted, (entry) => entry.totalXp);
   return { count: ranked.length, pageSize: ranked.length, entries: ranked };
 }
 

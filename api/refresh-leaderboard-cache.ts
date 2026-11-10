@@ -96,15 +96,15 @@ type StoredUserDoc = {
 
 type Student = StoredUserDoc & { uid: string };
 
-function competitionRank<T>(
+function denseRank<T>(
   sorted: T[],
   score: (entry: T) => number,
 ): Array<T & { rank: number }> {
   let previous: number | undefined;
   let rank = 0;
-  return sorted.map((entry, index) => {
+  return sorted.map((entry) => {
     const current = score(entry);
-    if (previous === undefined || current !== previous) rank = index + 1;
+    if (previous === undefined || current !== previous) rank += 1;
     previous = current;
     return { ...entry, rank };
   });
@@ -183,7 +183,7 @@ function rankStudents(
         stat: board.value(d),
         statLabel: board.label,
       }));
-    const entries = competitionRank(ranked, (d) => d.stat);
+    const entries = denseRank(ranked, (d) => d.stat);
     return { count: entries.length, pageSize: entries.length, entries };
   }
 
@@ -205,7 +205,7 @@ function rankStudents(
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
       }));
-    const entries = competitionRank(ranked, (d) => d.bestRaceWpm);
+    const entries = denseRank(ranked, (d) => d.bestRaceWpm);
     return { count: entries.length, pageSize: entries.length, entries };
   }
 
@@ -227,7 +227,7 @@ function rankStudents(
         totalRaces: d.raceTotalRaces ?? 0,
         wins: d.raceWins ?? 0,
       }));
-    const entries = competitionRank(ranked, (d) => d.bestRaceAcc);
+    const entries = denseRank(ranked, (d) => d.bestRaceAcc);
     return { count: entries.length, pageSize: entries.length, entries };
   }
 
@@ -259,7 +259,7 @@ function rankStudents(
         avatarUrl: x.d.avatarUrl,
         title: x.d.selectedTitle,
       }));
-    const entries = competitionRank(ranked, (d) => d.wpm);
+    const entries = denseRank(ranked, (d) => d.wpm);
     return { count: entries.length, pageSize: entries.length, entries };
   }
 
@@ -276,7 +276,7 @@ function rankStudents(
         avatarUrl: d.avatarUrl,
         title: d.selectedTitle,
       }));
-    const entries = competitionRank(ranked, (d) => d.totalXp);
+    const entries = denseRank(ranked, (d) => d.totalXp);
     return { count: entries.length, pageSize: entries.length, entries };
   }
 
@@ -296,7 +296,7 @@ function rankStudents(
       avatarUrl: d.avatarUrl,
       title: d.selectedTitle,
     }));
-  const entries = competitionRank(ranked, (d) => d.totalXp);
+  const entries = denseRank(ranked, (d) => d.totalXp);
   return { count: entries.length, pageSize: entries.length, entries };
 }
 
@@ -342,7 +342,7 @@ function rankClassPairs(
     .sort(
       (a, b) => b.avgStars - a.avgStars || a.classId.localeCompare(b.classId),
     );
-  const entries = competitionRank(ranked, (c) => c.avgStars);
+  const entries = denseRank(ranked, (c) => c.avgStars);
 
   return { count: entries.length, pageSize: entries.length, entries };
 }
