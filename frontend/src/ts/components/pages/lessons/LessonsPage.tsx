@@ -2259,6 +2259,12 @@ export function LessonsPage(): JSXElement {
                           "type-racer",
                           "ghost-hunter",
                           "monster-raid",
+                          "balloon-pop",
+                          "fruit-ninja",
+                          "word-defender",
+                          "tower-climb",
+                          "snack-shop",
+                          "echo-keys",
                         ].includes(g.id),
                     )}
                   >
@@ -2279,6 +2285,12 @@ export function LessonsPage(): JSXElement {
                           "goldfish",
                           "shiritori",
                           "monster-raid",
+                          "balloon-pop",
+                          "fruit-ninja",
+                          "word-defender",
+                          "tower-climb",
+                          "snack-shop",
+                          "echo-keys",
                         ].includes(game.id) &&
                         !isCurrentUserAdmin() &&
                         isLessonLocked(requiredLesson);
@@ -2379,6 +2391,7 @@ export function LessonsPage(): JSXElement {
 
         <WordDefenderModal
           open={defenderOpen()}
+          initialMode={gameLaunchMode()}
           onClose={() => {
             setDefenderOpen(false);
             setRecommendedGameId(undefined);
@@ -2393,6 +2406,7 @@ export function LessonsPage(): JSXElement {
         />
         <TowerClimbModal
           open={towerOpen()}
+          initialMode={gameLaunchMode()}
           onClose={() => {
             setTowerOpen(false);
             setRecommendedGameId(undefined);
@@ -2404,6 +2418,7 @@ export function LessonsPage(): JSXElement {
         />
         <SnackShopModal
           open={snackOpen()}
+          initialMode={gameLaunchMode()}
           onClose={() => {
             setSnackOpen(false);
             setRecommendedGameId(undefined);
@@ -2415,6 +2430,7 @@ export function LessonsPage(): JSXElement {
         />
         <EchoKeysModal
           open={echoOpen()}
+          initialMode={gameLaunchMode()}
           onClose={() => {
             setEchoOpen(false);
             setRecommendedGameId(undefined);
@@ -2520,6 +2536,7 @@ export function LessonsPage(): JSXElement {
         />
         <BalloonPopModal
           open={balloonOpen()}
+          initialMode={gameLaunchMode()}
           onClose={() => {
             setBalloonOpen(false);
             setRecommendedGameId(undefined);
@@ -2567,6 +2584,7 @@ export function LessonsPage(): JSXElement {
         />
         <FruitNinjaModal
           open={fruitNinjaOpen()}
+          initialMode={gameLaunchMode()}
           onClose={() => {
             setFruitNinjaOpen(false);
             setRecommendedGameId(undefined);

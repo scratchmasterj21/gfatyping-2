@@ -8,12 +8,15 @@ export function SnackShopModal(props: {
   open: boolean;
   onClose: () => void;
   onResult?: (score: number, wave: number) => void;
+  initialMode?: "solo" | "together";
 }): JSXElement {
   return (
     <MiniGameShell
       open={props.open}
       onClose={props.onClose}
       onResult={props.onResult}
+      initialMode={props.initialMode}
+      raceDurationSec={(d) => d.seconds + 5}
       gameId="snack-shop"
       title="Snack Shop"
       difficulties={SNACK_DIFFICULTIES}

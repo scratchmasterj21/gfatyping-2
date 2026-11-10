@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createMemo,
   createSignal,
   For,
@@ -61,6 +62,8 @@ export function TowerClimb(p: MiniGamePlayProps<TowerDifficulty>): JSXElement {
   };
 
   const [state, setState] = createSignal<TowerState>(initialTower());
+  // live score for the multiplayer scoreboard
+  createEffect(() => p.onScore?.(towerScore(state())));
   const [word, setWord] = createSignal(nextWord());
   const [typed, setTyped] = createSignal("");
   const [wordClean, setWordClean] = createSignal(true);

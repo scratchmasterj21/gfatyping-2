@@ -8,12 +8,14 @@ export function EchoKeysModal(props: {
   open: boolean;
   onClose: () => void;
   onResult?: (score: number, wave: number) => void;
+  initialMode?: "solo" | "together";
 }): JSXElement {
   return (
     <MiniGameShell
       open={props.open}
       onClose={props.onClose}
       onResult={props.onResult}
+      initialMode={props.initialMode}
       gameId="echo-keys"
       title="Echo Keys"
       difficulties={ECHO_DIFFICULTIES}

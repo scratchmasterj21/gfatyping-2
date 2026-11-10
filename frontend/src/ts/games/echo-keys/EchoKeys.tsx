@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createSignal,
   For,
   JSXElement,
@@ -52,6 +53,8 @@ export function EchoKeys(p: MiniGamePlayProps<EchoDifficulty>): JSXElement {
   const keySet = new Set(settings.keys);
 
   const [state, setState] = createSignal<EchoState>(initialEcho());
+  // live score for the multiplayer scoreboard
+  createEffect(() => p.onScore?.(state().score));
   const [sequence, setSequence] = createSignal<string[]>([]);
   const [phase, setPhase] = createSignal<Phase>("pause");
   const [lit, setLit] = createSignal<string | null>(null);

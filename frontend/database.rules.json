@@ -251,6 +251,45 @@
         }
       }
     },
+    "scoreRaces": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.uid == $uid && ((!data.exists() && root.child('scoreRaces').child($code).child('status').val() == 'lobby') || (data.exists() && root.child('scoreRaces').child($code).child('status').val() != 'finished'))",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('score').val() <= 1000000 && newData.child('finished').isBoolean() && newData.child('online').isBoolean())"
+          }
+        },
+        "status": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && data.exists() && newData.val() == 'finished' && data.parent().child('startAt').isNumber() && data.parent().child('startAt').val() + data.parent().child('durationSec').val() * 1000 - 10000 < now",
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'countdown' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "gameId": {
+          ".validate": "(newData.val() == 'balloon-pop' || newData.val() == 'fruit-ninja' || newData.val() == 'word-defender' || newData.val() == 'tower-climb' || newData.val() == 'snack-shop' || newData.val() == 'echo-keys') && (!data.exists() || newData.val() == data.val())"
+        },
+        "durationSec": {
+          ".validate": "newData.isNumber() && newData.val() >= 30 && newData.val() <= 300 && (!data.exists() || newData.val() == data.val())"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "difficultyLabel": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "wordListLabel": {
+          ".validate": "newData.isString() && newData.val().length <= 80"
+        },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+          }
+        }
+      }
+    },
     "raidRooms": {
       ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],

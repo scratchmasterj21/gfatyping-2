@@ -24,6 +24,8 @@ const ROOM_ROOTS = [
   "karutaRooms",
   "goldfishRooms",
   "shiritoriRooms",
+  "raidRooms",
+  "scoreRaces",
 ] as const;
 /** Firestore deletes per run - plenty for a school, keeps a run cheap. */
 const MAX_RACE_DOCS = 100;

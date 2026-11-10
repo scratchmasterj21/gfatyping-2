@@ -23,7 +23,14 @@ import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
+import { ScoreRaceBoard } from "../components/score-race/ScoreRaceBoard";
+import { ScoreRaceFooter } from "../components/score-race/ScoreRaceFooter";
+import { ScoreRaceLobby } from "../components/score-race/ScoreRaceLobby";
+import { ScoreRaceModeSection } from "../components/score-race/ScoreRaceModeSection";
+import { ScoreRaceResults } from "../components/score-race/ScoreRaceResults";
+import { useScoreRace } from "../components/score-race/use-score-race";
 import { WordListPicker } from "../components/WordListPicker";
+import { ScoreRaceGameId } from "../shared/score-race";
 import {
   getWordListOptions,
   WordListOption,
@@ -57,7 +64,12 @@ export type MiniGamePlayProps<D> = {
   words: string[];
   difficulty: D;
   onFinish: (result: MiniGameResult) => void;
+  /** live score, for the multiplayer scoreboard */
+  onScore?: (score: number) => void;
 };
+
+/** Match lengths offered for games that don't time themselves. */
+const RACE_LENGTHS = [60, 120, 180] as const;
 
 /**
  * Shared setup -> play -> result flow for the DOM mini games. Each game only
@@ -67,7 +79,11 @@ export type MiniGamePlayProps<D> = {
 export function MiniGameShell<D extends DifficultyOption>(props: {
   open: boolean;
   onClose: () => void;
-  gameId: MiniGameId;
+  gameId: MiniGameId & ScoreRaceGameId;
+  initialMode?: "solo" | "together";
+  /** together: match length from the difficulty (games with their own
+   * timer); omit to let the host pick a length */
+  raceDurationSec?: (difficulty: D) => number;
   title: string;
   howToPlay: JSXElement;
   difficulties: D[];
@@ -90,13 +106,67 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   const [claim, setClaim] = createSignal<MiniGameClaim | "pending">("pending");
   // bumps on every start so the play area remounts fresh
   const [runId, setRunId] = createSignal(0);
+  const [mode, setMode] = createSignal<"solo" | "together">("solo");
+  const [raceLength, setRaceLength] = createSignal<number>(RACE_LENGTHS[0]);
+  /** my game is over in a match, the others are still playing */
+  const [raceDone, setRaceDone] = createSignal<number | null>(null);
+  let raceScore = 0;
+  let raceRewarded = false;
+
+  const rewardRace = (score: number, wave: number): void => {
+    if (raceRewarded) return;
+    raceRewarded = true;
+    props.onResult?.(score, Math.max(1, wave));
+    void claimMiniGameReward(props.gameId, score);
+  };
+
+  const race = useScoreRace({
+    gameId: untrack(() => props.gameId),
+    title: untrack(() => props.title),
+    onStart: (room) => {
+      setDifficulty(
+        () =>
+          props.difficulties.find((d) => d.label === room.difficultyLabel) ??
+          (props.difficulties[0] as D),
+      );
+      setWords(room.words ?? []);
+      raceScore = 0;
+      raceRewarded = false;
+      setRaceDone(null);
+      setRunId((n) => n + 1);
+      setPhase("playing");
+    },
+    onEnd: () => {
+      // time's up before my game ended: still count what I scored
+      rewardRace(raceScore, 1);
+      setPhase("pick");
+    },
+  });
 
   createEffect(() => {
     if (!props.open) {
       setPhase("pick");
       setResult(null);
+      void race.leave();
+      return;
     }
+    setMode(untrack(() => props.initialMode) ?? "solo");
   });
+
+  const createRace = async (): Promise<void> => {
+    const d = difficulty();
+    await race.create({
+      durationSec: props.raceDurationSec?.(d) ?? raceLength(),
+      difficultyLabel: d.label,
+      wordListLabel: props.usesWordList === false ? "" : selected().label,
+      words: props.usesWordList === false ? [] : await selected().getWords(),
+    });
+  };
+
+  const leaveRace = (): void => {
+    void race.leave();
+    setPhase("pick");
+  };
 
   const start = async (): Promise<void> => {
     setPhase("loading");
@@ -108,6 +178,13 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   };
 
   const finish = (r: MiniGameResult): void => {
+    if (race.phase() !== "off") {
+      race.reportFinished(r.score);
+      raceScore = r.score;
+      rewardRace(r.score, r.wave);
+      setRaceDone(r.score);
+      return;
+    }
     setResult(r);
     setPhase("result");
     if (r.score > 0) sfx.finish();
@@ -119,12 +196,22 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   return (
     <Show when={props.open}>
       <GameModalFrame
-        layout={phase() === "playing" ? "playing" : "pick"}
+        layout={
+          phase() === "playing" && race.phase() !== "results"
+            ? "playing"
+            : "pick"
+        }
         onClose={() => props.onClose()}
         // typed with the on-screen keyboard too, so no "connect a keyboard" hint
         needsKeyboard={false}
       >
         <Switch>
+          <Match when={race.phase() === "lobby"}>
+            <ScoreRaceLobby race={race} onLeave={leaveRace} />
+          </Match>
+          <Match when={race.phase() === "results"}>
+            <ScoreRaceResults race={race} onDone={leaveRace} />
+          </Match>
           <Match when={phase() === "pick"}>
             <GamePickLayout
               header={
@@ -134,15 +221,34 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                 />
               }
               footer={
-                <GameSetupPrimaryAction
-                  text="Start game"
-                  onClick={() => void start()}
-                />
+                <Show
+                  when={mode() === "together"}
+                  fallback={
+                    <GameSetupPrimaryAction
+                      text="Start game"
+                      onClick={() => void start()}
+                    />
+                  }
+                >
+                  <ScoreRaceFooter
+                    race={race}
+                    onCreate={() => void createRace()}
+                  />
+                </Show>
               }
             >
               <GameSetupSection title="How to play" accent>
                 <div class="grid gap-2 text-sm text-sub">{props.howToPlay}</div>
               </GameSetupSection>
+              <ScoreRaceModeSection
+                mode={mode()}
+                onModeChange={setMode}
+                lengths={
+                  props.raceDurationSec === undefined ? RACE_LENGTHS : undefined
+                }
+                length={raceLength()}
+                onLengthChange={setRaceLength}
+              />
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
                   options={props.difficulties}
@@ -176,18 +282,43 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
           </Match>
 
           <Match when={phase() === "playing"}>
-            {/* keyed on runId so each start remounts a fresh play area */}
-            <For each={[runId()]}>
-              {() => (
-                <>
-                  {props.play({
-                    words: untrack(words),
-                    difficulty: untrack(difficulty),
-                    onFinish: finish,
-                  })}
-                </>
+            <Show when={race.phase() === "playing"}>
+              <ScoreRaceBoard race={race} />
+            </Show>
+            <Show
+              when={raceDone() !== null}
+              fallback={
+                // keyed on runId so each start remounts a fresh play area
+                <For each={[runId()]}>
+                  {() => (
+                    <>
+                      {props.play({
+                        words: untrack(words),
+                        difficulty: untrack(difficulty),
+                        onFinish: finish,
+                        onScore: (score) => {
+                          if (race.phase() === "off") return;
+                          raceScore = score;
+                          race.reportScore(score);
+                        },
+                      })}
+                    </>
+                  )}
+                </For>
+              }
+            >
+              {(_) => (
+                <div class="grid h-full place-content-center justify-items-center gap-3 p-6 text-center font-kid">
+                  <Mascot mood="cheer" size={96} />
+                  <div class="text-2xl font-bold text-text">
+                    You scored {raceDone()}!
+                  </div>
+                  <div class="text-base text-sub">
+                    Waiting for the others to finish…
+                  </div>
+                </div>
               )}
-            </For>
+            </Show>
           </Match>
 
           <Match when={phase() === "result"}>

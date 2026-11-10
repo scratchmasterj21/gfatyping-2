@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createSignal,
   For,
   JSXElement,
@@ -75,6 +76,8 @@ export function SnackShop(p: MiniGamePlayProps<SnackDifficulty>): JSXElement {
   });
 
   const [state, setState] = createSignal<SnackState>(initialSnack());
+  // live score for the multiplayer scoreboard
+  createEffect(() => p.onScore?.(state().score));
   const [current, setCurrent] = createSignal<Customer>(newCustomer());
   const [queue, setQueue] = createSignal<Customer[]>([
     newCustomer(),
