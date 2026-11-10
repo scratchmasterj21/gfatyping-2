@@ -7,6 +7,8 @@ import { GHOST_TINTS } from "../art";
 export class Ghost extends GameObjects.Container {
   readonly word: string;
   readonly side: "left" | "right";
+  /** Ghost King (boss wave): hits left, counting this word */
+  readonly boss: { hp: number; maxHp: number } | null;
   private ghostImg: GameObjects.Image;
   private tag: WordTag;
   private bobPhase: number;
@@ -21,23 +23,42 @@ export class Ghost extends GameObjects.Container {
     y: number,
     word: string,
     side: "left" | "right",
+    boss: { hp: number; maxHp: number } | null = null,
   ) {
     super(scene, x, y);
     this.word = word;
     this.side = side;
+    this.boss = boss;
     this.spawnY = y;
     this.bobPhase = Math.random() * Math.PI * 2;
 
     // faces the middle of the lawn (art looks right by default)
     const tint = Math.floor(Math.random() * GHOST_TINTS.length);
     this.ghostImg = scene.add
-      .image(0, 10, `gh-ghost-${tint}`)
-      .setDisplaySize(56, 64)
+      .image(0, 10, boss === null ? `gh-ghost-${tint}` : "gh-king")
+      .setDisplaySize(boss === null ? 56 : 105, boss === null ? 64 : 144)
       .setOrigin(0.5, 1)
       .setFlipX(side === "right");
     this.add(this.ghostImg);
 
-    this.tag = new WordTag(scene, 0, -72, word, 16);
+    if (boss !== null) {
+      // hits-left bar over the crown
+      const barW = 84;
+      const bar = scene.add.graphics();
+      bar.fillStyle(hex("ink"), 0.8);
+      bar.fillRoundedRect(-barW / 2 - 2, -148, barW + 4, 12, 6);
+      bar.fillStyle(hex("red"), 1);
+      bar.fillRoundedRect(-barW / 2, -146, (barW * boss.hp) / boss.maxHp, 8, 4);
+      this.add(bar);
+    }
+
+    this.tag = new WordTag(
+      scene,
+      0,
+      boss === null ? -72 : -164,
+      word,
+      boss === null ? 16 : 20,
+    );
     this.add(this.tag);
     this.setTargetable(false);
 

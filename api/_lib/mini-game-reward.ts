@@ -15,6 +15,7 @@ export const MINI_GAME_IDS = [
   "karuta",
   "goldfish",
   "shiritori",
+  "monster-raid",
 ] as const;
 export type MiniGameId = (typeof MINI_GAME_IDS)[number];
 
@@ -37,6 +38,8 @@ export const MINI_GAME_SCORE_PER_COIN: Record<MiniGameId, number> = {
   goldfish: 12,
   // same scoring as Word Bomb
   shiritori: 15,
+  // damage + 5 per block + 40 for a win + 20 for MVP: a good win caps at 8
+  "monster-raid": 15,
 };
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;

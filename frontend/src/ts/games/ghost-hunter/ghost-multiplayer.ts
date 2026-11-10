@@ -52,6 +52,8 @@ export type SharedGhost = {
   x: number;
   y: number;
   frozen: boolean;
+  /** the Ghost King: hits left / total */
+  boss?: { hp: number; maxHp: number };
 };
 
 export type GhostWorld = {

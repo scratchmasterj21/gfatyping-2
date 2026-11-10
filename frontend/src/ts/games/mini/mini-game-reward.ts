@@ -13,7 +13,8 @@ export type MiniGameId =
   | "word-bomb"
   | "karuta"
   | "goldfish"
-  | "shiritori";
+  | "shiritori"
+  | "monster-raid";
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 

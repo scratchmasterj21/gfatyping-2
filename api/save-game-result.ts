@@ -35,6 +35,7 @@ const FREE_PLAY_IDS = new Set([
   "karuta",
   "goldfish",
   "shiritori",
+  "monster-raid",
 ]);
 /** One session can't count for more than this (tab left open, etc). */
 const MAX_SESSION_SECONDS = 30 * 60;

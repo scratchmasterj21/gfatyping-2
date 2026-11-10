@@ -29,7 +29,8 @@ export type BuiltinGame = {
     | "word-bomb"
     | "karuta"
     | "goldfish"
-    | "shiritori";
+    | "shiritori"
+    | "monster-raid";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -150,6 +151,14 @@ export const games: Game[] = [
     name: "Type Racer",
     description: "Race the CPU — type words to speed ahead!",
     icon: "fa-car",
+  },
+  {
+    type: "builtin",
+    id: "monster-raid",
+    name: "Monster Raid",
+    description:
+      "Team up with friends and type to beat monsters and a big boss!",
+    icon: "fa-dragon",
   },
   {
     type: "builtin",

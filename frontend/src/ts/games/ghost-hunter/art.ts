@@ -99,6 +99,25 @@ const bat = svg(
 `,
 );
 
+/** The Ghost King: a purple ghost with a gold crown (boss wave). */
+function kingGhost(): string {
+  const body = "#c9a3ff";
+  const inner = ghost(body)
+    .replace(/^<svg[^>]*>/, "")
+    .replace(/<\/svg>$/, "");
+  return svg(
+    70,
+    96,
+    `
+    <g transform="translate(0 16)">${inner}</g>
+    <path d="M17 22 L19 4 L28 14 L35 0 L42 14 L51 4 L53 22 Z" fill="${P.yellow}" stroke="${P.ink}" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="35" cy="14" r="3" fill="${P.red}"/>
+    <circle cx="24" cy="17" r="2" fill="${P.blue}"/>
+    <circle cx="46" cy="17" r="2" fill="${P.blue}"/>
+  `,
+  );
+}
+
 const sparkle = svg(
   24,
   24,
@@ -113,6 +132,7 @@ export function ghostTextureDefs(): Record<string, Def> {
     "gh-pumpkin": { svg: pumpkin, width: 48, height: 44 },
     "gh-bat": { svg: bat, width: 40, height: 20 },
     "gh-sparkle": { svg: sparkle, width: 24, height: 24 },
+    "gh-king": { svg: kingGhost(), width: 70, height: 96 },
   };
   GHOST_TINTS.forEach((c, i) => {
     defs[`gh-ghost-${i}`] = { svg: ghost(c), width: 70, height: 80 };

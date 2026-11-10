@@ -229,6 +229,49 @@
         }
       }
     },
+    "raidRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('raidRooms').child($code).child('status').val() == 'lobby') || data.exists())",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('online').isBoolean() && newData.child('dealt').isNumber() && newData.child('dealt').val() >= 0 && newData.child('dealt').val() <= 100000)"
+          }
+        },
+        "blocks": {
+          "$team": {
+            "$k": {
+              ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && !data.exists() && root.child('raidRooms').child($code).child('status').val() == 'playing' && root.child('raidRooms').child($code).child('teams').child(auth.uid).val() == $team",
+              ".validate": "newData.isString() && newData.val() == auth.uid"
+            }
+          }
+        },
+        "cleared": {
+          "$team": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && !data.exists() && root.child('raidRooms').child($code).child('status').val() == 'playing' && root.child('raidRooms').child($code).child('teams').child(auth.uid).val() == $team",
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          }
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "mode": {
+          ".validate": "newData.val() == 'coop' || newData.val() == 'teams'"
+        },
+        "teamSize": {
+          ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 4"
+        },
+        "difficultyLabel": {
+          ".validate": "newData.val() == 'Easy' || newData.val() == 'Medium' || newData.val() == 'Hard'"
+        }
+      }
+    },
     "digRooms": {
       ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],

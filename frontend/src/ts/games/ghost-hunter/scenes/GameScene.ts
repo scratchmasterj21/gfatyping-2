@@ -36,6 +36,15 @@ const DEFAULT_TARGET_Y_RANGE = 70; // fallback if no difficulty config is regist
 // ghosts than before to still feel like a real spike in danger.
 const HORDE_BONUS_MULTIPLIER = 2.5;
 const WORLD_SNAPSHOT_INTERVAL_MS = 250;
+/** Every this many waves the Ghost King comes (not in lesson checkpoints). */
+const BOSS_EVERY = 5;
+/** The Ghost King walks this much slower than normal ghosts. */
+const BOSS_SPEED_FACTOR = 0.5;
+/** Each word typed pushes the Ghost King back this far, px. */
+const BOSS_KNOCKBACK = 70;
+/** Logs the Ghost King reaches take this many hits. */
+const BOSS_LOG_DAMAGE = 2;
+const BOSS_BONUS = 100;
 
 type MultiplayerWorld = {
   wave: number;
@@ -48,6 +57,7 @@ type MultiplayerWorld = {
     x: number;
     y: number;
     frozen: boolean;
+    boss?: { hp: number; maxHp: number };
   }>;
   finished: boolean;
   cleared: boolean;
@@ -101,6 +111,7 @@ export class GameScene extends Scene {
   private betweenWaves = false;
   private isHordeWaveActive = false;
   private spawnTimer: Time.TimerEvent | null = null;
+  private isBossWaveActive = false;
 
   private centerX = 0;
   private groundY = 0;
@@ -150,6 +161,7 @@ export class GameScene extends Scene {
     this.pendingSpawns = 0;
     this.betweenWaves = false;
     this.isHordeWaveActive = false;
+    this.isBossWaveActive = false;
     this.facing = "right";
     this.movingUp = false;
     this.movingDown = false;
@@ -360,7 +372,9 @@ export class GameScene extends Scene {
       const ghost = this.ghosts[i];
       if (ghost === undefined) continue;
       if (ghost.isFrozen()) continue; // paused - still typeable via refreshTargeting above
-      ghost.x += ghost.side === "left" ? speed * dt : -(speed * dt);
+      const step =
+        (ghost.boss === null ? speed : speed * BOSS_SPEED_FACTOR) * dt;
+      ghost.x += ghost.side === "left" ? step : -step;
       ghost.bob(time);
 
       const logHp = ghost.side === "left" ? this.leftLogHp : this.rightLogHp;
@@ -742,7 +756,8 @@ export class GameScene extends Scene {
     } else {
       for (let i = this.ghosts.length - 1; i >= 0; i--) {
         const ghost = this.ghosts[i];
-        if (ghost === undefined) continue;
+        // TNT clears the little ghosts - the Ghost King has to be typed
+        if (ghost === undefined || ghost.boss !== null) continue;
         this.matcher.unregister(ghost.word);
         this.hits++;
         this.streak++;
@@ -770,7 +785,8 @@ export class GameScene extends Scene {
       const shouldBeTargetable =
         !this.pendingRemoteWords.has(ghost.word) &&
         (this.bothSides || ghost.side === this.facing) &&
-        Math.abs(ghost.y - this.playerY) <= this.targetYRange;
+        (ghost.boss !== null ||
+          Math.abs(ghost.y - this.playerY) <= this.targetYRange);
       if (shouldBeTargetable !== ghost.isTargetable()) {
         ghost.setTargetable(shouldBeTargetable);
         if (shouldBeTargetable) {
@@ -798,6 +814,56 @@ export class GameScene extends Scene {
 
   private isHordeWave(wave: number): boolean {
     return this.hordeEnabled && wave % 3 === 0;
+  }
+
+  /** Lesson checkpoints (solo, fixed short length) never get the boss. */
+  private isBossWave(wave: number): boolean {
+    const lesson = this.multiplayerRole === null && this.maxWave > 0;
+    return !lesson && wave % BOSS_EVERY === 0;
+  }
+
+  /** Hits the Ghost King takes: more each time he comes back, and on harder levels. */
+  private bossMaxHp(): number {
+    return (
+      3 +
+      Math.floor(this.wave / BOSS_EVERY) +
+      Math.ceil(this.perWaveBase / 2) +
+      (this.multiplayerRole !== null ? 3 : 0)
+    );
+  }
+
+  /** The boss wave: the Ghost King plus a few normal ghosts. */
+  private startBossWave(): void {
+    this.isHordeWaveActive = false;
+    this.isBossWaveActive = true;
+    // the Ghost King counts as one of this wave's ghosts
+    this.ghostsThisWave = this.perWaveBase + 1;
+    this.ghostsSpawned = 1;
+    this.pendingSpawns = 0;
+    this.betweenWaves = false;
+    this.game.events.emit("ui-wave", this.wave);
+    const side: "left" | "right" = Math.random() < 0.5 ? "left" : "right";
+    const W = this.scale.width;
+    const hp = this.bossMaxHp();
+    this.spawnBoss(side, side === "left" ? -50 : W + 50, hp, hp);
+    this.spawnTimer = this.time.addEvent({
+      delay: 4000,
+      callback: this.spawnGhost,
+      callbackScope: this,
+      repeat: this.ghostsThisWave - 2,
+    });
+  }
+
+  private spawnBoss(
+    side: "left" | "right",
+    x: number,
+    hp: number,
+    maxHp: number,
+  ): void {
+    const active = new Set(this.ghosts.map((g) => g.word));
+    const word = this.tryNextWord(active) ?? "boo";
+    const y = (this.lawnTop + this.lawnBottom) / 2;
+    this.ghosts.push(new Ghost(this, x, y, word, side, { hp, maxHp }));
   }
 
   private startWave(): void {
@@ -858,6 +924,24 @@ export class GameScene extends Scene {
     this.poof(ghost.x, ghost.y - 30);
     ghost.destroy();
     this.ghosts.splice(idx, 1);
+    if (ghost.boss !== null) {
+      if (ghost.boss.hp > 1) {
+        // knocked back - and a new word to type
+        const W = this.scale.width;
+        const x =
+          ghost.side === "left"
+            ? Math.max(-50, ghost.x - BOSS_KNOCKBACK)
+            : Math.min(W + 50, ghost.x + BOSS_KNOCKBACK);
+        this.spawnBoss(ghost.side, x, ghost.boss.hp - 1, ghost.boss.maxHp);
+        this.cameras.main.shake(120, 0.006);
+      } else {
+        this.score += BOSS_BONUS;
+        this.game.events.emit("ui-score", this.score);
+        this.cameras.main.flash(300, 255, 210, 63, false);
+        this.cameras.main.shake(300, 0.015);
+        playBombExplode();
+      }
+    }
     if (this.multiplayerRole === "host") {
       this.game.events.emit("multiplayer-player-award", {
         uid: playerUid,
@@ -882,12 +966,23 @@ export class GameScene extends Scene {
     this.matcher.unregister(ghost.word);
     ghost.destroy();
     this.ghosts.splice(idx, 1);
+    const damage = ghost.boss === null ? 1 : BOSS_LOG_DAMAGE;
+    if (ghost.boss !== null) {
+      // the Ghost King bounces off the log and comes again
+      const W = this.scale.width;
+      this.spawnBoss(
+        ghost.side,
+        ghost.side === "left" ? -50 : W + 50,
+        ghost.boss.hp,
+        ghost.boss.maxHp,
+      );
+    }
 
     if (ghost.side === "left") {
-      this.leftLogHp = Math.max(0, this.leftLogHp - 1);
+      this.leftLogHp = Math.max(0, this.leftLogHp - damage);
       this.game.events.emit("ui-log-left", this.leftLogHp);
     } else {
-      this.rightLogHp = Math.max(0, this.rightLogHp - 1);
+      this.rightLogHp = Math.max(0, this.rightLogHp - damage);
       this.game.events.emit("ui-log-right", this.rightLogHp);
     }
     this.redrawLogs();
@@ -945,7 +1040,24 @@ export class GameScene extends Scene {
       const W = this.scale.width;
       const H = this.scale.height;
 
-      if (this.isHordeWave(this.wave)) {
+      const lastWave = this.maxWave > 0 && this.wave >= this.maxWave;
+      const nextIsBoss = !lastWave && this.isBossWave(this.wave + 1);
+      const horde = !nextIsBoss && this.isHordeWave(this.wave);
+      const beatBoss = this.isBossWaveActive;
+      this.isBossWaveActive = false;
+
+      if (nextIsBoss) {
+        popBanner(
+          this,
+          W / 2,
+          H / 2,
+          "👑 The Ghost King is coming!",
+          "purple",
+          WAVE_PAUSE_MS,
+        );
+        this.cameras.main.flash(300, 80, 0, 120, false);
+        playHordeIncoming();
+      } else if (horde) {
         // Horde incoming — show warning, then unleash
         popBanner(
           this,
@@ -957,59 +1069,40 @@ export class GameScene extends Scene {
         );
         this.cameras.main.flash(300, 80, 0, 120, false);
         playHordeIncoming();
-
-        this.time.delayedCall(WAVE_PAUSE_MS, () => {
-          if (this.maxWave > 0 && this.wave >= this.maxWave) {
-            playGameOver();
-            if (this.multiplayerRole === "host") {
-              this.gameOver = true;
-              this.emitWorldSnapshot(true, true);
-            }
-            this.scene.stop("UI");
-            this.scene.start("GameOver", {
-              score: this.score,
-              wave: this.wave,
-              hits: this.hits,
-              misses: this.misses,
-              cleared: true,
-            });
-            return;
-          }
-          this.wave++;
-          this.startHordeWave();
-        });
       } else {
         this.tappy.cheer();
         popBanner(
           this,
           W / 2,
           H / 2,
-          `Wave ${this.wave} clear! 👻`,
-          "green",
+          beatBoss ? "Ghost King defeated! 👑" : `Wave ${this.wave} clear! 👻`,
+          beatBoss ? "yellow" : "green",
           WAVE_PAUSE_MS,
         );
-
-        this.time.delayedCall(WAVE_PAUSE_MS, () => {
-          if (this.maxWave > 0 && this.wave >= this.maxWave) {
-            playGameOver();
-            if (this.multiplayerRole === "host") {
-              this.gameOver = true;
-              this.emitWorldSnapshot(true, true);
-            }
-            this.scene.stop("UI");
-            this.scene.start("GameOver", {
-              score: this.score,
-              wave: this.wave,
-              hits: this.hits,
-              misses: this.misses,
-              cleared: true,
-            });
-            return;
-          }
-          this.wave++;
-          this.startWave();
-        });
       }
+
+      this.time.delayedCall(WAVE_PAUSE_MS, () => {
+        if (lastWave) {
+          playGameOver();
+          if (this.multiplayerRole === "host") {
+            this.gameOver = true;
+            this.emitWorldSnapshot(true, true);
+          }
+          this.scene.stop("UI");
+          this.scene.start("GameOver", {
+            score: this.score,
+            wave: this.wave,
+            hits: this.hits,
+            misses: this.misses,
+            cleared: true,
+          });
+          return;
+        }
+        this.wave++;
+        if (nextIsBoss) this.startBossWave();
+        else if (horde) this.startHordeWave();
+        else this.startWave();
+      });
     }
   }
 
@@ -1051,6 +1144,7 @@ export class GameScene extends Scene {
         x: ghost.x / width,
         y: (ghost.y - this.lawnTop) / lawnRange,
         frozen: ghost.isFrozen(),
+        ...(ghost.boss === null ? {} : { boss: ghost.boss }),
       })),
       finished,
       cleared,
@@ -1083,6 +1177,7 @@ export class GameScene extends Scene {
           this.lawnTop + state.y * lawnRange,
           state.word,
           state.side,
+          state.boss ?? null,
         );
         this.ghosts.push(ghost);
       }

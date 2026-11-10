@@ -66,6 +66,7 @@ import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
 import { GoldfishModal } from "../../../games/kana/GoldfishModal";
 import { KarutaModal } from "../../../games/kana/KarutaModal";
 import { ShiritoriModal } from "../../../games/kana/ShiritoriModal";
+import { MonsterRaidModal } from "../../../games/monster-raid/MonsterRaidModal";
 import { SnackShopModal } from "../../../games/snack-shop/SnackShopModal";
 import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
@@ -699,6 +700,7 @@ export function LessonsPage(): JSXElement {
   const [karutaOpen, setKarutaOpen] = createSignal(false);
   const [goldfishOpen, setGoldfishOpen] = createSignal(false);
   const [shiritoriOpen, setShiritoriOpen] = createSignal(false);
+  const [raidOpen, setRaidOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1471,6 +1473,7 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "karuta") setKarutaOpen(true);
     else if (gameId === "goldfish") setGoldfishOpen(true);
     else if (gameId === "shiritori") setShiritoriOpen(true);
+    else if (gameId === "monster-raid") setRaidOpen(true);
   };
 
   // Time in free-play games, for the teacher's activity view. Lesson
@@ -1493,6 +1496,7 @@ export function LessonsPage(): JSXElement {
     if (karutaOpen()) return "karuta";
     if (goldfishOpen()) return "goldfish";
     if (shiritoriOpen()) return "shiritori";
+    if (raidOpen()) return "monster-raid";
     return undefined;
   });
   createEffect(
@@ -2223,6 +2227,7 @@ export function LessonsPage(): JSXElement {
                             "type-toss",
                             "type-racer",
                             "ghost-hunter",
+                            "monster-raid",
                           ].includes(g.id),
                       )}
                     >
@@ -2242,6 +2247,7 @@ export function LessonsPage(): JSXElement {
                             "karuta",
                             "goldfish",
                             "shiritori",
+                            "monster-raid",
                           ].includes(game.id) &&
                           !isCurrentUserAdmin() &&
                           isLessonLocked(requiredLesson);
@@ -2461,6 +2467,15 @@ export function LessonsPage(): JSXElement {
           }}
         />
         <KanaPracticeModal />
+        <MonsterRaidModal
+          open={raidOpen()}
+          initialMode={gameLaunchMode()}
+          multiplayerUnlocked={true}
+          onClose={() => {
+            setRaidOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+        />
         <WordBombModal
           open={bombOpen()}
           initialMode={gameLaunchMode()}
