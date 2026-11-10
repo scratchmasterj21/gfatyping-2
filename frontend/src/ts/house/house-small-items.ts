@@ -430,6 +430,39 @@ export const HOUSE_SMALL_ITEMS: HouseSpriteItem[] = [
     sizePx: 48,
     slot: { xPct: 91.0, yPct: 77.6 },
   },
+  // drawn for GFA Typing (same style as the sprite sheet)
+  {
+    id: "lava-lamp",
+    name: "Lava Lamp",
+    price: 25,
+    image: images["lava-lamp.png"] ?? "",
+    sizePx: 18,
+    slot: { xPct: 15.0, yPct: 60.0 },
+  },
+  {
+    id: "cactus",
+    name: "Little Cactus",
+    price: 20,
+    image: images["cactus.png"] ?? "",
+    sizePx: 22,
+    slot: { xPct: 25.0, yPct: 60.0 },
+  },
+  {
+    id: "painting",
+    name: "Mountain Painting",
+    price: 35,
+    image: images["painting.png"] ?? "",
+    sizePx: 40,
+    slot: { xPct: 50.0, yPct: 10.0 },
+  },
+  {
+    id: "alarm-clock",
+    name: "Alarm Clock",
+    price: 20,
+    image: images["alarm-clock.png"] ?? "",
+    sizePx: 22,
+    slot: { xPct: 35.0, yPct: 60.0 },
+  },
 ];
 
 export function findHouseSmallItem(id: string): HouseSpriteItem | undefined {

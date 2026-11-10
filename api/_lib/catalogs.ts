@@ -137,6 +137,16 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     "wardrobe-double": { price: 60 },
     "wardrobe-mirror": { price: 45 },
     "wood-stove": { price: 60 },
+    "computer-desk": { price: 80 },
+    "tv-console": { price: 100 },
+    aquarium: { price: 120 },
+    "arcade-machine": { price: 150 },
+    "bean-bag": { price: 45 },
+    telescope: { price: 70 },
+    globe: { price: 50 },
+    "acoustic-guitar": { price: 60 },
+    "toy-chest": { price: 55 },
+    "teddy-bear": { price: 40 },
     // Small decorative items (see house-small-items.ts)
     "bottle-blue-small-1": { price: 10 },
     "bottle-blue-small-2": { price: 10 },
@@ -189,6 +199,10 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     teapot: { price: 20 },
     "tissue-cloud": { price: 10 },
     "wall-clock": { price: 20 },
+    "lava-lamp": { price: 25 },
+    cactus: { price: 20 },
+    painting: { price: 35 },
+    "alarm-clock": { price: 20 },
     // Room wall/floor finishes (see house-themes.ts). The free "plain"
     // default is deliberately absent - nothing to buy.
     "cozy-wood": { price: 80 },
