@@ -74,7 +74,7 @@ export function raidDifficultyFor(label: string): RaidDifficulty {
 export const WAVE_SHARES = [0.25, 0.25, 0.5] as const;
 
 /** Coins-score bonuses. */
-export const RAID_SCORE = { win: 40, mvp: 20, block: 5 };
+export const RAID_SCORE = { win: 40, mvp: 20, block: 5, heal: 5 };
 
 // ---------------------------------------------------------------- random
 
@@ -177,15 +177,62 @@ export function waveFor(dealt: number, maxHp: number): WaveView {
 
 // ---------------------------------------------------------------- attacks
 
-export type Charge = { k: number; startsAt: number; landsAt: number };
+/** Angry boss (below half HP): attacks come this much more often... */
+export const ANGRY_EVERY_FACTOR = 0.6;
+/** ...with this much less warning, and every 2nd one hits two players. */
+export const ANGRY_CHARGE_FACTOR = 0.75;
 
-/** Attack k (1, 2, ...) lands at startAt + k * attackEveryMs. */
-export function attackLandsAt(
+export type Attack = {
+  /** 1, 2, ... */
+  k: number;
+  startsAt: number;
+  landsAt: number;
+  /** the boss was angry when this attack started charging */
+  angry: boolean;
+  /** shields to type: 1, or 2 for a double attack */
+  slots: 1 | 2;
+};
+/** An attack that is charging right now. */
+export type Charge = Attack;
+
+/**
+ * Every attack in order. Until the boss gets angry (`angryAt`), attack k
+ * lands at startAt + k * attackEveryMs; an attack already charging when he
+ * gets angry still lands as normal, after that they speed up.
+ */
+export function* raidAttacks(
   startAt: number,
-  k: number,
   d: RaidDifficulty,
-): number {
-  return startAt + k * d.attackEveryMs;
+  angryAt?: number,
+): Generator<Attack> {
+  const angryEvery = Math.round(d.attackEveryMs * ANGRY_EVERY_FACTOR);
+  const angryCharge = Math.round(d.chargeMs * ANGRY_CHARGE_FACTOR);
+  let last = startAt;
+  let angryCount = 0;
+  for (let k = 1; ; k++) {
+    const normal = last + d.attackEveryMs;
+    if (angryAt === undefined || normal - d.chargeMs < angryAt) {
+      yield {
+        k,
+        startsAt: normal - d.chargeMs,
+        landsAt: normal,
+        angry: false,
+        slots: 1,
+      };
+      last = normal;
+      continue;
+    }
+    angryCount++;
+    const landsAt = Math.max(last + angryEvery, angryAt + angryCharge);
+    yield {
+      k,
+      startsAt: landsAt - angryCharge,
+      landsAt,
+      angry: true,
+      slots: angryCount % 2 === 0 ? 2 : 1,
+    };
+    last = landsAt;
+  }
 }
 
 /** The attack charging right now, if any. */
@@ -193,17 +240,29 @@ export function currentCharge(
   startAt: number,
   now: number,
   d: RaidDifficulty,
+  angryAt?: number,
 ): Charge | null {
   if (now < startAt) return null;
-  const k = Math.floor((now - startAt) / d.attackEveryMs) + 1;
-  const landsAt = attackLandsAt(startAt, k, d);
-  const startsAt = landsAt - d.chargeMs;
-  return now >= startsAt ? { k, startsAt, landsAt } : null;
+  for (const a of raidAttacks(startAt, d, angryAt)) {
+    if (a.landsAt <= now) continue;
+    return a.startsAt <= now ? a : null;
+  }
+  return null;
+}
+
+/** Key of one shield in the blocks list: "3", or "3b" for a double's 2nd. */
+export function blockKey(k: number, slot: number): string {
+  return slot === 0 ? String(k) : `${k}b`;
 }
 
 /** The shield word for attack k (the same for everyone in the room). */
-export function shieldWord(seed: number, k: number, words: string[]): string {
-  const rng = seededRandom(seed ^ Math.imul(k + 1, 2654435761));
+export function shieldWord(
+  seed: number,
+  k: number,
+  words: string[],
+  slot = 0,
+): string {
+  const rng = seededRandom(seed ^ Math.imul(k + 1 + slot * 977, 2654435761));
   // prefer a longer word so it feels like a big block
   const pool = words.filter((w) => w.length >= 4);
   const list = pool.length > 0 ? pool : words;
@@ -211,22 +270,89 @@ export function shieldWord(seed: number, k: number, words: string[]): string {
 }
 
 /**
- * Hearts lost up to time t: attacks that landed and weren't blocked. Also
- * returns when the last heart went (if it did).
+ * Who each shield of attack k is aimed at (only they can block it). A double
+ * attack picks two different players when the team has two.
+ */
+export function attackTargets(
+  seed: number,
+  k: number,
+  members: string[],
+  slots: 1 | 2,
+): string[] {
+  const list = members.toSorted();
+  if (list.length === 0) return [];
+  const rng = seededRandom(seed ^ Math.imul(k + 7, 40503));
+  const first = Math.floor(rng() * list.length);
+  const picks = [list[first] as string];
+  if (slots === 2) {
+    const second =
+      list.length < 2
+        ? first
+        : (first + 1 + Math.floor(rng() * (list.length - 1))) % list.length;
+    picks.push(list[second] as string);
+  }
+  return picks;
+}
+
+/** Boss below half HP: time to get angry. */
+export function bossShouldGetAngry(wave: WaveView): boolean {
+  return wave.index === 2 && !wave.cleared && wave.hp * 2 <= wave.maxHp;
+}
+
+// ---------------------------------------------------------------- heals
+
+/** A 💖 heal word shows up at 40s, then every 45s, for 8s. */
+export const HEAL_FIRST_MS = 40_000;
+export const HEAL_EVERY_MS = 45_000;
+export const HEAL_WINDOW_MS = 8000;
+
+export type HealWindow = { n: number; startsAt: number; endsAt: number };
+
+/** The heal word on screen right now, if any. */
+export function currentHeal(startAt: number, now: number): HealWindow | null {
+  const since = now - startAt - HEAL_FIRST_MS;
+  if (since < 0) return null;
+  const n = Math.floor(since / HEAL_EVERY_MS) + 1;
+  const begins = startAt + HEAL_FIRST_MS + (n - 1) * HEAL_EVERY_MS;
+  const endsAt = begins + HEAL_WINDOW_MS;
+  return now < endsAt ? { n, startsAt: begins, endsAt } : null;
+}
+
+export function healWord(seed: number, n: number, words: string[]): string {
+  const rng = seededRandom(seed ^ Math.imul(n + 3, 2246822519));
+  return words[Math.floor(rng() * words.length)] ?? "heart";
+}
+
+/**
+ * Hearts at time t: each attack slot that landed unblocked costs one, each
+ * heal (claim times) gives one back (up to START_HEARTS). Also returns when
+ * the last heart went (if it did) - no heal brings a team back after that.
  */
 export function heartsAt(
   startAt: number,
   t: number,
   d: RaidDifficulty,
-  blocked: ReadonlySet<number>,
+  blocked: ReadonlySet<string>,
+  angryAt?: number,
+  heals: readonly number[] = [],
 ): { hearts: number; knockedOutAt?: number } {
+  const events: { at: number; delta: number }[] = heals
+    .filter((at) => at <= t)
+    .map((at) => ({ at, delta: 1 }));
+  for (const a of raidAttacks(startAt, d, angryAt)) {
+    if (a.landsAt > t) break;
+    let lost = 0;
+    for (let slot = 0; slot < a.slots; slot++) {
+      if (!blocked.has(blockKey(a.k, slot))) lost++;
+    }
+    if (lost > 0) events.push({ at: a.landsAt, delta: -lost });
+  }
+  // attacks before heals at the same moment
+  events.sort((x, y) => x.at - y.at || x.delta - y.delta);
   let hearts = START_HEARTS;
-  for (let k = 1; ; k++) {
-    const lands = attackLandsAt(startAt, k, d);
-    if (lands > t) break;
-    if (blocked.has(k)) continue;
-    hearts--;
-    if (hearts <= 0) return { hearts: 0, knockedOutAt: lands };
+  for (const e of events) {
+    hearts = Math.min(START_HEARTS, hearts + e.delta);
+    if (hearts <= 0) return { hearts: 0, knockedOutAt: e.at };
   }
   return { hearts };
 }
@@ -264,10 +390,14 @@ export type RaidFacts = {
   teams: Record<string, RaidTeam>;
   /** uid -> damage dealt */
   dealt: Record<string, number>;
-  /** team -> blocked attack numbers */
-  blocked: Partial<Record<RaidTeam, ReadonlySet<number>>>;
+  /** team -> blocked shields (blockKey) */
+  blocked: Partial<Record<RaidTeam, ReadonlySet<string>>>;
   /** team -> when it beat its boss */
   clearedAt: Partial<Record<RaidTeam, number>>;
+  /** team -> when its boss got angry */
+  angryAt?: Partial<Record<RaidTeam, number>>;
+  /** team -> when each heal word was typed */
+  heals?: Partial<Record<RaidTeam, readonly number[]>>;
 };
 
 export type TeamView = {
@@ -279,6 +409,8 @@ export type TeamView = {
   hearts: number;
   knockedOut: boolean;
   clearedAt?: number;
+  /** when the boss got angry (if he has) */
+  angryAt?: number;
 };
 
 export type RaidView = {
@@ -307,6 +439,8 @@ export function raidView(f: RaidFacts, now: number): RaidView {
       now,
       f.difficulty,
       f.blocked[team] ?? new Set(),
+      f.angryAt?.[team],
+      f.heals?.[team],
     );
     return { team, members, dealt, maxHp, ko };
   });
@@ -344,6 +478,8 @@ export function raidView(f: RaidFacts, now: number): RaidView {
       at,
       f.difficulty,
       f.blocked[b.team] ?? new Set(),
+      f.angryAt?.[b.team],
+      f.heals?.[b.team],
     );
     return {
       team: b.team,
@@ -354,6 +490,7 @@ export function raidView(f: RaidFacts, now: number): RaidView {
       hearts: h.hearts,
       knockedOut: h.hearts <= 0,
       clearedAt: f.clearedAt[b.team],
+      angryAt: f.angryAt?.[b.team],
     };
   });
 
@@ -375,12 +512,14 @@ export function raidView(f: RaidFacts, now: number): RaidView {
 export function raidScore(input: {
   dealt: number;
   blocks: number;
+  heals?: number;
   won: boolean;
   mvp: boolean;
 }): number {
   return (
     Math.max(0, input.dealt) +
     input.blocks * RAID_SCORE.block +
+    (input.heals ?? 0) * RAID_SCORE.heal +
     (input.won ? RAID_SCORE.win : 0) +
     (input.mvp ? RAID_SCORE.mvp : 0)
   );
@@ -390,4 +529,51 @@ export function raidScore(input: {
 export function raidStars(won: boolean, hearts: number): number {
   if (!won) return 1;
   return hearts >= 4 ? 3 : 2;
+}
+
+// ---------------------------------------------------------------- awards
+
+export type RaidPlayerStats = {
+  uid: string;
+  name: string;
+  dealt: number;
+  blocks: number;
+  heals: number;
+  bestCombo: number;
+};
+
+export type RaidAward = {
+  icon: string;
+  title: string;
+  uids: string[];
+  names: string[];
+  value: number;
+};
+
+/** End-screen awards: top damage, blocks, combo and heals (ties share). */
+export function raidAwards(players: RaidPlayerStats[]): RaidAward[] {
+  const kinds: {
+    icon: string;
+    title: string;
+    of: (p: RaidPlayerStats) => number;
+  }[] = [
+    { icon: "⚔️", title: "Most damage", of: (p) => p.dealt },
+    { icon: "🛡️", title: "Most blocks", of: (p) => p.blocks },
+    { icon: "🔥", title: "Best combo", of: (p) => p.bestCombo },
+    { icon: "💖", title: "Healer", of: (p) => p.heals },
+  ];
+  const out: RaidAward[] = [];
+  for (const kind of kinds) {
+    const best = Math.max(0, ...players.map(kind.of));
+    if (best <= 0) continue;
+    const top = players.filter((p) => kind.of(p) === best);
+    out.push({
+      icon: kind.icon,
+      title: kind.title,
+      uids: top.map((p) => p.uid),
+      names: top.map((p) => p.name),
+      value: best,
+    });
+  }
+  return out;
 }

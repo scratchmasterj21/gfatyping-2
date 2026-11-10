@@ -37,7 +37,11 @@ export type RaidPlayer = {
   joinedAt: number;
   online: boolean;
   dealt: number;
+  /** longest run of mistake-free words */
+  bestCombo?: number;
 };
+
+export type RaidHeal = { uid: string; at: number };
 
 export type RaidRoom = {
   code: string;
@@ -52,10 +56,14 @@ export type RaidRoom = {
   startAt?: number;
   teams?: Record<string, RaidTeam>;
   players: Record<string, RaidPlayer>;
-  /** team -> attack number -> uid who blocked it */
+  /** team -> shield (blockKey) -> uid who blocked it */
   blocks?: Partial<Record<RaidTeam, Record<string, string>>>;
   /** team -> when it beat the boss (server time) */
   cleared?: Partial<Record<RaidTeam, number>>;
+  /** team -> when its boss got angry (server time) */
+  angry?: Partial<Record<RaidTeam, number>>;
+  /** team -> heal number -> who typed it and when */
+  heals?: Partial<Record<RaidTeam, Record<string, RaidHeal>>>;
 };
 
 const path = (code: string, rest = ""): DatabaseReference =>
@@ -187,23 +195,47 @@ export async function startRaidRoom(room: RaidRoom): Promise<void> {
   });
 }
 
-export async function writeDealt(code: string, dealt: number): Promise<void> {
+export async function writeDealt(
+  code: string,
+  dealt: number,
+  bestCombo: number,
+): Promise<void> {
   const user = getAuthenticatedUser();
   if (user === null) return;
   await update(path(code, `/players/${user.uid}`), {
     dealt: Math.max(0, Math.floor(dealt)),
+    bestCombo: Math.max(0, Math.floor(bestCombo)),
   });
 }
 
-/** Block attack k for my team (refused if a teammate got there first). */
+/** Block one shield (blockKey) for my team (first write wins). */
 export async function writeBlock(
   code: string,
   team: RaidTeam,
-  k: number,
+  key: string,
 ): Promise<void> {
   const user = getAuthenticatedUser();
   if (user === null) return;
-  await set(path(code, `/blocks/${team}/${k}`), user.uid);
+  await set(path(code, `/blocks/${team}/${key}`), user.uid);
+}
+
+/** My team's boss got angry (first write wins). */
+export async function writeAngry(code: string, team: RaidTeam): Promise<void> {
+  await set(path(code, `/angry/${team}`), raidNow());
+}
+
+/** I typed heal word n for my team (first write wins). */
+export async function writeHeal(
+  code: string,
+  team: RaidTeam,
+  n: number,
+): Promise<void> {
+  const user = getAuthenticatedUser();
+  if (user === null) return;
+  await set(path(code, `/heals/${team}/${n}`), {
+    uid: user.uid,
+    at: raidNow(),
+  } satisfies RaidHeal);
 }
 
 /** My team beat the boss (first write wins). */

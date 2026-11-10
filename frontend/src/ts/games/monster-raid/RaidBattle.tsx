@@ -38,6 +38,23 @@ export const TEAM_BG: Record<RaidTeam, string> = {
 
 export type RaidMember = { uid: string; name: string; dealt: number };
 
+/** One shield of the charging attack, as I see it. */
+export type ShieldView = {
+  key: string;
+  word: string;
+  targetName: string;
+  /** aimed at me - only I can block it */
+  mine: boolean;
+  blocked: boolean;
+};
+
+export type HealView = {
+  n: number;
+  word: string;
+  startsAt: number;
+  endsAt: number;
+};
+
 type Popup = { id: number; text: string; x: number };
 
 /**
@@ -56,11 +73,13 @@ export function RaidBattle(props: {
   /** my words, in order */
   words: string[];
   charge: Charge | null;
-  shield: string | undefined;
-  /** the charging attack is already blocked by my team */
-  shieldBlocked: boolean;
-  onHit: (damage: number) => void;
-  onBlock: (k: number) => void;
+  shields: ShieldView[];
+  heal: HealView | null;
+  /** my team's boss is angry */
+  angry: boolean;
+  onHit: (damage: number, combo: number) => void;
+  onBlock: (key: string) => void;
+  onHeal: (n: number) => void;
 }): JSXElement {
   const [wordIndex, setWordIndex] = createSignal(0);
   const [typed, setTyped] = createSignal("");
@@ -90,11 +109,13 @@ export function RaidBattle(props: {
     props.view.over ||
     mine()?.knockedOut === true ||
     mine()?.wave.cleared === true;
-  const shieldUp = (): boolean =>
-    props.charge !== null &&
-    props.shield !== undefined &&
-    !props.shieldBlocked &&
-    !done();
+  /** shields only I can type right now */
+  const myShields = (): ShieldView[] =>
+    props.charge === null || done()
+      ? []
+      : props.shields.filter((sh) => sh.mine && !sh.blocked);
+  const shieldUp = (): boolean => myShields().length > 0;
+  const healUp = (): boolean => props.heal !== null && !done();
   const secondsLeft = (): number =>
     Math.max(
       0,
@@ -110,12 +131,20 @@ export function RaidBattle(props: {
   const onInput = (raw: string): void => {
     if (counting() || done()) return;
     const value = raw.trim().toLowerCase();
-    const shield = shieldUp() ? (props.shield ?? "") : "";
-    if (shield !== "" && value === shield) {
-      const k = props.charge?.k;
-      if (k !== undefined) props.onBlock(k);
+    const shield = myShields().find((sh) => sh.word === value);
+    if (shield !== undefined) {
+      props.onBlock(shield.key);
       sfx.pop();
       popup("🛡️ Blocked!");
+      clearInput();
+      setWrong(false);
+      return;
+    }
+    const heal = healUp() ? props.heal : null;
+    if (heal !== null && value === heal.word) {
+      props.onHeal(heal.n);
+      sfx.great();
+      popup("💖 +1 heart!");
       clearInput();
       setWrong(false);
       return;
@@ -123,7 +152,7 @@ export function RaidBattle(props: {
     if (value === word()) {
       const nextCombo = clean() ? combo() + 1 : 0;
       const dmg = wordDamage(word(), clean(), nextCombo);
-      props.onHit(dmg);
+      props.onHit(dmg, nextCombo);
       setCombo(nextCombo);
       sfx.good();
       popup(`-${dmg}`);
@@ -135,7 +164,9 @@ export function RaidBattle(props: {
       return;
     }
     const ok =
-      word().startsWith(value) || (shield !== "" && shield.startsWith(value));
+      word().startsWith(value) ||
+      myShields().some((sh) => sh.word.startsWith(value)) ||
+      (heal !== null && heal.word.startsWith(value));
     if (!ok) {
       setClean(false);
       if (!wrong()) sfx.oops();
@@ -152,6 +183,18 @@ export function RaidBattle(props: {
         if (prev !== undefined && h < prev) {
           sfx.bad();
           popup("💥 Ouch!");
+        }
+      },
+    ),
+  );
+  createEffect(
+    on(
+      () => props.angry,
+      (angry, prev) => {
+        if (angry && prev === false) {
+          sfx.bad();
+          popup("😡 The boss is ANGRY!");
+          setHitKey((k) => k + 1);
         }
       },
     ),
@@ -230,7 +273,9 @@ export function RaidBattle(props: {
       <div class="relative flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center">
         <div class="text-center text-sm font-bold text-game-cream/80">
           {(mine()?.wave.index ?? 0) === 2
-            ? "👑 BOSS"
+            ? props.angry
+              ? "👑 BOSS · 😡 ANGRY!"
+              : "👑 BOSS"
             : `Wave ${(mine()?.wave.index ?? 0) + 1} of 3`}{" "}
           · {monster().name}
         </div>
@@ -248,18 +293,20 @@ export function RaidBattle(props: {
 
         <div class="relative mt-2 flex min-h-0 flex-1 items-center justify-center">
           <Show when={monster().id} keyed>
-            <div class="animate-game-pop motion-reduce:animate-none">
+            <div class="flex h-full animate-game-pop items-center justify-center motion-reduce:animate-none">
               <Show when={`hit-${hitKey()}`} keyed>
                 <img
                   src={monster().image}
                   alt={monster().name}
                   draggable={false}
                   class={cn(
-                    "max-h-[34vh] w-auto [image-rendering:pixelated]",
+                    "max-h-[min(34vh,100%)] w-auto object-contain [image-rendering:pixelated]",
                     (mine()?.wave.index ?? 0) === 2 ? "h-56 sm:h-64" : "h-40",
                     hitKey() > 0 && "animate-game-shake",
                     mine()?.wave.cleared === true && "opacity-0",
-                    shieldUp() && "drop-shadow-[0_0_14px_rgb(255_90_95)]",
+                    (shieldUp() || props.angry) &&
+                      "drop-shadow-[0_0_14px_rgb(255_90_95)]",
+                    props.angry && "saturate-150",
                   )}
                   style={{ "image-rendering": "pixelated" }}
                 />
@@ -278,29 +325,71 @@ export function RaidBattle(props: {
           </For>
         </div>
 
-        {/* shield word */}
-        <Show when={shieldUp() && props.charge}>
+        {/* shields: the one aimed at me to type, the rest for info */}
+        <Show when={props.charge !== null && !done() && props.charge}>
           {(c) => (
-            <div class="mt-1 grid w-72 max-w-full gap-1 rounded-2xl bg-game-red/90 px-4 py-2 text-center text-game-cream shadow-[0_4px_0_rgb(0_0_0/0.3)]">
+            <div class="mt-1 grid w-80 max-w-full justify-items-center gap-1.5">
+              <For each={props.shields}>
+                {(sh) => (
+                  <Show
+                    when={!sh.blocked}
+                    fallback={
+                      <div class="rounded-full bg-game-green px-4 py-1 text-sm font-bold text-game-ink">
+                        🛡️{" "}
+                        {sh.mine ? "Blocked!" : `${sh.targetName} blocked it!`}
+                      </div>
+                    }
+                  >
+                    <Show
+                      when={sh.mine}
+                      fallback={
+                        <div class="rounded-full bg-game-navy px-4 py-1 text-sm font-bold text-game-cream">
+                          🎯 {monster().name} is aiming at {sh.targetName}!
+                        </div>
+                      }
+                    >
+                      <div class="grid w-full gap-1 rounded-2xl bg-game-red/90 px-4 py-2 text-center text-game-cream shadow-[0_4px_0_rgb(0_0_0/0.3)]">
+                        <div class="text-xs font-bold tracking-wide uppercase">
+                          ⚠️ {monster().name} is aiming at YOU! Type to block:
+                        </div>
+                        <div class="font-mono text-3xl font-bold">
+                          {sh.word}
+                        </div>
+                        <div class="h-1.5 overflow-hidden rounded-full bg-game-ink/40">
+                          <div
+                            class="h-full bg-game-yellow"
+                            style={{
+                              width: `${Math.max(0, ((c().landsAt - props.now) / (c().landsAt - c().startsAt)) * 100)}%`,
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    </Show>
+                  </Show>
+                )}
+              </For>
+            </div>
+          )}
+        </Show>
+
+        {/* heal word: anyone on the team can grab it */}
+        <Show when={healUp() && props.heal}>
+          {(h) => (
+            <div class="mt-1 grid w-72 max-w-full gap-1 rounded-2xl bg-game-pink/90 px-4 py-2 text-center text-game-ink shadow-[0_4px_0_rgb(0_0_0/0.3)]">
               <div class="text-xs font-bold tracking-wide uppercase">
-                ⚠️ Attack coming! Type to block:
+                💖 Type to win back a heart:
               </div>
-              <div class="font-mono text-3xl font-bold">{props.shield}</div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-game-ink/40">
+              <div class="font-mono text-2xl font-bold">{h().word}</div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-game-ink/30">
                 <div
-                  class="h-full bg-game-yellow"
+                  class="h-full bg-game-cream"
                   style={{
-                    width: `${Math.max(0, ((c().landsAt - props.now) / (c().landsAt - c().startsAt)) * 100)}%`,
+                    width: `${Math.max(0, ((h().endsAt - props.now) / (h().endsAt - h().startsAt)) * 100)}%`,
                   }}
                 ></div>
               </div>
             </div>
           )}
-        </Show>
-        <Show when={props.charge !== null && props.shieldBlocked && !done()}>
-          <div class="mt-1 rounded-full bg-game-green px-4 py-1 font-bold text-game-ink">
-            🛡️ Blocked! Keep attacking!
-          </div>
         </Show>
       </div>
 

@@ -40,27 +40,44 @@ import {
   startRaidRoom,
   subscribeRaidRoom,
   syncRaidClock,
+  writeAngry,
   writeBlock,
   writeCleared,
   writeDealt,
+  writeHeal,
 } from "./raid-multiplayer";
 import {
+  attackTargets,
+  blockKey,
+  bossShouldGetAngry,
   currentCharge,
+  currentHeal,
+  healWord,
   MAX_RAID_PLAYERS,
   RAID_DIFFICULTIES,
   raidDifficultyFor,
   RaidDifficulty,
   RaidFacts,
   RaidMode,
+  raidAwards,
+  RaidPlayerStats,
   raidScore,
   raidStars,
   RaidTeam,
   raidView,
   shieldWord,
+  START_HEARTS,
   START_PAUSE_MS,
   wordStream,
 } from "./raid-rules";
-import { RaidBattle, RaidMember, TEAM_BG, TEAM_LABEL } from "./RaidBattle";
+import {
+  HealView,
+  RaidBattle,
+  RaidMember,
+  ShieldView,
+  TEAM_BG,
+  TEAM_LABEL,
+} from "./RaidBattle";
 
 const ME = "me";
 const RESULT_PAUSE_MS = 1800;
@@ -106,8 +123,12 @@ export function MonsterRaidModal(props: {
     seed: number;
     startAt: number;
     dealt: number;
-    blocked: Set<number>;
+    blocked: Set<string>;
     clearedAt?: number;
+    angryAt?: number;
+    /** heal number -> when I typed it */
+    heals: Map<number, number>;
+    bestCombo: number;
   } | null>(null);
 
   // together
@@ -118,6 +139,7 @@ export function MonsterRaidModal(props: {
   let unsubscribeRoom: (() => void) | undefined;
   /** my damage, kept locally so fast typing never loses a hit */
   let myDealt = 0;
+  let myBestCombo = 0;
 
   const uid = (): string | undefined => getAuthenticatedUser()?.uid;
   const myId = (): string => (mode() === "solo" ? ME : (uid() ?? ME));
@@ -142,6 +164,8 @@ export function MonsterRaidModal(props: {
         dealt: { [ME]: s.dealt },
         blocked: { red: s.blocked },
         clearedAt: s.clearedAt === undefined ? {} : { red: s.clearedAt },
+        angryAt: s.angryAt === undefined ? {} : { red: s.angryAt },
+        heals: { red: [...s.heals.values()] },
       };
     }
     const r = room();
@@ -150,7 +174,11 @@ export function MonsterRaidModal(props: {
     }
     const blocked: RaidFacts["blocked"] = {};
     for (const [team, ks] of Object.entries(r.blocks ?? {})) {
-      blocked[team as RaidTeam] = new Set(Object.keys(ks ?? {}).map(Number));
+      blocked[team as RaidTeam] = new Set(Object.keys(ks ?? {}));
+    }
+    const heals: NonNullable<RaidFacts["heals"]> = {};
+    for (const [team, hs] of Object.entries(r.heals ?? {})) {
+      heals[team as RaidTeam] = Object.values(hs ?? {}).map((h) => h.at);
     }
     const dealt = Object.fromEntries(
       Object.values(r.players ?? {}).map((p) => [p.uid, p.dealt ?? 0]),
@@ -165,6 +193,8 @@ export function MonsterRaidModal(props: {
       dealt,
       blocked,
       clearedAt: r.cleared ?? {},
+      angryAt: r.angry ?? {},
+      heals,
     };
   });
   const seed = (): number =>
@@ -175,22 +205,50 @@ export function MonsterRaidModal(props: {
   });
   const myTeam = (): RaidTeam => facts()?.teams[myId()] ?? "red";
   const myTeamView = () => view()?.teams.find((t) => t.team === myTeam());
+  const myAngryAt = (): number | undefined => facts()?.angryAt?.[myTeam()];
   const charge = createMemo(() => {
     const f = facts();
     if (f === null) return null;
-    return currentCharge(f.startAt, now(), f.difficulty);
+    return currentCharge(f.startAt, now(), f.difficulty, myAngryAt());
   });
-  const shield = (): string | undefined => {
+  /** teammates who can be aimed at: online ones (everyone if none are) */
+  const targetable = (): string[] => {
+    const team = myTeamView()?.members ?? [];
+    if (mode() === "solo") return team;
+    const players = room()?.players ?? {};
+    const online = team.filter((u) => players[u]?.online === true);
+    return online.length > 0 ? online : team;
+  };
+  const shields = createMemo((): ShieldView[] => {
     const c = charge();
     const f = facts();
-    return c === null || f === null
-      ? undefined
-      : shieldWord(seed(), c.k, f.difficulty.words);
-  };
-  const shieldBlocked = (): boolean => {
-    const c = charge();
-    return c !== null && facts()?.blocked[myTeam()]?.has(c.k) === true;
-  };
+    if (c === null || f === null) return [];
+    const targets = attackTargets(seed(), c.k, targetable(), c.slots);
+    return targets.map((target, slot) => {
+      const key = blockKey(c.k, slot);
+      return {
+        key,
+        word: shieldWord(seed(), c.k, f.difficulty.words, slot),
+        targetName:
+          target === myId() ? "you" : (names()[target] ?? "a teammate"),
+        mine: target === myId(),
+        blocked: f.blocked[myTeam()]?.has(key) === true,
+      };
+    });
+  });
+  const healClaimed = (n: number): boolean =>
+    mode() === "solo"
+      ? solo()?.heals.has(n) === true
+      : room()?.heals?.[myTeam()]?.[String(n)] !== undefined;
+  const heal = createMemo((): HealView | null => {
+    const f = facts();
+    if (f === null) return null;
+    const h = currentHeal(f.startAt, now());
+    if (h === null || healClaimed(h.n)) return null;
+    // only when it helps
+    if ((myTeamView()?.hearts ?? START_HEARTS) >= START_HEARTS) return null;
+    return { ...h, word: healWord(seed(), h.n, f.difficulty.words) };
+  });
   const myWords = createMemo(() =>
     wordStream(seed(), myId(), (facts()?.difficulty ?? difficulty()).words),
   );
@@ -211,33 +269,74 @@ export function MonsterRaidModal(props: {
   };
 
   // ---------------------------------------------------------- actions
-  const onHit = (damage: number): void => {
+  const onHit = (damage: number, combo: number): void => {
     if (mode() === "solo") {
-      setSolo((s) => (s === null ? s : { ...s, dealt: s.dealt + damage }));
+      setSolo((s) =>
+        s === null
+          ? s
+          : {
+              ...s,
+              dealt: s.dealt + damage,
+              bestCombo: Math.max(s.bestCombo, combo),
+            },
+      );
       return;
     }
     const code = roomCode();
     myDealt += damage;
+    myBestCombo = Math.max(myBestCombo, combo);
     // refresh the local view right away
     setRoom((r) => (r === null ? r : { ...r }));
     if (code !== undefined) {
-      void writeDealt(code, myDealt).catch(() => undefined);
+      void writeDealt(code, myDealt, myBestCombo).catch(() => undefined);
     }
   };
 
-  const onBlock = (k: number): void => {
+  const onBlock = (key: string): void => {
     if (mode() === "solo") {
       setSolo((s) =>
-        s === null ? s : { ...s, blocked: new Set([...s.blocked, k]) },
+        s === null ? s : { ...s, blocked: new Set([...s.blocked, key]) },
       );
       return;
     }
     const code = roomCode();
     if (code !== undefined) {
-      // a teammate may have blocked it first - then this is refused; fine
-      void writeBlock(code, myTeam(), k).catch(() => undefined);
+      void writeBlock(code, myTeam(), key).catch(() => undefined);
     }
   };
+
+  const onHeal = (n: number): void => {
+    if (mode() === "solo") {
+      setSolo((s) =>
+        s === null ? s : { ...s, heals: new Map(s.heals).set(n, Date.now()) },
+      );
+      return;
+    }
+    const code = roomCode();
+    if (code !== undefined) {
+      // a teammate may have grabbed it first - then this is refused; fine
+      void writeHeal(code, myTeam(), n).catch(() => undefined);
+    }
+  };
+
+  // my team's boss is down to half: he gets angry (first write wins)
+  createEffect(() => {
+    const t = myTeamView();
+    if (t === undefined || t.angryAt !== undefined) return;
+    if (!bossShouldGetAngry(t.wave) || view()?.over === true) return;
+    if (mode() === "solo") {
+      setSolo((s) =>
+        s === null || s.angryAt !== undefined
+          ? s
+          : { ...s, angryAt: Date.now() },
+      );
+      return;
+    }
+    const code = roomCode();
+    if (code !== undefined) {
+      void writeAngry(code, t.team).catch(() => undefined);
+    }
+  });
 
   // my team beat the boss: record when (first write wins)
   createEffect(() => {
@@ -267,13 +366,46 @@ export function MonsterRaidModal(props: {
     const best = Math.max(0, ...Object.values(f.dealt));
     const mvp = mode() === "together" && dealt > 0 && dealt === best;
     const r = untrack(room);
+    const s = untrack(solo);
+    const countBy = (list: string[]): Record<string, number> => {
+      const out: Record<string, number> = {};
+      for (const u of list) out[u] = (out[u] ?? 0) + 1;
+      return out;
+    };
+    const blocksBy = countBy(
+      Object.values(r?.blocks ?? {}).flatMap((ks) => Object.values(ks ?? {})),
+    );
+    const healsBy = countBy(
+      Object.values(r?.heals ?? {}).flatMap((hs) =>
+        Object.values(hs ?? {}).map((h) => h.uid),
+      ),
+    );
     const blocks =
+      mode() === "solo" ? (s?.blocked.size ?? 0) : (blocksBy[me] ?? 0);
+    const heals = mode() === "solo" ? (s?.heals.size ?? 0) : (healsBy[me] ?? 0);
+    const bestCombo =
       mode() === "solo"
-        ? (untrack(solo)?.blocked.size ?? 0)
-        : Object.values(r?.blocks?.[team ?? "red"] ?? {}).filter(
-            (u) => u === me,
-          ).length;
-    const score = raidScore({ dealt, blocks, won, mvp });
+        ? (s?.bestCombo ?? 0)
+        : Math.max(myBestCombo, r?.players[me]?.bestCombo ?? 0);
+    const score = raidScore({ dealt, blocks, heals, won, mvp });
+    const awards =
+      mode() === "solo" || r === null
+        ? []
+        : raidAwards(
+            Object.values(r.players ?? {}).map(
+              (p): RaidPlayerStats => ({
+                uid: p.uid,
+                name: p.name,
+                dealt: f.dealt[p.uid] ?? 0,
+                blocks: blocksBy[p.uid] ?? 0,
+                heals: healsBy[p.uid] ?? 0,
+                bestCombo:
+                  p.uid === me
+                    ? Math.max(myBestCombo, p.bestCombo ?? 0)
+                    : (p.bestCombo ?? 0),
+              }),
+            ),
+          );
     const hearts = v.teams.find((t) => t.team === team)?.hearts ?? 0;
     if (won) sfx.finish();
     if (r !== null && r.hostUid === uid()) {
@@ -295,9 +427,14 @@ export function MonsterRaidModal(props: {
         score,
         stars: raidStars(won, hearts),
         stats: [
-          { label: "damage", value: String(dealt) },
+          { label: "your damage", value: String(dealt) },
           { label: "attacks blocked", value: String(blocks) },
-          ...(mvp ? [{ label: "MVP", value: "⭐ top damage" }] : []),
+          { label: "best combo", value: `🔥 x${bestCombo}` },
+          { label: "hearts healed", value: String(heals) },
+          ...awards.map((a) => ({
+            label: `${a.icon} ${a.title}`,
+            value: `${a.names.join(" & ")} (${a.title === "Best combo" ? `x${a.value}` : a.value})`,
+          })),
         ],
       });
       setPhase("result");
@@ -317,6 +454,8 @@ export function MonsterRaidModal(props: {
       startAt: Date.now() + START_PAUSE_MS,
       dealt: 0,
       blocked: new Set(),
+      heals: new Map(),
+      bestCombo: 0,
     });
     setNow(Date.now());
     setPhase("playing");
@@ -326,6 +465,7 @@ export function MonsterRaidModal(props: {
   const watchRoom = (code: string): void => {
     unsubscribeRoom?.();
     myDealt = 0;
+    myBestCombo = 0;
     finished = false;
     setRoomCode(code);
     setPhase("lobby");
@@ -476,10 +616,14 @@ export function MonsterRaidModal(props: {
                 <li>⚔️ Type your word to hit the monster.</li>
                 <li>🔥 No mistakes in a row = combo for extra damage!</li>
                 <li>
-                  ⚠️ When the monster charges, type the red shield word to block
-                  it - or lose a ❤️.
+                  ⚠️ The monster aims at one player - if it&apos;s you, type the
+                  red shield word to block it, or your team loses a ❤️.
                 </li>
-                <li>👑 Beat 2 minions, then the boss!</li>
+                <li>💖 Grab a pink heal word to win back a heart.</li>
+                <li>
+                  👑 Beat 2 minions, then the boss - he gets angry at half
+                  health!
+                </li>
               </ul>
             </GameSetupSection>
             <GameSetupSection title="Who do you want to play with?">
@@ -628,10 +772,12 @@ export function MonsterRaidModal(props: {
                 members={members()}
                 words={myWords()}
                 charge={charge()}
-                shield={shield()}
-                shieldBlocked={shieldBlocked()}
+                shields={shields()}
+                heal={heal()}
+                angry={myAngryAt() !== undefined && (myAngryAt() ?? 0) <= now()}
                 onHit={onHit}
                 onBlock={onBlock}
+                onHeal={onHeal}
               />
             )}
           </Show>

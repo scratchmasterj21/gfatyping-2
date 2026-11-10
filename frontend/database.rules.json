@@ -310,6 +310,20 @@
             }
           }
         },
+        "angry": {
+          "$team": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && !data.exists() && root.child('raidRooms').child($code).child('status').val() == 'playing' && root.child('raidRooms').child($code).child('teams').child(auth.uid).val() == $team",
+            ".validate": "newData.isNumber() && newData.val() <= now + 60000"
+          }
+        },
+        "heals": {
+          "$team": {
+            "$n": {
+              ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && !data.exists() && root.child('raidRooms').child($code).child('status').val() == 'playing' && root.child('raidRooms').child($code).child('teams').child(auth.uid).val() == $team",
+              ".validate": "newData.child('uid').val() == auth.uid && newData.child('at').isNumber() && newData.child('at').val() <= now + 60000"
+            }
+          }
+        },
         "cleared": {
           "$team": {
             ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && !data.exists() && root.child('raidRooms').child($code).child('status').val() == 'playing' && root.child('raidRooms').child($code).child('teams').child(auth.uid).val() == $team",
