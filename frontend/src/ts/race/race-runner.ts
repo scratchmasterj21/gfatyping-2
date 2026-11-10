@@ -1,9 +1,11 @@
 import { loadFromLocalStorage } from "../config/lifecycle";
+import { getAuthenticatedUser } from "../firebase";
 import { setConfig } from "../config/setters";
 import { navigationEvent } from "../events/navigation";
 import { restartTestEvent } from "../events/test";
 import { setActiveLesson } from "../lessons/lesson-progress";
 import { getActivePage, setCustomTextIndicator } from "../states/core";
+import { showNoticeNotification } from "../states/notifications";
 import { getSnapshot } from "../states/snapshot";
 import { getLastResult, setLastResult } from "../states/test";
 import * as CustomText from "../test/custom-text";
@@ -21,6 +23,7 @@ import {
 } from "./race-db";
 import {
   getActiveRacePin,
+  getCurrentRace,
   resetRaceState,
   setActiveRacePin,
   setCurrentRace,
@@ -68,7 +71,25 @@ function teardownSubscriptions(): void {
 
 function subscribeToParticipants(pin: string): void {
   if (unsubParticipants !== null) return;
-  unsubParticipants = subscribeParticipants(pin, setRaceParticipants);
+  const myUid = getAuthenticatedUser()?.uid;
+  let listed = false;
+  unsubParticipants = subscribeParticipants(pin, (list) => {
+    setRaceParticipants(list);
+    if (myUid === undefined) return;
+    if (list.some((p) => p.uid === myUid)) {
+      listed = true;
+      return;
+    }
+    // I was in the lobby and now I'm not: the teacher removed me
+    if (listed && joinedPin === pin && getCurrentRace()?.status === "lobby") {
+      listed = false;
+      showNoticeNotification(
+        "Your teacher removed you from the race. Check your account and join again.",
+        { durationMs: 8000 },
+      );
+      void exitRace();
+    }
+  });
 }
 
 function stopParticipantSubscription(): void {

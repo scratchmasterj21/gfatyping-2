@@ -452,6 +452,15 @@ export async function leaveRace(pin: string): Promise<void> {
   await remove(participantRef(pin, user.uid)).catch(() => undefined);
 }
 
+/**
+ * Teacher removes a student from the lobby (e.g. signed in on the wrong
+ * account). The student's client sees itself gone and leaves; they can join
+ * again with the right account.
+ */
+export async function kickParticipant(pin: string, uid: string): Promise<void> {
+  await remove(participantRef(pin, uid));
+}
+
 /** Throttled live progress write for the current student. */
 export async function writeProgress(
   pin: string,

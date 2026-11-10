@@ -45,6 +45,7 @@ import {
   deleteRace,
   finishRace,
   getRace,
+  kickParticipant,
   RaceContentSource,
   resetAllParticipants,
   resolveRaceTokens,
@@ -1713,9 +1714,30 @@ export function RaceHostPage(): JSXElement {
                       }
                     >
                       {(p) => (
-                        <div class="flex animate-game-pop items-center gap-2 rounded-full bg-bg py-1.5 pr-4 pl-1.5 text-base font-bold text-text motion-reduce:animate-none">
+                        <div class="flex animate-game-pop items-center gap-2 rounded-full bg-bg py-1.5 pr-1.5 pl-1.5 text-base font-bold text-text motion-reduce:animate-none">
                           <Avatar url={p.avatarUrl} />
                           {p.name}
+                          <button
+                            type="button"
+                            class="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-sub hover:bg-error hover:text-bg"
+                            title={`Remove ${p.name}`}
+                            aria-label={`Remove ${p.name}`}
+                            onClick={() => {
+                              const pin = hostedPin();
+                              if (pin === null) return;
+                              kickParticipant(pin, p.uid).then(
+                                () =>
+                                  showSuccessNotification(`Removed ${p.name}`),
+                                (e: unknown) =>
+                                  showErrorNotification(
+                                    "Could not remove player",
+                                    { error: e },
+                                  ),
+                              );
+                            }}
+                          >
+                            <Fa icon="fa-times" />
+                          </button>
                         </div>
                       )}
                     </For>
