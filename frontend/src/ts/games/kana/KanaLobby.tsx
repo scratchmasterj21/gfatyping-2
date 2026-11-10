@@ -4,9 +4,11 @@ import type { KanaRoom } from "./kana-room";
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
+import { InviteClassmates } from "../components/InviteClassmates";
 
 /** Waiting room for the romaji games: code, players, Start for the host. */
 export function KanaLobby(props: {
+  gameId: string;
   room: KanaRoom<unknown> | null;
   code: string | undefined;
   me: string | undefined;
@@ -49,6 +51,14 @@ export function KanaLobby(props: {
       <Show when={players().length < 2}>
         <div class="text-center text-sub">Waiting for friends to join…</div>
       </Show>
+      <InviteClassmates
+        gameId={props.gameId}
+        code={props.code}
+        show={
+          props.room?.hostUid === props.me &&
+          players().length < props.maxPlayers
+        }
+      />
       <Show
         when={props.room?.hostUid === props.me}
         fallback={

@@ -671,6 +671,7 @@ export function ShiritoriModal(props: {
       >
         <Show when={phase() === "pick"}>
           <KanaGameSetup
+            gameId="shiritori"
             title="Shiritori Bomb"
             howTo={[
               "💣 A bomb is passed around - with a word chain!",
@@ -704,6 +705,7 @@ export function ShiritoriModal(props: {
         </Show>
         <Show when={phase() === "lobby"}>
           <KanaLobby
+            gameId="shiritori"
             room={room()}
             code={roomCode()}
             me={uid()}

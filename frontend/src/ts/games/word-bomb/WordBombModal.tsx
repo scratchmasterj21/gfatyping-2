@@ -24,6 +24,7 @@ import {
 } from "../components/GameResultOverlay";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
@@ -432,6 +433,7 @@ export function WordBombModal(props: {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="word-bomb"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -515,6 +517,11 @@ export function WordBombModal(props: {
                 Waiting for friends to join…
               </div>
             </Show>
+            <InviteClassmates
+              gameId="word-bomb"
+              code={roomCode()}
+              show={room()?.hostUid === uid()}
+            />
             <Show
               when={room()?.hostUid === uid()}
               fallback={

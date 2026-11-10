@@ -26,6 +26,7 @@ import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
@@ -436,6 +437,7 @@ export function GemDigModal(props: {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="gem-dig"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -526,6 +528,11 @@ export function GemDigModal(props: {
                 Waiting for friends to join…
               </div>
             </Show>
+            <InviteClassmates
+              gameId="gem-dig"
+              code={roomCode()}
+              show={room()?.hostUid === me()}
+            />
             <Show
               when={room()?.hostUid === me()}
               fallback={

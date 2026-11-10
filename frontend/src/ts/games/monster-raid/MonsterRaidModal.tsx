@@ -25,6 +25,7 @@ import {
 } from "../components/GameResultOverlay";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_GENERIC } from "../components/multiplayer-unlock-hints";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
@@ -459,6 +460,7 @@ export function MonsterRaidModal(props: {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="monster-raid"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -577,6 +579,11 @@ export function MonsterRaidModal(props: {
                 {room()?.mode === "teams" ? " for teams" : ""})
               </div>
             </Show>
+            <InviteClassmates
+              gameId="monster-raid"
+              code={roomCode()}
+              show={room()?.hostUid === uid()}
+            />
             <Show
               when={room()?.hostUid === uid()}
               fallback={

@@ -1,6 +1,7 @@
-import { JSXElement } from "solid-js";
+import { JSXElement, Show } from "solid-js";
 
 import { GameSetupPrimaryAction } from "./GameSetupPrimaryAction";
+import { WaitForInvite } from "./WaitForInvite";
 
 export function GameMultiplayerRoomFooter(props: {
   roomBusy: boolean;
@@ -9,6 +10,8 @@ export function GameMultiplayerRoomFooter(props: {
   onCreateRoom: () => void;
   onJoinRoom: () => void;
   createLabel?: string;
+  /** games-data id; shows "wait for an invite" */
+  gameId?: string;
 }): JSXElement {
   const createText = (): string =>
     props.roomBusy
@@ -45,6 +48,18 @@ export function GameMultiplayerRoomFooter(props: {
           Join
         </button>
       </div>
+      <Show when={props.gameId}>
+        {(gameId) => (
+          <WaitForInvite
+            gameId={gameId()}
+            disabled={props.roomBusy}
+            onAccept={(code) => {
+              props.onJoinCodeChange(code);
+              props.onJoinRoom();
+            }}
+          />
+        )}
+      </Show>
     </div>
   );
 }

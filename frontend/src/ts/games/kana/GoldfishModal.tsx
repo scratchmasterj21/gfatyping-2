@@ -524,6 +524,7 @@ export function GoldfishModal(props: {
       >
         <Show when={phase() === "pick"}>
           <KanaGameSetup
+            gameId="goldfish"
             title="Goldfish Scooping"
             howTo={[
               "🐟 Goldfish swim across the pond with hiragana words.",
@@ -557,6 +558,7 @@ export function GoldfishModal(props: {
         </Show>
         <Show when={phase() === "lobby"}>
           <KanaLobby
+            gameId="goldfish"
             room={room()}
             code={roomCode()}
             me={uid()}

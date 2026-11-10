@@ -25,6 +25,7 @@ import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
@@ -400,6 +401,7 @@ export function WordPongModal(props: {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="word-pong"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -491,6 +493,11 @@ export function WordPongModal(props: {
                 Waiting for a friend to join…
               </div>
             </Show>
+            <InviteClassmates
+              gameId="word-pong"
+              code={roomCode()}
+              show={room()?.hostUid === me() && players().length < 2}
+            />
             <Show
               when={room()?.hostUid === me()}
               fallback={

@@ -537,6 +537,7 @@ export function KarutaModal(props: {
       >
         <Show when={phase() === "pick"}>
           <KanaGameSetup
+            gameId="karuta"
             title="Karuta Battle"
             howTo={[
               "🎴 Hiragana cards are on the table.",
@@ -570,6 +571,7 @@ export function KarutaModal(props: {
         </Show>
         <Show when={phase() === "lobby"}>
           <KanaLobby
+            gameId="karuta"
             room={room()}
             code={roomCode()}
             me={uid()}

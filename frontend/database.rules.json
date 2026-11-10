@@ -229,6 +229,28 @@
         }
       }
     },
+    "gameInvites": {
+      "$grade": {
+        ".validate": "$grade.matches(/^G[1-6]$/)",
+        "$game": {
+          ".validate": "$game.matches(/^[a-z-]{2,20}$/)",
+          "waiting": {
+            ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+            "$uid": {
+              ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid",
+              ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('classId').isString() && newData.child('classId').val().beginsWith($grade) && newData.child('at').isNumber())",
+              "invite": {
+                ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && data.parent().exists()",
+                ".validate": "!newData.exists() || (newData.child('code').isString() && newData.child('code').val().matches(/^[0-9]{6}$/) && newData.child('fromUid').val() == auth.uid && newData.child('fromName').isString() && newData.child('fromName').val().length <= 40 && newData.child('at').isNumber())"
+              },
+              "$other": {
+                ".validate": "$other == 'uid' || $other == 'name' || $other == 'classId' || $other == 'at'"
+              }
+            }
+          }
+        }
+      }
+    },
     "raidRooms": {
       ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
       ".indexOn": ["createdAt"],

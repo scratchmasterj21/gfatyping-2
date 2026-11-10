@@ -24,6 +24,7 @@ import {
 } from "../components/GameResultOverlay";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
@@ -380,6 +381,7 @@ export function FourRowModal(props: {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="four-row"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -455,6 +457,11 @@ export function FourRowModal(props: {
                 Waiting for a friend to join…
               </div>
             </Show>
+            <InviteClassmates
+              gameId="four-row"
+              code={roomCode()}
+              show={room()?.hostUid === me() && players().length < 2}
+            />
             <Show
               when={room()?.hostUid === me()}
               fallback={

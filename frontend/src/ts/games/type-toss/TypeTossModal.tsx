@@ -30,6 +30,7 @@ import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS } from "../components/multiplayer-unlock-hints";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
@@ -389,6 +390,7 @@ export function TypeTossModal(props: Props): JSXElement {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="type-toss"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -491,6 +493,14 @@ export function TypeTossModal(props: Props): JSXElement {
                 </div>
               )}
             </For>
+            <InviteClassmates
+              gameId="type-toss"
+              code={roomCode()}
+              show={
+                room()?.hostUid === getAuthenticatedUser()?.uid &&
+                room()?.status !== "countdown"
+              }
+            />
             <Show
               when={room()?.status === "countdown"}
               fallback={

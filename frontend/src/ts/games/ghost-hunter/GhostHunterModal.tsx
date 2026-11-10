@@ -32,6 +32,7 @@ import { GameSetupMore } from "../components/GameSetupMore";
 import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
+import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_GHOST } from "../components/multiplayer-unlock-hints";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
@@ -484,6 +485,7 @@ export function GhostHunterModal(props: Props): JSXElement {
                 }
               >
                 <GameMultiplayerRoomFooter
+                  gameId="ghost-hunter"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
@@ -591,6 +593,14 @@ export function GhostHunterModal(props: Props): JSXElement {
                 )}
               </For>
             </div>
+            <InviteClassmates
+              gameId="ghost-hunter"
+              code={roomCode()}
+              show={
+                room()?.hostUid === getAuthenticatedUser()?.uid &&
+                room()?.status !== "countdown"
+              }
+            />
             <Show
               when={room()?.status === "countdown"}
               fallback={

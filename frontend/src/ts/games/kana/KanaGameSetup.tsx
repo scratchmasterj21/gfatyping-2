@@ -11,6 +11,7 @@ import { KANA_DIFFICULTIES, KanaDifficulty } from "./kana-words";
 
 /** The setup screen shared by the romaji games. */
 export function KanaGameSetup(props: {
+  gameId: string;
   title: string;
   howTo: string[];
   mode: "solo" | "together";
@@ -44,6 +45,7 @@ export function KanaGameSetup(props: {
           }
         >
           <GameMultiplayerRoomFooter
+            gameId={props.gameId}
             roomBusy={props.roomBusy}
             joinCode={props.joinCode}
             onJoinCodeChange={(c) => props.onJoinCodeChange(c)}
