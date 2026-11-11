@@ -183,18 +183,6 @@ export function Nav(): JSXElement {
               {...pageProperties("leaderboards", "Leaderboards")}
               onClick={() => setMobileMenuOpen(false)}
             />
-            <Show when={getSnapshot() !== undefined}>
-              <Button
-                variant="text"
-                fa={{ icon: "fa-flag-checkered", fixedWidth: true }}
-                text="Class race"
-                class={mobileDestinationClass("race")}
-                href="/race"
-                router-link
-                {...pageProperties("race", "Class race")}
-                onClick={() => setMobileMenuOpen(false)}
-              />
-            </Show>
             <Show when={isCurrentUserAdmin()}>
               <Button
                 variant="text"
@@ -282,6 +270,29 @@ export function Nav(): JSXElement {
       >
         {navLabel("Rankings")}
       </Button>
+      {/* always out in the header (not in Menu): students join races a lot */}
+      <Show when={getSnapshot() !== undefined}>
+        <Button
+          variant="text"
+          fa={{
+            icon: "fa-flag-checkered",
+            fixedWidth: true,
+          }}
+          router-link
+          dataset={{
+            "data-nav-item": "race",
+          }}
+          class={cn(
+            buttonClass(),
+            "aspect-auto gap-2 px-3 text-main",
+            kidTabBarHides(),
+          )}
+          href="/race"
+          {...pageProperties("race", "Class race")}
+        >
+          <span class="text-sm font-semibold">Class race</span>
+        </Button>
+      </Show>
       <Show when={isCurrentUserAdmin()}>
         <Button
           variant="text"
