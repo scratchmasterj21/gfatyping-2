@@ -416,6 +416,7 @@ export async function resetParticipant(pin: string): Promise<void> {
     finishedAt: 0,
     finalWpm: 0,
     finalAcc: 0,
+    submitted: false,
     lastSeen: Date.now(),
   });
 }
@@ -440,6 +441,7 @@ export async function resetAllParticipants(
         finishedAt: 0,
         finalWpm: 0,
         finalAcc: 0,
+        submitted: false,
         lastSeen: Date.now(),
       }),
     ),
@@ -494,6 +496,23 @@ export async function writeFinal(
   if (user === null) return;
   try {
     await callApi("/api/submit-race-result", { pin, ...data });
+  } catch (e) {
+    console.error("Failed to submit race result:", e);
+  }
+}
+
+/**
+ * Unfinished student's speed/accuracy so far, sent when the host ends the
+ * race early (same server checks as writeFinal; never marks them finished).
+ */
+export async function writePartial(
+  pin: string,
+  data: { wpm: number; acc: number; progress: number; wordIndex: number },
+): Promise<void> {
+  const user = getAuthenticatedUser();
+  if (user === null) return;
+  try {
+    await callApi("/api/submit-race-result", { pin, ...data, partial: true });
   } catch (e) {
     console.error("Failed to submit race result:", e);
   }
@@ -618,7 +637,8 @@ async function updateRaceStats(
 
       // Race speed / accuracy boards: speed races only - Tug of War is a
       // long home-row game and Blitz has no speed, so they'd skew it
-      const speedRace = isSpeedRaceFormat(format);
+      // ...and only from a full run (not a race the host cut short)
+      const speedRace = isSpeedRaceFormat(format) && s.finishedAt > 0;
       const bestWpm =
         speedRace && s.finalWpm > (prev.raceBestWpm ?? 0)
           ? { raceBestWpm: s.finalWpm, raceBestWpmAcc: s.finalAcc }

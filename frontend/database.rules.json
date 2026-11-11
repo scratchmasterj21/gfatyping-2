@@ -493,6 +493,9 @@
             "finalAcc": {
               ".validate": "newData.isNumber() && (newData.val() == 0 || auth.token.email == 'john.limpiada@felice.ed.jp')"
             },
+            "submitted": {
+              ".validate": "newData.isBoolean() && (newData.val() == false || auth.token.email == 'john.limpiada@felice.ed.jp')"
+            },
             "$other": { ".validate": false }
           }
         }

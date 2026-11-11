@@ -274,6 +274,12 @@ export function getTimerStats(): TimerStats[] {
   return timerStats;
 }
 
+/** Latest per-second wpm/acc of the running test (null before the 1st tick). */
+let liveStats: { wpm: number; acc: number } | null = null;
+export function getLiveStats(): { wpm: number; acc: number } | null {
+  return liveStats;
+}
+
 function timerStep(now: number, catchingUp: boolean): void {
   if (timerDebug) console.time("timer step -----------------------------");
 
@@ -304,6 +310,7 @@ function timerStep(now: number, catchingUp: boolean): void {
         ),
       ),
     };
+    liveStats = { wpm: wpmAndRaw.wpm, acc: roundTo2(acc) };
 
     //ui updates
     requestDebouncedAnimationFrame("test-timer.timerStep", () => {
@@ -365,6 +372,7 @@ export async function start(now: number): Promise<void> {
     removeNotification(id, "clear");
   }
   slowTimerNotifIds = [];
+  liveStats = null;
   void _startNew(now);
   // void _startOld(now);
 }

@@ -865,7 +865,8 @@ export function RaceHostPage(): JSXElement {
 
   /**
    * Run `then` once the students' final results are in. Races that end on
-   * the clock (timed, Tug of War) end for everyone at once, and each
+   * the clock (timed, Tug of War) or that the host ends early end for
+   * everyone at once, and each
    * student's final speed arrives a moment later from their own screen -
    * saving straight away recorded everyone at 0 wpm (no bests, no coins,
    * wrong winner). Waits until every connected student has submitted, or
@@ -873,10 +874,14 @@ export function RaceHostPage(): JSXElement {
    */
   const RESULTS_WAIT_MS = 12_000;
   const whenResultsIn = (format: RaceFormat, then: () => void): void => {
-    const clock = format === "timed" || format === "tug";
+    // blitz scores live in the room; everything else waits for students'
+    // results (finish/accuracy too: ending early sends progress so far)
+    const clock = format !== "blitz";
     const deadline = Date.now() + (clock ? RESULTS_WAIT_MS : 0);
     const check = (): void => {
-      const waiting = participants().some((p) => !p.finished && isConnected(p));
+      const waiting = participants().some(
+        (p) => !p.finished && p.submitted !== true && isConnected(p),
+      );
       if (clock && waiting && Date.now() < deadline) {
         setTimeout(check, 500);
         return;

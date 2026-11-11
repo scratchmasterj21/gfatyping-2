@@ -35,7 +35,10 @@ export default async function handler(
     acc?: unknown;
     progress?: unknown;
     wordIndex?: unknown;
+    /** host ended the race before I finished: progress so far */
+    partial?: unknown;
   };
+  const partial = body.partial === true;
 
   const pin = body.pin;
   const wpm = Number(body.wpm);
@@ -102,6 +105,28 @@ export default async function handler(
       throw new SubmitError("Race is not running");
     }
 
+    if (partial) {
+      const tokens = Array.isArray(race.tokens) ? race.tokens.length : 0;
+      const already = participantSnap.val() as { finished?: boolean } | null;
+      if (!justFinished || race.format === "blitz" || wordIndex > tokens) {
+        throw new SubmitError("Race hasn't ended");
+      }
+      if (already?.finished === true) {
+        res.status(200).json({ ok: true });
+        return;
+      }
+      await participantRef.update({
+        finalWpm: wpm,
+        finalAcc: acc,
+        progress,
+        wordIndex,
+        submitted: true,
+        lastSeen: Date.now(),
+      });
+      res.status(200).json({ ok: true });
+      return;
+    }
+
     const tokenCount = Array.isArray(race.tokens) ? race.tokens.length : 0;
     const runningAt = Number(race.runningAt);
     const elapsedMs = Date.now() - runningAt;
@@ -131,6 +156,7 @@ export default async function handler(
       finalAcc: acc,
       progress,
       wordIndex,
+      submitted: true,
       lastSeen: Date.now(),
     });
     res.status(200).json({ ok: true });

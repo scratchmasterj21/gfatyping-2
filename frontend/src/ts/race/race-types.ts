@@ -75,6 +75,8 @@ export type RaceParticipant = {
   finishedAt?: number;
   finalWpm?: number;
   finalAcc?: number;
+  /** result sent this round (full, or progress so far if the race was ended) */
+  submitted?: boolean;
   /** Updated with progress writes (RTDB) while running; used to detect disconnects. */
   lastSeen?: number;
 };
@@ -117,7 +119,8 @@ export function generatePin(): string {
 /**
  * Rank participants for final standings.
  * - "finish": earliest to complete wins; progress then accuracy break ties.
- * - "accuracy": highest accuracy wins; WPM then finish time break ties.
+ * - "accuracy": finishers first, then highest accuracy; WPM then finish
+ *   time break ties.
  * - "timed": highest WPM wins; accuracy breaks ties.
  */
 export function rankParticipants(
@@ -126,6 +129,8 @@ export function rankParticipants(
 ): RaceStanding[] {
   const sorted = [...participants].sort((a, b) => {
     if (format === "accuracy") {
+      // ended early: finishing the text beats a few perfect words
+      if (a.finished !== b.finished) return a.finished ? -1 : 1;
       if ((b.finalAcc ?? 0) !== (a.finalAcc ?? 0)) {
         return (b.finalAcc ?? 0) - (a.finalAcc ?? 0);
       }

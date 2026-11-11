@@ -10,6 +10,7 @@ import { getSnapshot } from "../states/snapshot";
 import { getLastResult, setLastResult } from "../states/test";
 import * as CustomText from "../test/custom-text";
 import * as TestState from "../test/test-state";
+import { getLiveStats } from "../test/test-timer";
 import {
   getRace,
   getParticipants,
@@ -19,6 +20,7 @@ import {
   subscribeParticipants,
   subscribeRace,
   writeFinal,
+  writePartial,
   writeProgress,
 } from "./race-db";
 import {
@@ -184,6 +186,8 @@ function handleRaceUpdate(race: Race): void {
     }
   }
 
+  if (race.status === "finished") submitOnRaceEnd(race);
+
   if (race.status === "lobby") {
     subscribeToParticipants(race.pin);
   } else if (race.status === "countdown" || race.status === "running") {
@@ -194,9 +198,12 @@ function handleRaceUpdate(race: Race): void {
   } else if (race.status === "finished" && !finalParticipantsLoaded) {
     finalParticipantsLoaded = true;
     stopParticipantSubscription();
-    void getParticipants(race.pin)
-      .then(setRaceParticipants)
-      .catch(() => undefined);
+    // give everyone's end-of-race results (submitOnRaceEnd) a moment to land
+    setTimeout(() => {
+      void getParticipants(race.pin)
+        .then(setRaceParticipants)
+        .catch(() => undefined);
+    }, RESULTS_SETTLE_MS);
   }
 
   if (
@@ -208,6 +215,55 @@ function handleRaceUpdate(race: Race): void {
   ) {
     enterTest(race);
   }
+}
+
+const RESULTS_SETTLE_MS = 3000;
+
+/**
+ * The host ended the race while I was still typing: send how far I got and
+ * my speed/accuracy so far, instead of leaving me at 0 in the standings.
+ */
+function submitOnRaceEnd(race: Race): void {
+  if (
+    finalWritten ||
+    race.format === "blitz" ||
+    enteredPin !== race.pin ||
+    enteredRound !== race.round
+  ) {
+    return;
+  }
+  // clock ran out: the test's own result is on its way (startPolling)
+  if (
+    isTimedFormat(race.format) &&
+    race.durationSec !== undefined &&
+    race.runningAt !== undefined &&
+    (race.finishedAt ?? Date.now()) >=
+      race.runningAt + race.durationSec * 1000 - 1000
+  ) {
+    return;
+  }
+  finalWritten = true;
+  stopPolling();
+  const result = getLastResult();
+  if (result !== null) {
+    void writeFinal(race.pin, {
+      wpm: result.wpm,
+      acc: result.acc,
+      progress: 1,
+      wordIndex: TestState.activeWordIndex,
+    });
+    return;
+  }
+  const live = getLiveStats();
+  if (live === null) return;
+  const total = race.tokens.length;
+  const wordIndex = TestState.activeWordIndex;
+  void writePartial(race.pin, {
+    wpm: live.wpm,
+    acc: live.acc,
+    progress: total > 0 ? Math.min(wordIndex / total, 1) : 0,
+    wordIndex,
+  });
 }
 
 /**
