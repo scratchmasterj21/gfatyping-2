@@ -5,11 +5,11 @@ import {
   FINGER_ORDER,
   fingerForChar,
 } from "../../lessons/finger-map";
+import { requestHomeRowCheck } from "../../lessons/home-row-check";
 import {
   getIntroLesson,
   getIntroRewardCategory,
 } from "../../lessons/lesson-intro";
-import { startLesson } from "../../lessons/lesson-launcher";
 import { tipOfTheDay } from "../../lessons/typing-tips";
 import { hideModalAndClearChain } from "../../states/modals";
 import * as TTS from "../../test/tts";
@@ -55,8 +55,12 @@ export function LessonIntroModal(): JSXElement {
   const start = (): void => {
     const lesson = getIntroLesson();
     window.speechSynthesis.cancel();
-    hideModalAndClearChain("LessonIntro");
-    if (lesson !== null) void startLesson(lesson, getIntroRewardCategory());
+    if (lesson === null) {
+      hideModalAndClearChain("LessonIntro");
+      return;
+    }
+    // swaps this modal for the home-row check, which starts the lesson
+    requestHomeRowCheck(lesson, getIntroRewardCategory());
   };
 
   return (

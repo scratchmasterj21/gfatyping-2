@@ -43,7 +43,8 @@ export type ModalId =
   | "EditPresetModal"
   | "EditProfile"
   | "LessonIntro"
-  | "LessonIntroVideo";
+  | "LessonIntroVideo"
+  | "HomeRowCheck";
 
 export type ModalVisibility = {
   visible: boolean;

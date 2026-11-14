@@ -10,6 +10,7 @@ import { CustomTestDurationModal } from "./CustomTestDurationModal";
 import { CustomTextModal } from "./CustomTextModal";
 import { CustomWordAmountModal } from "./CustomWordAmountModal";
 import { HandsShopModal } from "./HandsShopModal";
+import { HomeRowCheckModal } from "./HomeRowCheckModal";
 import { HouseModal } from "./HouseModal";
 import { HouseShopModal } from "./HouseShopModal";
 import { KeyboardSkinShopModal } from "./KeyboardSkinShopModal";
@@ -51,6 +52,7 @@ export function Modals(): JSXElement {
       <AddPresetModal />
       <EditPresetModal />
       <LessonIntroModal />
+      <HomeRowCheckModal />
       <LessonIntroVideoModal />
       <AvatarModal />
       <SideImagesModal />

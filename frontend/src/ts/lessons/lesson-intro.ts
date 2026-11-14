@@ -3,7 +3,7 @@ import { createSignal } from "solid-js";
 import { Config } from "../config/store";
 import { isKanaLesson, openKanaPractice } from "../states/kana-practice";
 import { showModal } from "../states/modals";
-import { startLesson } from "./lesson-launcher";
+import { requestHomeRowCheck } from "./home-row-check";
 import { PracticeRewardCategory } from "./lesson-progress";
 import { Lesson } from "./lessons-data";
 
@@ -19,7 +19,7 @@ export const getIntroRewardCategory = introRewardCategory;
 /**
  * Launch a lesson, first showing a pre-reader intro (new keys + finger hints,
  * optional read-aloud) when intros are enabled and the lesson introduces keys.
- * Otherwise starts the lesson directly.
+ * Then (or straight away) the home-row check, which starts the lesson.
  */
 export function launchLessonWithIntro(
   lesson: Lesson,
@@ -37,5 +37,5 @@ export function launchLessonWithIntro(
     showModal("LessonIntro");
     return;
   }
-  void startLesson(lesson, rewardCategory);
+  requestHomeRowCheck(lesson, rewardCategory);
 }
