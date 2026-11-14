@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import admin from "firebase-admin";
 
+import { tokyoDateString, tokyoWeekId } from "./_lib/time.js";
+
 // Reads the entire `users` collection to rank the grade/school classroom
 // leaderboards, then caches the result so repeat views within TTL_MS are a
 // single doc read instead of a full collection scan. Only this function
@@ -92,6 +94,11 @@ type StoredUserDoc = {
   raceBestTug?: number;
   championWins?: number;
   lessonStars?: number;
+  /** see api/_lib/activity.ts */
+  activityDays?: Record<
+    string,
+    { t?: number; l?: number; lx?: unknown[] } | null | undefined
+  >;
 };
 
 type Student = StoredUserDoc & { uid: string };
@@ -305,8 +312,45 @@ type ClassPairEntry = {
   studentCount: number;
   avgStars: number;
   totalStars: number;
+  /** lessons passed with 2+ stars this Japan week (Mon-Sun), for class goals */
+  weekLessons: number;
+  /** typing seconds this Japan week */
+  weekTypingSec: number;
   rank: number;
 };
+
+/** Japan dates from this Monday to today. Mirrors weekDates() in classroom/activity.ts. */
+function thisWeekDates(now = Date.now()): string[] {
+  const today = tokyoDateString(now);
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = tokyoDateString(
+      tokyoWeekId(now) + 12 * 3_600_000 + i * 86_400_000,
+    );
+    if (d > today) break;
+    out.push(d);
+  }
+  return out;
+}
+
+function weekTotals(
+  members: Student[],
+  dates: string[],
+): { weekLessons: number; weekTypingSec: number } {
+  let weekLessons = 0;
+  let weekTypingSec = 0;
+  for (const m of members) {
+    for (const date of dates) {
+      const d = m.activityDays?.[date];
+      if (d === null || d === undefined || typeof d !== "object") continue;
+      weekLessons += Array.isArray(d.lx) ? d.lx.length : 0;
+      const t = Number(d.t) || 0;
+      const l = Number(d.l) || 0;
+      weekTypingSec += Math.max(t, l, 0);
+    }
+  }
+  return { weekLessons, weekTypingSec: Math.round(weekTypingSec) };
+}
 
 /**
  * Groups a single grade's students by classId (e.g. "G3A" vs "G3B") and
@@ -325,6 +369,7 @@ function rankClassPairs(
     list.push(s);
     byClass.set(s.classId, list);
   }
+  const dates = thisWeekDates();
 
   const ranked = [...byClass.entries()]
     .map(([classId, members]) => {
@@ -337,6 +382,7 @@ function rankClassPairs(
         studentCount: members.length,
         totalStars,
         avgStars: members.length > 0 ? totalStars / members.length : 0,
+        ...weekTotals(members, dates),
       };
     })
     .sort(

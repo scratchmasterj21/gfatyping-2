@@ -482,6 +482,10 @@ export type ClassCompareEntry = {
   studentCount: number;
   avgStars: number;
   totalStars: number;
+  /** lessons passed with 2+ stars this Japan week (missing on old cache docs) */
+  weekLessons?: number;
+  /** typing seconds this Japan week */
+  weekTypingSec?: number;
   rank: number;
 };
 

@@ -7,10 +7,15 @@ import {
   For,
   JSXElement,
   Show,
+  untrack,
 } from "solid-js";
 import { z } from "zod";
 
 import { isCurrentUserAdmin } from "../../../auth";
+import {
+  getClassActivity as getClassActivityDays,
+  weekTotalsOf,
+} from "../../../classroom/activity";
 import {
   getClassActivity,
   getStudentActivity,
@@ -47,8 +52,15 @@ import {
 } from "../../../classroom/assignments";
 import { storeCertificateBatch } from "../../../classroom/certificate-batch";
 import {
+  CLASS_GOAL_KINDS,
   ClassGoal,
+  ClassGoalKind,
+  GOAL_KIND_LABEL,
   getClassGoals,
+  goalCurrent,
+  goalKind,
+  goalUnit,
+  isWeeklyGoal,
   setClassGoal,
 } from "../../../classroom/class-goals";
 import { buildProgressCsv } from "../../../classroom/progress-csv";
@@ -84,6 +96,7 @@ import { ActivityTab } from "./ActivityTab";
 import { SideImageApprovals } from "./SideImageApprovals";
 import { StudentsTab } from "./StudentsTab";
 import { UsageTab } from "./UsageTab";
+import { WeekTab } from "./WeekTab";
 
 const inputClass =
   "w-full rounded border border-sub-alt bg-bg px-3 py-2 text-text outline-none focus:ring-2 focus:ring-sub";
@@ -108,6 +121,7 @@ const CLASSROOM_QUERY_STALE_MS = 5 * 60 * 1000;
 const TabSchema = z.enum([
   "students",
   "progress",
+  "week",
   "activity",
   "assignments",
   "wordlists",
@@ -121,6 +135,7 @@ type Tab = z.infer<typeof TabSchema>;
 
 const CLASS_TABS = new Set<Tab>([
   "progress",
+  "week",
   "activity",
   "assignments",
   "races",
@@ -428,20 +443,57 @@ function ProgressTab(props: {
   );
   const [goalStars, setGoalStars] = createSignal(0);
   const [goalReward, setGoalReward] = createSignal("");
+  const [goalKindPick, setGoalKindPick] =
+    createSignal<ClassGoalKind>("weekLessons");
   const [savingGoal, setSavingGoal] = createSignal(false);
+  // weekly goals count activityDays (same cached query as the Week tab)
+  const weekActivityQuery = useQuery(() => ({
+    queryKey: ["classroom", "activity", props.classId],
+    queryFn: async () => getClassActivityDays(props.classId),
+    enabled:
+      (currentGoal() !== undefined &&
+        isWeeklyGoal(currentGoal() as ClassGoal)) ||
+      (openPanel() === "rewards" && goalKindPick() !== "stars"),
+    staleTime: CLASSROOM_QUERY_STALE_MS,
+  }));
+  const classCounts = createMemo(() => {
+    let weekLessons = 0;
+    let weekTypingSec = 0;
+    for (const s of weekActivityQuery.data ?? []) {
+      const w = weekTotalsOf(s.activity);
+      weekLessons += w.weekLessons;
+      weekTypingSec += w.weekTypingSec;
+    }
+    return { totalStars: classStars(), weekLessons, weekTypingSec };
+  });
+  const suggestedTarget = (kind: ClassGoalKind): number => {
+    const n = Math.max(1, props.rows.length);
+    if (kind === "weekLessons") return n * 3;
+    if (kind === "weekMinutes") return Math.ceil((n * 30) / 50) * 50;
+    return Math.max(50, Math.ceil((classStars() + 50) / 50) * 50);
+  };
   createEffect(() => {
     const g = currentGoal();
-    setGoalStars(
-      g?.stars ?? Math.max(50, Math.ceil((classStars() + 50) / 50) * 50),
-    );
+    const kind = g === undefined ? "weekLessons" : goalKind(g);
+    setGoalKindPick(kind);
+    setGoalStars(g?.stars ?? untrack(() => suggestedTarget(kind)));
     setGoalReward(g?.reward ?? "");
   });
+  const pickGoalKind = (kind: ClassGoalKind): void => {
+    setGoalKindPick(kind);
+    const g = currentGoal();
+    setGoalStars(
+      g !== undefined && goalKind(g) === kind ? g.stars : suggestedTarget(kind),
+    );
+  };
   const saveGoal = async (clear: boolean): Promise<void> => {
     setSavingGoal(true);
     try {
       await setClassGoal(
         props.classId,
-        clear ? null : { stars: goalStars(), reward: goalReward() },
+        clear
+          ? null
+          : { stars: goalStars(), reward: goalReward(), kind: goalKindPick() },
       );
       await queryClient.invalidateQueries({ queryKey: ["classGoals"] });
       await goalsQuery.refetch();
@@ -755,7 +807,8 @@ function ProgressTab(props: {
               <ClassGoalBar
                 class="bg-bg"
                 classId={props.classId}
-                current={classStars()}
+                kind={goalKind(g)}
+                current={goalCurrent(g, classCounts())}
                 goal={g.stars}
                 reward={g.reward}
               />
@@ -977,13 +1030,25 @@ function ProgressTab(props: {
                 type="number"
                 min="1"
                 class={cn(selectClass, "w-24")}
-                aria-label="Goal stars"
+                aria-label="Goal target"
                 value={goalStars()}
                 onChange={(e) =>
                   setGoalStars(Math.max(1, Number(e.currentTarget.value) || 1))
                 }
               />
-              <span>stars, reward</span>
+              <select
+                class={selectClass}
+                aria-label="What the goal counts"
+                value={goalKindPick()}
+                onChange={(e) =>
+                  pickGoalKind(e.currentTarget.value as ClassGoalKind)
+                }
+              >
+                <For each={CLASS_GOAL_KINDS}>
+                  {(k) => <option value={k}>{GOAL_KIND_LABEL[k]}</option>}
+                </For>
+              </select>
+              <span>, reward</span>
               <input
                 type="text"
                 maxLength={60}
@@ -1007,8 +1072,14 @@ function ProgressTab(props: {
                 />
               </Show>
               <span class="text-xs">
-                (class has {classStars()} stars now · students see the bar on
-                their lessons page)
+                (class has{" "}
+                {goalCurrent(
+                  { stars: 1, reward: "", kind: goalKindPick() },
+                  classCounts(),
+                )}{" "}
+                {goalUnit(goalKindPick())} now
+                {goalKindPick() === "stars" ? "" : ", resets every Monday"} ·
+                students see it on their Learn tab)
               </span>
             </div>
             <div class="flex items-center gap-1.5 text-sm text-sub">
@@ -2770,7 +2841,7 @@ export function ClassroomDashboard(): JSXElement {
   const progressQuery = useQuery(() => ({
     queryKey: ["classroom", "progress", selectedClass()],
     queryFn: async () => getClassProgress(selectedClass()),
-    enabled: tabOn("progress", "assignments", "announcements"),
+    enabled: tabOn("progress", "week", "assignments", "announcements"),
     staleTime: CLASSROOM_QUERY_STALE_MS,
   }));
 
@@ -2846,6 +2917,7 @@ export function ClassroomDashboard(): JSXElement {
   const REFRESH_KEYS: Record<Tab, string[]> = {
     students: ["students"],
     progress: ["progress"],
+    week: ["activity", "progress"],
     activity: ["activity"],
     assignments: ["assignments"],
     wordlists: ["wordlists"],
@@ -2945,6 +3017,9 @@ export function ClassroomDashboard(): JSXElement {
                 {tabButton("progress", "Student progress", {
                   icon: "fa-chart-line",
                 })}
+                {tabButton("week", "This week", {
+                  icon: "fa-calendar-week",
+                })}
                 {tabButton("activity", "Lessons vs games", {
                   icon: "fa-gamepad",
                 })}
@@ -3009,6 +3084,15 @@ export function ClassroomDashboard(): JSXElement {
           <Show when={tab() === "usage" && classroomOpen()}>
             <div class={panelClass}>
               <UsageTab />
+            </div>
+          </Show>
+          <Show when={tab() === "week" && classroomOpen()}>
+            <div class={panelClass}>
+              <WeekTab
+                classId={selectedClass()}
+                rows={rows()}
+                rowsLoading={progressQuery.isPending}
+              />
             </div>
           </Show>
           <Show when={tab() === "activity" && classroomOpen()}>

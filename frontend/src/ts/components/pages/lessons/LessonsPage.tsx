@@ -16,6 +16,7 @@ import {
   getAvatarState,
   getEquippedAvatar,
 } from "../../../avatar/avatar-state";
+import { weekTotalsOf } from "../../../classroom/activity";
 import {
   Assignment,
   ASSIGNMENT_PREFIX,
@@ -31,7 +32,11 @@ import {
   WORDLIST_PREFIX,
   wordListTokens,
 } from "../../../classroom/assignments";
-import { getClassGoals } from "../../../classroom/class-goals";
+import {
+  getClassGoals,
+  goalCurrent,
+  goalKind,
+} from "../../../classroom/class-goals";
 import {
   ClassCompareEntry,
   getClassCompare,
@@ -143,12 +148,12 @@ import { cn } from "../../../utils/cn";
 import { localDateString } from "../../../utils/date-and-time";
 import { Avatar } from "../../common/Avatar";
 import { Button } from "../../common/Button";
-import { ClassGoalBar } from "../../common/ClassGoalBar";
 import { Fa } from "../../common/Fa";
 import { H2, H3 } from "../../common/Headers";
 import { Page } from "../../common/Page";
 import { RankRow } from "../leaderboard/RankRow";
 import { AdventureMap, MapStopState } from "./AdventureMap";
+import { ClassGoalCard } from "./ClassGoalCard";
 import { DailyPracticeCards } from "./DailyPracticeCards";
 import { KanaPracticeModal } from "./KanaPracticeModal";
 import { LessonCard } from "./LessonCard";
@@ -1213,20 +1218,27 @@ export function LessonsPage(): JSXElement {
     return c === undefined ? undefined : gradeOf(c);
   };
 
-  const classCompareQuery = useQuery(() => ({
-    queryKey: ["classCompare", grade()],
-    queryFn: async () => getClassCompare(grade() as string),
-    enabled:
-      isOpen() && tab() === "me" && isAuthenticated() && grade() !== undefined,
-    staleTime: 1000 * 60,
-  }));
-
   const classGoalsQuery = useQuery(() => ({
     queryKey: ["classGoals"],
     queryFn: getClassGoals,
     enabled: isOpen() && isAuthenticated() && classId() !== undefined,
     staleTime: 1000 * 60 * 30,
   }));
+  const hasClassGoal = (): boolean => {
+    const id = classId();
+    return id !== undefined && classGoalsQuery.data?.[id] !== undefined;
+  };
+  const classCompareQuery = useQuery(() => ({
+    queryKey: ["classCompare", grade()],
+    queryFn: async () => getClassCompare(grade() as string),
+    enabled:
+      isOpen() &&
+      isAuthenticated() &&
+      grade() !== undefined &&
+      (tab() === "me" || (tab() === "learn" && hasClassGoal())),
+    staleTime: 1000 * 60 * 5,
+  }));
+
   // ---- teacher game controls (schoolConfig/gameAccess) ----
   const gameAccessQuery = useQuery(() => ({
     queryKey: ["gameAccess"],
@@ -1249,7 +1261,23 @@ export function LessonsPage(): JSXElement {
     const goal = classGoalsQuery.data?.[id];
     const entry = classCompareQuery.data?.entries.find((e) => e.classId === id);
     if (goal === undefined || entry === undefined) return undefined;
-    return { classId: id, current: entry.totalStars, ...goal };
+    const kind = goalKind(goal);
+    const mine =
+      kind === "stars"
+        ? undefined
+        : goalCurrent(goal, {
+            totalStars: 0,
+            ...weekTotalsOf(getSnapshot()?.activityDays),
+          });
+    return {
+      classId: id,
+      kind,
+      // own activity can be fresher than the 5-min class cache
+      current: Math.max(goalCurrent(goal, entry), mine ?? 0),
+      goal: goal.stars,
+      reward: goal.reward,
+      mine,
+    };
   });
 
   const weeklyQuestQuery = useQuery(() => ({
@@ -1846,11 +1874,13 @@ export function LessonsPage(): JSXElement {
 
             <Show when={classGoal()} keyed>
               {(g) => (
-                <ClassGoalBar
+                <ClassGoalCard
                   classId={g.classId}
+                  kind={g.kind}
                   current={g.current}
-                  goal={g.stars}
+                  goal={g.goal}
                   reward={g.reward}
+                  mine={g.mine}
                 />
               )}
             </Show>

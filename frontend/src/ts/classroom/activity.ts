@@ -88,6 +88,55 @@ export function summarizeActivity(
   return out;
 }
 
+/** Japan dates from Monday of this week (or `weeksBefore` weeks back) to Sunday, capped at today. */
+export function weekDates(now = Date.now(), weeksBefore = 0): string[] {
+  const today = tokyoDate(now);
+  const daysSinceMonday = (new Date(now + TOKYO_OFFSET_MS).getUTCDay() + 6) % 7;
+  const monday = now - (daysSinceMonday + weeksBefore * 7) * DAY_MS;
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = tokyoDate(monday + i * DAY_MS);
+    if (d > today) break;
+    out.push(d);
+  }
+  return out;
+}
+
+/** Totals for the given Japan dates (see weekDates). */
+export function summarizeDates(
+  activity: ActivityDays | undefined,
+  dates: string[],
+): ActivitySummary & { daysPracticed: number } {
+  const out = {
+    typingSec: 0,
+    gameSec: 0,
+    gamesOpened: 0,
+    lessonsPassed: 0,
+    daysPracticed: 0,
+  };
+  if (activity === undefined) return out;
+  for (const date of dates) {
+    const d = activity[date];
+    if (d === undefined) continue;
+    const typing = Math.max(d.t ?? 0, d.l ?? 0);
+    out.typingSec += typing;
+    out.gameSec += d.g ?? 0;
+    out.gamesOpened += d.gp ?? 0;
+    out.lessonsPassed += d.lx?.length ?? 0;
+    if (typing >= 60) out.daysPracticed++;
+  }
+  return out;
+}
+
+/** This week's class-goal counts for one student (see class-goals.ts). */
+export function weekTotalsOf(activity: ActivityDays | undefined): {
+  weekLessons: number;
+  weekTypingSec: number;
+} {
+  const w = summarizeDates(activity, weekDates());
+  return { weekLessons: w.lessonsPassed, weekTypingSec: w.typingSec };
+}
+
 /** Minimum game time over 7 days before "mostly games" is flagged. */
 const FLAG_MIN_GAME_SEC = 10 * 60;
 

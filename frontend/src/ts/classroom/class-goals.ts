@@ -2,8 +2,75 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { getDb } from "../firebase";
 
-/** A teacher-set star target for one class, e.g. 500 stars -> "class party". */
-export type ClassGoal = { stars: number; reward: string };
+/**
+ * What a class goal counts:
+ * - stars: all lesson stars ever (never resets)
+ * - weekLessons: lessons passed with 2+ stars this week (resets Monday, Japan)
+ * - weekMinutes: minutes of typing this week (resets Monday, Japan)
+ */
+export type ClassGoalKind = "stars" | "weekLessons" | "weekMinutes";
+
+export const CLASS_GOAL_KINDS: readonly ClassGoalKind[] = [
+  "weekLessons",
+  "weekMinutes",
+  "stars",
+];
+
+/**
+ * A teacher-set target for one class, e.g. 60 lessons this week -> "class
+ * party". `stars` is the target number for every kind (old docs had no kind).
+ */
+export type ClassGoal = { stars: number; reward: string; kind?: ClassGoalKind };
+
+export type ClassGoalCounts = {
+  totalStars: number;
+  weekLessons?: number;
+  weekTypingSec?: number;
+};
+
+export function goalKind(goal: ClassGoal): ClassGoalKind {
+  return goal.kind ?? "stars";
+}
+
+export function isWeeklyGoal(goal: ClassGoal): boolean {
+  return goalKind(goal) !== "stars";
+}
+
+/** Progress toward the goal, in the goal's own unit. */
+export function goalCurrent(goal: ClassGoal, counts: ClassGoalCounts): number {
+  switch (goalKind(goal)) {
+    case "weekLessons":
+      return counts.weekLessons ?? 0;
+    case "weekMinutes":
+      return Math.floor((counts.weekTypingSec ?? 0) / 60);
+    default:
+      return counts.totalStars;
+  }
+}
+
+/** "lessons" / "minutes" / "stars" (singular for 1). */
+export function goalUnit(kind: ClassGoalKind, n = 2): string {
+  const word =
+    kind === "weekLessons"
+      ? "lesson"
+      : kind === "weekMinutes"
+        ? "minute"
+        : "star";
+  return n === 1 ? word : `${word}s`;
+}
+
+export const GOAL_KIND_LABEL: Record<ClassGoalKind, string> = {
+  weekLessons: "⭐⭐ lessons this week",
+  weekMinutes: "minutes of typing this week",
+  stars: "stars (all time)",
+};
+
+/** Kid-facing icon for the goal's unit. */
+export const GOAL_KIND_EMOJI: Record<ClassGoalKind, string> = {
+  weekLessons: "📚",
+  weekMinutes: "⏱️",
+  stars: "⭐",
+};
 
 export type ClassGoals = Record<string, ClassGoal>;
 
@@ -22,11 +89,15 @@ function parseGoals(data: unknown): ClassGoals {
     if (g === null || typeof g !== "object") continue;
     const stars = Number((g as { stars?: unknown }).stars);
     const reward = (g as { reward?: unknown }).reward;
+    const kind = (g as { kind?: unknown }).kind;
     if (!Number.isFinite(stars) || stars <= 0) continue;
     out[classId] = {
       stars: Math.round(stars),
       reward:
         typeof reward === "string" ? reward.slice(0, MAX_REWARD_LENGTH) : "",
+      ...(CLASS_GOAL_KINDS.includes(kind as ClassGoalKind)
+        ? { kind: kind as ClassGoalKind }
+        : {}),
     };
   }
   return out;
@@ -50,6 +121,7 @@ export async function setClassGoal(
     goals[classId] = {
       stars: Math.max(1, Math.round(goal.stars)),
       reward: goal.reward.trim().slice(0, MAX_REWARD_LENGTH),
+      kind: goalKind(goal),
     };
   }
   await setDoc(goalsRef(), { goals });
