@@ -23,6 +23,12 @@ import {
   updateStudentGamePolicy,
 } from "../../../games/game-access";
 import { games } from "../../../games/games-data";
+import {
+  getLessonSettings,
+  LESSON_SETTINGS_KEY,
+  setClassHomeRowOff,
+  setStudentHomeRowOff,
+} from "../../../lessons/lesson-settings";
 import { queryClient } from "../../../queries";
 import {
   showErrorNotification,
@@ -64,7 +70,14 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     queryFn: getGameAccess,
     staleTime: 5 * 60 * 1000,
   }));
+  const lessonQuery = useQuery(() => ({
+    queryKey: LESSON_SETTINGS_KEY,
+    queryFn: getLessonSettings,
+    staleTime: 5 * 60 * 1000,
+  }));
   const [saving, setSaving] = createSignal(false);
+  const classHomeRowOff = (): boolean =>
+    lessonQuery.data?.homeRowOff.classes[props.classId] === true;
 
   const access = (): GameAccessDoc | undefined => accessQuery.data;
   const classPolicy = (): GamePolicy => access()?.classes[props.classId] ?? {};
@@ -77,7 +90,10 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     setSaving(true);
     try {
       await work();
-      await queryClient.invalidateQueries({ queryKey: ACCESS_KEY });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ACCESS_KEY }),
+        queryClient.invalidateQueries({ queryKey: LESSON_SETTINGS_KEY }),
+      ]);
       if (done !== undefined) showSuccessNotification(done);
     } catch (e) {
       showErrorNotification("Could not save game settings", { error: e });
@@ -149,6 +165,42 @@ export function ActivityTab(props: { classId: string }): JSXElement {
       <p class="text-sm text-sub">
         📋 The weekly ClassDojo post is now on the <b>This week</b> tab.
       </p>
+
+      {/* lesson settings */}
+      <div class="grid gap-2 rounded bg-bg p-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="mr-1 font-semibold text-text">
+            🖐️ Home-row check before lessons
+          </span>
+          <button
+            type="button"
+            class={chip(!classHomeRowOff())}
+            disabled={saving() || lessonQuery.isPending}
+            onClick={() => {
+              const id = props.classId;
+              void save(async () => setClassHomeRowOff(id, false));
+            }}
+          >
+            On
+          </button>
+          <button
+            type="button"
+            class={chip(classHomeRowOff())}
+            disabled={saving() || lessonQuery.isPending}
+            onClick={() => {
+              const id = props.classId;
+              void save(async () => setClassHomeRowOff(id, true));
+            }}
+          >
+            Off
+          </button>
+        </div>
+        <p class="text-sm text-sub">
+          Students hold F and J before each lesson. Turn it off for{" "}
+          {props.classId}, or per student under <b>More</b> below. Students see
+          a change within 30 minutes (or after reloading).
+        </p>
+      </div>
 
       {/* class controls */}
       <div class="grid gap-3 rounded bg-bg p-4">
@@ -240,6 +292,10 @@ export function ActivityTab(props: { classId: string }): JSXElement {
                   access={access()}
                   saving={saving()}
                   save={save}
+                  homeRowOwn={
+                    lessonQuery.data?.homeRowOff.students[row.student.uid]
+                  }
+                  classHomeRowOff={classHomeRowOff()}
                 />
               )}
             </For>
@@ -329,6 +385,9 @@ function StudentRow(props: {
   access: GameAccessDoc | undefined;
   saving: boolean;
   save: (work: () => Promise<void>, done?: string) => Promise<void>;
+  /** student override: true = off, false = on, undefined = class setting */
+  homeRowOwn: boolean | undefined;
+  classHomeRowOff: boolean;
 }): JSXElement {
   const [open, setOpen] = createSignal(false);
   const uid = (): string => props.student.uid;
@@ -403,6 +462,14 @@ function StudentRow(props: {
           <Show when={props.flagged}>
             <span class="shrink-0 rounded-full bg-error px-2 py-0.5 text-xs font-bold text-bg">
               Mostly games
+            </span>
+          </Show>
+          <Show when={props.homeRowOwn !== undefined}>
+            <span
+              class="shrink-0 rounded-full bg-sub-alt px-2 py-0.5 text-xs text-sub"
+              title="Home-row check set just for this student"
+            >
+              🖐️ check {props.homeRowOwn === true ? "off" : "on"}
             </span>
           </Show>
         </div>
@@ -495,6 +562,33 @@ function StudentRow(props: {
 
       <Show when={open()}>
         <div class="grid gap-3 border-t border-sub-alt pt-3">
+          <label class="flex flex-wrap items-center gap-2 text-sm text-sub">
+            🖐️ Home-row check for {props.student.name}:
+            <select
+              class="min-h-9 rounded bg-sub-alt px-2 text-text"
+              value={
+                props.homeRowOwn === undefined
+                  ? "class"
+                  : props.homeRowOwn
+                    ? "off"
+                    : "on"
+              }
+              disabled={props.saving}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                const id = uid();
+                void props.save(async () =>
+                  setStudentHomeRowOff(id, v === "class" ? null : v === "off"),
+                );
+              }}
+            >
+              <option value="class">
+                Class setting ({props.classHomeRowOff ? "off" : "on"})
+              </option>
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
           <Show when={own().mode === "earn"}>
             <EarnStepper
               value={own().earnLessons ?? policy().earnLessons}

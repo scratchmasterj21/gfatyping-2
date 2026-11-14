@@ -1,7 +1,14 @@
 import { createSignal } from "solid-js";
 
-import { showModal } from "../states/modals";
+import { getAuthenticatedUser } from "../firebase";
+import {
+  hideModalAndClearChain,
+  isModalOpen,
+  showModal,
+} from "../states/modals";
+import { getSnapshot } from "../states/snapshot";
 import { PracticeRewardCategory } from "./lesson-progress";
+import { getLessonSettingsCached, homeRowCheckOn } from "./lesson-settings";
 import { Lesson } from "./lessons-data";
 
 /**
@@ -33,11 +40,31 @@ type Pending = { lesson: Lesson; rewardCategory?: PracticeRewardCategory };
 const [pending, setPending] = createSignal<Pending | null>(null);
 export const getHomeRowCheckLesson = pending;
 
+/** Teacher can turn the check off per class / student (lesson-settings.ts). */
+async function checkEnabled(): Promise<boolean> {
+  try {
+    const settings = await getLessonSettingsCached();
+    return homeRowCheckOn(
+      settings,
+      getSnapshot()?.classId ?? undefined,
+      getAuthenticatedUser()?.uid,
+    );
+  } catch {
+    return true;
+  }
+}
+
 /** Show the check; the modal starts the lesson once fingers are placed. */
-export function requestHomeRowCheck(
+export async function requestHomeRowCheck(
   lesson: Lesson,
   rewardCategory?: PracticeRewardCategory,
-): void {
+): Promise<void> {
+  if (!(await checkEnabled())) {
+    if (isModalOpen("LessonIntro")) hideModalAndClearChain("LessonIntro");
+    const { startLesson } = await import("./lesson-launcher");
+    await startLesson(lesson, rewardCategory);
+    return;
+  }
   setPending({ lesson, rewardCategory });
   showModal("HomeRowCheck");
 }

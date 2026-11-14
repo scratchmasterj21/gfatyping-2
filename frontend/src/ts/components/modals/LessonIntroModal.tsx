@@ -60,7 +60,7 @@ export function LessonIntroModal(): JSXElement {
       return;
     }
     // swaps this modal for the home-row check, which starts the lesson
-    requestHomeRowCheck(lesson, getIntroRewardCategory());
+    void requestHomeRowCheck(lesson, getIntroRewardCategory());
   };
 
   return (

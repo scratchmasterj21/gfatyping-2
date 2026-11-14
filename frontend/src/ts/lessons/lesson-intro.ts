@@ -37,5 +37,5 @@ export function launchLessonWithIntro(
     showModal("LessonIntro");
     return;
   }
-  requestHomeRowCheck(lesson, rewardCategory);
+  void requestHomeRowCheck(lesson, rewardCategory);
 }
