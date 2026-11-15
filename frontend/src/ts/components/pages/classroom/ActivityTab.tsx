@@ -1,3 +1,4 @@
+import { ThemeName } from "@monkeytype/schemas/configs";
 import { useQuery } from "@tanstack/solid-query";
 import { createMemo, createSignal, For, JSXElement, Show } from "solid-js";
 
@@ -8,6 +9,12 @@ import {
   StudentActivity,
   summarizeActivity,
 } from "../../../classroom/activity";
+import { KID_THEME_NAMES, ThemesList } from "../../../constants/themes";
+import {
+  ClassThemePolicy,
+  FALLBACK_THEME,
+  READABLE_THEME_NAMES,
+} from "../../../controllers/theme-policy";
 import {
   checkGameAccess,
   EARN_LESSONS_DEFAULT,
@@ -24,9 +31,11 @@ import {
 } from "../../../games/game-access";
 import { games } from "../../../games/games-data";
 import {
+  classThemePolicy,
   getLessonSettings,
   LESSON_SETTINGS_KEY,
   setClassHomeRowOff,
+  setClassThemePolicy,
   setStudentHomeRowOff,
 } from "../../../lessons/lesson-settings";
 import { queryClient } from "../../../queries";
@@ -38,6 +47,13 @@ import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
 
 const FREE_PLAY = games.filter((g) => g.type === "builtin");
+/** kids' themes first, then the other readable ones A-Z */
+const LOCKABLE_THEMES: ThemeName[] = [
+  ...KID_THEME_NAMES.filter((n) => READABLE_THEME_NAMES.has(n)),
+  ...[...READABLE_THEME_NAMES]
+    .filter((n) => !KID_THEME_NAMES.includes(n))
+    .sort(),
+];
 const ACCESS_KEY = ["gameAccess"];
 
 const MODE_LABEL: Record<GameMode, string> = {
@@ -76,6 +92,12 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     staleTime: 5 * 60 * 1000,
   }));
   const [saving, setSaving] = createSignal(false);
+  const themePolicy = (): ClassThemePolicy =>
+    classThemePolicy(lessonQuery.data, props.classId);
+  const setThemePolicy = (policy: ClassThemePolicy): void => {
+    const id = props.classId;
+    void save(async () => setClassThemePolicy(id, policy));
+  };
   const classHomeRowOff = (): boolean =>
     lessonQuery.data?.homeRowOff.classes[props.classId] === true;
 
@@ -199,6 +221,71 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           Students hold F and J before each lesson. Turn it off for{" "}
           {props.classId}, or per student under <b>More</b> below. Students see
           a change within 30 minutes (or after reloading).
+        </p>
+      </div>
+
+      {/* themes */}
+      <div class="grid gap-2 rounded bg-bg p-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="mr-1 font-semibold text-text">
+            🎨 {props.classId} themes
+          </span>
+          <button
+            type="button"
+            class={chip(themePolicy().mode === "readable")}
+            disabled={saving() || lessonQuery.isPending}
+            onClick={() => setThemePolicy({ mode: "readable" })}
+          >
+            Any easy-to-read theme
+          </button>
+          <button
+            type="button"
+            class={chip(themePolicy().mode === "kids")}
+            disabled={saving() || lessonQuery.isPending}
+            onClick={() => setThemePolicy({ mode: "kids" })}
+          >
+            Kids&apos; themes only
+          </button>
+          <button
+            type="button"
+            class={chip(themePolicy().mode === "locked")}
+            disabled={saving() || lessonQuery.isPending}
+            onClick={() =>
+              setThemePolicy({
+                mode: "locked",
+                theme: themePolicy().theme ?? FALLBACK_THEME,
+              })
+            }
+          >
+            One theme
+          </button>
+          <Show when={themePolicy().mode === "locked"}>
+            <select
+              class="min-h-9 rounded bg-sub-alt px-2 text-text"
+              aria-label="Theme for the class"
+              value={themePolicy().theme ?? FALLBACK_THEME}
+              disabled={saving()}
+              onChange={(e) =>
+                setThemePolicy({
+                  mode: "locked",
+                  theme: e.currentTarget.value as ThemeName,
+                })
+              }
+            >
+              <For each={LOCKABLE_THEMES}>
+                {(name) => (
+                  <option value={name}>{name.replace(/_/g, " ")}</option>
+                )}
+              </For>
+            </select>
+          </Show>
+        </div>
+        <p class="text-sm text-sub">
+          Hard-to-read themes ({ThemesList.length - READABLE_THEME_NAMES.size}{" "}
+          of {ThemesList.length}) are always hidden from students, and custom
+          colours must be easy to read. Students on a theme that isn&apos;t
+          allowed are switched automatically. Changes reach students within 30
+          minutes (or after reloading).
         </p>
       </div>
 

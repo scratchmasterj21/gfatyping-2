@@ -1,4 +1,5 @@
 import * as ConfigSchemas from "@monkeytype/schemas/configs";
+import { createSignal } from "solid-js";
 
 import { migrateConfig } from "./utils";
 import { applyConfig } from "./lifecycle";
@@ -7,6 +8,10 @@ import Ape from "../ape";
 import { SnapshotInitError } from "../utils/snapshot-init-error";
 import { getDefaultConfig } from "../constants/default-config";
 import { Config } from "./store";
+
+/** True once the signed-in user's saved config has been loaded. */
+export const [isServerConfigLoaded, setServerConfigLoaded] =
+  createSignal(false);
 
 export async function updateFromServer(): Promise<void> {
   const remoteConfig = await getRemoteConfig();
@@ -21,6 +26,7 @@ export async function updateFromServer(): Promise<void> {
     await applyConfig(remoteConfig);
     saveFullConfigToLocalStorage(true);
   }
+  setServerConfigLoaded(true);
 }
 
 async function getRemoteConfig(): Promise<ConfigSchemas.Config> {

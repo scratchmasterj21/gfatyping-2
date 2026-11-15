@@ -7,6 +7,11 @@ import { ThemesList, ThemeWithName } from "../../constants/themes";
 import { not } from "@monkeytype/util/predicates";
 import { configEvent } from "../../events/config";
 import * as getErrorMessage from "../../utils/error";
+import {
+  getMyThemePolicy,
+  isKidThemeActive,
+} from "../../controllers/kid-theme-controller";
+import { presetAllowed } from "../../controllers/theme-policy";
 
 const isFavorite = (theme: ThemeWithName): boolean =>
   Config.favThemes.includes(theme.name);
@@ -21,6 +26,9 @@ const createThemeCommand = (theme: ThemeWithName): Command => {
     id: `changeTheme${capitalizeFirstLetterOfEachWord(theme.name)}`,
     display: theme.name.replace(/_/g, " "),
     configValue: theme.name,
+    // students only get themes they're allowed (see theme-policy.ts)
+    available: (): boolean =>
+      !isKidThemeActive() || presetAllowed(getMyThemePolicy(), theme.name),
     // customStyle: `color:${theme.main};background:${theme.bg};`,
     customData: {
       main: theme.main,

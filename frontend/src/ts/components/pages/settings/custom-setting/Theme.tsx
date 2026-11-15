@@ -18,11 +18,19 @@ import {
   ThemesList,
   ThemeWithName,
 } from "../../../../constants/themes";
-import { isKidThemeActive } from "../../../../controllers/kid-theme-controller";
+import {
+  getMyThemePolicy,
+  isKidThemeActive,
+  refreshThemePolicy,
+} from "../../../../controllers/kid-theme-controller";
 import {
   convertCustomColorsToTheme,
   convertThemeToCustomColors,
 } from "../../../../controllers/theme-controller";
+import {
+  isReadableTheme,
+  presetAllowed,
+} from "../../../../controllers/theme-policy";
 import { createEffectOn } from "../../../../hooks/effects";
 import { isAuthenticated } from "../../../../states/core";
 import {
@@ -51,17 +59,40 @@ export const sortedThemes: ThemeWithName[] = [...ThemesList].sort((a, b) => {
   return b2.lgt - b1.lgt;
 });
 
+/** Students only see themes they're allowed (teacher sees all). */
+function shownToMe(theme: ThemeWithName): boolean {
+  return !isKidThemeActive() || presetAllowed(getMyThemePolicy(), theme.name);
+}
+
+/** Students can't keep custom colours that are hard to read. */
+function customReadableForMe(): boolean {
+  return !isKidThemeActive() || isReadableTheme(getTheme());
+}
+
 export function Theme(): JSXElement {
   const customThemes = useCustomThemesLiveQuery();
+  if (isKidThemeActive()) void refreshThemePolicy();
+  const policyMode = (): string =>
+    isKidThemeActive() ? getMyThemePolicy().mode : "readable";
 
   const kidThemes = (): ThemeWithName[] =>
     KID_THEME_NAMES.flatMap((name) => {
       const theme = ThemesList.find((t) => t.name === name);
-      return theme === undefined ? [] : [theme];
+      return theme === undefined || !shownToMe(theme) ? [] : [theme];
     });
 
   const Presets = () => (
     <div class="grid gap-4">
+      <Show when={isKidThemeActive()}>
+        <div class="text-sm text-sub">
+          <Show
+            when={policyMode() === "readable"}
+            fallback="🎨 Your teacher picked the themes for your class."
+          >
+            👀 Only themes that are easy to read are shown.
+          </Show>
+        </div>
+      </Show>
       <Show when={isKidThemeActive()}>
         <div class="grid gap-2">
           <div class="text-sm font-semibold text-sub">Made for kids</div>
@@ -76,8 +107,8 @@ export function Theme(): JSXElement {
       <Show when={getConfig.favThemes.length > 0}>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-2">
           <For
-            each={sortedThemes.filter((t) =>
-              getConfig.favThemes.includes(t.name),
+            each={sortedThemes.filter(
+              (t) => getConfig.favThemes.includes(t.name) && shownToMe(t),
             )}
           >
             {(theme) => <ThemeButton theme={theme} />}
@@ -90,7 +121,10 @@ export function Theme(): JSXElement {
       <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-2">
         <For
           each={sortedThemes.filter(
-            (t) => !getConfig.favThemes.includes(t.name),
+            (t) =>
+              !getConfig.favThemes.includes(t.name) &&
+              shownToMe(t) &&
+              !(isKidThemeActive() && KID_THEME_NAMES.includes(t.name)),
           )}
         >
           {(theme) => <ThemeButton theme={theme} />}
@@ -106,6 +140,12 @@ export function Theme(): JSXElement {
           <For each={customThemes()}>
             {(theme) => <CustomThemeButton theme={theme} />}
           </For>
+        </div>
+      </Show>
+      <Show when={!customReadableForMe()}>
+        <div class="rounded bg-error px-3 py-2 text-sm font-bold text-bg">
+          ⚠️ These colours are too hard to read. Pick a darker or lighter colour
+          - you can&apos;t save this theme.
         </div>
       </Show>
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -222,6 +262,10 @@ export function Theme(): JSXElement {
           <Button
             text="save as new"
             onClick={() => {
+              if (!customReadableForMe()) {
+                showNoticeNotification("Too hard to read - change the colours");
+                return;
+              }
               if (customThemes().length >= 20) {
                 showNoticeNotification("Custom themes limit reached");
                 return;
@@ -248,6 +292,10 @@ export function Theme(): JSXElement {
           <Button
             text="save"
             onClick={() => {
+              if (!customReadableForMe()) {
+                showNoticeNotification("Too hard to read - change the colours");
+                return;
+              }
               setConfig(
                 "customThemeColors",
                 convertThemeToCustomColors(getTheme()),
@@ -285,11 +333,13 @@ export function Theme(): JSXElement {
             active={!getConfig.customTheme}
             text="preset"
           />
-          <Button
-            onClick={() => setConfig("customTheme", true)}
-            active={getConfig.customTheme}
-            text="custom"
-          />
+          <Show when={policyMode() === "readable"}>
+            <Button
+              onClick={() => setConfig("customTheme", true)}
+              active={getConfig.customTheme}
+              text="custom"
+            />
+          </Show>
         </div>
       }
       fullWidthInputs={
