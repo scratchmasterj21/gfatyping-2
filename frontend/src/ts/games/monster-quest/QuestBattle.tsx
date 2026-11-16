@@ -19,6 +19,8 @@ import {
   BATTLE_COUNT,
   CLASS_INFO,
   eventMs,
+  GUARD_MS,
+  HERO_TURN_MS,
   HeroAction,
   HeroInput,
   heroId,
@@ -405,7 +407,8 @@ export function QuestBattle(props: {
   };
 
   const onInput = (raw: string): void => {
-    const value = raw.trim().toLowerCase();
+    // phrases: ignore case, extra spaces and a leading space
+    const value = normalize(raw);
     const guard = myGuard();
     if (guard !== null) {
       if (value === guard.word) {
@@ -530,7 +533,7 @@ export function QuestBattle(props: {
       </div>
 
       {/* battlefield */}
-      <div class="relative grid min-h-0 flex-1 grid-cols-2 bg-linear-to-b from-game-night via-game-navy to-game-grass-dark">
+      <div class="relative grid min-h-60 flex-1 grid-cols-2 bg-linear-to-b from-game-night via-game-navy to-game-grass-dark">
         <div class="flex flex-col items-center justify-center gap-3 p-3">
           <For each={monsters()}>
             {(m) => (
@@ -634,7 +637,7 @@ export function QuestBattle(props: {
                   (secondsLeft() ?? 99) <= 3 ? "bg-game-red" : "bg-game-yellow",
                 )}
                 style={{
-                  width: `${timerShare(myGuard() !== null ? 5000 : 20_000) * 100}%`,
+                  width: `${timerShare(myGuard() !== null ? GUARD_MS : HERO_TURN_MS) * 100}%`,
                 }}
               ></div>
             </div>
@@ -828,16 +831,28 @@ export function QuestBattle(props: {
   );
 }
 
-/** The word to type, with what's typed so far coloured in. */
+const normalize = (raw: string): string =>
+  raw.toLowerCase().replace(/\s+/g, " ").replace(/^ /, "");
+
+/** The words to type, with what's typed so far coloured in. */
 function TypedWord(props: { word: string; typed: string }): JSXElement {
   const done = (): number => {
-    const t = props.typed.trim().toLowerCase();
+    const t = normalize(props.typed);
     let i = 0;
     while (i < t.length && t[i] === props.word[i]) i++;
     return i;
   };
   return (
-    <div class="py-2 text-center font-mono text-4xl font-bold tracking-wider sm:text-5xl">
+    <div
+      class={cn(
+        "py-2 text-center font-mono font-bold tracking-wide whitespace-pre-wrap",
+        props.word.length > 16
+          ? "text-2xl sm:text-3xl"
+          : props.word.length > 9
+            ? "text-3xl sm:text-4xl"
+            : "text-4xl sm:text-5xl",
+      )}
+    >
       <span class="text-game-green">{props.word.slice(0, done())}</span>
       <span class="text-game-cream">{props.word.slice(done())}</span>
     </div>

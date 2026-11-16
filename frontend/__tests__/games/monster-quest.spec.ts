@@ -108,4 +108,20 @@ describe("monster quest", () => {
     const d = pendingDeadline(s, 1000, []);
     expect(d).toBeGreaterThan(1000 + 20_000);
   });
+
+  it("asks for several words per move", () => {
+    const p = runQuest(solo(), []).pending;
+    expect(p?.kind).toBe("hero");
+    if (p?.kind !== "hero") return;
+    expect(p.words.attack.split(" ")).toHaveLength(2);
+    expect(p.words.skill.split(" ")).toHaveLength(3);
+    expect(p.words.defend.split(" ")).toHaveLength(2);
+    const hard = runQuest(
+      { ...solo(), difficulty: questDifficultyFor("Hard") },
+      [],
+    ).pending;
+    if (hard?.kind === "hero") {
+      expect(hard.words.attack.split(" ")).toHaveLength(3);
+    }
+  });
 });

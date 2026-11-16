@@ -124,6 +124,8 @@ export type QuestDifficulty = DifficultyOption & {
   words: string[];
   /** longer words for skills */
   skillWords: string[];
+  /** how many words each move asks for */
+  phrase: Record<HeroAction, number>;
   /** monster HP multiplier */
   hp: number;
   /** monster attack multiplier */
@@ -135,14 +137,16 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     label: "Easy",
     hint: "short words",
     words: EASY_WORDS,
-    skillWords: MEDIUM_WORDS,
+    skillWords: EASY_WORDS,
+    phrase: { attack: 2, skill: 3, defend: 2, potion: 2 },
     hp: 0.85,
     atk: 0.8,
   },
   {
     label: "Medium",
     words: MEDIUM_WORDS,
-    skillWords: HARD_WORDS,
+    skillWords: MEDIUM_WORDS,
+    phrase: { attack: 2, skill: 3, defend: 2, potion: 2 },
     hp: 1,
     atk: 1,
   },
@@ -151,6 +155,7 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     hint: "long words",
     words: HARD_WORDS,
     skillWords: HARD_WORDS,
+    phrase: { attack: 3, skill: 3, defend: 2, potion: 2 },
     hp: 1.15,
     atk: 1.2,
   },
@@ -235,15 +240,30 @@ export function hashString(text: string): number {
 }
 
 function pickWord(seed: number, key: number, words: string[]): string {
+  return pickWords(seed, key, words, 1);
+}
+
+/** `count` different words joined by spaces. */
+function pickWords(
+  seed: number,
+  key: number,
+  words: string[],
+  count: number,
+): string {
   const rng = seededRandom(seed ^ Math.imul(key + 1, 0x9e3779b1));
-  return words[Math.floor(rng() * words.length)] ?? "go";
+  const out: string[] = [];
+  for (let tries = 0; out.length < count && tries < count * 10; tries++) {
+    const w = words[Math.floor(rng() * words.length)] ?? "go";
+    if (!out.includes(w) || tries >= count * 5) out.push(w);
+  }
+  return out.join(" ");
 }
 
 // ---------------------------------------------------------------- typing power
 
 /** Fast enough for a critical hit. */
-export function fastMs(word: string): number {
-  return 900 + word.length * 380;
+export function fastMs(phrase: string): number {
+  return 900 + phrase.length * 380;
 }
 
 /** Strength of a typed move: 1.5 = critical, 0.4 = ran out of time. */
@@ -507,10 +527,10 @@ function heroMoveWords(
   d: QuestDifficulty,
 ): Record<HeroAction, string> {
   return {
-    attack: pickWord(seed, step * 8 + 1, d.words),
-    skill: pickWord(seed, step * 8 + 2, d.skillWords),
-    defend: pickWord(seed, step * 8 + 3, d.words),
-    potion: pickWord(seed, step * 8 + 4, d.words),
+    attack: pickWords(seed, step * 8 + 1, d.words, d.phrase.attack),
+    skill: pickWords(seed, step * 8 + 2, d.skillWords, d.phrase.skill),
+    defend: pickWords(seed, step * 8 + 3, d.words, d.phrase.defend),
+    potion: pickWords(seed, step * 8 + 4, d.words, d.phrase.potion),
   };
 }
 
@@ -911,7 +931,7 @@ export function eventMs(e: QuestEvent): number {
 }
 
 /** Time to make a move / guard, ms. */
-export const HERO_TURN_MS = 20_000;
+export const HERO_TURN_MS = 30_000;
 export const GUARD_MS = 5_000;
 export const START_PAUSE_MS = 3000;
 
