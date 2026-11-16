@@ -40,7 +40,7 @@ export const RTDB_ROOM_ROOTS = [
   "tossRooms",
   "racerRooms",
   "ghostRooms",
-  "raidRooms",
+  "questRooms",
   "scoreRaces",
   "classRaces",
 ] as const;

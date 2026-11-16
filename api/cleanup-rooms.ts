@@ -24,7 +24,7 @@ const ROOM_ROOTS = [
   "karutaRooms",
   "goldfishRooms",
   "shiritoriRooms",
-  "raidRooms",
+  "questRooms",
   "scoreRaces",
 ] as const;
 /** Firestore deletes per run - plenty for a school, keeps a run cheap. */

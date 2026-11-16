@@ -200,9 +200,9 @@ export const games: Game[] = [
   {
     type: "builtin",
     id: "monster-raid",
-    name: "Monster Raid",
+    name: "Monster Quest",
     description:
-      "Team up with friends and type to beat monsters and a big boss!",
+      "Turn-based hero battles! Pick a move, type its word, beat the boss.",
     icon: "fa-dragon",
     words: "levels",
   },

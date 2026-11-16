@@ -1,0 +1,145 @@
+import { HeroClass } from "./quest-rules";
+
+/**
+ * Pixel-art heroes (18x20), drawn as tiny SVGs so they stay crisp when
+ * scaled up. Each letter is a palette colour, "." is see-through.
+ */
+
+const PALETTE: Record<string, string> = {
+  k: "#1a1c2c",
+  s: "#f4c59e",
+  S: "#d9966b",
+  w: "#f4f4f4",
+  g: "#b8c2d0",
+  G: "#6d7889",
+  r: "#e04444",
+  R: "#9c2a3a",
+  b: "#3d7be0",
+  B: "#27458f",
+  y: "#f6c544",
+  Y: "#c48a22",
+  p: "#9a5ce0",
+  P: "#5d2f9c",
+  c: "#7fe0f0",
+  n: "#7a4a2a",
+  N: "#4e2e18",
+  h: "#3fbf6a",
+  H: "#23804a",
+  o: "#ef8a32",
+  O: "#a8561a",
+  m: "#ff8fb8",
+};
+
+const GRIDS: Record<HeroClass, string[]> = {
+  knight: [
+    "........rr........",
+    ".......rrR........",
+    ".....kkkkkk.......",
+    "....kggggggk......",
+    "...kgggggggGk.....",
+    "...kgkkkkkgGk.....",
+    "...kgkskskgGk.....",
+    "...kgggggggGk.....",
+    "....kggggggk......",
+    ".w...kkkkkk.......",
+    ".w..kbbbbbbk......",
+    ".w.kbbbyybbbk.....",
+    ".wkkbbbyybbbbk....",
+    "yyykskbbbbbbkGk...",
+    ".y.kkkbbbbbbkGGk..",
+    "....kBBBBBBBkGGk..",
+    ".....kGk.kGk.kk...",
+    ".....kGk.kGk......",
+    "....kGGk.kGGk.....",
+    "....kkkk.kkkk.....",
+  ],
+  mage: [
+    "........kk........",
+    ".......kpPk.......",
+    "......kppyPk......",
+    ".....kpppppPk.....",
+    "....kppppppppk....",
+    "...kkkkkkkkkkkk...",
+    "....kssssssSk.....",
+    "..c.kskssksSk.....",
+    ".ccckssssssSk.....",
+    "..c..kwwwwwk......",
+    "..n.kpwwwwwpk.....",
+    "..nkppppppppPk....",
+    "..nksspppyppPk....",
+    "..nkkppppppppPk...",
+    "..n.kpppppppPPk...",
+    "..n.kppppppppPk...",
+    "..n.kPPPPPPPPPk...",
+    "..n..kNk..kNk.....",
+    ".....kNNk.kNNk....",
+    ".....kkkk.kkkk....",
+  ],
+  healer: [
+    ".....kkkkkk.......",
+    "....kwwwwwwk......",
+    "...kwwwhwwwwk.....",
+    "...kwwhhhwwwk.....",
+    "...kwwwhwwwwk.....",
+    "...kwkkkkkwwk.....",
+    "...kwssssswwk.....",
+    "..m.kskssksk......",
+    ".mmmkssssssk......",
+    "..m..kssssk.......",
+    "..n.kwwwwwwk......",
+    "..nkwwwhwwwwk.....",
+    "..nkswhhhwwwk.....",
+    "..nkkwwhwwwwwk....",
+    "..n.kwwwwwwwwk....",
+    "..n.kmmmmmmmmk....",
+    "..n.kwwwwwwwwk....",
+    "..n..kNk..kNk.....",
+    ".....kNNk.kNNk....",
+    ".....kkkk.kkkk....",
+  ],
+  guardian: [
+    ".......kkkk.......",
+    "......kooook......",
+    ".....kooooOOk.....",
+    "....kkkkkkkOk.....",
+    "....kssssskOk.....",
+    "....kskssksOk.....",
+    "....kssssssk......",
+    ".kkkkkSSSSk.......",
+    "kyyyyykoooook.....",
+    "kygbgykoooooOk....",
+    "kybcbykoooooOOk...",
+    "kybbbykoooooOOk...",
+    "kygbgykoooooOOk...",
+    "kygggykOOOOOOOk...",
+    "kyyyyyknnnnnnk....",
+    ".kyyykkoooooOk....",
+    "..kkk.kOk.kOk.....",
+    "......kOk.kOk.....",
+    ".....kOOk.kOOk....",
+    ".....kkkk.kkkk....",
+  ],
+};
+
+function toSvg(grid: string[]): string {
+  const rects: string[] = [];
+  grid.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const colour = PALETTE[row[x] ?? "."];
+      if (colour === undefined) continue;
+      rects.push(
+        `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${colour}"/>`,
+      );
+    }
+  });
+  const width = grid[0]?.length ?? 0;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${grid.length}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+export const HERO_ART: Record<HeroClass, string> = {
+  knight: toSvg(GRIDS.knight),
+  mage: toSvg(GRIDS.mage),
+  healer: toSvg(GRIDS.healer),
+  guardian: toSvg(GRIDS.guardian),
+};

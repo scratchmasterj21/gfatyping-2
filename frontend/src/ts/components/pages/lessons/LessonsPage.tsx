@@ -75,7 +75,7 @@ import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
 import { GoldfishModal } from "../../../games/kana/GoldfishModal";
 import { KarutaModal } from "../../../games/kana/KarutaModal";
 import { ShiritoriModal } from "../../../games/kana/ShiritoriModal";
-import { MonsterRaidModal } from "../../../games/monster-raid/MonsterRaidModal";
+import { MonsterQuestModal } from "../../../games/monster-quest/MonsterQuestModal";
 import { SnackShopModal } from "../../../games/snack-shop/SnackShopModal";
 import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
@@ -2595,7 +2595,7 @@ export function LessonsPage(): JSXElement {
           }}
         />
         <KanaPracticeModal />
-        <MonsterRaidModal
+        <MonsterQuestModal
           open={raidOpen()}
           initialMode={gameLaunchMode()}
           multiplayerUnlocked={true}
