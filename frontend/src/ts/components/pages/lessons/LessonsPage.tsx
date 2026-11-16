@@ -76,6 +76,7 @@ import { GoldfishModal } from "../../../games/kana/GoldfishModal";
 import { KarutaModal } from "../../../games/kana/KarutaModal";
 import { ShiritoriModal } from "../../../games/kana/ShiritoriModal";
 import { MonsterQuestModal } from "../../../games/monster-quest/MonsterQuestModal";
+import { RescueShipModal } from "../../../games/rescue-ship/RescueShipModal";
 import { SnackShopModal } from "../../../games/snack-shop/SnackShopModal";
 import { TowerClimbModal } from "../../../games/tower-climb/TowerClimbModal";
 import { TypeRacerModal } from "../../../games/type-racer/TypeRacerModal";
@@ -187,6 +188,7 @@ const TOGETHER_GAME_IDS: string[] = [
   "type-racer",
   "ghost-hunter",
   "monster-raid",
+  "rescue-ship",
   "balloon-pop",
   "fruit-ninja",
   "word-defender",
@@ -781,6 +783,7 @@ export function LessonsPage(): JSXElement {
   const [goldfishOpen, setGoldfishOpen] = createSignal(false);
   const [shiritoriOpen, setShiritoriOpen] = createSignal(false);
   const [raidOpen, setRaidOpen] = createSignal(false);
+  const [shipOpen, setShipOpen] = createSignal(false);
   const [racerOpen, setRacerOpen] = createSignal(false);
   const [ghostOpen, setGhostOpen] = createSignal(false);
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
@@ -1592,6 +1595,7 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "goldfish") setGoldfishOpen(true);
     else if (gameId === "shiritori") setShiritoriOpen(true);
     else if (gameId === "monster-raid") setRaidOpen(true);
+    else if (gameId === "rescue-ship") setShipOpen(true);
   };
 
   // Time in free-play games, for the teacher's activity view. Lesson
@@ -1615,6 +1619,7 @@ export function LessonsPage(): JSXElement {
     if (goldfishOpen()) return "goldfish";
     if (shiritoriOpen()) return "shiritori";
     if (raidOpen()) return "monster-raid";
+    if (shipOpen()) return "rescue-ship";
     return undefined;
   });
   createEffect(
@@ -2178,6 +2183,7 @@ export function LessonsPage(): JSXElement {
                             "goldfish",
                             "shiritori",
                             "monster-raid",
+                            "rescue-ship",
                             "balloon-pop",
                             "fruit-ninja",
                             "word-defender",
@@ -2601,6 +2607,15 @@ export function LessonsPage(): JSXElement {
           multiplayerUnlocked={true}
           onClose={() => {
             setRaidOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+        />
+        <RescueShipModal
+          open={shipOpen()}
+          initialMode={gameLaunchMode()}
+          multiplayerUnlocked={true}
+          onClose={() => {
+            setShipOpen(false);
             setRecommendedGameId(undefined);
           }}
         />

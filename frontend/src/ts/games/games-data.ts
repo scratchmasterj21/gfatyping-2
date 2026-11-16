@@ -30,7 +30,8 @@ export type BuiltinGame = {
     | "karuta"
     | "goldfish"
     | "shiritori"
-    | "monster-raid";
+    | "monster-raid"
+    | "rescue-ship";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -204,6 +205,15 @@ export const games: Game[] = [
     description:
       "Turn-based hero battles! Pick a move, type its word, beat the boss.",
     icon: "fa-dragon",
+    words: "levels",
+  },
+  {
+    type: "builtin",
+    id: "rescue-ship",
+    name: "Rescue Ship",
+    description:
+      "Crew a spaceship with friends - everyone has a job. Save the space pets!",
+    icon: "fa-rocket",
     words: "levels",
   },
   {

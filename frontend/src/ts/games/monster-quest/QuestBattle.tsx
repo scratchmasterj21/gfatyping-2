@@ -495,7 +495,7 @@ export function QuestBattle(props: {
   return (
     <div class="relative flex h-full w-full flex-col overflow-hidden bg-game-night font-kid text-game-cream select-none">
       {/* turn order */}
-      <div class="flex min-h-14 items-center gap-1.5 bg-game-ink/70 py-1.5 pr-44 pl-20">
+      <div class="flex min-h-14 items-center gap-1.5 bg-game-ink/70 px-3 pt-16 pb-1.5 sm:pt-1.5 sm:pr-44 sm:pl-20">
         <span class="mr-1 text-xs font-bold tracking-wide text-game-grey uppercase">
           Turns
         </span>
