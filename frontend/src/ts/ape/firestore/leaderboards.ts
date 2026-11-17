@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   setDoc,
+  where,
 } from "firebase/firestore";
 import { getAuthenticatedUser } from "../../firebase";
 import { db, Handler, ok, stripUndefined } from "./common";
@@ -22,6 +23,26 @@ export function leaderboardKey(
   language: string,
 ): string {
   return `${mode}_${mode2}_${language}`;
+}
+
+const TEACHER_CACHE_MS = 5 * 60 * 1000;
+let teacherCache: { at: number; uids: Promise<Set<string>> } | undefined;
+
+/** Teachers never show on the rankings (cached 5 min, one small query). */
+async function teacherUids(): Promise<Set<string>> {
+  if (teacherCache && Date.now() - teacherCache.at < TEACHER_CACHE_MS) {
+    return teacherCache.uids;
+  }
+  const uids = getDocs(
+    query(collection(db(), "users"), where("role", "==", "teacher")),
+  )
+    .then((snap) => new Set(snap.docs.map((d) => d.id)))
+    .catch(() => {
+      teacherCache = undefined;
+      return new Set<string>();
+    });
+  teacherCache = { at: Date.now(), uids };
+  return uids;
 }
 
 function entriesCol(key: string): CollectionReference {
@@ -212,9 +233,13 @@ export async function incrementWeeklyXp(
 async function getSortedSpeedEntries(
   col: CollectionReference,
 ): Promise<StoredEntry[]> {
-  const snap = await getDocs(query(col, orderBy("wpm", "desc")));
+  const [snap, teachers] = await Promise.all([
+    getDocs(query(col, orderBy("wpm", "desc"))),
+    teacherUids(),
+  ]);
   return snap.docs
     .map((d) => d.data() as StoredEntry)
+    .filter((e) => !teachers.has(e.uid))
     .sort(
       (a, b) =>
         b.wpm - a.wpm ||
@@ -226,9 +251,13 @@ async function getSortedSpeedEntries(
 async function getSortedWeeklyEntries(
   col: CollectionReference,
 ): Promise<WeeklyStoredEntry[]> {
-  const snap = await getDocs(query(col, orderBy("totalXp", "desc")));
+  const [snap, teachers] = await Promise.all([
+    getDocs(query(col, orderBy("totalXp", "desc"))),
+    teacherUids(),
+  ]);
   return snap.docs
     .map((d) => d.data() as WeeklyStoredEntry)
+    .filter((e) => !teachers.has(e.uid))
     .sort(
       (a, b) =>
         b.totalXp - a.totalXp ||
