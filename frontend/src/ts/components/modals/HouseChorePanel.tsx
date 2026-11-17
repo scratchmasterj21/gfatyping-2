@@ -96,7 +96,7 @@ export function HouseChorePanel(props: {
       </button>
 
       <Show when={open()}>
-        <div class="fixed inset-0 z-[300] flex items-center justify-center bg-game-ink/50 p-4">
+        <div class="fixed inset-0 z-[6000] flex items-center justify-center bg-game-ink/50 p-4">
           <div class="grid w-full max-w-md gap-4 rounded-2xl bg-game-cream p-5 font-kid text-game-ink shadow-xl">
             <div class="flex items-center justify-between">
               <div class="text-xl font-bold">

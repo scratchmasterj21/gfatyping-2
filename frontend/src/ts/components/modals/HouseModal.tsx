@@ -1300,7 +1300,9 @@ export function HouseModal(): JSXElement {
           <div
             ref={roomRef}
             data-house-room
-            class="relative h-112 w-full touch-none overflow-hidden rounded-xl"
+            // isolate: furniture z-indexes (up to ~3000) stay inside the room
+            // and can't cover pop-ups like the chore panel
+            class="relative isolate h-112 w-full touch-none overflow-hidden rounded-xl"
             onPointerMove={handleRoomPointerMove}
             onPointerUp={handleRoomPointerUp}
             onPointerCancel={handleRoomPointerUp}
