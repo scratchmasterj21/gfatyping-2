@@ -102,6 +102,8 @@ type Props = {
     wave: number,
     difficultyLabel: string,
     wordListGroup: string,
+    /** a lesson checkpoint was beaten */
+    cleared?: boolean,
   ) => void;
 };
 
@@ -193,13 +195,22 @@ export function GhostHunterModal(props: Props): JSXElement {
       multiplayerRole,
       gradeOneLesson,
     );
-    game.events.on("game-result", (data: { score: number; wave: number }) => {
-      if (multiplayerCode === undefined) {
-        onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
-        return;
-      }
-      void markGhostPlayerFinished(multiplayerCode, data.wave);
-    });
+    game.events.on(
+      "game-result",
+      (data: { score: number; wave: number; cleared?: boolean }) => {
+        if (multiplayerCode === undefined) {
+          onResult?.(
+            data.score,
+            data.wave,
+            usedDifficulty.label,
+            usedGroup,
+            data.cleared,
+          );
+          return;
+        }
+        void markGhostPlayerFinished(multiplayerCode, data.wave);
+      },
+    );
     game.events.on("ui-wave", (wave: number) => {
       game?.registry.set("multiplayerWave", wave);
     });

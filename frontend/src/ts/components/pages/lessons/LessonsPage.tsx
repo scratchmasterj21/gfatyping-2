@@ -2729,13 +2729,14 @@ export function LessonsPage(): JSXElement {
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
-          onResult={(score, wave) => {
+          onResult={(score, wave, _label, _group, cleared) => {
             const gid = lessonDefGroupId();
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:word-defender`,
                 score,
                 wave,
+                { cleared },
               );
               claimRecommendedGame("word-defender", score, wave);
             }
@@ -2749,13 +2750,14 @@ export function LessonsPage(): JSXElement {
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
-          onResult={(score, wave) => {
+          onResult={(score, wave, _label, _group, cleared) => {
             const gid = lessonBallGroupId();
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:balloon-pop`,
                 score,
                 wave,
+                { cleared },
               );
               claimRecommendedGame("balloon-pop", score, wave);
             }
@@ -2790,13 +2792,14 @@ export function LessonsPage(): JSXElement {
             void progress.refetch();
           }}
           lessonWords={lessonGameWords()}
-          onResult={(score, wave) => {
+          onResult={(score, wave, _label, _group, cleared) => {
             const gid = lessonGhostGroupId();
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:ghost-hunter`,
                 score,
                 wave,
+                { cleared },
               );
               claimRecommendedGame("ghost-hunter", score, wave);
             }

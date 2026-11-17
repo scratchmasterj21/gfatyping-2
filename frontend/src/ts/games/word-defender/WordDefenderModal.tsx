@@ -76,6 +76,8 @@ type Props = {
     wave: number,
     difficultyLabel: string,
     wordListGroup: string,
+    /** a lesson checkpoint was beaten */
+    cleared?: boolean,
   ) => void;
 };
 
@@ -208,10 +210,19 @@ export function WordDefenderModal(props: Props): JSXElement {
     );
     setAvatarVisible(true);
     game.events.on("game-avatar-visible", setAvatarVisible);
-    game.events.on("game-result", (data: { score: number; wave: number }) => {
-      setAvatarVisible(false);
-      onResult?.(data.score, data.wave, usedDifficulty.label, usedGroup);
-    });
+    game.events.on(
+      "game-result",
+      (data: { score: number; wave: number; cleared?: boolean }) => {
+        setAvatarVisible(false);
+        onResult?.(
+          data.score,
+          data.wave,
+          usedDifficulty.label,
+          usedGroup,
+          data.cleared,
+        );
+      },
+    );
     game.events.on("game-over-screen", (d: WaveEnd) => {
       setResult(toView(d));
     });

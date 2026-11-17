@@ -15,6 +15,9 @@ export class GameOverScene extends Scene {
     this.game.events.emit("game-result", {
       score: data.score,
       wave: data.wave,
+      // a lesson checkpoint's last wave was beaten (the server unlocks the
+      // next lesson on this, whatever the wave number)
+      cleared: data.cleared === true,
     });
     this.game.events.emit("game-over-screen", data);
   }
