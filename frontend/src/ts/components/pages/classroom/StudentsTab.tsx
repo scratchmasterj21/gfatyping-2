@@ -4,6 +4,7 @@ import { createMemo, createSignal, For, JSXElement, Show } from "solid-js";
 import {
   listAllStudents,
   setStudentClass,
+  setTeacherRole,
   Student,
 } from "../../../classroom/classroom";
 import {
@@ -137,6 +138,24 @@ export function StudentsTab(): JSXElement {
       }, 2000);
     } catch (e) {
       showErrorNotification("Failed to update class", { error: e });
+    } finally {
+      setSavingUid(null);
+    }
+  };
+
+  const toggleTeacher = async (student: Student): Promise<void> => {
+    if (savingUid() !== null) return;
+    setSavingUid(student.uid);
+    try {
+      await setTeacherRole(student.uid, student.teacher !== true);
+      await invalidate();
+      showSuccessNotification(
+        student.teacher === true
+          ? `${student.name} is a student again`
+          : `${student.name} is now a teacher 🍎`,
+      );
+    } catch (e) {
+      showErrorNotification("Failed to change role", { error: e });
     } finally {
       setSavingUid(null);
     }
@@ -363,6 +382,7 @@ export function StudentsTab(): JSXElement {
                   <th class="p-2">name</th>
                   <th class="p-2">email</th>
                   <th class="p-2">class</th>
+                  <th class="p-2">role</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,7 +402,14 @@ export function StudentsTab(): JSXElement {
                           onChange={() => toggle(student.uid)}
                         />
                       </td>
-                      <td class="p-2 text-text">{student.name}</td>
+                      <td class="p-2 text-text">
+                        {student.name}
+                        <Show when={student.teacher === true}>
+                          <span class="ml-1" title="Teacher">
+                            🍎
+                          </span>
+                        </Show>
+                      </td>
                       <td class="p-2 text-sub">{student.email ?? "—"}</td>
                       <td class="p-2">
                         <div class="flex items-center gap-2">
@@ -413,6 +440,25 @@ export function StudentsTab(): JSXElement {
                             <Fa icon="fa-check" class="text-main" />
                           </Show>
                         </div>
+                      </td>
+                      <td class="p-2">
+                        <button
+                          type="button"
+                          class={
+                            student.teacher === true
+                              ? "cursor-pointer rounded-full bg-main px-3 py-1 text-xs font-bold text-bg"
+                              : "cursor-pointer rounded-full bg-sub-alt px-3 py-1 text-xs text-sub hover:text-text"
+                          }
+                          title={
+                            student.teacher === true
+                              ? "Teacher: skips student rules, left out of class stats. Click to make a student."
+                              : "Make this account a teacher"
+                          }
+                          disabled={savingUid() !== null || busy()}
+                          onClick={() => void toggleTeacher(student)}
+                        >
+                          {student.teacher === true ? "🍎 teacher" : "student"}
+                        </button>
                       </td>
                     </tr>
                   )}

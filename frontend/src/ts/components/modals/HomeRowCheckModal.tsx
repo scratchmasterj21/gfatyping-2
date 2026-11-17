@@ -1,6 +1,6 @@
 import { createSignal, For, JSXElement, onCleanup, Show } from "solid-js";
 
-import { isCurrentUserAdmin } from "../../auth";
+import { isCurrentUserStaff } from "../../auth";
 import { fingerForChar } from "../../lessons/finger-map";
 import {
   getHomeRowCheckLesson,
@@ -176,7 +176,7 @@ export function HomeRowCheckModal(): JSXElement {
           </Show>
         </div>
 
-        <Show when={isCurrentUserAdmin()}>
+        <Show when={isCurrentUserStaff()}>
           <button
             type="button"
             class="cursor-pointer text-sm text-sub underline hover:text-text"

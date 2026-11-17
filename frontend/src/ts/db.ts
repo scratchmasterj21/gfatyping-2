@@ -133,6 +133,10 @@ export async function initSnapshot(): Promise<Snapshot | false> {
     snap.details = userData.profileDetails;
     snap.avatarUrl = (userData as { avatarUrl?: string }).avatarUrl;
     snap.classId = (userData as { classId?: string }).classId;
+    snap.role =
+      (userData as { role?: unknown }).role === "teacher"
+        ? "teacher"
+        : undefined;
     snap.raceWins = (userData as { raceWins?: number }).raceWins ?? 0;
     snap.championWins =
       (userData as { championWins?: number }).championWins ?? 0;

@@ -1,6 +1,7 @@
 import { collection, getDocs, query, where } from "firebase/firestore";
 
 import { getDb } from "../firebase";
+import { isTeacherDoc } from "./roles";
 
 /**
  * Per-day activity counters stored on users/{uid}.activityDays (written only
@@ -167,6 +168,7 @@ export async function getClassActivity(
     query(collection(getDb(), "users"), where("classId", "==", classId)),
   );
   return snap.docs
+    .filter((d) => !isTeacherDoc(d.data() as { role?: unknown }))
     .map((d) => {
       const data = d.data() as {
         uid?: string;

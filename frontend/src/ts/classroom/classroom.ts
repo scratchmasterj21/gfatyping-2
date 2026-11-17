@@ -5,6 +5,7 @@ import {
 import {
   collection,
   CollectionReference,
+  deleteField,
   doc,
   getDocs,
   query,
@@ -14,6 +15,7 @@ import {
 
 import { gradeOf } from "../constants/classes";
 import { getDb, getIdToken } from "../firebase";
+import { isTeacherDoc, withoutTeachers } from "./roles";
 import {
   isRaceStatMetric,
   RACE_STAT_BOARDS,
@@ -29,6 +31,8 @@ export type Student = {
   classId?: string;
   /** moved on after G6 (see rollover.ts); hidden from class lists */
   graduated?: boolean;
+  /** a teacher account (see roles.ts) */
+  teacher?: boolean;
   /** the last new-school-year move, so it can be undone */
   rollover?: StudentRollover;
 };
@@ -97,6 +101,8 @@ export type StoredWeeklyPeriod = {
 
 export type StoredUserDoc = {
   uid?: string;
+  /** "teacher" = staff account (see roles.ts) */
+  role?: string;
   name?: string;
   email?: string;
   avatarUrl?: string;
@@ -155,6 +161,7 @@ function toStudent(userDoc: StudentDoc): Student {
     avatarUrl: userDoc.avatarUrl,
     classId: userDoc.classId ?? undefined,
     ...(userDoc.graduated === true ? { graduated: true } : {}),
+    ...(isTeacherDoc(userDoc) ? { teacher: true } : {}),
     ...(userDoc.rollover !== undefined ? { rollover: userDoc.rollover } : {}),
   };
 }
@@ -170,6 +177,18 @@ async function fetchUserDocs(): Promise<StudentDoc[]> {
 export async function listAllStudents(): Promise<Student[]> {
   const docs = await fetchUserDocs();
   return docs.map(toStudent);
+}
+
+/** Admin only: mark an account as a teacher (or back to a student). */
+export async function setTeacherRole(
+  uid: string,
+  teacher: boolean,
+): Promise<void> {
+  await setDoc(
+    doc(usersCol(), uid),
+    { role: teacher ? "teacher" : deleteField() },
+    { merge: true },
+  );
 }
 
 export async function setStudentClass(
@@ -251,14 +270,16 @@ export async function getClassroomLeaderboard(options: {
     const snap = await getDocs(
       query(usersCol(), where("classId", "==", options.classId)),
     );
-    students = snap.docs.map((d) => {
-      const data = d.data() as StoredUserDoc;
-      return { ...data, uid: data.uid ?? d.id };
-    });
+    students = withoutTeachers(
+      snap.docs.map((d) => {
+        const data = d.data() as StoredUserDoc;
+        return { ...data, uid: data.uid ?? d.id };
+      }),
+    );
   } else {
     // Grade / school scope: need all assigned users
     const docs = await fetchUserDocs();
-    students = docs.filter(
+    students = withoutTeachers(docs).filter(
       (d) => typeof d.classId === "string" && d.classId !== "",
     );
     if (options.scope === "grade" && options.grade !== undefined) {
@@ -465,6 +486,7 @@ export async function getLessonStarsLeaderboard(
     query(usersCol(), where("classId", "==", classId)),
   );
   return snap.docs
+    .filter((d) => !isTeacherDoc(d.data() as StoredUserDoc))
     .map((d) => {
       const data = d.data() as StoredUserDoc;
       return {
@@ -539,13 +561,15 @@ export async function getGameScoresLeaderboard(options: {
     const snap = await getDocs(
       query(usersCol(), where("classId", "==", options.classId)),
     );
-    students = snap.docs.map((d) => {
-      const data = d.data() as StoredUserDoc;
-      return { ...data, uid: data.uid ?? d.id };
-    });
+    students = withoutTeachers(
+      snap.docs.map((d) => {
+        const data = d.data() as StoredUserDoc;
+        return { ...data, uid: data.uid ?? d.id };
+      }),
+    );
   } else {
     const docs = await fetchUserDocs();
-    students = docs.filter(
+    students = withoutTeachers(docs).filter(
       (d) => typeof d.classId === "string" && d.classId !== "",
     );
     if (options.scope === "grade" && options.grade !== undefined) {

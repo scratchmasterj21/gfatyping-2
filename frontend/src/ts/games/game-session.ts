@@ -1,5 +1,5 @@
 import { callApi } from "../api-client";
-import { isCurrentUserAdmin } from "../auth";
+import { isCurrentUserStaff } from "../auth";
 import { noteGameSeconds } from "./game-access";
 
 /**
@@ -65,7 +65,7 @@ function readPending(): Pending | undefined {
 }
 
 async function report(p: Pending, opened: boolean): Promise<void> {
-  if (isCurrentUserAdmin()) return;
+  if (isCurrentUserStaff()) return;
   const seconds = Math.round(p.seconds);
   if (seconds < MIN_SECONDS) return;
   noteGameSeconds(seconds);

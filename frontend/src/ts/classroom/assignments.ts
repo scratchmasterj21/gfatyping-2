@@ -17,6 +17,7 @@ import { getAuthenticatedUser, getDb } from "../firebase";
 import { lessonDisplayName } from "../lessons/lesson-display-name";
 import { lessonOrder } from "../lessons/lessons-data";
 import { bestWpm, StoredUserDoc } from "./classroom";
+import { withoutTeachers } from "./roles";
 import { LessonMark } from "./certificate-levels";
 
 export type ContentScope = "class" | "grade" | "school";
@@ -465,10 +466,13 @@ export async function getClassProgress(
   const usersSnap = await getDocs(
     query(collection(getDb(), "users"), where("classId", "==", classId)),
   );
-  const docs = usersSnap.docs.map((d) => {
-    const data = d.data() as StoredUserDoc;
-    return { ...data, uid: data.uid ?? d.id };
-  });
+  // teachers aren't part of the class's statistics
+  const docs = withoutTeachers(
+    usersSnap.docs.map((d) => {
+      const data = d.data() as StoredUserDoc;
+      return { ...data, uid: data.uid ?? d.id };
+    }),
+  );
 
   const allAssignments = await listAssignments();
 

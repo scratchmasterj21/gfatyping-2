@@ -1,6 +1,6 @@
 import { createEffect, createRoot, createSignal, untrack } from "solid-js";
 
-import { isCurrentUserAdmin } from "../auth";
+import { isCurrentUserAdmin, isCurrentUserTeacher } from "../auth";
 import { isServerConfigLoaded } from "../config/remote";
 import { setConfig } from "../config/setters";
 import { Config, getConfig } from "../config/store";
@@ -29,6 +29,11 @@ export function isKidThemeActive(): boolean {
   return !isCurrentUserAdmin();
 }
 
+/** The readable-theme / class theme rules: students only (not teachers). */
+export function themeRulesApply(): boolean {
+  return isKidThemeActive() && !isCurrentUserTeacher();
+}
+
 const [lessonSettings, setLessonSettings] = createSignal<
   LessonSettings | undefined
 >();
@@ -53,7 +58,7 @@ export async function refreshThemePolicy(): Promise<void> {
 /** Signed in as a student, with their saved config loaded. */
 function enforcingThemes(): boolean {
   return (
-    isKidThemeActive() &&
+    themeRulesApply() &&
     getAuthenticatedUser() !== null &&
     getSnapshot()?.uid !== undefined &&
     isServerConfigLoaded()
@@ -73,7 +78,7 @@ createRoot(() => {
 
   // Students: load the class theme rule once signed in.
   createEffect(() => {
-    if (getSnapshot()?.uid === undefined || !isKidThemeActive()) return;
+    if (getSnapshot()?.uid === undefined || !themeRulesApply()) return;
     void refreshThemePolicy();
   });
 

@@ -36,6 +36,7 @@ import {
   showNoticeNotification,
   showSuccessNotification,
 } from "./states/notifications";
+import { getSnapshot } from "./states/snapshot";
 import { isDevEnvironment } from "./utils/env";
 import { createErrorMessage } from "./utils/error";
 import { typedKeys } from "./utils/misc";
@@ -89,6 +90,20 @@ export const ADMIN_UID = "VCCAWzj9oGfj8JEpKYCCwifqMpk1";
 export function isCurrentUserAdmin(): boolean {
   getUserId();
   return getAuthenticatedUser()?.email?.toLowerCase() === ADMIN_EMAIL;
+}
+
+/** A teacher account (set by the admin): no Classroom access, no student rules. */
+export function isCurrentUserTeacher(): boolean {
+  return getSnapshot()?.role === "teacher";
+}
+
+/**
+ * Staff = the admin or a teacher. Use this for "skip the student rules"
+ * (locks, game limits, home-row check, theme rules); keep
+ * isCurrentUserAdmin() for admin-only powers like the Classroom page.
+ */
+export function isCurrentUserStaff(): boolean {
+  return isCurrentUserAdmin() || isCurrentUserTeacher();
 }
 
 /**

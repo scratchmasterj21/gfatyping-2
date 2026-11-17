@@ -76,6 +76,8 @@ type StoredWeeklyPeriod = {
 
 type StoredUserDoc = {
   uid?: string;
+  /** "teacher" accounts are left out of every board (see classroom/roles.ts) */
+  role?: string;
   name?: string;
   avatarUrl?: string;
   selectedTitle?: string;
@@ -499,7 +501,12 @@ export default async function handler(
       const data = d.data() as StoredUserDoc;
       return { ...data, uid: data.uid ?? d.id };
     })
-    .filter((d: Student) => typeof d.classId === "string" && d.classId !== "");
+    .filter(
+      (d: Student) =>
+        typeof d.classId === "string" &&
+        d.classId !== "" &&
+        d.role !== "teacher",
+    );
 
   if (isClassCompare) {
     const result = rankClassPairs(students, grade as string);

@@ -9,7 +9,7 @@ import { configEvent } from "../../events/config";
 import * as getErrorMessage from "../../utils/error";
 import {
   getMyThemePolicy,
-  isKidThemeActive,
+  themeRulesApply,
 } from "../../controllers/kid-theme-controller";
 import { presetAllowed } from "../../controllers/theme-policy";
 
@@ -28,7 +28,7 @@ const createThemeCommand = (theme: ThemeWithName): Command => {
     configValue: theme.name,
     // students only get themes they're allowed (see theme-policy.ts)
     available: (): boolean =>
-      !isKidThemeActive() || presetAllowed(getMyThemePolicy(), theme.name),
+      !themeRulesApply() || presetAllowed(getMyThemePolicy(), theme.name),
     // customStyle: `color:${theme.main};background:${theme.bg};`,
     customData: {
       main: theme.main,

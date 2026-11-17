@@ -51,7 +51,9 @@ service cloud.firestore {
         // the game unlock rules rely on them, so students can't edit them
         'activityDays', 'lastStarLessonDate',
         'houseChoreDate', 'houseChoresDone', 'houseRoomThemes',
-        'championWins', 'lastChampionAt'
+        'championWins', 'lastChampionAt',
+        // "teacher" accounts skip the student rules - admin sets it
+        'role'
       ];
     }
 
@@ -60,7 +62,8 @@ service cloud.firestore {
       allow read: if isDomainUser();
       // create: one-time account bootstrap (ape/firestore/users.ts) writes
       // every field at its default/zero value - not an exploit surface.
-      allow create: if isOwner(uid) || isAdminUser();
+      allow create: if (isOwner(uid) && !('role' in request.resource.data))
+        || isAdminUser();
       // update: students keep direct write access to cosmetic/preference
       // fields (equipped items, selected palettes, layout, ...); economy
       // fields are blocked here and must go through a validated endpoint.

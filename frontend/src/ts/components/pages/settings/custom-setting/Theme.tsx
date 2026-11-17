@@ -22,6 +22,7 @@ import {
   getMyThemePolicy,
   isKidThemeActive,
   refreshThemePolicy,
+  themeRulesApply,
 } from "../../../../controllers/kid-theme-controller";
 import {
   convertCustomColorsToTheme,
@@ -61,19 +62,19 @@ export const sortedThemes: ThemeWithName[] = [...ThemesList].sort((a, b) => {
 
 /** Students only see themes they're allowed (teacher sees all). */
 function shownToMe(theme: ThemeWithName): boolean {
-  return !isKidThemeActive() || presetAllowed(getMyThemePolicy(), theme.name);
+  return !themeRulesApply() || presetAllowed(getMyThemePolicy(), theme.name);
 }
 
 /** Students can't keep custom colours that are hard to read. */
 function customReadableForMe(): boolean {
-  return !isKidThemeActive() || isReadableTheme(getTheme());
+  return !themeRulesApply() || isReadableTheme(getTheme());
 }
 
 export function Theme(): JSXElement {
   const customThemes = useCustomThemesLiveQuery();
-  if (isKidThemeActive()) void refreshThemePolicy();
+  if (themeRulesApply()) void refreshThemePolicy();
   const policyMode = (): string =>
-    isKidThemeActive() ? getMyThemePolicy().mode : "readable";
+    themeRulesApply() ? getMyThemePolicy().mode : "readable";
 
   const kidThemes = (): ThemeWithName[] =>
     KID_THEME_NAMES.flatMap((name) => {
@@ -83,7 +84,7 @@ export function Theme(): JSXElement {
 
   const Presets = () => (
     <div class="grid gap-4">
-      <Show when={isKidThemeActive()}>
+      <Show when={themeRulesApply()}>
         <div class="text-sm text-sub">
           <Show
             when={policyMode() === "readable"}

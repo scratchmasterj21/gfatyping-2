@@ -71,6 +71,8 @@ export type Snapshot = Omit<
   isPremium: boolean;
   streakHourOffset?: number;
   classId?: string;
+  /** "teacher": a staff account - skips student rules, left out of class stats */
+  role?: "teacher";
   /** per-day lesson/game activity (see classroom/activity.ts) */
   activityDays?: ActivityDays;
   /** class race wins (written by the teacher's race host) */

@@ -358,7 +358,12 @@ export default async function handler(
         return;
       }
     }
-    if ((isTypingQuest || isTypingQuestStart) && !isAdminEmail(auth.email)) {
+    if (
+      (isTypingQuest || isTypingQuestStart) &&
+      !isAdminEmail(auth.email) &&
+      // teacher accounts skip the student unlock rules
+      (await userRef.get()).data()?.["role"] !== "teacher"
+    ) {
       const prerequisite = await userRef
         .collection("lessonProgress")
         .doc("bottom-words")

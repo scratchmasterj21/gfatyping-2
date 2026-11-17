@@ -1,5 +1,6 @@
 import { createSignal } from "solid-js";
 
+import { isCurrentUserStaff } from "../auth";
 import { getAuthenticatedUser } from "../firebase";
 import {
   hideModalAndClearChain,
@@ -42,6 +43,7 @@ export const getHomeRowCheckLesson = pending;
 
 /** Teacher can turn the check off per class / student (lesson-settings.ts). */
 async function checkEnabled(): Promise<boolean> {
+  if (isCurrentUserStaff()) return false;
   try {
     const settings = await getLessonSettingsCached();
     return homeRowCheckOn(

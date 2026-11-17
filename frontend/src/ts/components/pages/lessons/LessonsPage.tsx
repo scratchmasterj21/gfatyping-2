@@ -10,7 +10,7 @@ import {
   Show,
 } from "solid-js";
 
-import { isCurrentUserAdmin } from "../../../auth";
+import { isCurrentUserAdmin, isCurrentUserStaff } from "../../../auth";
 import { AVATAR_ITEMS } from "../../../avatar/avatar-items";
 import {
   getAvatarState,
@@ -950,6 +950,8 @@ export function LessonsPage(): JSXElement {
   });
 
   const isLessonLocked = (id: string): boolean => {
+    // teachers (and the admin) can open any lesson
+    if (isCurrentUserStaff()) return false;
     const progressMap = progress.data;
     if (progressMap === undefined) return false;
     return isLessonLockedForProgress(
@@ -979,7 +981,7 @@ export function LessonsPage(): JSXElement {
     );
   };
   const rpgUnlocked = (): boolean =>
-    isCurrentUserAdmin() ||
+    isCurrentUserStaff() ||
     (progress.data !== undefined && !isLessonLocked("all-keys-1"));
 
   // The first not-yet-completed lesson OR checkpoint game in curriculum
@@ -1246,7 +1248,7 @@ export function LessonsPage(): JSXElement {
   const gameAccessQuery = useQuery(() => ({
     queryKey: ["gameAccess"],
     queryFn: getGameAccess,
-    enabled: isOpen() && isAuthenticated() && !isCurrentUserAdmin(),
+    enabled: isOpen() && isAuthenticated() && !isCurrentUserStaff(),
     staleTime: 1000 * 60 * 5,
   }));
   const gamePolicy = createMemo(() =>
@@ -1254,7 +1256,7 @@ export function LessonsPage(): JSXElement {
   );
   /** Free-play access; no game id = the games section as a whole. */
   const gameAccess = (gameId?: string): GameAccess =>
-    isCurrentUserAdmin()
+    isCurrentUserStaff()
       ? { allowed: true }
       : checkGameAccess(gameId, gamePolicy(), myToday());
 
@@ -1806,7 +1808,7 @@ export function LessonsPage(): JSXElement {
           signedIn={isAuthenticated()}
           showClassSetupNotice={
             isAuthenticated() &&
-            !isCurrentUserAdmin() &&
+            !isCurrentUserStaff() &&
             classId() === undefined
           }
           isNewStudent={isNewStudent()}
@@ -2191,7 +2193,7 @@ export function LessonsPage(): JSXElement {
                             "snack-shop",
                             "echo-keys",
                           ].includes(game.id) &&
-                          !isCurrentUserAdmin() &&
+                          !isCurrentUserStaff() &&
                           isLessonLocked(requiredLesson);
                         const locked = () =>
                           lessonLocked() || !gameAccess(game.id).allowed;
@@ -2650,7 +2652,7 @@ export function LessonsPage(): JSXElement {
           open={racerOpen()}
           initialMode={gameLaunchMode()}
           multiplayerUnlocked={
-            isCurrentUserAdmin() || !isLessonLocked("home-middle")
+            isCurrentUserStaff() || !isLessonLocked("home-middle")
           }
           onClose={() => {
             setRacerOpen(false);
@@ -2665,7 +2667,7 @@ export function LessonsPage(): JSXElement {
           open={ghostOpen()}
           initialMode={gameLaunchMode()}
           multiplayerUnlocked={
-            isCurrentUserAdmin() || !isLessonLocked("all-keys-1")
+            isCurrentUserStaff() || !isLessonLocked("all-keys-1")
           }
           onClose={() => {
             setGhostOpen(false);
@@ -2698,7 +2700,7 @@ export function LessonsPage(): JSXElement {
           open={typeTossOpen()}
           initialMode={gameLaunchMode()}
           multiplayerUnlocked={
-            isCurrentUserAdmin() || !isLessonLocked("home-words")
+            isCurrentUserStaff() || !isLessonLocked("home-words")
           }
           onClose={() => {
             setTypeTossOpen(false);

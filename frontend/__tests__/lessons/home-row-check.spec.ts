@@ -6,6 +6,7 @@ vi.mock("../../src/ts/firebase", () => ({
   getAuthenticatedUser: vi.fn(),
 }));
 vi.mock("../../src/ts/queries", () => ({ queryClient: {} }));
+vi.mock("../../src/ts/auth", () => ({ isCurrentUserStaff: () => false }));
 
 import { homeRowReady } from "../../src/ts/lessons/home-row-check";
 import {

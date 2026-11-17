@@ -38,7 +38,10 @@ export function planRollover(students: Student[]): RolloverPlan {
   const moves: RolloverMove[] = [];
   const counts = new Map<string, { to: string | null; count: number }>();
   for (const s of students) {
-    if (s.graduated === true || s.classId === undefined) continue;
+    // teachers stay with their class; graduates and unassigned don't move
+    if (s.graduated === true || s.classId === undefined || s.teacher === true) {
+      continue;
+    }
     const to = nextClassId(s.classId);
     if (to === undefined) continue;
     moves.push({ uid: s.uid, from: s.classId, to });
