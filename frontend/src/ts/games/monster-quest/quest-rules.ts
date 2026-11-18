@@ -346,6 +346,8 @@ export type QuestEvent =
       emoji: string;
       hits: HitResult[];
       note?: string;
+      /** hero who gets a shield (Defend / Protect), for the effect */
+      shield?: string;
     }
   | { type: "angry"; actor: string }
   | { type: "rest"; hp: number[] }
@@ -600,6 +602,7 @@ function applyHero(
       move: "Defend",
       emoji: "🛡️",
       hits: [],
+      shield: heroId(hero.slot),
     });
     return;
   }
@@ -675,6 +678,7 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: [],
+      shield: heroId(target.hp > 0 ? target.slot : hero.slot),
       note: `protects ${target.slot === hero.slot ? "the team" : target.name}`,
     });
   }

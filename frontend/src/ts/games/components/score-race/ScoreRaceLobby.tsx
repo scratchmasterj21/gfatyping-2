@@ -17,7 +17,7 @@ export function ScoreRaceLobby(props: {
   const online = (): number =>
     props.race.players().filter((p) => p.online).length;
   return (
-    <div class="grid gap-4 p-4 pt-12 font-kid">
+    <div class="grid min-h-0 gap-4 overflow-y-auto p-4 pt-12 font-kid">
       <div class="text-center">
         <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
           {props.race.title} room code

@@ -477,93 +477,106 @@ export function RescueShipModal(props: {
         </Show>
 
         <Show when={phase() === "lobby"}>
-          <div class="grid gap-4 p-6 pt-12 font-kid">
-            <div class="text-center">
-              <div class="text-sm font-bold tracking-widest text-sub uppercase">
-                Room code - tell your friends!
-              </div>
-              <div class="text-5xl font-bold tracking-[0.25em] text-main">
-                {roomCode()}
-              </div>
-              <div class="mt-2 text-sm text-sub">
-                {shipDifficultyFor(room()?.difficultyLabel ?? "").label} words ·{" "}
-                {lobbyPlayers().length}/{CREW_SIZE} crew · helpers run empty
-                stations
-              </div>
-            </div>
-            <For each={lobbyPlayers()}>
-              {(player) => (
-                <div class="flex items-center gap-3 rounded-xl bg-sub-alt px-3 py-2">
-                  <UserAvatar uid={player.uid} class="h-9 w-9" />
-                  <span class="flex-1 truncate text-lg font-bold text-text">
-                    {player.name}
-                    {player.uid === room()?.hostUid ? " · host" : ""}
-                  </span>
-                  <Show when={player.station}>
-                    {(st) => (
-                      <span class="text-text">
-                        {STATION_INFO[st()].emoji} {STATION_INFO[st()].name}
-                      </span>
-                    )}
-                  </Show>
-                  <span class={player.online ? "text-main" : "text-sub"}>
-                    {player.online ? "ready" : "offline"}
-                  </span>
-                </div>
-              )}
-            </For>
-            <div>
-              <div class="mb-2 text-sm font-bold text-sub">Your station</div>
-              <StationPicker
-                selected={room()?.players[uid() ?? ""]?.station ?? station()}
-                taken={takenByOthers()}
-                onSelect={(st) => {
-                  setStation(st);
-                  const code = roomCode();
-                  if (code !== undefined) {
-                    void setMyStation(code, st).catch(() => undefined);
+          <GamePickLayout
+            header={
+              <GameModalHeader
+                title="Rescue Ship"
+                onClose={() => props.onClose()}
+              />
+            }
+            footer={
+              <div class="grid gap-2 font-kid">
+                <Show
+                  when={room()?.hostUid === uid()}
+                  fallback={
+                    <div class="text-center text-sub">
+                      Waiting for the captain to launch…
+                    </div>
                   }
-                }}
+                >
+                  <GameSetupPrimaryAction
+                    text="Launch the ship!"
+                    disabled={onlineCount() < 2}
+                    onClick={() => {
+                      const r = room();
+                      if (r !== null) void startShipRoom(r);
+                    }}
+                  />
+                </Show>
+                <button
+                  type="button"
+                  class="text-center text-sm text-sub underline"
+                  onClick={() => {
+                    void leaveRoom();
+                    setPhase("pick");
+                  }}
+                >
+                  Leave room
+                </button>
+              </div>
+            }
+          >
+            <div class="grid gap-3 font-kid">
+              <div class="text-center">
+                <div class="text-sm font-bold tracking-widest text-sub uppercase">
+                  Room code - tell your friends!
+                </div>
+                <div class="text-4xl font-bold tracking-[0.25em] text-main">
+                  {roomCode()}
+                </div>
+                <div class="mt-2 text-sm text-sub">
+                  {shipDifficultyFor(room()?.difficultyLabel ?? "").label} words
+                  · {lobbyPlayers().length}/{CREW_SIZE} crew · helpers run empty
+                  stations
+                </div>
+              </div>
+              <For each={lobbyPlayers()}>
+                {(player) => (
+                  <div class="flex items-center gap-3 rounded-xl bg-sub-alt px-3 py-1.5">
+                    <UserAvatar uid={player.uid} class="h-8 w-8" />
+                    <span class="flex-1 truncate text-lg font-bold text-text">
+                      {player.name}
+                      {player.uid === room()?.hostUid ? " · host" : ""}
+                    </span>
+                    <Show when={player.station}>
+                      {(st) => (
+                        <span class="text-text">
+                          {STATION_INFO[st()].emoji} {STATION_INFO[st()].name}
+                        </span>
+                      )}
+                    </Show>
+                    <span class={player.online ? "text-main" : "text-sub"}>
+                      {player.online ? "ready" : "offline"}
+                    </span>
+                  </div>
+                )}
+              </For>
+              <div>
+                <div class="mb-2 text-sm font-bold text-sub">Your station</div>
+                <StationPicker
+                  selected={room()?.players[uid() ?? ""]?.station ?? station()}
+                  taken={takenByOthers()}
+                  onSelect={(st) => {
+                    setStation(st);
+                    const code = roomCode();
+                    if (code !== undefined) {
+                      void setMyStation(code, st).catch(() => undefined);
+                    }
+                  }}
+                />
+              </div>
+              <Show when={onlineCount() < 2}>
+                <div class="text-center text-sub">
+                  Waiting for crew to join… (need 2)
+                </div>
+              </Show>
+              <InviteClassmates
+                gameId={GAME_ID}
+                code={roomCode()}
+                show={room()?.hostUid === uid()}
               />
             </div>
-            <Show when={onlineCount() < 2}>
-              <div class="text-center text-sub">
-                Waiting for crew to join… (need 2)
-              </div>
-            </Show>
-            <InviteClassmates
-              gameId={GAME_ID}
-              code={roomCode()}
-              show={room()?.hostUid === uid()}
-            />
-            <Show
-              when={room()?.hostUid === uid()}
-              fallback={
-                <div class="text-center text-sub">
-                  Waiting for the captain to launch…
-                </div>
-              }
-            >
-              <GameSetupPrimaryAction
-                text="Launch the ship!"
-                disabled={onlineCount() < 2}
-                onClick={() => {
-                  const r = room();
-                  if (r !== null) void startShipRoom(r);
-                }}
-              />
-            </Show>
-            <button
-              type="button"
-              class="text-center text-sm text-sub underline"
-              onClick={() => {
-                void leaveRoom();
-                setPhase("pick");
-              }}
-            >
-              Leave room
-            </button>
-          </div>
+          </GamePickLayout>
         </Show>
 
         <Show when={phase() === "playing" || phase() === "result"}>

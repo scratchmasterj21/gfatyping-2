@@ -425,7 +425,7 @@ export function FourRowModal(props: {
         </Show>
 
         <Show when={phase() === "lobby"}>
-          <div class="grid gap-4 p-6 pt-12 font-kid">
+          <div class="grid min-h-0 gap-4 overflow-y-auto p-6 pt-12 font-kid">
             <div class="text-center">
               <div class="text-sm font-bold tracking-widest text-sub uppercase">
                 Room code - tell your friend!

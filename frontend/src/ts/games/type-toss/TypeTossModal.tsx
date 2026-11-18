@@ -467,7 +467,7 @@ export function TypeTossModal(props: Props): JSXElement {
         </Show>
 
         <Show when={phase() === "lobby"}>
-          <div class="grid gap-4 pt-12">
+          <div class="grid min-h-0 gap-4 overflow-y-auto pt-12">
             <div class="text-center">
               <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
                 room code

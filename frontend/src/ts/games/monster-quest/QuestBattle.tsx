@@ -3,6 +3,7 @@ import {
   createMemo,
   createSignal,
   For,
+  Index,
   JSXElement,
   on,
   onCleanup,
@@ -14,6 +15,14 @@ import { cn } from "../../utils/cn";
 import { sfx } from "../mini/mini-sounds";
 import { MiniTypingInput } from "../mini/MiniTypingInput";
 import { HERO_ART } from "./hero-art";
+import {
+  FLASH_CLASS,
+  FlashKind,
+  flashFor,
+  FxKind,
+  fxForMove,
+  fxParticles,
+} from "./quest-fx";
 import { MONSTER_ART } from "./quest-monsters";
 import {
   BATTLE_COUNT,
@@ -35,6 +44,14 @@ import {
 } from "./quest-rules";
 
 type Popup = { id: number; target: string; text: string; tone: string };
+type Burst = { id: number; target: string; emoji: string };
+type Fx = { id: number; target: string; kind: FxKind; fromRight: boolean };
+type Motion = "lunge-left" | "lunge-right" | "cast";
+const MOTION_CLASS: Record<Motion, string> = {
+  "lunge-left": "animate-quest-lunge-left",
+  "lunge-right": "animate-quest-lunge-right",
+  cast: "animate-quest-cast",
+};
 type Step = "menu" | "target" | "type";
 
 /** Hits land a little after the move name shows. */
@@ -67,6 +84,22 @@ export function QuestBattle(props: {
   const [message, setMessage] = createSignal("");
   const [banner, setBanner] = createSignal<string | null>(null);
   const [popups, setPopups] = createSignal<Popup[]>([]);
+  const [bursts, setBursts] = createSignal<Burst[]>([]);
+  const [motion, setMotion] = createSignal<{ id: string; kind: Motion } | null>(
+    null,
+  );
+  const [quake, setQuake] = createSignal(false);
+  const [effects, setEffects] = createSignal<Fx[]>([]);
+  const [flash, setFlash] = createSignal<{
+    id: number;
+    kind: FlashKind;
+  } | null>(null);
+  const [entering, setEntering] = createSignal(false);
+  const [victory, setVictory] = createSignal(false);
+  const motionClass = (id: string): string | false => {
+    const m = motion();
+    return m !== null && m.id === id && MOTION_CLASS[m.kind];
+  };
   let popupId = 0;
   let finishedFired = false;
   let playTimer: ReturnType<typeof setTimeout> | undefined;
@@ -86,6 +119,13 @@ export function QuestBattle(props: {
     setMonsters([]);
     setActive(null);
     setMessage("");
+    setMotion(null);
+    setBursts([]);
+    setEffects([]);
+    setFlash(null);
+    setQuake(false);
+    setEntering(false);
+    setVictory(false);
   };
   createEffect(
     on(
@@ -113,9 +153,25 @@ export function QuestBattle(props: {
     setTimeout(() => setPopups((p) => p.filter((q) => q.id !== id)), 1000);
   };
 
+  const burst = (target: string, emoji: string): void => {
+    const id = ++popupId;
+    setBursts((b) => [...b, { id, target, emoji }]);
+    setTimeout(() => setBursts((b) => b.filter((q) => q.id !== id)), 700);
+  };
+
+  const effect = (target: string, kind: FxKind, fromRight: boolean): void => {
+    const id = ++popupId;
+    setEffects((f) => [...f, { id, target, kind, fromRight }]);
+    setTimeout(() => setEffects((f) => f.filter((q) => q.id !== id)), 1100);
+  };
+
   const applyHits = (hits: HitResult[]): void => {
     const struck = new Set<string>();
     for (const hit of hits) {
+      if (hit.crit === true) burst(hit.id, "💥");
+      if (hit.guarded === true) {
+        effect(hit.id, "shield", false);
+      }
       const i = Number(hit.id.slice(1));
       const sign = hit.heal === true ? 1 : -1;
       if (hit.id.startsWith("h")) {
@@ -148,6 +204,13 @@ export function QuestBattle(props: {
         );
       }
     }
+    const heavy =
+      hits.some((h) => h.crit === true) ||
+      hits.filter((h) => h.heal !== true && h.id.startsWith("h")).length > 1;
+    if (heavy) {
+      setQuake(true);
+      setTimeout(() => setQuake(false), 400);
+    }
     setHurt(struck);
     setTimeout(() => setHurt(new Set<string>()), 420);
     if (hits.some((h) => h.heal === true)) sfx.pop();
@@ -169,6 +232,9 @@ export function QuestBattle(props: {
           : "Monsters appear!",
       );
       setTimeout(() => setBanner(null), 1500);
+      setVictory(false);
+      setEntering(true);
+      setTimeout(() => setEntering(false), 750);
       return;
     }
     if (e.type === "rest") {
@@ -185,6 +251,7 @@ export function QuestBattle(props: {
     }
     if (e.type === "end") {
       setMessage(e.won ? "🎉 Victory!" : "💤 The party fell asleep…");
+      setVictory(e.won);
       return;
     }
     setActive(e.actor);
@@ -195,6 +262,28 @@ export function QuestBattle(props: {
     setMessage(
       `${actorName(e.actor)}: ${e.emoji} ${e.move}${targets}!${e.note !== undefined ? ` (${e.note})` : ""}`,
     );
+    const hero = e.actor.startsWith("h");
+    const strikes = e.hits.some(
+      (h) => h.heal !== true && h.id.startsWith(hero ? "m" : "h"),
+    );
+    const kind = fxForMove(e.move, hero);
+    const melee =
+      strikes && (kind === "slash" || kind === "bigslash" || kind === "claw");
+    setMotion({
+      id: e.actor,
+      kind: melee ? (hero ? "lunge-left" : "lunge-right") : "cast",
+    });
+    setTimeout(() => setMotion(null), 720);
+    // effects start now so they land with the hit
+    const fxTargets =
+      e.shield !== undefined ? [e.shield] : e.hits.map((h) => h.id);
+    for (const t of fxTargets) effect(t, kind, hero);
+    const tint = flashFor(kind);
+    if (tint !== null && e.hits.length > 1) {
+      const id = ++popupId;
+      setFlash({ id, kind: tint });
+      setTimeout(() => setFlash((f) => (f?.id === id ? null : f)), 650);
+    }
     hitTimer = setTimeout(() => applyHits(e.hits), HIT_DELAY_MS);
   };
 
@@ -533,76 +622,118 @@ export function QuestBattle(props: {
       </div>
 
       {/* battlefield */}
-      <div class="relative grid min-h-60 flex-1 grid-cols-2 bg-linear-to-b from-game-night via-game-navy to-game-grass-dark">
+      <div
+        class={cn(
+          "relative grid min-h-60 flex-1 grid-cols-2 bg-linear-to-b from-game-night via-game-navy to-game-grass-dark",
+          quake() && "animate-quest-quake motion-reduce:animate-none",
+        )}
+      >
         <div class="flex flex-col items-center justify-center gap-3 p-3">
-          <For each={monsters()}>
-            {(m) => (
+          <Index each={monsters()}>
+            {(m, i) => (
               <div
                 class={cn(
-                  "relative flex flex-col items-center transition-all duration-500",
-                  m.hp <= 0 && "scale-75 opacity-0",
-                  active() === `m${m.index}` && "translate-x-6",
+                  "relative flex flex-col items-center",
+                  entering() && "animate-quest-enter",
+                  motionClass(`m${m().index}`),
+                  m().hp <= 0 && "animate-quest-die",
                 )}
+                style={{ "animation-delay": entering() ? `${i * 0.12}s` : "" }}
               >
-                <img
-                  src={MONSTER_ART[m.kind]}
-                  alt={m.name}
-                  class={cn(
-                    "h-auto object-contain [image-rendering:pixelated]",
-                    m.boss ? "w-44 sm:w-56" : "w-20 sm:w-24",
-                    hurt().has(`m${m.index}`) && "animate-game-shake",
-                    m.boss &&
-                      props.state.angry &&
-                      shown() > 0 &&
-                      "drop-shadow-[0_0_10px_var(--color-game-red)]",
-                  )}
-                />
+                <span
+                  class="block animate-quest-idle motion-reduce:animate-none"
+                  style={{ "animation-delay": `${i * 0.35}s` }}
+                >
+                  <img
+                    src={MONSTER_ART[m().kind]}
+                    alt={m().name}
+                    class={cn(
+                      "h-auto object-contain [image-rendering:pixelated]",
+                      m().boss ? "w-44 sm:w-56" : "w-20 sm:w-24",
+                      hurt().has(`m${m().index}`)
+                        ? "animate-quest-hit"
+                        : m().boss &&
+                            props.state.angry &&
+                            shown() > 0 &&
+                            "animate-quest-aura",
+                    )}
+                  />
+                </span>
                 <div class="mt-1 h-2 w-20 overflow-hidden rounded-full bg-game-ink sm:w-24">
                   <div
                     class={cn(
                       "h-full rounded-full transition-[width] duration-300",
-                      m.hp / m.maxHp > 0.5
+                      m().hp / m().maxHp > 0.5
                         ? "bg-game-green"
-                        : m.hp / m.maxHp > 0.25
+                        : m().hp / m().maxHp > 0.25
                           ? "bg-game-yellow"
                           : "bg-game-red",
                     )}
-                    style={{ width: `${(m.hp / m.maxHp) * 100}%` }}
+                    style={{ width: `${(m().hp / m().maxHp) * 100}%` }}
                   ></div>
                 </div>
-                <PopupLayer popups={popups()} target={`m${m.index}`} />
+                <FxLayer effects={effects()} target={`m${m().index}`} />
+                <BurstLayer bursts={bursts()} target={`m${m().index}`} />
+                <PopupLayer popups={popups()} target={`m${m().index}`} />
               </div>
             )}
-          </For>
+          </Index>
         </div>
         <div class="flex flex-col items-end justify-center gap-1 p-3 pr-6">
           <For each={party()}>
-            {(h) => (
-              <div
-                class={cn(
-                  "relative transition-transform duration-300",
-                  h.slot % 2 === 1 && "-translate-x-8",
-                  active() === `h${h.slot}` && "-translate-x-14",
-                )}
-              >
-                <img
-                  src={HERO_ART[h.cls]}
-                  alt={CLASS_INFO[h.cls].name}
+            {(h) => {
+              const asleep = (): boolean => (heroHp()[h.slot] ?? 1) <= 0;
+              return (
+                <div
                   class={cn(
-                    "h-auto w-16 transition-all duration-300 [image-rendering:pixelated] sm:w-20",
-                    (heroHp()[h.slot] ?? 1) <= 0 &&
-                      "rotate-90 opacity-50 grayscale",
-                    hurt().has(`h${h.slot}`) && "animate-game-shake",
-                    h.uid === props.myUid &&
-                      "drop-shadow-[0_0_6px_var(--color-game-yellow)]",
+                    "relative",
+                    h.slot % 2 === 1 && "-translate-x-8",
+                    motionClass(`h${h.slot}`),
                   )}
-                />
-                <PopupLayer popups={popups()} target={`h${h.slot}`} />
-              </div>
-            )}
+                >
+                  <span
+                    class={cn(
+                      "block motion-reduce:animate-none",
+                      asleep()
+                        ? ""
+                        : victory()
+                          ? "animate-quest-victory"
+                          : "animate-quest-idle",
+                    )}
+                    style={{ "animation-delay": `${h.slot * 0.15}s` }}
+                  >
+                    <img
+                      src={HERO_ART[h.cls]}
+                      alt={CLASS_INFO[h.cls].name}
+                      class={cn(
+                        "h-auto w-16 transition-[rotate,opacity,filter] duration-300 [image-rendering:pixelated] sm:w-20",
+                        asleep() && "rotate-90 opacity-50 grayscale",
+                        hurt().has(`h${h.slot}`) && "animate-quest-hit",
+                        h.uid === props.myUid &&
+                          !hurt().has(`h${h.slot}`) &&
+                          "drop-shadow-[0_0_6px_var(--color-game-yellow)]",
+                      )}
+                    />
+                  </span>
+                  <FxLayer effects={effects()} target={`h${h.slot}`} />
+                  <BurstLayer bursts={bursts()} target={`h${h.slot}`} />
+                  <PopupLayer popups={popups()} target={`h${h.slot}`} />
+                </div>
+              );
+            }}
           </For>
         </div>
 
+        <Show when={flash()} keyed>
+          {(f) => (
+            <div
+              class={cn(
+                "pointer-events-none absolute inset-0 animate-quest-flash motion-reduce:hidden",
+                FLASH_CLASS[f.kind],
+              )}
+            ></div>
+          )}
+        </Show>
         <Show when={banner()}>
           {(b) => (
             <div class="pointer-events-none absolute inset-0 grid place-items-center">
@@ -874,6 +1005,30 @@ function PopupLayer(props: { popups: Popup[]; target: string }): JSXElement {
         >
           {p.text}
         </span>
+      )}
+    </For>
+  );
+}
+
+function BurstLayer(props: { bursts: Burst[]; target: string }): JSXElement {
+  return (
+    <For each={props.bursts.filter((b) => b.target === props.target)}>
+      {(b) => (
+        <span class="pointer-events-none absolute top-1/2 left-1/2 animate-quest-burst text-5xl drop-shadow motion-reduce:hidden">
+          {b.emoji}
+        </span>
+      )}
+    </For>
+  );
+}
+
+function FxLayer(props: { effects: Fx[]; target: string }): JSXElement {
+  return (
+    <For each={props.effects.filter((f) => f.target === props.target)}>
+      {(f) => (
+        <For each={fxParticles(f.kind, f.fromRight)}>
+          {(p) => <span class={p.class} style={p.style}></span>}
+        </For>
       )}
     </For>
   );
