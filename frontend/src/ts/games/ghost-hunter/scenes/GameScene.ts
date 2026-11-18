@@ -1,8 +1,20 @@
 import { Scene, GameObjects, Time } from "phaser";
 
 import { hex } from "../../shared/game-palette";
-import { popBanner, TappyBuddy } from "../../shared/phaser-ui";
-import { bossFinaleFx, bossHitFx, playCatchFx, StreakAura } from "../catch-fx";
+import {
+  kidText,
+  popBanner,
+  TappyBuddy,
+  WordTag,
+} from "../../shared/phaser-ui";
+import {
+  bossFinaleFx,
+  bossHitFx,
+  chainBeamFx,
+  lightningArc,
+  playCatchFx,
+  StreakAura,
+} from "../catch-fx";
 import { Ghost } from "../entities/Ghost";
 import { PowerUp, PowerUpKind } from "../entities/PowerUp";
 import {
@@ -51,6 +63,12 @@ const BOSS_STAGGER_MS = 400;
 /** Logs the Ghost King reaches take this many hits. */
 const BOSS_LOG_DAMAGE = 2;
 const BOSS_BONUS = 100;
+/** Catches to charge the Chain Beam. */
+const CHAIN_CHARGE = 8;
+/** Time to type the combo word once it appears. */
+const COMBO_MS = 8000;
+/** Online: a guest's Chain Beam, sent to the host like a typed word. */
+const CHAIN_ACTION = "⚡chain";
 
 type MultiplayerWorld = {
   wave: number;
@@ -64,6 +82,7 @@ type MultiplayerWorld = {
     y: number;
     frozen: boolean;
     boss?: { hp: number; maxHp: number };
+    party?: boolean;
   }>;
   finished: boolean;
   cleared: boolean;
@@ -99,6 +118,13 @@ export class GameScene extends Scene {
   private aura!: StreakAura;
   /** <1 during the Ghost King's slow-motion finale */
   private slowMo = 1;
+  /** Chain Beam charge (catches) and the combo word when it's up */
+  private charge = 0;
+  private comboWord: string | null = null;
+  private comboUi: GameObjects.Container | null = null;
+  private comboTag: WordTag | null = null;
+  private comboTimer: Time.TimerEvent | null = null;
+  private meterGfx: GameObjects.Graphics | null = null;
   private gameOver = false;
 
   private baseSpeed = 30;
@@ -227,6 +253,11 @@ export class GameScene extends Scene {
       if (this.powerUp !== null) {
         this.powerUp.updateTyped(this.powerUp.word === locked ? buf : "");
       }
+      if (this.comboTag !== null) {
+        const mine = locked === this.comboWord;
+        this.comboTag.setTyped(mine ? buf : "");
+        this.comboTag.setMode(mine && buf.length > 0 ? "locked" : "normal");
+      }
       this.game.events.emit("ui-buffer", buf, locked);
     });
 
@@ -280,17 +311,21 @@ export class GameScene extends Scene {
       if (result.status === "complete") {
         const perfect = this.wordMisses === 0;
         this.wordMisses = 0;
-        if (this.powerUp !== null && result.word === this.powerUp.word) {
+        if (this.comboWord !== null && result.word === this.comboWord) {
+          this.fireChainBeam();
+        } else if (this.powerUp !== null && result.word === this.powerUp.word) {
           this.onPowerUpCollected(this.powerUp);
         } else {
           if (this.multiplayerRole === "guest") {
             this.hits++;
             this.streak++;
+            this.addCharge(1);
             this.guestCatchFx(result.word, perfect);
             this.pendingRemoteWords.add(result.word);
             this.matcher.unregister(result.word);
             this.game.events.emit("multiplayer-word-action", result.word);
           } else {
+            this.addCharge(1);
             this.onGhostDestroyed(result.word, undefined, perfect);
           }
         }
@@ -315,6 +350,14 @@ export class GameScene extends Scene {
     });
 
     this.aura = new StreakAura(this);
+    if (this.chainEnabled()) {
+      this.add
+        .text(W / 2 - 74, 156, "⚡", { fontSize: "16px" })
+        .setOrigin(0.5)
+        .setDepth(50);
+      this.meterGfx = this.add.graphics().setDepth(50);
+      this.drawMeter();
+    }
     this.scene.launch("UI");
     this.emitUI();
     if (this.multiplayerRole !== "guest") {
@@ -327,7 +370,8 @@ export class GameScene extends Scene {
       "multiplayer-remote-action",
       (action: { uid: string; word: string }) => {
         if (this.multiplayerRole === "host") {
-          this.onGhostDestroyed(action.word, action.uid);
+          if (action.word === CHAIN_ACTION) this.runChainBeam(action.uid);
+          else this.onGhostDestroyed(action.word, action.uid);
         }
       },
     );
@@ -653,7 +697,14 @@ export class GameScene extends Scene {
    * make the WordMatcher (Set-backed) only ever resolve the first one,
    * permanently orphaning the second.
    */
-  private trySpawnGhostEntity(side: "left" | "right"): void {
+  private trySpawnGhostEntity(
+    side: "left" | "right",
+    /** 0..1 down the lawn (random if not given) */
+    lane?: number,
+    party = false,
+    /** start this much further off screen (spreads a party group out) */
+    behind = 0,
+  ): void {
     if (this.gameOver) {
       this.pendingSpawns--;
       return;
@@ -661,15 +712,18 @@ export class GameScene extends Scene {
     const activeWords = new Set(this.ghosts.map((g) => g.word));
     const word = this.tryNextWord(activeWords);
     if (word === null) {
-      this.time.delayedCall(400, () => this.trySpawnGhostEntity(side));
+      this.time.delayedCall(400, () =>
+        this.trySpawnGhostEntity(side, lane, party, behind),
+      );
       return;
     }
     this.pendingSpawns--;
 
     const W = this.scale.width;
-    const x = side === "left" ? -30 : W + 30;
-    const y = this.lawnTop + Math.random() * (this.lawnBottom - this.lawnTop);
-    const ghost = new Ghost(this, x, y, word, side);
+    const x = side === "left" ? -30 - behind : W + 30 + behind;
+    const y =
+      this.lawnTop + (lane ?? Math.random()) * (this.lawnBottom - this.lawnTop);
+    const ghost = new Ghost(this, x, y, word, side, null, party);
     this.ghosts.push(ghost);
   }
 
@@ -901,14 +955,83 @@ export class GameScene extends Scene {
     this.betweenWaves = false;
     this.game.events.emit("ui-wave", this.wave);
 
-    const interval = Math.max(1000, 2400 - this.wave * 150);
+    // a real swarm: groups arrive together, sometimes from both sides
+    const easy = this.perWaveBase <= 2;
+    const groupGap = easy ? 4500 : 3500;
     this.spawnTimer = this.time.addEvent({
-      delay: interval,
-      callback: this.spawnGhost,
+      delay: groupGap,
+      callback: this.spawnPartyGroup,
       callbackScope: this,
-      repeat: this.ghostsThisWave - 1,
+      loop: true,
     });
-    this.spawnGhost();
+    this.spawnPartyGroup();
+  }
+
+  /** One Ghost Party group: 3-5 ghosts (2-3 on Easy), spread down the lawn. */
+  private spawnPartyGroup(): void {
+    const left = this.ghostsThisWave - this.ghostsSpawned;
+    if (left <= 0 || this.gameOver) {
+      this.spawnTimer?.remove();
+      return;
+    }
+    const easy = this.perWaveBase <= 2;
+    const min = easy ? 2 : 3;
+    const max = easy ? 3 : 5;
+    const size = Math.min(
+      left,
+      min + Math.floor(Math.random() * (max - min + 1)),
+    );
+    const both = size >= 3 && Math.random() < 0.35;
+    const oneSide: "left" | "right" =
+      this.ghostsSpawned % 2 === 0 ? "left" : "right";
+    for (let i = 0; i < size; i++) {
+      const side: "left" | "right" = both
+        ? i % 2 === 0
+          ? "left"
+          : "right"
+        : oneSide;
+      const lanes = both ? Math.ceil(size / 2) : size;
+      const slot = both ? Math.floor(i / 2) : i;
+      const lane = Math.min(
+        0.95,
+        Math.max(0.05, (slot + 0.5) / lanes + (Math.random() - 0.5) * 0.12),
+      );
+      // reserve the slot now so the wave can't end mid-group
+      this.ghostsSpawned++;
+      this.pendingSpawns++;
+      // a loose crowd: each one a bit further back so words don't overlap
+      const behind = slot * 75 + Math.random() * 20;
+      this.time.delayedCall(i * 120, () =>
+        this.trySpawnGhostEntity(side, lane, true, behind),
+      );
+    }
+  }
+
+  /** Party confetti raining down for the Ghost Party warning. */
+  private confetti(): void {
+    const W = this.scale.width;
+    const p = this.add
+      .particles(0, -10, "gh-sparkle", {
+        x: { min: 0, max: W },
+        lifespan: 2200,
+        speedY: { min: 90, max: 200 },
+        speedX: { min: -40, max: 40 },
+        rotate: { min: 0, max: 360 },
+        scale: { start: 0.8, end: 0.4 },
+        tint: [
+          hex("pink"),
+          hex("yellow"),
+          hex("sky"),
+          hex("mint"),
+          hex("orange"),
+          hex("purple"),
+        ],
+        frequency: 25,
+        emitting: true,
+      })
+      .setDepth(55);
+    this.time.delayedCall(1200, () => p.stop());
+    this.time.delayedCall(3600, () => p.destroy());
   }
 
   /** Where the flashlight is when aiming at x. */
@@ -917,7 +1040,12 @@ export class GameScene extends Scene {
     return { x: this.centerX + dir * 34, y: this.playerY - 34 };
   }
 
-  private catchFx(ghost: Ghost, points: number, perfect: boolean): void {
+  private catchFx(
+    ghost: Ghost,
+    points: number,
+    perfect: boolean,
+    chained = false,
+  ): void {
     const from = this.flashlightAt(ghost.x);
     playCatchFx(this, {
       x: ghost.x,
@@ -926,12 +1054,171 @@ export class GameScene extends Scene {
       points,
       streak: this.streak,
       perfect,
-      close: Math.abs(ghost.x - this.centerX) < LOG_X_OFFSET + 45,
+      close: !chained && Math.abs(ghost.x - this.centerX) < LOG_X_OFFSET + 45,
       fromX: from.x,
       fromY: from.y,
       image: ghost.picture(),
+      beam: !chained,
     });
     playCatchChime(this.streak);
+  }
+
+  // ------------------------------------------------------------ Chain Beam
+
+  /** Not in lesson checkpoints: passing those needs plain typing. */
+  private chainEnabled(): boolean {
+    return !(this.multiplayerRole === null && this.maxWave > 0);
+  }
+
+  private drawMeter(): void {
+    const g = this.meterGfx;
+    if (g === null) return;
+    const x0 = this.scale.width / 2 - 62;
+    g.clear();
+    g.fillStyle(hex("ink"), 0.55);
+    g.fillRoundedRect(x0 - 4, 149, CHAIN_CHARGE * 17 + 5, 14, 7);
+    for (let i = 0; i < CHAIN_CHARGE; i++) {
+      const on = i < this.charge || this.comboWord !== null;
+      g.fillStyle(on ? hex("yellow") : hex("grey"), on ? 1 : 0.5);
+      g.fillRoundedRect(x0 + i * 17, 152, 14, 8, 3);
+    }
+  }
+
+  private addCharge(n: number): void {
+    if (!this.chainEnabled() || this.comboWord !== null) return;
+    this.charge = Math.max(0, Math.min(CHAIN_CHARGE, this.charge + n));
+    this.drawMeter();
+    if (this.charge >= CHAIN_CHARGE) this.showComboWord();
+  }
+
+  /** The meter is full: a gold combo phrase (lesson words) to type. */
+  private showComboWord(): void {
+    const a = this.nextWord();
+    let b = this.nextWord();
+    for (let i = 0; i < 5 && b === a; i++) b = this.nextWord();
+    const phrase = `${a} ${b}`;
+    this.comboWord = phrase;
+    this.matcher.register(phrase);
+    const W = this.scale.width;
+    const label = this.add
+      .text(
+        0,
+        -34,
+        "⚡ CHAIN BEAM! Type:",
+        kidText(18, "yellow", {
+          stroke: "#1a1c2c",
+          strokeThickness: 4,
+        }),
+      )
+      .setOrigin(0.5);
+    const tag = new WordTag(this, 0, 0, phrase, 22, "yellow");
+    const barBg = this.add.rectangle(0, 26, 200, 6, hex("ink"), 0.6);
+    const bar = this.add.rectangle(-100, 26, 200, 6, hex("yellow"), 1);
+    bar.setOrigin(0, 0.5);
+    this.comboTag = tag;
+    this.comboUi = this.add
+      .container(W / 2, 218, [label, tag, barBg, bar])
+      .setDepth(58)
+      .setScale(0.3);
+    this.tweens.add({
+      targets: this.comboUi,
+      scale: 1,
+      duration: 260,
+      ease: "Back.easeOut",
+    });
+    this.tweens.add({
+      targets: label,
+      alpha: 0.55,
+      yoyo: true,
+      repeat: -1,
+      duration: 400,
+    });
+    this.tweens.add({ targets: bar, scaleX: 0, duration: COMBO_MS });
+    this.comboTimer = this.time.delayedCall(COMBO_MS, () =>
+      this.clearComboWord(true),
+    );
+    this.drawMeter();
+    playWaveClear();
+  }
+
+  /** Remove the combo word; missed = it timed out (keep half the charge). */
+  private clearComboWord(missed: boolean): void {
+    if (this.comboWord !== null) this.matcher.unregister(this.comboWord);
+    this.comboWord = null;
+    this.comboTag = null;
+    this.comboTimer?.remove();
+    this.comboTimer = null;
+    this.comboUi?.destroy();
+    this.comboUi = null;
+    this.charge = missed ? Math.floor(CHAIN_CHARGE / 2) : 0;
+    this.drawMeter();
+  }
+
+  private fireChainBeam(): void {
+    this.clearComboWord(false);
+    if (this.multiplayerRole === "guest") {
+      // the host catches them for real; show it here right away
+      this.game.events.emit("multiplayer-word-action", CHAIN_ACTION);
+      this.playChain(undefined, true);
+    } else {
+      this.runChainBeam(undefined);
+    }
+  }
+
+  /** Solo / host: catch every ghost on screen, hopping ghost to ghost. */
+  private runChainBeam(uid: string | undefined): void {
+    this.playChain(uid, false);
+  }
+
+  private playChain(uid: string | undefined, guestOnly: boolean): void {
+    const W = this.scale.width;
+    const onScreen = this.ghosts.filter(
+      (g) => g.visible && g.x > -10 && g.x < W + 10,
+    );
+    // hop to the nearest next ghost each time
+    const order: Ghost[] = [];
+    let at = this.flashlightAt(this.facing === "left" ? 0 : W);
+    const left = [...onScreen];
+    while (left.length > 0) {
+      let best = 0;
+      let bestD = Infinity;
+      left.forEach((g, i) => {
+        const d = Math.hypot(g.x - at.x, g.y - 30 - at.y);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      });
+      const next = left.splice(best, 1)[0] as Ghost;
+      order.push(next);
+      at = { x: next.x, y: next.y - 30 };
+    }
+    if (order.length === 0) return;
+    chainBeamFx(this, order.length);
+    playBombExplode();
+    this.cameras.main.shake(260, 0.01);
+    let prev = this.flashlightAt(order[0]?.x ?? this.centerX);
+    order.forEach((target, i) => {
+      const from = { ...prev };
+      prev = { x: target.x, y: target.y - 30 };
+      this.time.delayedCall(i * 110, () => {
+        const ghost = this.ghosts.find((g) => g.word === target.word);
+        if (ghost === undefined) return;
+        lightningArc(this, from.x, from.y, ghost.x, ghost.y - 30);
+        this.matcher.unregister(ghost.word);
+        if (guestOnly) {
+          this.pendingRemoteWords.add(ghost.word);
+          this.catchFx(ghost, 10 + ghost.word.length * 2, false, true);
+          ghost.setVisible(false);
+        } else {
+          this.onGhostDestroyed(ghost.word, uid, false, true);
+        }
+      });
+    });
+    if (!guestOnly && this.multiplayerRole === null) {
+      this.score += 5 * order.length;
+      this.game.events.emit("ui-score", this.score);
+    }
   }
 
   /** Online guests see their own catch right away (the host removes it). */
@@ -960,6 +1247,7 @@ export class GameScene extends Scene {
     word: string,
     playerUid?: string,
     perfect = false,
+    chained = false,
   ): void {
     const idx = this.ghosts.findIndex((g) => g.word === word);
     if (idx === -1) return;
@@ -974,7 +1262,7 @@ export class GameScene extends Scene {
     playExplode();
     this.tappy.cheer();
 
-    this.catchFx(ghost, points, perfect);
+    this.catchFx(ghost, points, perfect, chained);
     ghost.destroy();
     this.ghosts.splice(idx, 1);
     if (ghost.boss !== null) {
@@ -1019,6 +1307,10 @@ export class GameScene extends Scene {
   private onMiss(): void {
     this.streak = 0;
     this.wordMisses++;
+    if (this.comboWord === null && this.charge > 0) {
+      this.charge--;
+      this.drawMeter();
+    }
     this.misses++;
     this.game.events.emit("ui-streak", 0);
     this.cameras.main.flash(100, 80, 0, 0);
@@ -1099,6 +1391,7 @@ export class GameScene extends Scene {
       // power-up that's still alive on screen - re-register it so it doesn't
       // silently become untypeable until the player happens to change facing.
       if (this.powerUp !== null) this.matcher.register(this.powerUp.word);
+      if (this.comboWord !== null) this.matcher.register(this.comboWord);
       playWaveClear();
 
       const W = this.scale.width;
@@ -1127,11 +1420,12 @@ export class GameScene extends Scene {
           this,
           W / 2,
           H / 2,
-          "👻 Ghost party coming!",
+          "🎉 Ghost party coming!",
           "purple",
           WAVE_PAUSE_MS,
         );
         this.cameras.main.flash(300, 80, 0, 120, false);
+        this.confetti();
         playHordeIncoming();
       } else {
         this.tappy.cheer();
@@ -1209,6 +1503,7 @@ export class GameScene extends Scene {
         y: (ghost.y - this.lawnTop) / lawnRange,
         frozen: ghost.isFrozen(),
         ...(ghost.boss === null ? {} : { boss: ghost.boss }),
+        ...(ghost.party ? { party: true } : {}),
       })),
       finished,
       cleared,
@@ -1242,6 +1537,7 @@ export class GameScene extends Scene {
           state.word,
           state.side,
           state.boss ?? null,
+          state.party === true,
         );
         this.ghosts.push(ghost);
       }

@@ -9,6 +9,8 @@ export class Ghost extends GameObjects.Container {
   readonly side: "left" | "right";
   /** Ghost King (boss wave): hits left, counting this word */
   readonly boss: { hp: number; maxHp: number } | null;
+  /** Ghost Party guest: wears a party hat */
+  readonly party: boolean;
   /** scene time (ms) until which the Ghost King stands still after a hit */
   staggeredUntil = 0;
   private ghostImg: GameObjects.Image;
@@ -27,11 +29,13 @@ export class Ghost extends GameObjects.Container {
     word: string,
     side: "left" | "right",
     boss: { hp: number; maxHp: number } | null = null,
+    party = false,
   ) {
     super(scene, x, y);
     this.word = word;
     this.side = side;
     this.boss = boss;
+    this.party = party;
     this.spawnY = y;
     this.bobPhase = Math.random() * Math.PI * 2;
 
@@ -44,6 +48,23 @@ export class Ghost extends GameObjects.Container {
       .setOrigin(0.5, 1)
       .setFlipX(side === "right");
     this.add(this.ghostImg);
+
+    if (party && boss === null) {
+      // a little striped party hat, tilted
+      const hat = scene.add.graphics();
+      const colors = ["pink", "yellow", "sky", "mint"] as const;
+      const c = colors[Math.floor(Math.random() * colors.length)] ?? "pink";
+      hat.fillStyle(hex(c), 1);
+      hat.fillTriangle(-9, -50, 9, -50, 0, -68);
+      hat.lineStyle(2, hex("ink"), 0.8);
+      hat.strokeTriangle(-9, -50, 9, -50, 0, -68);
+      hat.fillStyle(hex("cream"), 1);
+      hat.fillRect(-6, -57, 12, 2);
+      hat.fillStyle(hex("yellow"), 1);
+      hat.fillCircle(0, -69, 3.5);
+      hat.setAngle(side === "left" ? 12 : -12);
+      this.add(hat);
+    }
 
     if (boss !== null) {
       // hits-left bar over the crown

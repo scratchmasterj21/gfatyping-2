@@ -28,6 +28,8 @@ export type CatchFxInput = {
   fromY: number;
   /** the ghost's picture, to vacuum a copy of it */
   image?: { key: string; w: number; h: number; flip: boolean };
+  /** false for Chain Beam catches (the lightning arc is the beam) */
+  beam?: boolean;
 };
 
 const RAINBOW: PaletteName[] = [
@@ -300,7 +302,7 @@ function softFlash(scene: Scene, color: number, alpha: number): void {
 
 export function playCatchFx(scene: Scene, c: CatchFxInput): void {
   const gy = c.y - 30;
-  beam(scene, c, gy);
+  if (c.beam !== false) beam(scene, c, gy);
   letters(scene, c.word, c.x, c.y - 72, c.streak);
   vacuum(scene, c, (px, py) => {
     const big = c.streak >= 10;
@@ -511,4 +513,62 @@ export class StreakAura {
       this.edge.setVisible(false);
     }
   }
+}
+
+/** A jagged lightning arc from one point to another (Chain Beam). */
+export function lightningArc(
+  scene: Scene,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): void {
+  const pts: Array<[number, number]> = [[x1, y1]];
+  const steps = 7;
+  const nx = -(y2 - y1);
+  const ny = x2 - x1;
+  const len = Math.max(1, Math.hypot(nx, ny));
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const off = (Math.random() - 0.5) * 34;
+    pts.push([
+      x1 + (x2 - x1) * t + (nx / len) * off,
+      y1 + (y2 - y1) * t + (ny / len) * off,
+    ]);
+  }
+  pts.push([x2, y2]);
+  const g = scene.add.graphics().setDepth(DEPTH + 1);
+  const stroke = (w: number, color: number, a: number): void => {
+    g.lineStyle(w, color, a);
+    g.beginPath();
+    g.moveTo(pts[0]?.[0] ?? x1, pts[0]?.[1] ?? y1);
+    for (const [x, y] of pts.slice(1)) g.lineTo(x, y);
+    g.strokePath();
+  };
+  stroke(14, hex("sky"), 0.25);
+  stroke(7, hex("yellow"), 0.7);
+  stroke(3, hex("cream"), 1);
+  scene.tweens.add({
+    targets: g,
+    alpha: 0,
+    duration: 320,
+    ease: "Quad.easeIn",
+    onComplete: () => g.destroy(),
+  });
+  ring(scene, x2, y2, hex("yellow"), 70, 4, 300);
+}
+
+/** "CHAIN BEAM!" when it fires: a flash and a big banner word. */
+export function chainBeamFx(scene: Scene, count: number): void {
+  softFlash(scene, hex("yellow"), 0.3);
+  floatText(
+    scene,
+    scene.scale.width / 2,
+    scene.scale.height * 0.3,
+    `⚡ CHAIN BEAM x${count}! ⚡`,
+    40,
+    "yellow",
+    30,
+    1400,
+  );
 }
