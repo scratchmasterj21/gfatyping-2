@@ -1191,6 +1191,7 @@ function heroMoveWords(
   step: number,
   d: QuestDifficulty,
   hero: HeroState,
+  land: string,
 ): Record<HeroAction, string> {
   const say = (kind: string, n: number, key: number): string =>
     storyPhrase(
@@ -1200,6 +1201,7 @@ function heroMoveWords(
       d.level,
       hero.cls,
       hero.ultimate === undefined ? "power" : ULTIMATES[hero.ultimate].name,
+      land,
     );
   return {
     attack: say("attack", d.phrase.attack, 1),
@@ -1823,6 +1825,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             what === "team" ? d.phrase.ultimate : d.phrase.guard + 1,
             d.level,
             h.cls,
+            "power",
+            s.land ?? "any",
           ),
         ]),
       );
@@ -2074,7 +2078,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             n: s.used,
             slot: hero.slot,
             uid: hero.uid,
-            words: heroMoveWords(setup.seed, step, d, hero),
+            words: heroMoveWords(setup.seed, step, d, hero, s.land ?? "any"),
           };
           s.upNext = queue;
           return s;

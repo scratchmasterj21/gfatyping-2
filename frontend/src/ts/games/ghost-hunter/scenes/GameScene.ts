@@ -15,6 +15,7 @@ import {
   playCatchFx,
   StreakAura,
 } from "../catch-fx";
+import { handleKeyWithCombo } from "../combo-priority";
 import { Ghost } from "../entities/Ghost";
 import { PowerUp, PowerUpKind } from "../entities/PowerUp";
 import {
@@ -283,6 +284,8 @@ export class GameScene extends Scene {
         if (!e.repeat) this.activateHeldPowerUp();
         return;
       }
+      // space is part of the Chain Beam phrase - never scroll / press buttons
+      if (e.key === " ") e.preventDefault();
       if (this.betweenWaves || this.gameOver || e.repeat) return;
       const char =
         e.key.length === 1 ? e.key : e.key === "Backspace" ? "Backspace" : null;
@@ -307,7 +310,12 @@ export class GameScene extends Scene {
           this.matcher.releaseLock();
         }
       }
-      const result = this.matcher.handleKey(char);
+      const result = handleKeyWithCombo(
+        this.matcher,
+        char,
+        this.comboWord,
+        this.ghosts.filter((g) => g.isTargetable()).map((g) => g.word),
+      );
       if (result.status === "complete") {
         const perfect = this.wordMisses === 0;
         this.wordMisses = 0;
