@@ -225,7 +225,7 @@ export function ShipGame(props: {
   };
 
   return (
-    <div class="relative flex h-full w-full flex-col overflow-hidden bg-game-night font-kid text-game-cream select-none">
+    <div class="game-motion relative flex h-full w-full flex-col overflow-hidden bg-game-night font-kid text-game-cream select-none">
       {/* HUD */}
       <div class="flex min-h-14 flex-wrap items-center gap-x-4 gap-y-1 bg-game-ink/80 px-3 pt-16 pb-1.5 text-sm sm:pt-1.5 sm:pr-44 sm:pl-20">
         <span class="font-bold">

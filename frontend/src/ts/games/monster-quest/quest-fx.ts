@@ -30,7 +30,7 @@ export type FlashKind = "fire" | "rock" | "water" | "spore" | "ice" | "laser";
 export type Particle = { class: string; style: JSX.CSSProperties };
 
 const BASE =
-  "pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 motion-reduce:hidden";
+  "pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
 
 /** Which effect a move makes. */
 export function fxForMove(move: string, heroActor: boolean): FxKind {

@@ -47,7 +47,9 @@ body {
       .fa-spin,
       .animate-\[loader\],
       .preloader,
-      .typed-effect-fade .word.typed
+      .typed-effect-fade .word.typed,
+      .game-motion,
+      .game-motion *
     ) {
     animation: none !important;
     transition: none !important;

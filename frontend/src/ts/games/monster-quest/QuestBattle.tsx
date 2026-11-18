@@ -880,7 +880,7 @@ export function QuestBattle(props: {
 
   // ---------------------------------------------------------- view
   return (
-    <div class="relative flex h-full w-full flex-col overflow-hidden bg-game-night font-kid text-game-cream select-none">
+    <div class="game-motion relative flex h-full w-full flex-col overflow-hidden bg-game-night font-kid text-game-cream select-none">
       {/* turn order */}
       <div class="flex min-h-14 items-center gap-1.5 bg-game-ink/70 px-3 pt-16 pb-1.5 sm:pt-1.5 sm:pr-44 sm:pl-20">
         <span class="mr-1 text-xs font-bold tracking-wide text-game-grey uppercase">
@@ -973,7 +973,7 @@ export function QuestBattle(props: {
                 </Show>
                 <span
                   class={cn(
-                    "block animate-quest-idle transition-[translate] duration-500 motion-reduce:animate-none",
+                    "block animate-quest-idle transition-[translate] duration-500",
                     m().flying && "-translate-y-12",
                   )}
                   style={{ "animation-delay": `${i * 0.35}s` }}
@@ -1034,7 +1034,7 @@ export function QuestBattle(props: {
                 >
                   <span
                     class={cn(
-                      "block motion-reduce:animate-none",
+                      "block",
                       asleep()
                         ? ""
                         : victory()
@@ -1069,7 +1069,7 @@ export function QuestBattle(props: {
           {(f) => (
             <div
               class={cn(
-                "pointer-events-none absolute inset-0 animate-quest-flash motion-reduce:hidden",
+                "pointer-events-none absolute inset-0 animate-quest-flash",
                 FLASH_CLASS[f.kind],
               )}
             ></div>
@@ -1139,7 +1139,7 @@ export function QuestBattle(props: {
         <Show when={banner()}>
           {(b) => (
             <div class="pointer-events-none absolute inset-0 grid place-items-center">
-              <span class="animate-game-pop rounded-2xl border-4 border-game-cream bg-game-navy px-6 py-3 text-4xl font-bold text-game-yellow motion-reduce:animate-none">
+              <span class="animate-game-pop rounded-2xl border-4 border-game-cream bg-game-navy px-6 py-3 text-4xl font-bold text-game-yellow">
                 {b()}
               </span>
             </div>
@@ -1147,7 +1147,7 @@ export function QuestBattle(props: {
         </Show>
         <Show when={props.now < props.startAt}>
           <div class="pointer-events-none absolute inset-0 grid place-items-center bg-game-ink/40">
-            <span class="animate-game-pop text-8xl font-bold text-game-yellow motion-reduce:animate-none">
+            <span class="animate-game-pop text-8xl font-bold text-game-yellow">
               {countdown()}
             </span>
           </div>
@@ -1472,7 +1472,7 @@ function PopupLayer(props: { popups: Popup[]; target: string }): JSXElement {
       {(p) => (
         <span
           class={cn(
-            "pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 animate-game-float-up text-2xl font-bold whitespace-nowrap drop-shadow motion-reduce:animate-none",
+            "pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 animate-game-float-up text-2xl font-bold whitespace-nowrap drop-shadow",
             p.tone === "heal" && "text-game-green",
             p.tone === "crit" && "text-3xl text-game-yellow",
             p.tone === "hurt" && "text-game-red",
@@ -1490,7 +1490,7 @@ function BurstLayer(props: { bursts: Burst[]; target: string }): JSXElement {
   return (
     <For each={props.bursts.filter((b) => b.target === props.target)}>
       {(b) => (
-        <span class="pointer-events-none absolute top-1/2 left-1/2 animate-quest-burst text-5xl drop-shadow motion-reduce:hidden">
+        <span class="pointer-events-none absolute top-1/2 left-1/2 animate-quest-burst text-5xl drop-shadow">
           {b.emoji}
         </span>
       )}
@@ -1513,7 +1513,7 @@ function FxLayer(props: { effects: Fx[]; target: string }): JSXElement {
 function WeatherLayer(props: { weather: Weather }): JSXElement {
   const drops = Array.from({ length: 24 }, (_, i) => i);
   return (
-    <div class="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden">
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <Show when={props.weather === "rain"}>
         <For each={drops}>
           {(i) => (
