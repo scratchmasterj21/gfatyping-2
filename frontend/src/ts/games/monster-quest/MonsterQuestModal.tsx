@@ -4,6 +4,7 @@ import {
   createSignal,
   For,
   JSXElement,
+  on,
   onCleanup,
   Show,
   untrack,
@@ -29,7 +30,11 @@ import { GameSetupSection } from "../components/GameSetupSection";
 import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_GENERIC } from "../components/multiplayer-unlock-hints";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
-import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
+import {
+  claimMiniGameReward,
+  MiniGameClaim,
+  MONSTER_QUEST_PAID_RUNS_PER_DAY,
+} from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
 import { HERO_ART } from "./hero-art";
 import {
@@ -90,7 +95,9 @@ const CLOSE_GRACE_MS = 700;
 const claimNote = (c: MiniGameClaim | "pending"): string | undefined => {
   if (c === "pending") return "Adding coins…";
   if (c.kind === "coins") return `🪙 +${c.coins} coins!`;
-  if (c.kind === "capped") return "You've earned today's coins for this game.";
+  if (c.kind === "capped") {
+    return `You've earned coins ${MONSTER_QUEST_PAID_RUNS_PER_DAY} times today - come back tomorrow for more!`;
+  }
   if (c.kind === "signedOut") return "Sign in to earn coins.";
   if (c.kind === "error") return "Couldn't add coins - check your connection.";
   return undefined;
@@ -114,6 +121,15 @@ export function MonsterQuestModal(props: {
   const [result, setResult] = createSignal<GameResultView | null>(null);
   const [claim, setClaim] = createSignal<MiniGameClaim | "pending">("pending");
   const [weekly, setWeekly] = createSignal(false);
+  /** my typing this quest, for the results */
+  let typing = { chars: 0, ms: 0, errors: 0 };
+  const onTyped = (t: { chars: number; ms: number; errors: number }): void => {
+    typing = {
+      chars: typing.chars + t.chars,
+      ms: typing.ms + Math.min(t.ms, 60_000),
+      errors: typing.errors + t.errors,
+    };
+  };
   const [weeklyNote, setWeeklyNote] = createSignal<string>();
 
   // solo
@@ -136,6 +152,13 @@ export function MonsterQuestModal(props: {
   const myId = (): string => (mode() === "solo" ? ME : (uid() ?? ME));
   const clock = (): number => (mode() === "together" ? questNow() : Date.now());
 
+  createEffect(
+    on(phase, (p, prev) => {
+      if (p === "playing" && prev !== "playing") {
+        typing = { chars: 0, ms: 0, errors: 0 };
+      }
+    }),
+  );
   createEffect(() => {
     if (phase() !== "playing" && phase() !== "result") return;
     const t = setInterval(() => setNow(clock()), 100);
@@ -290,11 +313,18 @@ export function MonsterQuestModal(props: {
     const stats = myStats ?? { damage: 0, healed: 0, guards: 0, crits: 0 };
     const mvp =
       mode() === "together" && stats.damage > 0 && stats.damage === best;
+    const words = Math.round(typing.chars / 5);
+    const wpm = typing.ms > 0 ? Math.round(words / (typing.ms / 60_000)) : 0;
+    const accuracy =
+      typing.chars > 0
+        ? Math.round((typing.chars / (typing.chars + typing.errors)) * 100)
+        : 100;
     const score = questScore({
       won: st.won,
       stats,
       battlesWon: st.won ? 3 : st.battle,
       mvp,
+      words,
     });
     if (st.won) sfx.finish();
     const r = untrack(room);
@@ -330,6 +360,9 @@ export function MonsterQuestModal(props: {
       score,
       stars: questStars(st.won, st.heroes),
       stats: [
+        { label: "⌨️ words typed", value: String(words) },
+        { label: "typing speed", value: `${wpm} WPM` },
+        { label: "accuracy", value: `${accuracy}%` },
         { label: "your damage", value: String(stats.damage) },
         { label: "healing", value: String(stats.healed) },
         { label: "guards", value: `🛡️ ${stats.guards}` },
@@ -532,8 +565,9 @@ export function MonsterQuestModal(props: {
               <ul class="grid gap-2 font-kid text-base text-text">
                 <li>🔁 Heroes and monsters take turns.</li>
                 <li>
-                  ⚔️ On your turn, pick a move, then type its word - fast and no
-                  mistakes = ⭐ critical hit!
+                  ⌨️ On your turn, type a move&apos;s name (like
+                  &ldquo;attack&rdquo;), then type its sentence - fast and no
+                  mistakes = ⭐ critical hit! Clean turns in a row = 🔥 streak.
                 </li>
                 <li>
                   🛡️ When a monster attacks you, type the guard word quickly to
@@ -554,6 +588,10 @@ export function MonsterQuestModal(props: {
                   a TEAM ATTACK!
                 </li>
                 <li>👑 Win 2 battles, then beat the boss!</li>
+                <li>
+                  🪙 Earn coins for up to {MONSTER_QUEST_PAID_RUNS_PER_DAY}{" "}
+                  quests a day - more typing means more coins.
+                </li>
               </ul>
             </GameSetupSection>
             <GameSetupSection title="Pick your hero">
@@ -712,6 +750,7 @@ export function MonsterQuestModal(props: {
                     onHero={onHero}
                     onGuard={onGuard}
                     onVote={onVote}
+                    onTyped={onTyped}
                     openVotes={liveVotes()}
                     onFinished={finish}
                   />

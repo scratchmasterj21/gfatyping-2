@@ -6,6 +6,8 @@ import {
   MINI_GAME_MAX_COINS_PER_RUN,
   MINI_GAME_PAID_RUNS_PER_DAY,
   miniGameCoins,
+  MiniGameRewardState,
+  paidRunsPerDay,
 } from "../../../api/_lib/mini-game-reward";
 
 describe("miniGameCoins", () => {
@@ -59,5 +61,18 @@ describe("isMiniGameId", () => {
     expect(isMiniGameId("echo-keys")).toBe(true);
     expect(isMiniGameId("balloon-pop")).toBe(false);
     expect(isMiniGameId(3)).toBe(false);
+  });
+
+  it("Monster Quest pays 5 quests a day", () => {
+    let state: MiniGameRewardState | undefined;
+    let paid = 0;
+    for (let i = 0; i < 7; i++) {
+      const r = applyMiniGameClaim(state, "2026-11-18", "monster-raid", 120);
+      if (r.coins > 0) paid++;
+      state = r.next;
+    }
+    expect(paid).toBe(5);
+    expect(paidRunsPerDay("monster-raid")).toBe(5);
+    expect(paidRunsPerDay("tower-climb")).toBe(MINI_GAME_PAID_RUNS_PER_DAY);
   });
 });

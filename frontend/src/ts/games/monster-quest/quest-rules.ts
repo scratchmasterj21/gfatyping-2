@@ -1,6 +1,7 @@
 import type { DifficultyOption } from "../components/DifficultySegmented";
 
 import { EASY_WORDS, HARD_WORDS, MEDIUM_WORDS } from "../shared/kid-words";
+import { guardPhrase, PhraseLevel, storyPhrase } from "./quest-phrases";
 
 /**
  * Monster Quest: a turn-based party battle. Four heroes (players + computer
@@ -124,8 +125,10 @@ export type QuestDifficulty = DifficultyOption & {
   words: string[];
   /** longer words for skills */
   skillWords: string[];
-  /** how many words each move asks for */
-  phrase: Record<HeroAction, number>;
+  /** how many words each move asks for (story sentences) */
+  phrase: Record<HeroAction | "guard", number>;
+  /** word pool size for the sentences: short / everyday / long words */
+  level: PhraseLevel;
   /** monster HP multiplier */
   hp: number;
   /** monster attack multiplier */
@@ -138,7 +141,15 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     hint: "short words",
     words: EASY_WORDS,
     skillWords: EASY_WORDS,
-    phrase: { attack: 2, skill: 3, defend: 2, potion: 2, ultimate: 3 },
+    phrase: {
+      attack: 3,
+      skill: 4,
+      defend: 3,
+      potion: 3,
+      ultimate: 5,
+      guard: 2,
+    },
+    level: 0,
     hp: 0.85,
     atk: 0.8,
   },
@@ -146,7 +157,15 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     label: "Medium",
     words: MEDIUM_WORDS,
     skillWords: MEDIUM_WORDS,
-    phrase: { attack: 2, skill: 3, defend: 2, potion: 2, ultimate: 3 },
+    phrase: {
+      attack: 4,
+      skill: 5,
+      defend: 3,
+      potion: 3,
+      ultimate: 6,
+      guard: 2,
+    },
+    level: 1,
     hp: 1.2,
     atk: 1.12,
   },
@@ -155,7 +174,15 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     hint: "long words",
     words: HARD_WORDS,
     skillWords: HARD_WORDS,
-    phrase: { attack: 3, skill: 3, defend: 2, potion: 2, ultimate: 4 },
+    phrase: {
+      attack: 5,
+      skill: 6,
+      defend: 4,
+      potion: 4,
+      ultimate: 7,
+      guard: 3,
+    },
+    level: 2,
     hp: 1.28,
     atk: 1.3,
   },
@@ -387,6 +414,35 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
   },
 };
 
+/** The word to type to aim at a monster (twins add "a" / "b"). */
+export const KIND_WORD: Record<MonsterKind, string> = {
+  slime: "slime",
+  bat: "bat",
+  mushroom: "mushroom",
+  snake: "snake",
+  wolf: "wolf",
+  snowman: "snowy",
+  ghost: "ghost",
+  skeleton: "bones",
+  imp: "imp",
+  bolt: "bot",
+  golem: "golem",
+  dragon: "dragon",
+  treant: "thornroot",
+  queen: "queen",
+  robot: "clank",
+};
+
+export function monsterWord(m: {
+  kind: MonsterKind;
+  name: string;
+  mini?: boolean;
+}): string {
+  const twin = /\s([A-E])$/.exec(m.name)?.[1];
+  const base = m.mini === true ? "mini slime" : KIND_WORD[m.kind];
+  return twin === undefined ? base : `${base} ${twin.toLowerCase()}`;
+}
+
 export type LandId = "forest" | "mountain" | "castle";
 
 export type LandInfo = {
@@ -453,26 +509,6 @@ export function hashString(text: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
-}
-
-function pickWord(seed: number, key: number, words: string[]): string {
-  return pickWords(seed, key, words, 1);
-}
-
-/** `count` different words joined by spaces. */
-function pickWords(
-  seed: number,
-  key: number,
-  words: string[],
-  count: number,
-): string {
-  const rng = seededRandom(seed ^ Math.imul(key + 1, 0x9e3779b1));
-  const out: string[] = [];
-  for (let tries = 0; out.length < count && tries < count * 10; tries++) {
-    const w = words[Math.floor(rng() * words.length)] ?? "go";
-    if (!out.includes(w) || tries >= count * 5) out.push(w);
-  }
-  return out.join(" ");
 }
 
 // ---------------------------------------------------------------- typing power
@@ -585,6 +621,10 @@ export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
 const BOSS_HP = 1.45;
 const BOSS_ATK = 1.1;
 
+/** Typing streak: +5% damage per clean move in a row, up to +25%. */
+export const STREAK_STEP = 0.05;
+export const STREAK_MAX = 5;
+
 /** A used super move comes back after this many of the hero's turns. */
 export const ULTIMATE_COOLDOWN = 3;
 /** Super moves get a longer show: cut-in, effect, then the hits. */
@@ -688,6 +728,8 @@ export type VoteTopic = "land" | "boss" | "shop";
 
 export type VoteOption = {
   id: string;
+  /** what to type to choose it */
+  word: string;
   label: string;
   emoji: string;
   detail: string;
@@ -717,6 +759,8 @@ export type HeroState = HeroSetup & {
   ultimateCooldown: number;
   /** fairy: next move is a critical */
   blessed: boolean;
+  /** clean moves in a row (players): a growing damage bonus */
+  streak: number;
 };
 
 export type MonsterState = {
@@ -834,6 +878,8 @@ export type PendingGuard = {
   /** uid -> word to type */
   words: Record<string, string>;
   big: boolean;
+  /** time allowed */
+  ms: number;
 };
 
 export type PendingVote = {
@@ -852,6 +898,8 @@ export type PendingChallenge = {
   what: "chest" | "trap" | "team";
   /** uid -> words to type */
   words: Record<string, string>;
+  /** time allowed */
+  ms: number;
 };
 
 /** Each player picks their own super move. Answered with a vote input. */
@@ -1004,6 +1052,7 @@ function landOptions(): VoteOption[] {
     const land = LANDS[id];
     return {
       id,
+      word: id,
       label: land.name,
       emoji: land.emoji,
       detail: land.minions.map((k) => MONSTER_INFO[k].name).join(", "),
@@ -1014,6 +1063,7 @@ function landOptions(): VoteOption[] {
 function bossOptions(land: LandId): VoteOption[] {
   return LANDS[land].bosses.map((k) => ({
     id: k,
+    word: KIND_WORD[k],
     label: MONSTER_INFO[k].name,
     emoji: "👑",
     detail: MONSTER_INFO[k].trick,
@@ -1133,17 +1183,30 @@ function cpuChoice(
   return rng() < 0.45 ? { ...attack, action: "skill" } : attack;
 }
 
+const keyRng = (seed: number, key: number): (() => number) =>
+  seededRandom(seed ^ Math.imul(key + 1, 0x9e3779b1));
+
 function heroMoveWords(
   seed: number,
   step: number,
   d: QuestDifficulty,
+  hero: HeroState,
 ): Record<HeroAction, string> {
+  const say = (kind: string, n: number, key: number): string =>
+    storyPhrase(
+      keyRng(seed, step * 8 + key),
+      kind,
+      n,
+      d.level,
+      hero.cls,
+      hero.ultimate === undefined ? "power" : ULTIMATES[hero.ultimate].name,
+    );
   return {
-    attack: pickWords(seed, step * 8 + 1, d.words, d.phrase.attack),
-    skill: pickWords(seed, step * 8 + 2, d.skillWords, d.phrase.skill),
-    defend: pickWords(seed, step * 8 + 3, d.words, d.phrase.defend),
-    potion: pickWords(seed, step * 8 + 4, d.words, d.phrase.potion),
-    ultimate: pickWords(seed, step * 8 + 6, d.skillWords, d.phrase.ultimate),
+    attack: say("attack", d.phrase.attack, 1),
+    skill: say("skill", d.phrase.skill, 2),
+    defend: say("defend", d.phrase.defend, 3),
+    potion: say("potion", d.phrase.potion, 4),
+    ultimate: say("ultimate", d.phrase.ultimate, 6),
   };
 }
 
@@ -1153,7 +1216,16 @@ function guardWord(
   slot: number,
   d: QuestDifficulty,
 ): string {
-  return pickWord(seed, step * 8 + 5 + slot * 101, d.words);
+  return guardPhrase(keyRng(seed, step * 8 + 5 + slot * 101), d.phrase.guard);
+}
+
+/** Time to type the longest of these phrases: a base plus some per letter. */
+export function typeTimeMs(
+  words: Record<string, string>,
+  base: number,
+): number {
+  const longest = Math.max(0, ...Object.values(words).map((w) => w.length));
+  return base + longest * 230;
 }
 
 const scaled = (base: number, power: number, rng: () => number): number =>
@@ -1181,6 +1253,11 @@ function applyHero(
   const stats = s.stats[hero.slot] as HeroStats;
   if (crit) stats.crits++;
   // team spirit: players' clean typing, anyone's criticals
+  if (needsPlayer(hero)) {
+    hero.streak =
+      input.power >= 1 && input.timeout !== true ? hero.streak + 1 : 0;
+  }
+  const streakBoost = 1 + STREAK_STEP * Math.min(hero.streak, STREAK_MAX);
   const spiritRate = s.twist === "team" ? 2 : 1;
   if (needsPlayer(hero) && input.timeout !== true) {
     s.spirit += (crit ? 2 : input.power >= 1 ? 1 : 0) * spiritRate;
@@ -1212,7 +1289,7 @@ function applyHero(
     style: "melee" | "fire" | "magic" = "melee",
   ): HitResult => {
     const id = monsterId(m.index);
-    base *= (hero.level > 1 ? LEVEL_BOOST : 1) * s.strength;
+    base *= (hero.level > 1 ? LEVEL_BOOST : 1) * s.strength * streakBoost;
     if (style === "fire") {
       base *= s.weather === "rain" ? 0.7 : s.weather === "sun" ? 1.2 : 1;
       if (s.twist === "fire") base *= 2;
@@ -1627,6 +1704,7 @@ export function journeyPlan(
 function ultimateOptions(cls: HeroClass): VoteOption[] {
   return ULTIMATE_CHOICES[cls].map((id) => ({
     id,
+    word: ULTIMATES[id].name.toLowerCase(),
     label: ULTIMATES[id].name,
     emoji: ULTIMATES[id].emoji,
     detail: ULTIMATES[id].blurb,
@@ -1657,6 +1735,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       level: 1,
       ultimateCooldown: 0,
       blessed: false,
+      streak: 0,
     })),
     monsters: [],
     potions: START_POTIONS,
@@ -1732,18 +1811,27 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
     if (players.length === 0) return {};
     const given = inputs[s.used];
     if (given === undefined) {
+      const words: Record<string, string> = Object.fromEntries(
+        players.map((h) => [
+          h.uid,
+          storyPhrase(
+            keyRng(
+              setup.seed,
+              9000 + step * 10 + (what === "team" ? 0 : h.slot),
+            ),
+            what,
+            what === "team" ? d.phrase.ultimate : d.phrase.guard + 1,
+            d.level,
+            h.cls,
+          ),
+        ]),
+      );
       s.pending = {
         kind: "challenge",
         n: s.used,
         what,
-        words: Object.fromEntries(
-          players.map((h) => [
-            h.uid,
-            what === "team"
-              ? pickWords(setup.seed, 9000 + step * 10, d.words, 3)
-              : pickWords(setup.seed, 9000 + step * 10 + h.slot, d.words, 2),
-          ]),
-        ),
+        words,
+        ms: typeTimeMs(words, CHALLENGE_BASE_MS),
       };
       s.upNext = [];
       return null;
@@ -1805,6 +1893,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         .filter(([, item]) => item.price <= s.gold)
         .map(([id, item]) => ({
           id,
+          word: item.label.split(" ").at(-1)?.toLowerCase() ?? id,
           label: item.label,
           emoji: item.emoji,
           detail:
@@ -1985,7 +2074,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             n: s.used,
             slot: hero.slot,
             uid: hero.uid,
-            words: heroMoveWords(setup.seed, step, d),
+            words: heroMoveWords(setup.seed, step, d, hero),
           };
           s.upNext = queue;
           return s;
@@ -2041,17 +2130,16 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       if (players.length > 0) {
         const given = inputs[s.used];
         if (given === undefined) {
+          const words: Record<string, string> = Object.fromEntries(
+            players.map((h) => [h.uid, guardWord(setup.seed, step, h.slot, d)]),
+          );
           s.pending = {
             kind: "guard",
             n: s.used,
             monster: m.index,
             big: plan.big,
-            words: Object.fromEntries(
-              players.map((h) => [
-                h.uid,
-                guardWord(setup.seed, step, h.slot, d),
-              ]),
-            ),
+            words,
+            ms: typeTimeMs(words, GUARD_BASE_MS),
           };
           s.upNext = queue;
           return s;
@@ -2256,10 +2344,11 @@ export function eventMs(e: QuestEvent): number {
 }
 
 /** Time to make a move / guard, ms. */
-export const HERO_TURN_MS = 30_000;
-export const GUARD_MS = 5_000;
+/** Longer story sentences + typing the move name need more time. */
+export const HERO_TURN_MS = 45_000;
+const GUARD_BASE_MS = 2500;
+const CHALLENGE_BASE_MS = 4000;
 export const VOTE_MS = 20_000;
-export const CHALLENGE_MS = 8_000;
 export const START_PAUSE_MS = 3000;
 
 // ---------------------------------------------------------------- score
@@ -2271,6 +2360,8 @@ export function questScore(input: {
   stats: HeroStats;
   battlesWon: number;
   mvp: boolean;
+  /** words the player typed (moves, guards, choices) */
+  words?: number;
 }): number {
   return Math.round(
     (input.won ? QUEST_SCORE.win : 0) +
@@ -2279,7 +2370,8 @@ export function questScore(input: {
       input.stats.healed / 6 +
       input.stats.guards * QUEST_SCORE.guard +
       input.stats.crits * QUEST_SCORE.crit +
-      (input.mvp ? QUEST_SCORE.mvp : 0),
+      (input.mvp ? QUEST_SCORE.mvp : 0) +
+      Math.min(60, (input.words ?? 0) / 2),
   );
 }
 
@@ -2350,8 +2442,6 @@ export function pendingDeadline(
       ? HERO_TURN_MS
       : p.kind === "vote" || p.kind === "pick"
         ? VOTE_MS
-        : p.kind === "challenge"
-          ? CHALLENGE_MS
-          : GUARD_MS)
+        : p.ms)
   );
 }

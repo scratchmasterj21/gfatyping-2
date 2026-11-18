@@ -28,7 +28,6 @@ import {
   BATTLE_COUNT,
   CLASS_INFO,
   eventMs,
-  GUARD_MS,
   HERO_TURN_MS,
   HeroAction,
   HeroInput,
@@ -43,13 +42,13 @@ import {
   QuestSetup,
   QuestState,
   typingPower,
+  monsterWord,
   ULTIMATES,
   UltimateId,
   VOTE_MS,
   VoteOption,
   WEATHER_INFO,
   Weather,
-  CHALLENGE_MS,
   SHOP_ITEMS,
   SPIRIT_MAX,
   TWISTS,
@@ -111,6 +110,8 @@ export function QuestBattle(props: {
   onHero: (input: HeroInput) => void;
   onGuard: (guarded: boolean) => void;
   onVote: (choice: string) => void;
+  /** a phrase or choice word was typed: for the typing results */
+  onTyped?: (t: { chars: number; ms: number; errors: number }) => void;
   /** votes so far on the open vote (online), uid -> option id */
   openVotes?: Record<string, string>;
   /** the quest is over and the last move has been shown */
@@ -602,6 +603,7 @@ export function QuestBattle(props: {
     title: string;
     challenge: boolean;
     chest: boolean;
+    ms: number;
   } | null => {
     const p = props.state.pending;
     if (p === null || !caughtUp()) return null;
@@ -622,6 +624,7 @@ export function QuestBattle(props: {
       title,
       challenge: p.kind === "challenge",
       chest: p.kind === "challenge" && p.what !== "trap",
+      ms: p.ms,
     };
   };
   const [chosen, setChosen] = createSignal<string>();
@@ -750,6 +753,8 @@ export function QuestBattle(props: {
 
   type Option = {
     action: HeroAction;
+    /** what to type to pick it */
+    word: string;
     label: string;
     emoji: string;
     off?: boolean;
@@ -757,12 +762,18 @@ export function QuestBattle(props: {
   const menu = (): Option[] => {
     const info = CLASS_INFO[myClass()];
     return [
-      { action: "attack", label: "Attack", emoji: "⚔️" },
-      { action: "skill", label: info.skill, emoji: info.skillEmoji },
-      { action: "defend", label: "Defend", emoji: "🛡️" },
+      { action: "attack", word: "attack", label: "", emoji: "⚔️" },
+      {
+        action: "skill",
+        word: info.skill.toLowerCase(),
+        label: "",
+        emoji: info.skillEmoji,
+      },
+      { action: "defend", word: "defend", label: "", emoji: "🛡️" },
       {
         action: "potion",
-        label: `Potion x${props.state.potions}`,
+        word: "potion",
+        label: `x${props.state.potions}`,
         emoji: "🧪",
         off: props.state.potions <= 0,
       },
@@ -771,10 +782,11 @@ export function QuestBattle(props: {
         : [
             {
               action: "ultimate" as const,
+              word: ULTIMATES[ult() ?? "mighty"].name.toLowerCase(),
               label:
                 (me()?.ultimateCooldown ?? 0) > 0
-                  ? `${ULTIMATES[ult() ?? "mighty"].name} (in ${me()?.ultimateCooldown})`
-                  : `${ULTIMATES[ult() ?? "mighty"].name} ⭐`,
+                  ? `in ${me()?.ultimateCooldown}`
+                  : "⭐",
               emoji: ULTIMATES[ult() ?? "mighty"].emoji,
               off: (me()?.ultimateCooldown ?? 0) > 0,
             },
@@ -782,8 +794,15 @@ export function QuestBattle(props: {
     ];
   };
   const ult = (): QuestState["heroes"][number]["ultimate"] => me()?.ultimate;
+  /** does what's typed so far fit this choice word? */
+  const fits = (w: string): boolean => w.startsWith(normalize(typed()));
 
-  type TargetOption = { index: number; label: string; detail: string };
+  type TargetOption = {
+    index: number;
+    word: string;
+    label: string;
+    detail: string;
+  };
   const targetsFor = (a: HeroAction): TargetOption[] | null => {
     const info = CLASS_INFO[myClass()];
     const aim =
@@ -801,6 +820,7 @@ export function QuestBattle(props: {
         .filter((m) => m.hp > 0)
         .map((m) => ({
           index: m.index,
+          word: monsterWord(m),
           label: m.name,
           detail: `${m.hp}/${m.maxHp}`,
         }));
@@ -815,6 +835,7 @@ export function QuestBattle(props: {
       });
       return heroes.map((h) => ({
         index: h.slot,
+        word: CLASS_INFO[h.cls].name.toLowerCase(),
         label: heroName(h.slot),
         detail: h.hp <= 0 ? "💤 asleep" : `${h.hp}/${h.maxHp}`,
       }));
@@ -862,6 +883,7 @@ export function QuestBattle(props: {
     const p = myHero();
     if (p === null) return;
     const power = typingPower(word(), errors, performance.now() - typeStart);
+    record(word());
     setSubmitted(p.n);
     clearInput();
     props.onHero({
@@ -872,12 +894,49 @@ export function QuestBattle(props: {
     });
   };
 
+  const noop = (): void => undefined;
+
+  /** a finished phrase / choice word, for the typing results */
+  const record = (text: string): void => {
+    props.onTyped?.({
+      chars: text.length,
+      ms: performance.now() - typeStart,
+      errors,
+    });
+    errors = 0;
+    typeStart = performance.now();
+  };
+
+  /** Typing a choice word: picks it when it matches, red when nothing fits. */
+  const typeChoice = <T extends { word: string }>(
+    raw: string,
+    options: T[],
+    onPick: (o: T) => void,
+  ): void => {
+    const value = normalize(raw);
+    const hit = options.find((o) => o.word === value);
+    if (hit !== undefined) {
+      record(hit.word);
+      clearInput();
+      onPick(hit);
+      return;
+    }
+    const ok = value === "" || options.some((o) => o.word.startsWith(value));
+    if (!ok && !wrong()) {
+      errors++;
+      sfx.oops();
+    }
+    setWrong(!ok);
+    setTyped(raw);
+  };
+
   const onInput = (raw: string): void => {
     // phrases: ignore case, extra spaces and a leading space
     const value = normalize(raw);
     const guard = myGuard();
     if (guard !== null) {
       if (value === guard.word) {
+        record(guard.word);
         setSubmitted(guard.n);
         clearInput();
         sfx.great();
@@ -890,36 +949,45 @@ export function QuestBattle(props: {
         return;
       }
       const ok = guard.word.startsWith(value);
-      if (!ok && !wrong()) sfx.oops();
+      if (!ok && !wrong()) {
+        errors++;
+        sfx.oops();
+      }
       setWrong(!ok);
       setTyped(raw);
       return;
     }
     const vote = myVote();
     if (vote !== null) {
-      const n = Number(value);
-      const o = vote.options[n - 1];
-      if (Number.isInteger(n) && o !== undefined) castVote(o.id);
-      clearInput();
+      if (voted() !== undefined) {
+        clearInput();
+        return;
+      }
+      const hit = vote.options.find((o) => o.word === normalize(raw));
+      typeChoice(raw, vote.options, noop);
+      if (hit !== undefined) castVote(hit.id);
       return;
     }
     if (myHero() === null) {
       clearInput();
       return;
     }
-    if (step() !== "type") {
-      // number keys pick from the menu / target list
-      const n = Number(value);
-      if (Number.isInteger(n) && n >= 1) {
-        if (step() === "menu") {
-          const o = menu()[n - 1];
-          if (o !== undefined) choose(o);
-        } else {
-          const t = targetsFor(action())?.[n - 1];
-          if (t !== undefined) pickTarget(t);
-        }
-      }
-      clearInput();
+    if (step() === "menu") {
+      typeChoice(raw, menu(), choose);
+      return;
+    }
+    if (step() === "target") {
+      typeChoice(
+        raw,
+        [...(targetsFor(action()) ?? []), { word: "back", index: -1 }],
+        (t) => {
+          if (t.index === -1) {
+            setStep("menu");
+          } else {
+            pickTarget(t as TargetOption);
+          }
+        },
+      );
       return;
     }
     if (value === word()) {
@@ -1228,18 +1296,16 @@ export function QuestBattle(props: {
                 )}
               >
                 <For each={v().options}>
-                  {(o, i) => (
-                    <button
-                      type="button"
-                      disabled={voted() !== undefined}
+                  {(o) => (
+                    <div
                       class={cn(
-                        "press-3d grid cursor-pointer justify-items-center gap-1 rounded-xl border-4 bg-game-navy p-2 text-center text-game-cream disabled:cursor-default",
+                        "grid justify-items-center gap-1 rounded-xl border-4 bg-game-navy p-2 text-center text-game-cream",
                         voted() === o.id
                           ? "border-game-yellow"
-                          : "border-game-cream/40 hover:border-game-cream",
+                          : fits(o.word)
+                            ? "border-game-cream/60"
+                            : "border-game-cream/20 opacity-50",
                       )}
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={() => castVote(o.id)}
                     >
                       <Show
                         when={o.monster}
@@ -1253,10 +1319,10 @@ export function QuestBattle(props: {
                           />
                         )}
                       </Show>
-                      <span class="text-lg leading-tight font-bold">
-                        <span class="text-sm text-game-grey">{i() + 1} </span>
+                      <span class="text-sm leading-tight text-game-grey">
                         {o.label}
                       </span>
+                      <ChoiceWord word={o.word} typed={typed()} />
                       <span class="text-xs leading-tight text-game-grey">
                         {o.detail}
                       </span>
@@ -1265,7 +1331,7 @@ export function QuestBattle(props: {
                           {"🗳️".repeat(voteCount(o.id))}
                         </span>
                       </Show>
-                    </button>
+                    </div>
                   )}
                 </For>
               </div>
@@ -1308,7 +1374,7 @@ export function QuestBattle(props: {
                   (secondsLeft() ?? 99) <= 3 ? "bg-game-red" : "bg-game-yellow",
                 )}
                 style={{
-                  width: `${timerShare(myGuard()?.challenge === true ? CHALLENGE_MS : myGuard() !== null ? GUARD_MS : myVote() !== null ? VOTE_MS : HERO_TURN_MS) * 100}%`,
+                  width: `${timerShare(myGuard()?.ms ?? (myVote() !== null ? VOTE_MS : HERO_TURN_MS)) * 100}%`,
                 }}
               ></div>
             </div>
@@ -1328,11 +1394,10 @@ export function QuestBattle(props: {
                       }
                     >
                       <div class="text-lg leading-snug font-bold text-game-yellow">
-                        👆 Tap a card or press{" "}
+                        ⌨️ Type your choice:{" "}
                         {myVote()
-                          ?.options.map((_, i) => i + 1)
-                          .join(", ")}
-                        .
+                          ?.options.map((o) => o.word)
+                          .join(" · ")}
                       </div>
                     </Show>
                     <Show when={waitingOn()}>
@@ -1347,32 +1412,30 @@ export function QuestBattle(props: {
               >
                 <Show when={step() === "menu"}>
                   <div class="mb-2 text-sm text-game-grey">
-                    Your turn, {CLASS_INFO[myClass()].name}! Pick a move (or
-                    press 1-{menu().length}):
+                    Your turn, {CLASS_INFO[myClass()].name}! Type a move:
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <For each={menu()}>
-                      {(o, i) => (
-                        <button
-                          type="button"
+                      {(o) => (
+                        <div
                           class={cn(
-                            "press-3d flex min-h-12 cursor-pointer items-center gap-2 rounded-lg bg-game-ink px-3 py-2 text-left text-lg font-bold text-game-cream hover:bg-game-blue hover:text-game-ink",
-                            o.off === true && "cursor-not-allowed opacity-40",
+                            "flex min-h-12 items-center gap-2 rounded-lg bg-game-ink px-3 py-2 text-left text-lg font-bold text-game-cream",
+                            (o.off === true || !fits(o.word)) && "opacity-40",
                           )}
-                          onPointerDown={(e) => e.preventDefault()}
-                          onClick={() => choose(o)}
                         >
-                          <span class="text-sm text-game-grey">{i() + 1}</span>
                           <span>{o.emoji}</span>
-                          <span class="truncate">{o.label}</span>
-                        </button>
+                          <ChoiceWord word={o.word} typed={typed()} />
+                          <span class="ml-auto text-sm font-normal text-game-grey">
+                            {o.label}
+                          </span>
+                        </div>
                       )}
                     </For>
                   </div>
                 </Show>
                 <Show when={step() === "target"}>
                   <div class="mb-2 flex items-center justify-between text-sm text-game-grey">
-                    <span>Who? (press a number)</span>
+                    <span>Who? Type a name (or &ldquo;back&rdquo;):</span>
                     <button
                       type="button"
                       class="cursor-pointer rounded bg-transparent px-1 text-game-grey underline hover:text-game-cream"
@@ -1384,17 +1447,19 @@ export function QuestBattle(props: {
                   </div>
                   <div class="grid gap-2 sm:grid-cols-2">
                     <For each={targetsFor(action()) ?? []}>
-                      {(t, i) => (
-                        <button
-                          type="button"
-                          class="press-3d flex min-h-12 cursor-pointer items-center gap-2 rounded-lg bg-game-ink px-3 py-2 text-left text-lg font-bold text-game-cream hover:bg-game-blue hover:text-game-ink"
-                          onPointerDown={(e) => e.preventDefault()}
-                          onClick={() => pickTarget(t)}
+                      {(t) => (
+                        <div
+                          class={cn(
+                            "flex min-h-12 items-center gap-2 rounded-lg bg-game-ink px-3 py-2 text-left text-lg font-bold text-game-cream",
+                            !fits(t.word) && "opacity-40",
+                          )}
                         >
-                          <span class="text-sm text-game-grey">{i() + 1}</span>
-                          <span class="flex-1 truncate">{t.label}</span>
+                          <ChoiceWord word={t.word} typed={typed()} />
+                          <span class="flex-1 truncate text-sm font-normal text-game-grey">
+                            {t.label}
+                          </span>
                           <span class="text-sm font-normal">{t.detail}</span>
-                        </button>
+                        </div>
                       )}
                     </For>
                   </div>
@@ -1467,6 +1532,11 @@ export function QuestBattle(props: {
                       {heroName(h.slot)}
                       {live()?.away === true ? " (helper)" : ""}
                     </span>
+                    <Show when={(live()?.streak ?? 0) >= 2}>
+                      <span title="Clean typing streak: extra damage">
+                        🔥{live()?.streak}
+                      </span>
+                    </Show>
                     <Show when={live()?.blessed === true}>
                       <span title="Fairy blessing: next move is a critical">
                         ✨
@@ -1560,11 +1630,11 @@ export function QuestBattle(props: {
               : myGuard() !== null
                 ? "type the guard word!"
                 : myVote() !== null && voted() === undefined
-                  ? "press a number to vote"
+                  ? "type your choice"
                   : step() === "type"
-                    ? "type the word"
+                    ? "type the sentence"
                     : myHero() !== null
-                      ? "press a number"
+                      ? "type a move or name"
                       : "wait for your turn"
           }
           ref={(el) => (inputEl = el)}
@@ -1684,5 +1754,19 @@ function WeatherLayer(props: { weather: Weather }): JSXElement {
         </For>
       </Show>
     </div>
+  );
+}
+
+/** A choice word with the typed part coloured in. */
+function ChoiceWord(props: { word: string; typed: string }): JSXElement {
+  const done = (): number => {
+    const t = normalize(props.typed);
+    return props.word.startsWith(t) ? t.length : 0;
+  };
+  return (
+    <span class="font-mono text-lg font-bold tracking-wide">
+      <span class="text-game-green">{props.word.slice(0, done())}</span>
+      <span>{props.word.slice(done())}</span>
+    </span>
   );
 }

@@ -309,15 +309,17 @@ describe("monster quest", () => {
     const p = started(solo()).pending;
     expect(p?.kind).toBe("hero");
     if (p?.kind !== "hero") return;
-    expect(p.words.attack.split(" ")).toHaveLength(2);
-    expect(p.words.skill.split(" ")).toHaveLength(3);
-    expect(p.words.defend.split(" ")).toHaveLength(2);
+    expect(p.words.attack.split(" ")).toHaveLength(3);
+    expect(p.words.skill.split(" ")).toHaveLength(4);
+    expect(p.words.defend.split(" ")).toHaveLength(3);
+    expect(p.words.ultimate.split(" ")).toHaveLength(5);
     const hard = started({
       ...solo(),
       difficulty: questDifficultyFor("Hard"),
     }).pending;
     if (hard?.kind === "hero") {
-      expect(hard.words.attack.split(" ")).toHaveLength(3);
+      expect(hard.words.attack.split(" ")).toHaveLength(5);
+      expect(hard.words.skill.split(" ")).toHaveLength(6);
     }
   });
 });

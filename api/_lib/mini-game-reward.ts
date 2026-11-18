@@ -46,6 +46,12 @@ export const MINI_GAME_SCORE_PER_COIN: Record<MiniGameId, number> = {
 };
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
+/** Games with their own daily limit (Monster Quest: 5 paid quests a day). */
+export const MINI_GAME_PAID_RUNS_OVERRIDE: Partial<Record<MiniGameId, number>> =
+  { "monster-raid": 5 };
+export function paidRunsPerDay(gameId: MiniGameId): number {
+  return MINI_GAME_PAID_RUNS_OVERRIDE[gameId] ?? MINI_GAME_PAID_RUNS_PER_DAY;
+}
 /** Anything above this is not a real run. */
 export const MINI_GAME_MAX_SCORE = 50_000;
 
@@ -79,7 +85,7 @@ export function applyMiniGameClaim(
 ): { coins: number; capped: boolean; next: MiniGameRewardState } {
   const runs = stored?.date === today ? { ...stored.runs } : {};
   const used = runs[gameId] ?? 0;
-  if (used >= MINI_GAME_PAID_RUNS_PER_DAY) {
+  if (used >= paidRunsPerDay(gameId)) {
     return { coins: 0, capped: true, next: { date: today, runs } };
   }
   const coins = miniGameCoins(gameId, score);
