@@ -45,6 +45,8 @@ document.addEventListener("keydown", (e) => {
 
 //stop space scrolling
 window.addEventListener("keydown", function (e) {
+  // games (Phaser) ignore keys already prevented - space is typed there
+  if (document.querySelector("[data-game-frame]") !== null) return;
   if (
     e.code === "Space" &&
     (e.target === document.body || (e.target as HTMLElement)?.id === "result")

@@ -262,6 +262,8 @@ export class GameScene extends Scene {
       this.game.events.emit("ui-buffer", buf, locked);
     });
 
+    // stop the page scrolling the moment space is pressed (Chain Beam phrase)
+    this.input.keyboard?.addCapture("SPACE");
     this.input.keyboard?.on("keydown", (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") {
         e.preventDefault(); // stop the page from scrolling with the player
