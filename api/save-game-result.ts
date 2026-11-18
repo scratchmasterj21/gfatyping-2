@@ -4,7 +4,7 @@ import admin from "firebase-admin";
 import { getAdminApp } from "./_lib/admin.js";
 import { activityUpdate } from "./_lib/activity.js";
 import { verifyStudent } from "./_lib/auth.js";
-import { tokyoDateString } from "./_lib/time.js";
+import { tokyoDateString, tokyoDayId } from "./_lib/time.js";
 
 // Mirrors LESSON_CHECKPOINT_COMPLETE_WAVE in lesson-checkpoints.ts.
 const COMPLETE_WAVE = 3;
@@ -73,6 +73,12 @@ export default async function handler(
   const weeklyBody = (req.body as { weeklyQuest?: unknown }).weeklyQuest;
   if (weeklyBody !== undefined) {
     await saveWeeklyQuest(auth.uid, weeklyBody, res);
+    return;
+  }
+
+  const dailyBody = (req.body as { dailyGhost?: unknown }).dailyGhost;
+  if (dailyBody !== undefined) {
+    await saveDailyGhost(auth.uid, dailyBody, res);
     return;
   }
 
@@ -280,6 +286,77 @@ async function saveWeeklyQuest(
     res.status(200).json({ ok: true, counted: true, best });
   } catch (e) {
     console.error("save-game-result (weekly) failed:", e);
+    res.status(500).json({ ok: false, reason: "Something went wrong" });
+  }
+}
+
+/** A 5-wave Daily Haunting can't score more than this. */
+const MAX_DAILY_SCORE = 20_000;
+
+/**
+ * Ghost Hunter Daily Haunting: best score per class today, in
+ * dailyGhost/{day} (one small doc, read once by the game menu).
+ * Body: { dailyGhost: { day, score } }.
+ */
+async function saveDailyGhost(
+  uid: string,
+  raw: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  const body = (raw ?? {}) as { day?: unknown; score?: unknown };
+  const day = Number(body.day);
+  const score = Math.round(Number(body.score));
+  const now = Date.now();
+  // a run started just before midnight still counts
+  const validDay =
+    day === tokyoDayId(now) || day === tokyoDayId(now - 30 * 60 * 1000);
+  if (
+    !validDay ||
+    !Number.isFinite(score) ||
+    score <= 0 ||
+    score > MAX_DAILY_SCORE
+  ) {
+    res.status(400).json({ ok: false, reason: "Invalid daily haunting" });
+    return;
+  }
+  const db = getAdminApp().firestore();
+  const user = (await db.collection("users").doc(uid).get()).data() as
+    | { classId?: unknown; role?: unknown; name?: unknown; graduated?: unknown }
+    | undefined;
+  const classId = user?.classId;
+  if (
+    typeof classId !== "string" ||
+    classId === "" ||
+    user?.role === "teacher" ||
+    user?.graduated === true
+  ) {
+    res.status(200).json({ ok: true, counted: false });
+    return;
+  }
+  const name =
+    typeof user?.name === "string" ? user.name.slice(0, 40) : "Student";
+  const ref = db.collection("dailyGhost").doc(String(day));
+  try {
+    const best = await db.runTransaction(
+      async (tx: admin.firestore.Transaction) => {
+        const snap = await tx.get(ref);
+        const classes = (snap.data()?.["classes"] ?? {}) as Record<
+          string,
+          { score?: number }
+        >;
+        const prev = classes[classId]?.score;
+        if (prev !== undefined && prev >= score) return false;
+        tx.set(
+          ref,
+          { day, classes: { [classId]: { score, name, uid, at: now } } },
+          { merge: true },
+        );
+        return true;
+      },
+    );
+    res.status(200).json({ ok: true, counted: true, best });
+  } catch (e) {
+    console.error("save-game-result (daily) failed:", e);
     res.status(500).json({ ok: false, reason: "Something went wrong" });
   }
 }

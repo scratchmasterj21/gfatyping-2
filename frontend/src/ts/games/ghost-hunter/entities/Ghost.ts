@@ -3,6 +3,7 @@ import { Scene, GameObjects } from "phaser";
 import { hex } from "../../shared/game-palette";
 import { WordTag } from "../../shared/phaser-ui";
 import { GHOST_TINTS } from "../art";
+import { GhostKind, KIND_INFO } from "../ghost-kinds";
 
 export class Ghost extends GameObjects.Container {
   readonly word: string;
@@ -11,6 +12,9 @@ export class Ghost extends GameObjects.Container {
   readonly boss: { hp: number; maxHp: number } | null;
   /** Ghost Party guest: wears a party hat */
   readonly party: boolean;
+  readonly kind: GhostKind;
+  /** armored ghosts: still wearing it (needs one more word) */
+  armored: boolean;
   /** scene time (ms) until which the Ghost King stands still after a hit */
   staggeredUntil = 0;
   private ghostImg: GameObjects.Image;
@@ -21,6 +25,11 @@ export class Ghost extends GameObjects.Container {
   private targetable = false;
   private frozen = false;
   private frozenBadge: GameObjects.Text;
+  /** shy ghosts hide their word until revealed */
+  private revealed: boolean;
+  private hidden: GameObjects.Text | null = null;
+  private armorGfx: GameObjects.Graphics | null = null;
+  private kindBadge: GameObjects.Text | null = null;
 
   constructor(
     scene: Scene,
@@ -30,24 +39,87 @@ export class Ghost extends GameObjects.Container {
     side: "left" | "right",
     boss: { hp: number; maxHp: number } | null = null,
     party = false,
+    kind: GhostKind = "normal",
   ) {
     super(scene, x, y);
     this.word = word;
     this.side = side;
     this.boss = boss;
     this.party = party;
+    this.kind = boss === null ? kind : "normal";
+    this.armored = this.kind === "armored";
+    this.revealed = this.kind !== "shy";
     this.spawnY = y;
     this.bobPhase = Math.random() * Math.PI * 2;
 
     // faces the middle of the lawn (art looks right by default)
     const tint = Math.floor(Math.random() * GHOST_TINTS.length);
     this.imgKey = boss === null ? `gh-ghost-${tint}` : "gh-king";
+    const small = this.kind === "speedy" || this.kind === "mini";
+    const [w, h] = boss !== null ? [105, 144] : small ? [42, 48] : [56, 64];
+    const back = side === "left" ? -1 : 1;
+    if (this.kind === "twin") {
+      // its twin peeking out from behind
+      this.add(
+        scene.add
+          .image(back * 16, 4, this.imgKey)
+          .setDisplaySize(w * 0.8, h * 0.8)
+          .setOrigin(0.5, 1)
+          .setFlipX(side === "right")
+          .setAlpha(0.7),
+      );
+    }
+    if (this.kind === "speedy") {
+      // speed lines trailing behind
+      const lines = scene.add.graphics();
+      lines.lineStyle(3, hex("cream"), 0.7);
+      for (const [dy, len] of [
+        [-34, 22],
+        [-22, 30],
+        [-10, 18],
+      ] as const) {
+        lines.lineBetween(back * 22, dy, back * (22 + len), dy);
+      }
+      this.add(lines);
+      scene.tweens.add({
+        targets: lines,
+        alpha: 0.25,
+        duration: 140,
+        yoyo: true,
+        repeat: -1,
+      });
+    }
     this.ghostImg = scene.add
       .image(0, 10, this.imgKey)
-      .setDisplaySize(boss === null ? 56 : 105, boss === null ? 64 : 144)
+      .setDisplaySize(w, h)
       .setOrigin(0.5, 1)
       .setFlipX(side === "right");
     this.add(this.ghostImg);
+    if (this.kind === "shy") {
+      // fading in and out, nervous
+      scene.tweens.add({
+        targets: this.ghostImg,
+        alpha: 0.35,
+        duration: 600,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+    }
+    if (this.armored) {
+      // a knight's helmet with a visor slit
+      const a = scene.add.graphics();
+      a.fillStyle(hex("grey"), 1);
+      a.fillRoundedRect(-22, -56, 44, 26, { tl: 18, tr: 18, bl: 4, br: 4 });
+      a.lineStyle(2, hex("ink"), 0.8);
+      a.strokeRoundedRect(-22, -56, 44, 26, { tl: 18, tr: 18, bl: 4, br: 4 });
+      a.fillStyle(hex("ink"), 1);
+      a.fillRect(-14, -42, 28, 4);
+      a.fillStyle(hex("red"), 1);
+      a.fillTriangle(-3, -56, 3, -56, 0, -68);
+      this.armorGfx = a;
+      this.add(a);
+    }
 
     if (party && boss === null) {
       // a little striped party hat, tilted
@@ -86,6 +158,21 @@ export class Ghost extends GameObjects.Container {
     );
     this.add(this.tag);
     this.setTargetable(false);
+
+    if (this.kind !== "normal" && this.kind !== "mini") {
+      this.kindBadge = scene.add
+        .text(back * -30, -44, KIND_INFO[this.kind].emoji, {
+          fontSize: "16px",
+        })
+        .setOrigin(0.5);
+      this.add(this.kindBadge);
+    }
+    if (!this.revealed) {
+      this.hidden = scene.add
+        .text(0, -72, "❓", { fontSize: "20px" })
+        .setOrigin(0.5);
+      this.add(this.hidden);
+    }
 
     this.frozenBadge = scene.add
       .text(0, -20, "❄️", { fontSize: "18px" })
@@ -127,8 +214,40 @@ export class Ghost extends GameObjects.Container {
    */
   setTargetable(value: boolean): void {
     this.targetable = value;
-    this.tag.setVisible(value);
+    this.tag.setVisible(value && this.revealed);
     this.setAlpha(value ? 1 : 0.45);
+  }
+
+  isRevealed(): boolean {
+    return this.revealed;
+  }
+
+  /** A shy ghost shows its word (it can be typed from now on). */
+  reveal(): void {
+    if (this.revealed) return;
+    this.revealed = true;
+    this.hidden?.destroy();
+    this.hidden = null;
+    this.tag.setVisible(this.targetable);
+    this.scene.tweens.killTweensOf(this.ghostImg);
+    this.ghostImg.setAlpha(1);
+    this.scene.tweens.add({
+      targets: this.tag,
+      scale: { from: 1.5, to: 1 },
+      duration: 220,
+      ease: "Back.easeOut",
+    });
+  }
+
+  /** The first word knocks the armor off; the same word catches it. */
+  breakArmor(): void {
+    if (!this.armored) return;
+    this.armored = false;
+    this.armorGfx?.destroy();
+    this.armorGfx = null;
+    this.kindBadge?.destroy();
+    this.kindBadge = null;
+    this.updateTyped("");
   }
 
   isFrozen(): boolean {

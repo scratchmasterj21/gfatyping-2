@@ -12,6 +12,7 @@ import {
 } from "solid-js";
 
 import type { GameOverScene } from "./scenes/GameOverScene";
+import type { TypingReport } from "./typing-report";
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
@@ -42,6 +43,15 @@ import {
   WordListOption,
 } from "../word-defender/systems/vocab-pool";
 import {
+  DailyPlan,
+  DAILY_WAVES,
+  dailyDay,
+  dailyPlan,
+  getDailyWords,
+  submitDailyScore,
+} from "./daily-haunting";
+import { DailyHauntingCard } from "./DailyHauntingCard";
+import {
   createGhostHunterGame,
   GHOST_DIFFICULTIES,
   GameDifficulty,
@@ -66,7 +76,9 @@ import {
   updateGhostPlayerPosition,
 } from "./ghost-multiplayer";
 
-const toView = (d: WaveEnd): GameResultView => ({
+type GhostEnd = WaveEnd & { report?: TypingReport };
+
+const toView = (d: GhostEnd): GameResultView => ({
   headline:
     d.cleared === true
       ? "Yard saved!"
@@ -77,9 +89,12 @@ const toView = (d: WaveEnd): GameResultView => ({
   stars: waveStars(d),
   stats: [
     { label: "wave reached", value: String(d.wave) },
-    { label: "accuracy", value: `${waveAccuracy(d)}%` },
     { label: "ghosts caught", value: String(d.hits) },
-    { label: "missed keys", value: String(d.misses) },
+    { label: "words per minute", value: String(d.report?.wpm ?? 0) },
+    {
+      label: "accuracy",
+      value: `${d.report?.accuracy ?? waveAccuracy(d)}%`,
+    },
   ],
 });
 
@@ -121,7 +136,10 @@ export function GhostHunterModal(props: Props): JSXElement {
   const [result, setResult] = createSignal<{
     view: GameResultView;
     multiplayer: boolean;
+    practice: string[];
   } | null>(null);
+  const [daily, setDaily] = createSignal(false);
+  const [dailyNote, setDailyNote] = createSignal<string>();
   const [maxWave, setMaxWave] = createSignal<5 | 10>(5);
   const [roomCode, setRoomCode] = createSignal<string>();
   const [joinCode, setJoinCode] = createSignal("");
@@ -166,21 +184,31 @@ export function GhostHunterModal(props: Props): JSXElement {
     multiplayerDifficulty?: GameDifficulty,
     multiplayerRole?: "host" | "guest",
     multiplayerMaxWave?: 5 | 10,
+    dailyRun?: DailyPlan,
   ): Promise<void> => {
     const easyDiff = GHOST_DIFFICULTIES[0] as GameDifficulty;
     const onClose = props.onClose;
     const onResult = props.onResult;
     const multiplayerCode = roomCode();
     setResult(null);
+    setDailyNote(undefined);
     setPhase("loading");
-    const words = wordsOverride ?? (await selected().getWords());
+    const words =
+      wordsOverride ??
+      (dailyRun !== undefined
+        ? await getDailyWords(dailyRun)
+        : await selected().getWords());
     setPhase("playing");
     await Promise.resolve();
     if (containerRef === undefined) return;
     const usedDifficulty =
       multiplayerDifficulty ??
-      (wordsOverride !== undefined ? easyDiff : difficulty());
-    const usedGroup = selected().group;
+      (dailyRun !== undefined
+        ? (GHOST_DIFFICULTIES[1] as GameDifficulty)
+        : wordsOverride !== undefined
+          ? easyDiff
+          : difficulty());
+    const usedGroup = dailyRun?.group ?? selected().group;
     const gradeOneLesson =
       wordsOverride !== undefined && getStudentGrade() === 1;
     game = await createGhostHunterGame(
@@ -189,11 +217,14 @@ export function GhostHunterModal(props: Props): JSXElement {
       usedDifficulty,
       multiplayerRole !== undefined
         ? (multiplayerMaxWave ?? 5)
-        : wordsOverride !== undefined
-          ? LESSON_CHECKPOINT_MAX_WAVE
-          : 0,
+        : dailyRun !== undefined
+          ? DAILY_WAVES
+          : wordsOverride !== undefined
+            ? LESSON_CHECKPOINT_MAX_WAVE
+            : 0,
       multiplayerRole,
       gradeOneLesson,
+      dailyRun === undefined ? undefined : { seed: dailyRun.seed },
     );
     game.events.on(
       "game-result",
@@ -206,6 +237,17 @@ export function GhostHunterModal(props: Props): JSXElement {
             usedGroup,
             data.cleared,
           );
+          if (dailyRun !== undefined && data.score > 0) {
+            submitDailyScore(dailyRun.day, data.score)
+              .then((best) =>
+                setDailyNote(
+                  best
+                    ? "🏆 New best for your class today!"
+                    : "🗓️ Daily haunting score sent!",
+                ),
+              )
+              .catch(() => undefined);
+          }
           return;
         }
         void markGhostPlayerFinished(multiplayerCode, data.wave);
@@ -271,10 +313,11 @@ export function GhostHunterModal(props: Props): JSXElement {
         );
       },
     );
-    game.events.on("game-over-screen", (d: WaveEnd) => {
+    game.events.on("game-over-screen", (d: GhostEnd) => {
       setResult({
         view: toView(d),
         multiplayer: multiplayerCode !== undefined,
+        practice: d.report?.hardest ?? [],
       });
     });
     game.events.on("exit-game", () => {
@@ -284,6 +327,7 @@ export function GhostHunterModal(props: Props): JSXElement {
 
   const playAgain = (): void => {
     setResult(null);
+    setDailyNote(undefined);
     const over = game?.scene.getScene("GameOver") as GameOverScene | null;
     over?.playAgain();
   };
@@ -490,8 +534,16 @@ export function GhostHunterModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
-                    text="Start solo game"
-                    onClick={() => void startGame()}
+                    text={daily() ? "Start daily haunting" : "Start solo game"}
+                    onClick={() =>
+                      void startGame(
+                        undefined,
+                        undefined,
+                        undefined,
+                        undefined,
+                        daily() ? dailyPlan(dailyDay()) : undefined,
+                      )
+                    }
                   />
                 }
               >
@@ -514,14 +566,24 @@ export function GhostHunterModal(props: Props): JSXElement {
               </p>
             </GameSetupSection>
 
-            <GameSetupSection title="Choose difficulty">
-              <DifficultySegmented
-                options={availableDifficulties()}
-                selectedLabel={difficulty().label}
-                onSelect={(d) => setDifficulty(d)}
-                compact
+            <Show when={mode() === "solo"}>
+              <DailyHauntingCard
+                day={dailyDay()}
+                selected={daily()}
+                onSelect={setDaily}
               />
-            </GameSetupSection>
+            </Show>
+
+            <Show when={mode() === "together" || !daily()}>
+              <GameSetupSection title="Choose difficulty">
+                <DifficultySegmented
+                  options={availableDifficulties()}
+                  selectedLabel={difficulty().label}
+                  onSelect={(d) => setDifficulty(d)}
+                  compact
+                />
+              </GameSetupSection>
+            </Show>
 
             <GameSetupMore>
               <GameSetupSection title="Mode">
@@ -554,14 +616,16 @@ export function GhostHunterModal(props: Props): JSXElement {
                   </div>
                 </GameSetupSection>
               </Show>
-              <GameSetupSection title="Choose a word list">
-                <WordListPicker
-                  groups={groups()}
-                  selectedId={selected().id}
-                  onSelect={setSelected}
-                  listClass="max-h-40 sm:max-h-52"
-                />
-              </GameSetupSection>
+              <Show when={mode() === "together" || !daily()}>
+                <GameSetupSection title="Choose a word list">
+                  <WordListPicker
+                    groups={groups()}
+                    selectedId={selected().id}
+                    onSelect={setSelected}
+                    listClass="max-h-40 sm:max-h-52"
+                  />
+                </GameSetupSection>
+              </Show>
             </GameSetupMore>
           </GamePickLayout>
         </Show>
@@ -718,8 +782,26 @@ export function GhostHunterModal(props: Props): JSXElement {
               <GameResultOverlay
                 result={r().view}
                 onPlayAgain={r().multiplayer ? undefined : playAgain}
-                note={r().multiplayer ? "Waiting for your team…" : undefined}
+                note={r().multiplayer ? "Waiting for your team…" : dailyNote()}
                 onExit={() => props.onClose()}
+                extra={
+                  <Show when={r().practice.length > 0}>
+                    <div class="grid w-full gap-1">
+                      <div class="text-sm font-bold text-sub">
+                        📝 Practice these words
+                      </div>
+                      <div class="flex flex-wrap justify-center gap-2">
+                        <For each={r().practice}>
+                          {(w) => (
+                            <span class="rounded-lg bg-sub-alt px-3 py-1 font-mono text-lg font-bold text-text">
+                              {w}
+                            </span>
+                          )}
+                        </For>
+                      </div>
+                    </div>
+                  </Show>
+                }
               />
             )}
           </Show>

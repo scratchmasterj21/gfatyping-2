@@ -215,6 +215,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Ghost Hunter Daily Haunting class scores, written only by
+    // api/save-game-result.ts (Admin SDK).
+    match /dailyGhost/{day} {
+      allow read: if isDomainUser();
+      allow write: if false;
+    }
+
     match /weeklyXpLeaderboards/{week} {
       allow read: if isDomainUser();
       match /entries/{uid} {

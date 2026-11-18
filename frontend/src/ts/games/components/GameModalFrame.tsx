@@ -30,10 +30,7 @@ export function GameModalFrame(props: {
     props.needsKeyboard !== false &&
     !hardwareKeySeen();
   return (
-    <div
-      data-game-frame
-      class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95"
-    >
+    <div class="fixed inset-0 z-[150] flex items-center justify-center bg-bg/95">
       <div
         class={cn(
           "relative flex flex-col overflow-hidden rounded-double border-2 border-main/40 bg-bg shadow-2xl",

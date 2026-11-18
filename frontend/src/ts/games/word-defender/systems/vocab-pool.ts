@@ -44,10 +44,13 @@ export function getWordListOptions(): WordListOption[] {
   return options;
 }
 
-export function shuffleCyclic(words: string[]): string[] {
+export function shuffleCyclic(
+  words: string[],
+  rng: () => number = Math.random,
+): string[] {
   const arr = [...words];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rng() * (i + 1));
     const tmp = arr[i] as string;
     arr[i] = arr[j] as string;
     arr[j] = tmp;

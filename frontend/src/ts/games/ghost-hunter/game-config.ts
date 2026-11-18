@@ -49,6 +49,8 @@ export async function createGhostHunterGame(
   maxWave = 0,
   multiplayerRole?: "host" | "guest",
   bothSides = false,
+  /** Daily Haunting: same ghosts for everyone (seeded), boss allowed */
+  daily?: { seed: number },
 ): Promise<Phaser.Game> {
   const PhaserLib = await import("phaser");
   const [{ BootScene }, { GameOverScene }, { GameScene }, { UIScene }] =
@@ -83,5 +85,7 @@ export async function createGhostHunterGame(
   game.registry.set("multiplayerRole", multiplayerRole);
   // Grade 1 lesson checkpoints type either side. Free play still requires facing.
   game.registry.set("bothSides", bothSides);
+  game.registry.set("daily", daily !== undefined);
+  game.registry.set("seed", daily?.seed);
   return game;
 }

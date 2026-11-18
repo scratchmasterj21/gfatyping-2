@@ -26,6 +26,8 @@ export function GameResultOverlay(props: {
   onExit: () => void;
   /** Small line under the stats, e.g. "Waiting for the other racers…". */
   note?: string;
+  /** Anything else under the stats (e.g. words to practice). */
+  extra?: JSXElement;
 }): JSXElement {
   return (
     <div class="absolute inset-0 z-20 flex items-center justify-center overflow-y-auto bg-bg/85 p-4">
@@ -56,6 +58,7 @@ export function GameResultOverlay(props: {
             )}
           </For>
         </div>
+        {props.extra}
         <Show when={props.note}>
           <div class="text-sm font-semibold text-sub">{props.note}</div>
         </Show>
