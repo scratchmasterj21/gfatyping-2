@@ -5,7 +5,7 @@ import { HeroClass } from "./quest-rules";
  * scaled up. Each letter is a palette colour, "." is see-through.
  */
 
-const PALETTE: Record<string, string> = {
+export const PALETTE: Record<string, string> = {
   k: "#1a1c2c",
   s: "#f4c59e",
   S: "#d9966b",
@@ -121,18 +121,22 @@ const GRIDS: Record<HeroClass, string[]> = {
   ],
 };
 
-function toSvg(grid: string[]): string {
+/** Grid of palette letters -> crisp SVG data URL. */
+export function toSvg(
+  grid: string[],
+  palette: Record<string, string> = PALETTE,
+): string {
   const rects: string[] = [];
   grid.forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
-      const colour = PALETTE[row[x] ?? "."];
+      const colour = palette[row[x] ?? "."];
       if (colour === undefined) continue;
       rects.push(
         `<rect x="${x}" y="${y}" width="1.02" height="1.02" fill="${colour}"/>`,
       );
     }
   });
-  const width = grid[0]?.length ?? 0;
+  const width = Math.max(0, ...grid.map((r) => r.length));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${grid.length}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

@@ -34,13 +34,24 @@ import {
   HeroInput,
   heroId,
   HitResult,
+  LandId,
+  LANDS,
+  MONSTER_INFO,
   MonsterState,
-  PendingGuard,
   PendingHero,
   QuestEvent,
   QuestSetup,
   QuestState,
   typingPower,
+  ULTIMATES,
+  VOTE_MS,
+  VoteOption,
+  WEATHER_INFO,
+  Weather,
+  CHALLENGE_MS,
+  SHOP_ITEMS,
+  SPIRIT_MAX,
+  TWISTS,
 } from "./quest-rules";
 
 type Popup = { id: number; target: string; text: string; tone: string };
@@ -71,6 +82,9 @@ export function QuestBattle(props: {
   deadline: number | null;
   onHero: (input: HeroInput) => void;
   onGuard: (guarded: boolean) => void;
+  onVote: (choice: string) => void;
+  /** votes so far on the open vote (online), uid -> option id */
+  openVotes?: Record<string, string>;
   /** the quest is over and the last move has been shown */
   onFinished: () => void;
 }): JSXElement {
@@ -96,6 +110,11 @@ export function QuestBattle(props: {
   } | null>(null);
   const [entering, setEntering] = createSignal(false);
   const [victory, setVictory] = createSignal(false);
+  const [land, setLand] = createSignal<LandId | null>(null);
+  const [weather, setWeather] = createSignal<Weather>("clear");
+  const [heroMax, setHeroMax] = createSignal<number[]>([]);
+  /** monsters that just joined (slide in) */
+  const [joined, setJoined] = createSignal<Set<number>>(new Set());
   const motionClass = (id: string): string | false => {
     const m = motion();
     return m !== null && m.id === id && MOTION_CLASS[m.kind];
@@ -126,6 +145,10 @@ export function QuestBattle(props: {
     setQuake(false);
     setEntering(false);
     setVictory(false);
+    setLand(null);
+    setJoined(new Set<number>());
+    setWeather("clear");
+    setHeroMax(props.setup.party.map((h) => CLASS_INFO[h.cls].maxHp));
   };
   createEffect(
     on(
@@ -195,11 +218,13 @@ export function QuestBattle(props: {
           hit.revive === true ? "✨ Up!" : `+${hit.amount}`,
           "heal",
         );
+      } else if (hit.miss === true) {
+        popup(hit.id, "Miss!", "hit");
       } else {
         struck.add(hit.id);
         popup(
           hit.id,
-          `${hit.crit === true ? "⭐" : ""}${hit.amount}${hit.guarded === true ? " 🛡️" : ""}`,
+          `${hit.crit === true ? "⭐" : ""}${hit.amount}${hit.weak === true ? " 🔥x2" : ""}${hit.guarded === true ? " 🛡️" : ""}`,
           hit.crit === true ? "crit" : hit.id.startsWith("h") ? "hurt" : "hit",
         );
       }
@@ -216,7 +241,8 @@ export function QuestBattle(props: {
     if (hits.some((h) => h.heal === true)) sfx.pop();
     else if (hits.some((h) => h.crit === true)) sfx.great();
     else if (hits.some((h) => h.id.startsWith("h"))) sfx.bad();
-    else if (hits.length > 0) sfx.good();
+    else if (hits.some((h) => h.miss !== true)) sfx.good();
+    else if (hits.length > 0) sfx.oops();
   };
 
   const play = (e: QuestEvent): void => {
@@ -224,17 +250,158 @@ export function QuestBattle(props: {
     if (e.type === "battle") {
       setMonsters(e.monsters.map((m) => ({ ...m })));
       setBattle(e.battle);
+      setLand(e.land);
+      setWeather(e.weather);
+      setJoined(new Set<number>());
       const boss = e.battle === BATTLE_COUNT - 1;
       setBanner(boss ? "👑 BOSS BATTLE!" : `⚔️ Battle ${e.battle + 1}`);
+      const kinds = [...new Set(e.monsters.map((m) => m.kind))];
+      const sky =
+        e.weather === "clear"
+          ? ""
+          : ` ${WEATHER_INFO[e.weather].emoji} ${WEATHER_INFO[e.weather].name}: ${WEATHER_INFO[e.weather].tip}.`;
+      const wk = props.setup.weekly;
+      const twistText =
+        wk === undefined
+          ? ""
+          : ` ${TWISTS[wk.twist].emoji} ${TWISTS[wk.twist].name}: ${TWISTS[wk.twist].tip}.`;
       setMessage(
-        boss
-          ? `${e.monsters[0]?.name ?? "The boss"} appears!`
-          : "Monsters appear!",
+        `${boss ? `${e.monsters[0]?.name ?? "The boss"} appears!` : "Monsters appear!"}${twistText}${sky} ${kinds
+          .map((k) => `💡 ${MONSTER_INFO[k].name}: ${MONSTER_INFO[k].trick}.`)
+          .join(" ")}`,
       );
       setTimeout(() => setBanner(null), 1500);
       setVictory(false);
       setEntering(true);
       setTimeout(() => setEntering(false), 750);
+      return;
+    }
+    if (e.type === "path") {
+      setLand(e.land);
+      setBanner(
+        e.topic === "land"
+          ? `${e.choice.emoji} ${e.choice.label}`
+          : `👑 ${e.choice.label}`,
+      );
+      setMessage(
+        e.topic === "land"
+          ? `The party heads into ${e.choice.label}!`
+          : `To the lair of ${e.choice.label}!`,
+      );
+      setTimeout(() => setBanner(null), 1600);
+      sfx.great();
+      return;
+    }
+    if (e.type === "spawn") {
+      const m = e.monster;
+      setMonsters((ms) => [...ms, { ...m }]);
+      setJoined((j) => new Set([...j, m.index]));
+      setMessage(
+        m.kind === "slime"
+          ? "💧 The slime splits in two!"
+          : `🤖 ${m.name} joins the fight!`,
+      );
+      sfx.pop();
+      return;
+    }
+    if (e.type === "status") {
+      const who = actorName(e.id);
+      const text: Record<typeof e.what, string> = {
+        poison: `🤢 ${who} ${who === "You" ? "feel" : "feels"} the poison.`,
+        asleep: `💤 ${who} ${who === "You" ? "are" : "is"} fast asleep…`,
+        frozen: `🧊 ${who} ${who === "You" ? "are" : "is"} frozen solid!`,
+        regrow: `🌿 ${who} regrows some leaves!`,
+        rebuild: `💀 ${who} rattles back together!`,
+        potionsBack: "🧪 You got your potions back!",
+      };
+      setMessage(text[e.what]);
+      if (e.what === "asleep") popup(e.id, "💤", "hit");
+      if (e.what === "frozen") popup(e.id, "🧊", "hit");
+      if (e.what === "poison") effect(e.id, "poison", false);
+      if (e.what === "regrow") effect(e.id, "heal", false);
+      if (e.what === "rebuild") effect(e.id, "spooky", false);
+      applyHits(e.hits);
+      return;
+    }
+    if (e.type === "journey") {
+      const intro: Record<typeof e.what, [string, string]> = {
+        chest: ["🧰 Treasure!", "You found a treasure chest on the path!"],
+        trap: ["⚠️ Trap!", "Watch out - a trap on the path!"],
+        fairy: ["✨ A fairy!", "A friendly fairy flies over…"],
+        shop: ["🧙 A shop!", "A traveling shop! Time to spend some gold."],
+      };
+      setBanner(intro[e.what][0]);
+      setMessage(intro[e.what][1]);
+      setTimeout(() => setBanner(null), 1600);
+      sfx.pop();
+      return;
+    }
+    if (e.type === "team") {
+      setBanner("🌟 TEAM ATTACK!");
+      setTimeout(() => setBanner(null), 1800);
+      setMessage(
+        e.ids.length > 0
+          ? `🌟 ${e.ids.map((id) => actorName(id)).join(", ")} typed together - TEAM ATTACK!`
+          : "🌟 The whole party attacks together!",
+      );
+      for (const h of party()) {
+        effect(`h${h.slot}`, "charge", false);
+      }
+      const id = ++popupId;
+      setFlash({ id, kind: "laser" });
+      setTimeout(() => setFlash((f) => (f?.id === id ? null : f)), 650);
+      setVictory(true);
+      setTimeout(() => setVictory(false), 1200);
+      for (const h of e.hits) {
+        effect(h.id, "thunder", true);
+        effect(h.id, "holy", true);
+      }
+      hitTimer = setTimeout(() => applyHits(e.hits), HIT_DELAY_MS);
+      sfx.boom();
+      return;
+    }
+    if (e.type === "outcome") {
+      const text: Record<typeof e.what, string> = {
+        chestOpen: "🧰 The chest pops open: +1 🧪 potion and +10 💰 gold!",
+        chestStuck: "🧰 The chest stayed stuck… maybe next time!",
+        trapDodged: "⚠️ Everyone jumped clear of the trap!",
+        trapHit: "⚠️ Ouch! The trap got some of the party.",
+        fairy:
+          "✨ The fairy blesses everyone: your next move is a ⭐ critical!",
+        potion: `${SHOP_ITEMS["potion"]?.emoji ?? ""} The party bought a potion!`,
+        feast: `${SHOP_ITEMS["feast"]?.emoji ?? ""} A picnic! Everyone feels much better.`,
+        charm: `${SHOP_ITEMS["charm"]?.emoji ?? ""} Power Charm! Everyone hits harder now.`,
+        save: "💰 The party saved its gold.",
+      };
+      setMessage(text[e.what]);
+      const sparkle =
+        e.what === "fairy" || e.what === "charm" || e.what === "chestOpen";
+      const ids = e.what === "charm" ? party().map((h) => `h${h.slot}`) : e.ids;
+      for (const id of ids) {
+        effect(id, sparkle ? "charge" : "rock", false);
+      }
+      if (e.hits.length > 0) applyHits(e.hits);
+      else if (sparkle) sfx.great();
+      return;
+    }
+    if (e.type === "levelup") {
+      setHeroMax(e.maxHp);
+      setHeroHp(e.hp);
+      setBanner("⭐ LEVEL UP!");
+      setTimeout(() => setBanner(null), 1800);
+      setMessage(
+        `⭐ Everyone is stronger! New super moves: ${party()
+          .map((h) => {
+            const u = e.picks[h.slot];
+            return u === undefined
+              ? ""
+              : `${heroName(h.slot)} ${ULTIMATES[u].emoji} ${ULTIMATES[u].name}`;
+          })
+          .filter((x) => x !== "")
+          .join(", ")}.`,
+      );
+      for (const h of party()) effect(`h${h.slot}`, "charge", false);
+      sfx.finish();
       return;
     }
     if (e.type === "rest") {
@@ -260,8 +427,12 @@ export function QuestBattle(props: {
         ? ` on ${actorName(e.hits[0].id)}`
         : "";
     setMessage(
-      `${actorName(e.actor)}: ${e.emoji} ${e.move}${targets}!${e.note !== undefined ? ` (${e.note})` : ""}`,
+      `${e.combo !== undefined ? `💥 COMBO ${e.combo}! ` : ""}${actorName(e.actor)}: ${e.emoji} ${e.move}${targets}!${e.note !== undefined ? ` (${e.note})` : ""}`,
     );
+    if (e.combo !== undefined) {
+      setBanner(`💥 COMBO! ${e.combo}`);
+      setTimeout(() => setBanner(null), 1000);
+    }
     const hero = e.actor.startsWith("h");
     const strikes = e.hits.some(
       (h) => h.heal !== true && h.id.startsWith(hero ? "m" : "h"),
@@ -274,9 +445,22 @@ export function QuestBattle(props: {
       kind: melee ? (hero ? "lunge-left" : "lunge-right") : "cast",
     });
     setTimeout(() => setMotion(null), 720);
+    // a monster's fading / flying / charging shows after its move
+    const flags = e.flags;
+    if (flags !== undefined) {
+      const i = Number(e.actor.slice(1));
+      setMonsters((ms) =>
+        ms.map((m) => (m.index === i ? { ...m, ...flags } : m)),
+      );
+    }
     // effects start now so they land with the hit
     const fxTargets =
-      e.shield !== undefined ? [e.shield] : e.hits.map((h) => h.id);
+      e.shields ??
+      (e.shield !== undefined
+        ? [e.shield]
+        : kind === "charge"
+          ? [e.actor]
+          : e.hits.map((h) => h.id));
     for (const t of fxTargets) effect(t, kind, hero);
     const tint = flashFor(kind);
     if (tint !== null && e.hits.length > 1) {
@@ -292,7 +476,9 @@ export function QuestBattle(props: {
     const events = props.state.events;
     const i = shown();
     if (events.length < i) {
-      untrack(resetPlayback);
+      // a move was taken back (e.g. lost a race online): don't restart
+      // the whole battle, just carry on from here
+      setShown(events.length);
       return;
     }
     if (i >= events.length || playTimer !== undefined) return;
@@ -321,16 +507,103 @@ export function QuestBattle(props: {
     if (p === null || p.kind !== "hero" || !caughtUp()) return null;
     return p.uid === props.myUid && submitted() !== p.n ? p : null;
   };
-  const myGuard = (): (PendingGuard & { word: string }) | null => {
+  /** words I have to type right now (guard / chest / trap) */
+  const myGuard = (): {
+    n: number;
+    word: string;
+    title: string;
+    challenge: boolean;
+    chest: boolean;
+  } | null => {
     const p = props.state.pending;
-    if (p === null || p.kind !== "guard" || !caughtUp()) return null;
+    if (p === null || !caughtUp()) return null;
+    if (p.kind !== "guard" && p.kind !== "challenge") return null;
     const word = p.words[props.myUid];
-    return word !== undefined && submitted() !== p.n ? { ...p, word } : null;
+    if (word === undefined || submitted() === p.n) return null;
+    const title =
+      p.kind === "challenge"
+        ? p.what === "team"
+          ? "🌟 Team Spirit is full! Everyone type together:"
+          : p.what === "chest"
+            ? "🧰 A treasure chest! Type to open it:"
+            : "⚠️ A trap! Type fast to jump clear:"
+        : `⚠️ ${monsters()[p.monster]?.name ?? "The monster"} ${p.big ? "attacks EVERYONE" : "attacks you"}! Guard:`;
+    return {
+      n: p.n,
+      word,
+      title,
+      challenge: p.kind === "challenge",
+      chest: p.kind === "challenge" && p.what !== "trap",
+    };
   };
+  const [chosen, setChosen] = createSignal<string>();
+  /** a vote (land / boss / shop) or my level-up pick */
+  const myVote = (): {
+    n: number;
+    title: string;
+    options: VoteOption[];
+    shared: boolean;
+  } | null => {
+    const p = props.state.pending;
+    if (p === null || !caughtUp()) return null;
+    if (p.kind !== "vote" && p.kind !== "pick") return null;
+    if (!p.voters.includes(props.myUid)) return null;
+    if (p.kind === "pick") {
+      return {
+        n: p.n,
+        title: "⭐ Level up! Pick your super move:",
+        options: p.options[props.myUid] ?? [],
+        shared: false,
+      };
+    }
+    if (p.kind !== "vote") return null;
+    return {
+      n: p.n,
+      title:
+        p.topic === "land"
+          ? "🗺️ Where should the party go?"
+          : p.topic === "boss"
+            ? "👑 Which boss will you face?"
+            : `🧙 The shop! What should the party buy? (💰 ${props.state.gold} gold)`,
+      options: p.options,
+      shared: true,
+    };
+  };
+  const voted = (): string | undefined => {
+    const p = myVote();
+    if (p === null) return undefined;
+    return submitted() === p.n ? chosen() : props.openVotes?.[props.myUid];
+  };
+  const castVote = (id: string): void => {
+    const p = myVote();
+    if (p === null || voted() !== undefined) return;
+    setChosen(id);
+    setSubmitted(p.n);
+    sfx.great();
+    props.onVote(id);
+  };
+  const voteCount = (id: string): number =>
+    Object.values(props.openVotes ?? {}).filter((v) => v === id).length +
+    (chosen() === id &&
+    submitted() === myVote()?.n &&
+    props.openVotes?.[props.myUid] === undefined
+      ? 1
+      : 0);
+
   /** someone else is choosing */
   const waitingOn = (): string | null => {
     const p = props.state.pending;
     if (p === null || !caughtUp() || props.state.over) return null;
+    if (p.kind === "vote" || p.kind === "pick") {
+      return voted() !== undefined || !p.voters.includes(props.myUid)
+        ? "friends to choose"
+        : null;
+    }
+    if (p.kind === "challenge") {
+      return p.words[props.myUid] === undefined || submitted() === p.n
+        ? "friends to type"
+        : null;
+    }
     if (p.kind === "hero") {
       return p.uid === props.myUid ? null : heroName(p.slot);
     }
@@ -405,8 +678,19 @@ export function QuestBattle(props: {
         emoji: "🧪",
         off: props.state.potions <= 0,
       },
+      ...(ult() === undefined
+        ? []
+        : [
+            {
+              action: "ultimate" as const,
+              label: `${ULTIMATES[ult() ?? "mighty"].name} (1x)`,
+              emoji: ULTIMATES[ult() ?? "mighty"].emoji,
+              off: me()?.ultimateUsed === true,
+            },
+          ]),
     ];
   };
+  const ult = (): QuestState["heroes"][number]["ultimate"] => me()?.ultimate;
 
   type TargetOption = { index: number; label: string; detail: string };
   const targetsFor = (a: HeroAction): TargetOption[] | null => {
@@ -418,7 +702,9 @@ export function QuestBattle(props: {
           ? info.skillTarget
           : a === "potion"
             ? "ally"
-            : "none";
+            : a === "ultimate" && ULTIMATES[ult() ?? "wall"].aim === "monster"
+              ? "monster"
+              : "none";
     if (aim === "monster") {
       return props.state.monsters
         .filter((m) => m.hp > 0)
@@ -504,7 +790,11 @@ export function QuestBattle(props: {
         setSubmitted(guard.n);
         clearInput();
         sfx.great();
-        popup(heroId(myGuardSlot()), "🛡️ Guard!", "heal");
+        popup(
+          heroId(myGuardSlot()),
+          guard.challenge ? "✨ Got it!" : "🛡️ Guard!",
+          "heal",
+        );
         props.onGuard(true);
         return;
       }
@@ -512,6 +802,14 @@ export function QuestBattle(props: {
       if (!ok && !wrong()) sfx.oops();
       setWrong(!ok);
       setTyped(raw);
+      return;
+    }
+    const vote = myVote();
+    if (vote !== null) {
+      const n = Number(value);
+      const o = vote.options[n - 1];
+      if (Number.isInteger(n) && o !== undefined) castVote(o.id);
+      clearInput();
       return;
     }
     if (myHero() === null) {
@@ -565,7 +863,7 @@ export function QuestBattle(props: {
   createEffect(
     on(secondsLeft, (s, prev) => {
       if (
-        (myHero() !== null || myGuard() !== null) &&
+        (myHero() !== null || myGuard() !== null || myVote() !== null) &&
         s !== null &&
         s <= 3 &&
         s !== prev &&
@@ -624,35 +922,78 @@ export function QuestBattle(props: {
       {/* battlefield */}
       <div
         class={cn(
-          "relative grid min-h-60 flex-1 grid-cols-2 bg-linear-to-b from-game-night via-game-navy to-game-grass-dark",
+          "relative grid min-h-60 flex-1 grid-cols-2 bg-linear-to-b transition-colors duration-700",
+          land() === "mountain"
+            ? "from-game-night via-game-blue/60 to-game-mint"
+            : land() === "castle"
+              ? "from-game-ink via-game-purple/60 to-game-grey"
+              : "from-game-night via-game-navy to-game-grass-dark",
           quake() && "animate-quest-quake motion-reduce:animate-none",
         )}
       >
+        <Show when={weather() !== "clear"}>
+          <WeatherLayer weather={weather()} />
+        </Show>
+        <Show when={land()}>
+          {(l) => (
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 flex justify-around text-5xl opacity-20 select-none">
+              <For each={[0, 1, 2, 3, 4]}>
+                {(n) => (
+                  <span class={n % 2 === 1 ? "text-4xl" : ""}>
+                    {LANDS[l()].emoji}
+                  </span>
+                )}
+              </For>
+            </div>
+          )}
+        </Show>
         <div class="flex flex-col items-center justify-center gap-3 p-3">
           <Index each={monsters()}>
             {(m, i) => (
               <div
                 class={cn(
                   "relative flex flex-col items-center",
-                  entering() && "animate-quest-enter",
+                  (entering() || joined().has(m().index)) &&
+                    "animate-quest-enter",
                   motionClass(`m${m().index}`),
                   m().hp <= 0 && "animate-quest-die",
                 )}
                 style={{ "animation-delay": entering() ? `${i * 0.12}s` : "" }}
               >
+                <Show
+                  when={m().hp > 0 && (m().faded || m().flying || m().charging)}
+                >
+                  <span class="absolute -top-3 z-10 rounded-full bg-game-ink/80 px-2 text-xs font-bold whitespace-nowrap text-game-cream">
+                    {m().charging
+                      ? "⚡ charging - Defend!"
+                      : m().flying
+                        ? "🪽 flying - use spells!"
+                        : "👻 faded - use spells!"}
+                  </span>
+                </Show>
                 <span
-                  class="block animate-quest-idle motion-reduce:animate-none"
+                  class={cn(
+                    "block animate-quest-idle transition-[translate] duration-500 motion-reduce:animate-none",
+                    m().flying && "-translate-y-12",
+                  )}
                   style={{ "animation-delay": `${i * 0.35}s` }}
                 >
                   <img
                     src={MONSTER_ART[m().kind]}
                     alt={m().name}
                     class={cn(
-                      "h-auto object-contain [image-rendering:pixelated]",
-                      m().boss ? "w-44 sm:w-56" : "w-20 sm:w-24",
+                      "h-auto object-contain transition-opacity duration-500 [image-rendering:pixelated]",
+                      m().boss
+                        ? "w-44 sm:w-56"
+                        : m().mini === true
+                          ? "w-12 sm:w-14"
+                          : "w-20 sm:w-24",
+                      m().faded && "opacity-30",
                       hurt().has(`m${m().index}`)
                         ? "animate-quest-hit"
-                        : m().boss &&
+                        : m().charging
+                          ? "drop-shadow-[0_0_14px_var(--color-game-yellow)]"
+                          : m().boss &&
                             props.state.angry &&
                             shown() > 0 &&
                             "animate-quest-aura",
@@ -734,6 +1075,67 @@ export function QuestBattle(props: {
             ></div>
           )}
         </Show>
+        <Show when={myVote()}>
+          {(v) => (
+            <div class="absolute inset-0 z-10 grid content-center gap-3 bg-game-ink/70 p-3">
+              <div class="text-center text-2xl font-bold text-game-yellow">
+                {v().title}
+              </div>
+              <div
+                class={cn(
+                  "grid gap-2",
+                  v().options.length === 3
+                    ? "sm:grid-cols-3"
+                    : v().options.length === 4
+                      ? "grid-cols-2 sm:grid-cols-4"
+                      : "grid-cols-2",
+                )}
+              >
+                <For each={v().options}>
+                  {(o, i) => (
+                    <button
+                      type="button"
+                      disabled={voted() !== undefined}
+                      class={cn(
+                        "press-3d grid cursor-pointer justify-items-center gap-1 rounded-xl border-4 bg-game-navy p-2 text-center text-game-cream disabled:cursor-default",
+                        voted() === o.id
+                          ? "border-game-yellow"
+                          : "border-game-cream/40 hover:border-game-cream",
+                      )}
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => castVote(o.id)}
+                    >
+                      <Show
+                        when={o.monster}
+                        fallback={<span class="text-4xl">{o.emoji}</span>}
+                      >
+                        {(k) => (
+                          <img
+                            src={MONSTER_ART[k()]}
+                            alt=""
+                            class="h-16 w-auto [image-rendering:pixelated]"
+                          />
+                        )}
+                      </Show>
+                      <span class="text-lg leading-tight font-bold">
+                        <span class="text-sm text-game-grey">{i() + 1} </span>
+                        {o.label}
+                      </span>
+                      <span class="text-xs leading-tight text-game-grey">
+                        {o.detail}
+                      </span>
+                      <Show when={v().shared && voteCount(o.id) > 0}>
+                        <span class="text-sm text-game-yellow">
+                          {"🗳️".repeat(voteCount(o.id))}
+                        </span>
+                      </Show>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+          )}
+        </Show>
         <Show when={banner()}>
           {(b) => (
             <div class="pointer-events-none absolute inset-0 grid place-items-center">
@@ -758,7 +1160,9 @@ export function QuestBattle(props: {
           <Show
             when={
               props.deadline !== null &&
-              (myHero() !== null || myGuard() !== null)
+              (myHero() !== null ||
+                myGuard() !== null ||
+                (myVote() !== null && voted() === undefined))
             }
           >
             <div class="absolute inset-x-0 top-0 h-1.5 overflow-hidden rounded-t-md bg-game-ink">
@@ -768,7 +1172,7 @@ export function QuestBattle(props: {
                   (secondsLeft() ?? 99) <= 3 ? "bg-game-red" : "bg-game-yellow",
                 )}
                 style={{
-                  width: `${timerShare(myGuard() !== null ? GUARD_MS : HERO_TURN_MS) * 100}%`,
+                  width: `${timerShare(myGuard()?.challenge === true ? CHALLENGE_MS : myGuard() !== null ? GUARD_MS : myVote() !== null ? VOTE_MS : HERO_TURN_MS) * 100}%`,
                 }}
               ></div>
             </div>
@@ -781,7 +1185,20 @@ export function QuestBattle(props: {
                 when={myHero()}
                 fallback={
                   <div class="grid gap-1">
-                    <div class="text-lg leading-snug">{message()}</div>
+                    <Show
+                      when={myVote() !== null && voted() === undefined}
+                      fallback={
+                        <div class="text-lg leading-snug">{message()}</div>
+                      }
+                    >
+                      <div class="text-lg leading-snug font-bold text-game-yellow">
+                        👆 Tap a card or press{" "}
+                        {myVote()
+                          ?.options.map((_, i) => i + 1)
+                          .join(", ")}
+                        .
+                      </div>
+                    </Show>
                     <Show when={waitingOn()}>
                       {(who) => (
                         <div class="text-sm text-game-grey">
@@ -795,7 +1212,7 @@ export function QuestBattle(props: {
                 <Show when={step() === "menu"}>
                   <div class="mb-2 text-sm text-game-grey">
                     Your turn, {CLASS_INFO[myClass()].name}! Pick a move (or
-                    press 1-4):
+                    press 1-{menu().length}):
                   </div>
                   <div class="grid grid-cols-2 gap-2">
                     <For each={menu()}>
@@ -871,9 +1288,13 @@ export function QuestBattle(props: {
           >
             {(g) => (
               <div class="grid gap-1">
-                <div class="text-lg font-bold text-game-red">
-                  ⚠️ {monsters()[g().monster]?.name ?? "The monster"}{" "}
-                  {g().big ? "attacks EVERYONE" : "attacks you"}! Guard:
+                <div
+                  class={cn(
+                    "text-lg font-bold",
+                    g().chest ? "text-game-yellow" : "text-game-red",
+                  )}
+                >
+                  {g().title}
                 </div>
                 <TypedWord word={g().word} typed={typed()} />
               </div>
@@ -886,7 +1307,8 @@ export function QuestBattle(props: {
           <For each={party()}>
             {(h) => {
               const hp = (): number => heroHp()[h.slot] ?? 0;
-              const max = CLASS_INFO[h.cls].maxHp;
+              const max = (): number =>
+                heroMax()[h.slot] ?? CLASS_INFO[h.cls].maxHp;
               const live = (): QuestState["heroes"][number] | undefined =>
                 caughtUp() ? props.state.heroes[h.slot] : undefined;
               return (
@@ -909,33 +1331,79 @@ export function QuestBattle(props: {
                       {heroName(h.slot)}
                       {live()?.away === true ? " (helper)" : ""}
                     </span>
+                    <Show when={live()?.blessed === true}>
+                      <span title="Fairy blessing: next move is a critical">
+                        ✨
+                      </span>
+                    </Show>
+                    <Show
+                      when={
+                        live()?.ultimate !== undefined &&
+                        live()?.ultimateUsed !== true
+                      }
+                    >
+                      <span title="Super move ready">
+                        {ULTIMATES[live()?.ultimate ?? "wall"].emoji}
+                      </span>
+                    </Show>
                     <Show when={live()?.defending === true}>
                       <span title="Defending">🛡️</span>
+                    </Show>
+                    <Show when={(live()?.poison ?? 0) > 0}>
+                      <span title="Poisoned">🤢</span>
+                    </Show>
+                    <Show when={(live()?.sleep ?? 0) > 0}>
+                      <span title="Can't move">
+                        {live()?.sleepWhy === "frozen" ? "🧊" : "💤"}
+                      </span>
                     </Show>
                     <Show when={live()?.protectedBy !== undefined}>
                       <span title="Protected">💠</span>
                     </Show>
                     <span class="tabular-nums">
-                      {hp() <= 0 ? "💤" : `${hp()}/${max}`}
+                      {hp() <= 0 ? "💤" : `${hp()}/${max()}`}
                     </span>
                   </div>
                   <div class="h-1.5 overflow-hidden rounded-full bg-game-ink">
                     <div
                       class={cn(
                         "h-full rounded-full transition-[width] duration-300",
-                        hp() / max > 0.5
+                        hp() / max() > 0.5
                           ? "bg-game-green"
-                          : hp() / max > 0.25
+                          : hp() / max() > 0.25
                             ? "bg-game-yellow"
                             : "bg-game-red",
                       )}
-                      style={{ width: `${(hp() / max) * 100}%` }}
+                      style={{ width: `${(hp() / max()) * 100}%` }}
                     ></div>
                   </div>
                 </div>
               );
             }}
           </For>
+          <div class="grid gap-0.5 border-t border-game-ink pt-1">
+            <div class="flex items-center justify-between text-xs font-bold text-game-yellow">
+              <span>🌟 Team Spirit</span>
+              <span>
+                {Math.min(props.state.spirit, SPIRIT_MAX)}/{SPIRIT_MAX}
+              </span>
+            </div>
+            <div class="h-2 overflow-hidden rounded-full bg-game-ink">
+              <div
+                class={cn(
+                  "h-full rounded-full bg-linear-to-r from-game-orange to-game-yellow transition-[width] duration-500",
+                  props.state.spirit >= SPIRIT_MAX - 2 && "animate-game-pulse",
+                )}
+                style={{
+                  width: `${Math.min(1, props.state.spirit / SPIRIT_MAX) * 100}%`,
+                }}
+              ></div>
+            </div>
+          </div>
+          <div class="flex justify-between text-sm text-game-grey">
+            <span>🧪 {props.state.potions} potions</span>
+            <span>💰 {props.state.gold} gold</span>
+          </div>
         </div>
       </div>
 
@@ -945,15 +1413,23 @@ export function QuestBattle(props: {
           value={typed()}
           onInput={onInput}
           wrong={wrong()}
-          waiting={myHero() === null && myGuard() === null}
+          waiting={
+            myHero() === null &&
+            myGuard() === null &&
+            (myVote() === null || voted() !== undefined)
+          }
           placeholder={
-            myGuard() !== null
-              ? "type the guard word!"
-              : step() === "type"
-                ? "type the word"
-                : myHero() !== null
-                  ? "press a number"
-                  : "wait for your turn"
+            myGuard()?.challenge === true
+              ? "type it fast!"
+              : myGuard() !== null
+                ? "type the guard word!"
+                : myVote() !== null && voted() === undefined
+                  ? "press a number to vote"
+                  : step() === "type"
+                    ? "type the word"
+                    : myHero() !== null
+                      ? "press a number"
+                      : "wait for your turn"
           }
           ref={(el) => (inputEl = el)}
         />
@@ -1031,5 +1507,42 @@ function FxLayer(props: { effects: Fx[]; target: string }): JSXElement {
         </For>
       )}
     </For>
+  );
+}
+
+function WeatherLayer(props: { weather: Weather }): JSXElement {
+  const drops = Array.from({ length: 24 }, (_, i) => i);
+  return (
+    <div class="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden">
+      <Show when={props.weather === "rain"}>
+        <For each={drops}>
+          {(i) => (
+            <span
+              class="absolute -top-8 h-6 w-0.5 rotate-12 animate-quest-rain bg-game-sky/60"
+              style={{
+                left: `${(i * 37) % 100}%`,
+                "animation-delay": `${((i * 13) % 10) / 10}s`,
+              }}
+            ></span>
+          )}
+        </For>
+      </Show>
+      <Show when={props.weather === "sun"}>
+        <span class="absolute -top-16 -right-16 h-48 w-48 animate-game-pulse rounded-full bg-radial from-game-yellow/50 to-transparent"></span>
+      </Show>
+      <Show when={props.weather === "wind"}>
+        <For each={drops.slice(0, 10)}>
+          {(i) => (
+            <span
+              class="absolute -left-24 h-0.5 w-20 animate-quest-wind rounded-full bg-game-cream/40"
+              style={{
+                top: `${((i * 29) % 90) + 5}%`,
+                "animation-delay": `${((i * 17) % 12) / 10}s`,
+              }}
+            ></span>
+          )}
+        </For>
+      </Show>
+    </div>
   );
 }

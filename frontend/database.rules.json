@@ -308,7 +308,7 @@
         "inputs": {
           "$n": {
             ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('questRooms').child($code).child('status').val() == 'playing' && root.child('questRooms').child($code).child('players').child(auth.uid).exists() && !data.child('closed').exists()",
-            ".validate": "newData.child('kind').val() == 'hero' || newData.child('kind').val() == 'guard'"
+            ".validate": "newData.child('kind').val() == 'hero' || newData.child('kind').val() == 'guard' || newData.child('kind').val() == 'vote'"
           }
         },
         "status": {

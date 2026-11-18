@@ -15,9 +15,17 @@ export type FxKind =
   | "water"
   | "claw"
   | "spore"
-  | "rock";
+  | "rock"
+  | "ice"
+  | "poison"
+  | "spooky"
+  | "laser"
+  | "vine"
+  | "charge"
+  | "thunder"
+  | "holy";
 
-export type FlashKind = "fire" | "rock" | "water" | "spore";
+export type FlashKind = "fire" | "rock" | "water" | "spore" | "ice" | "laser";
 
 export type Particle = { class: string; style: JSX.CSSProperties };
 
@@ -30,9 +38,48 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Fire Storm":
     case "Fire Breath":
     case "Inferno":
+    case "Sky Dive":
       return "fire";
+    case "Snowball":
+    case "Snowstorm":
+    case "Ice Shard":
+    case "Blizzard":
+    case "Freeze":
+    case "Howl":
+      return "ice";
+    case "Poison Bite":
+      return "poison";
+    case "Spooky Touch":
+      return "spooky";
+    case "Laser Beam":
+    case "Mega Laser":
+    case "Zap":
+      return "laser";
+    case "Vine Whip":
+      return "vine";
+    case "Charge Up":
+    case "Fly Up":
+      return "charge";
+    case "Root Quake":
+    case "Mega Smash":
+    case "Bone Toss":
+      return "rock";
     case "Power Strike":
+    case "Whirlwind":
+    case "Mighty Blow":
       return "bigslash";
+    case "Ice Storm":
+      return "ice";
+    case "Thunder":
+      return "thunder";
+    case "Holy Light":
+      return "holy";
+    case "Group Heal":
+      return "heal";
+    case "Shield Wall":
+      return "shield";
+    case "Earth Slam":
+      return "rock";
     case "Heal":
     case "Wake Up":
     case "Potion":
@@ -45,6 +92,8 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
       return "water";
     case "Wing Flap":
     case "Screech":
+    case "Double Bite":
+    case "Sneaky Swipe":
       return "claw";
     case "Spore Puff":
     case "Spore Cloud":
@@ -59,9 +108,19 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
 
 /** Big moves that hit everyone also tint the whole battlefield. */
 export function flashFor(kind: FxKind): FlashKind | null {
-  if (kind === "fire" || kind === "rock" || kind === "water") return kind;
-  if (kind === "spore") return "spore";
-  return null;
+  switch (kind) {
+    case "fire":
+    case "rock":
+    case "water":
+    case "spore":
+    case "ice":
+    case "laser":
+      return kind;
+    case "thunder":
+      return "laser";
+    default:
+      return null;
+  }
 }
 
 export const FLASH_CLASS: Record<FlashKind, string> = {
@@ -69,6 +128,8 @@ export const FLASH_CLASS: Record<FlashKind, string> = {
   rock: "bg-game-brown",
   water: "bg-game-blue",
   spore: "bg-game-purple",
+  ice: "bg-game-sky",
+  laser: "bg-game-red",
 };
 
 const delay = (s: number): string => `${s.toFixed(2)}s`;
@@ -223,6 +284,85 @@ export function fxParticles(kind: FxKind, fromRight: boolean): Particle[] {
           "h-2 w-2 rounded-full bg-game-green",
           "h-2 w-2 rounded-full bg-game-purple",
         ]),
+      ];
+    case "ice":
+      return [
+        ...falling(
+          4,
+          "h-6 w-2.5 rotate-45 bg-linear-to-b from-game-cream to-game-sky shadow-[0_0_8px_var(--color-game-sky)]",
+          fromRight,
+        ),
+        ring("h-16 w-16 rounded-full border-4 border-game-sky", 0.36),
+        ...spray(10, "h-2 w-2 rotate-45 bg-game-cream", 0.38, 55),
+      ];
+    case "poison":
+      return [
+        ...slashes(2, CLAW, [-40, -20], 10),
+        ring(
+          "h-16 w-16 rounded-full bg-radial from-game-green/70 to-transparent",
+          0.34,
+        ),
+        ...rising(8, [
+          "h-3 w-3 rounded-full border-2 border-game-green bg-game-green/40",
+          "h-2 w-2 rounded-full bg-game-purple",
+        ]),
+      ];
+    case "spooky":
+      return [
+        ...spray(6, "h-8 w-8 rounded-full bg-game-purple/50 blur-sm", 0.15, 30),
+        ring("h-16 w-16 rounded-full border-4 border-game-purple", 0.34),
+        ...rising(6, ["h-2 w-2 rounded-full bg-game-cream"]),
+      ];
+    case "laser":
+      return [
+        ...slashes(
+          1,
+          "h-2.5 w-56 rounded-full bg-linear-to-r from-transparent via-game-red to-game-yellow shadow-[0_0_16px_var(--color-game-red)]",
+          [0],
+        ),
+        ring("h-14 w-14 rounded-full border-4 border-game-yellow", 0.34),
+        ...spray(8, "h-2 w-2 rounded-full bg-game-yellow", 0.36, 50),
+      ];
+    case "vine":
+      return [
+        ...slashes(
+          3,
+          "h-2 w-28 rounded-full bg-linear-to-r from-transparent via-game-green to-transparent shadow-[0_0_8px_var(--color-game-green)]",
+          [-30, 10, -60],
+        ),
+        ...spray(6, "h-2.5 w-1.5 rounded-full bg-game-green", 0.38, 45),
+      ];
+    case "thunder":
+      return [
+        ...falling(
+          3,
+          "h-10 w-2 bg-linear-to-b from-game-cream to-game-yellow shadow-[0_0_16px_var(--color-game-yellow)]",
+          fromRight,
+        ),
+        ring("h-20 w-20 rounded-full border-4 border-game-yellow", 0.34),
+        ring(
+          "h-14 w-14 rounded-full bg-radial from-game-cream to-transparent",
+          0.34,
+        ),
+        ...spray(10, "h-2 w-2 rotate-45 bg-game-yellow", 0.36, 65),
+      ];
+    case "holy":
+      return [
+        ring(
+          "h-24 w-24 rounded-full bg-radial from-game-gold/70 to-transparent",
+          0.2,
+        ),
+        ring("h-16 w-16 rounded-full border-4 border-game-gold", 0.34),
+        ...rising(10, [
+          "h-2.5 w-2.5 rotate-45 bg-game-gold",
+          "h-2 w-2 rounded-full bg-game-cream",
+        ]),
+      ];
+    case "charge":
+      return [
+        ring("h-20 w-20 rounded-full border-4 border-game-yellow", 0),
+        ring("h-20 w-20 rounded-full border-4 border-game-yellow", 0.25),
+        ...rising(8, ["h-2 w-2 rotate-45 bg-game-yellow"], 45),
       ];
     case "rock":
       return [

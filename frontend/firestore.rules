@@ -208,6 +208,13 @@ service cloud.firestore {
     }
 
     // --- weekly xp leaderboards ---
+    // Weekly Monster Quest class times, written only by
+    // api/save-game-result.ts (Admin SDK).
+    match /weeklyQuest/{week} {
+      allow read: if isDomainUser();
+      allow write: if false;
+    }
+
     match /weeklyXpLeaderboards/{week} {
       allow read: if isDomainUser();
       match /entries/{uid} {

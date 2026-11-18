@@ -11,6 +11,7 @@ import {
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
+import { queryClient } from "../../queries";
 import { showErrorNotification } from "../../states/notifications";
 import { getSnapshot } from "../../states/snapshot";
 import { cn } from "../../utils/cn";
@@ -37,6 +38,7 @@ import {
   finishQuestRoom,
   joinQuestRoom,
   leaveQuestRoom,
+  openVotes,
   QuestRoom,
   questNow,
   roomInputs,
@@ -47,6 +49,7 @@ import {
   syncQuestClock,
   writeGuard,
   writeHeroInput,
+  writeVote,
 } from "./quest-multiplayer";
 import {
   buildParty,
@@ -67,8 +70,16 @@ import {
   runQuest,
   START_PAUSE_MS,
   TIMEOUT_POWER,
+  WEEKLY_DIFFICULTY,
+  weeklyPlan,
 } from "./quest-rules";
 import { QuestBattle } from "./QuestBattle";
+import {
+  formatQuestTime,
+  questWeek,
+  submitWeeklyTime,
+} from "./weekly-quest-db";
+import { WeeklyQuestCard } from "./WeeklyQuestCard";
 
 /** Kept as the old Monster Raid id so teacher game settings and coins carry over. */
 const GAME_ID = "monster-raid";
@@ -102,6 +113,8 @@ export function MonsterQuestModal(props: {
   const [now, setNow] = createSignal(Date.now());
   const [result, setResult] = createSignal<GameResultView | null>(null);
   const [claim, setClaim] = createSignal<MiniGameClaim | "pending">("pending");
+  const [weekly, setWeekly] = createSignal(false);
+  const [weeklyNote, setWeeklyNote] = createSignal<string>();
 
   // solo
   const [solo, setSolo] = createSignal<{
@@ -134,6 +147,15 @@ export function MonsterQuestModal(props: {
     if (mode() === "solo") return solo()?.setup ?? null;
     const r = room();
     if (r === null || r.party === undefined) return null;
+    if (r.weekly !== undefined) {
+      const plan = weeklyPlan(r.weekly);
+      return {
+        seed: plan.seed,
+        difficulty: questDifficultyFor(WEEKLY_DIFFICULTY),
+        party: roomParty(r),
+        weekly: plan,
+      };
+    }
     return {
       seed: r.seed,
       difficulty: questDifficultyFor(r.difficultyLabel),
@@ -186,7 +208,7 @@ export function MonsterQuestModal(props: {
 
   const onGuard = (): void => {
     const p = state()?.pending;
-    if (p?.kind !== "guard") return;
+    if (p?.kind !== "guard" && p?.kind !== "challenge") return;
     if (mode() === "solo") {
       pushSolo({ kind: "guard", guards: { [ME]: true } });
       return;
@@ -195,6 +217,26 @@ export function MonsterQuestModal(props: {
     if (code !== undefined) {
       void writeGuard(code, p.n, Object.keys(p.words)).catch(() => undefined);
     }
+  };
+
+  const onVote = (choice: string): void => {
+    const p = state()?.pending;
+    if (p?.kind !== "vote" && p?.kind !== "pick") return;
+    if (mode() === "solo") {
+      pushSolo({ kind: "vote", votes: { [ME]: choice } });
+      return;
+    }
+    const code = roomCode();
+    if (code !== undefined) {
+      void writeVote(code, p.n, choice, p.voters).catch(() => undefined);
+    }
+  };
+  const liveVotes = (): Record<string, string> | undefined => {
+    const r = room();
+    const p = state()?.pending;
+    return r === null || (p?.kind !== "vote" && p?.kind !== "pick")
+      ? undefined
+      : openVotes(r, p.n);
   };
 
   // turn timer ran out: answer for the slow player
@@ -214,7 +256,9 @@ export function MonsterQuestModal(props: {
                 power: TIMEOUT_POWER,
                 timeout: true,
               }
-            : { kind: "guard", guards: {} },
+            : p.kind === "vote" || p.kind === "pick"
+              ? { kind: "vote", votes: {} }
+              : { kind: "guard", guards: {} },
         ),
       );
       return;
@@ -224,7 +268,9 @@ export function MonsterQuestModal(props: {
     closeTried = p.n;
     const code = roomCode();
     if (code !== undefined) {
-      void closeTimedOut(code, p.n, p.kind).catch(() => {
+      const closeAs =
+        p.kind === "pick" ? "vote" : p.kind === "challenge" ? "guard" : p.kind;
+      void closeTimedOut(code, p.n, closeAs).catch(() => {
         closeTried = -1;
       });
     }
@@ -257,6 +303,24 @@ export function MonsterQuestModal(props: {
     }
     const awards =
       mode() === "together" ? questAwards(st.heroes, st.stats) : [];
+    const plan = untrack(setup)?.weekly;
+    const clearMs = clock() - startAt();
+    setWeeklyNote(undefined);
+    if (plan !== undefined && st.won && getAuthenticatedUser() !== null) {
+      setWeeklyNote("Sending your class time…");
+      void submitWeeklyTime(plan.week, clearMs)
+        .then((best) => {
+          setWeeklyNote(
+            best
+              ? "🏆 New best time for your class this week!"
+              : "⏱️ Time saved - your class already has a faster one.",
+          );
+          void queryClient.invalidateQueries({
+            queryKey: ["weeklyQuest", plan.week],
+          });
+        })
+        .catch(() => setWeeklyNote("Couldn't send your time."));
+    }
     setResult({
       headline: st.won
         ? "Quest complete! 🎉"
@@ -270,6 +334,9 @@ export function MonsterQuestModal(props: {
         { label: "healing", value: String(stats.healed) },
         { label: "guards", value: `🛡️ ${stats.guards}` },
         { label: "critical hits", value: `⭐ ${stats.crits}` },
+        ...(plan !== undefined && st.won
+          ? [{ label: "🗓️ weekly time", value: formatQuestTime(clearMs) }]
+          : []),
         ...awards.map((a) => ({
           label: `${a.icon} ${a.title}`,
           value: `${a.names.join(" & ")} (${a.value})`,
@@ -284,14 +351,24 @@ export function MonsterQuestModal(props: {
   // ---------------------------------------------------------- solo
   const startSolo = (): void => {
     setResult(null);
+    const party = buildParty([
+      { uid: ME, name: getSnapshot()?.name ?? "You", cls: cls() },
+    ]);
+    const plan = weekly() ? weeklyPlan(questWeek()) : undefined;
     setSolo({
-      setup: {
-        seed: Math.floor(Math.random() * 2 ** 31),
-        difficulty: difficulty(),
-        party: buildParty([
-          { uid: ME, name: getSnapshot()?.name ?? "You", cls: cls() },
-        ]),
-      },
+      setup:
+        plan === undefined
+          ? {
+              seed: Math.floor(Math.random() * 2 ** 31),
+              difficulty: difficulty(),
+              party,
+            }
+          : {
+              seed: plan.seed,
+              difficulty: questDifficultyFor(WEEKLY_DIFFICULTY),
+              party,
+              weekly: plan,
+            },
       startAt: Date.now() + START_PAUSE_MS,
       inputs: [],
       times: [],
@@ -344,8 +421,9 @@ export function MonsterQuestModal(props: {
     try {
       watchRoom(
         await createQuestRoom({
-          difficultyLabel: difficulty().label,
+          difficultyLabel: weekly() ? WEEKLY_DIFFICULTY : difficulty().label,
           cls: cls(),
+          ...(weekly() ? { weekly: questWeek() } : {}),
         }),
       );
     } catch (e) {
@@ -461,6 +539,19 @@ export function MonsterQuestModal(props: {
                   🛡️ When a monster attacks you, type the guard word quickly to
                   take less damage.
                 </li>
+                <li>🗺️ Vote for a land, then pick which boss to face.</li>
+                <li>
+                  🧰 Between fights: treasure, traps, fairies and a shop - and a
+                  ⭐ level up with a new super move before the boss!
+                </li>
+                <li>
+                  💡 Every monster has a trick - read the tip when it appears!
+                </li>
+                <li>
+                  💥 Use special moves one after another for a COMBO. Good
+                  typing fills 🌟 Team Spirit - then everyone types together for
+                  a TEAM ATTACK!
+                </li>
                 <li>👑 Win 2 battles, then beat the boss!</li>
               </ul>
             </GameSetupSection>
@@ -477,13 +568,22 @@ export function MonsterQuestModal(props: {
                 togetherLabel={`friends (up to ${PARTY_SIZE})`}
               />
             </GameSetupSection>
-            <GameSetupSection title="Words">
-              <DifficultySegmented
-                options={QUEST_DIFFICULTIES}
-                selectedLabel={difficulty().label}
-                onSelect={(d) => setDifficulty(() => d)}
+            <GameSetupSection title="Which quest?">
+              <WeeklyQuestCard
+                week={questWeek()}
+                selected={weekly()}
+                onSelect={setWeekly}
               />
             </GameSetupSection>
+            <Show when={!weekly()}>
+              <GameSetupSection title="Words">
+                <DifficultySegmented
+                  options={QUEST_DIFFICULTIES}
+                  selectedLabel={difficulty().label}
+                  onSelect={(d) => setDifficulty(() => d)}
+                />
+              </GameSetupSection>
+            </Show>
           </GamePickLayout>
         </Show>
 
@@ -536,6 +636,7 @@ export function MonsterQuestModal(props: {
                   {roomCode()}
                 </div>
                 <div class="mt-2 text-sm text-sub">
+                  {room()?.weekly !== undefined ? "🗓️ Weekly quest · " : ""}
                   {questDifficultyFor(room()?.difficultyLabel ?? "").label}{" "}
                   words · {lobbyPlayers().length}/{PARTY_SIZE} heroes · helpers
                   fill empty spots
@@ -609,6 +710,8 @@ export function MonsterQuestModal(props: {
                     deadline={deadline()}
                     onHero={onHero}
                     onGuard={onGuard}
+                    onVote={onVote}
+                    openVotes={liveVotes()}
                     onFinished={finish}
                   />
                 )}
@@ -619,7 +722,9 @@ export function MonsterQuestModal(props: {
             {(r) => (
               <GameResultOverlay
                 result={r()}
-                note={claimNote(claim())}
+                note={[weeklyNote(), claimNote(claim())]
+                  .filter((n) => n !== undefined)
+                  .join(" ")}
                 onPlayAgain={mode() === "solo" ? startSolo : undefined}
                 onExit={() => props.onClose()}
               />

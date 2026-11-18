@@ -1,3 +1,4 @@
+import { DRAWN_MONSTER_ART } from "./monster-art";
 import { MonsterKind } from "./quest-rules";
 
 const images = import.meta.glob<string>("./art/*.png", {
@@ -11,4 +12,5 @@ export const MONSTER_ART: Record<MonsterKind, string> = {
   mushroom: images["./art/raid-mushroom.png"] ?? "",
   golem: images["./art/raid-golem.png"] ?? "",
   dragon: images["./art/raid-dragon.png"] ?? "",
+  ...DRAWN_MONSTER_ART,
 };

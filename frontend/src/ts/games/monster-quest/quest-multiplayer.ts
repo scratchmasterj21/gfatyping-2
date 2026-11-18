@@ -51,6 +51,8 @@ export type QuestRoom = {
   createdAt: number;
   difficultyLabel: string;
   seed: number;
+  /** weekly quest week id */
+  weekly?: number;
   startAt?: number;
   party?: HeroSetup[];
   players: Record<string, QuestPlayer>;
@@ -111,6 +113,7 @@ export const questNow = (): number => Date.now() + serverOffset;
 export async function createQuestRoom(input: {
   difficultyLabel: string;
   cls: HeroClass;
+  weekly?: number;
 }): Promise<string> {
   const user = currentUser();
   for (let attempt = 0; attempt < 10; attempt++) {
@@ -124,6 +127,7 @@ export async function createQuestRoom(input: {
         createdAt: Date.now(),
         difficultyLabel: input.difficultyLabel,
         seed: Math.floor(Math.random() * 2 ** 31),
+        ...(input.weekly === undefined ? {} : { weekly: input.weekly }),
         players: {
           [user.uid]: {
             uid: user.uid,
@@ -235,6 +239,8 @@ export async function writeHeroInput(
       if (cur?.closed === true) return;
       return { ...input, closed: true, at: questNow() };
     },
+    // only show a move once the database has accepted it
+    { applyLocally: false },
   );
 }
 
@@ -261,19 +267,70 @@ export async function writeGuard(
         ...(all ? { closed: true, at: questNow() } : {}),
       };
     },
+    // only show a move once the database has accepted it
+    { applyLocally: false },
   );
+}
+
+/** My vote. Closes the slot once every voter is in. */
+export async function writeVote(
+  code: string,
+  n: number,
+  choice: string,
+  voters: string[],
+): Promise<void> {
+  const user = getAuthenticatedUser();
+  if (user === null) return;
+  await runTransaction(
+    path(code, `/inputs/${n}`),
+    (cur: StoredInput | null) => {
+      if (cur?.closed === true) return;
+      const votes = {
+        ...(cur?.kind === "vote" ? (cur.votes ?? {}) : {}),
+        [user.uid]: choice,
+      };
+      const all = voters.every((u) => votes[u] !== undefined);
+      return {
+        kind: "vote",
+        votes,
+        ...(all ? { closed: true, at: questNow() } : {}),
+      };
+    },
+    // only show a move once the database has accepted it
+    { applyLocally: false },
+  );
+}
+
+/** Votes on the slot that's still open (to show who picked what). */
+export function openVotes(
+  room: QuestRoom,
+  n: number,
+): Record<string, string> | undefined {
+  const raw = (room.inputs ?? {}) as Record<string, StoredInput | undefined>;
+  const entry = raw[String(n)];
+  return entry?.kind === "vote" && entry.closed !== true
+    ? entry.votes
+    : undefined;
 }
 
 /** The turn timer ran out: close slot n with whatever came in. */
 export async function closeTimedOut(
   code: string,
   n: number,
-  kind: "hero" | "guard",
+  kind: "hero" | "guard" | "vote",
 ): Promise<void> {
   await runTransaction(
     path(code, `/inputs/${n}`),
     (cur: StoredInput | null) => {
       if (cur?.closed === true) return;
+      if (kind === "vote") {
+        return {
+          kind: "vote",
+          votes: cur?.kind === "vote" ? (cur.votes ?? {}) : {},
+          closed: true,
+          at: questNow(),
+        };
+      }
       if (kind === "hero") {
         return {
           kind: "hero",
@@ -291,6 +348,8 @@ export async function closeTimedOut(
         at: questNow(),
       };
     },
+    // only show a move once the database has accepted it
+    { applyLocally: false },
   );
 }
 

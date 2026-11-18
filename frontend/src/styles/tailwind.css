@@ -534,6 +534,30 @@
   --animate-quest-slash: quest-slash 0.35s ease-out both;
   --animate-quest-bubble: quest-bubble 1s ease-out both;
   --animate-quest-flash: quest-flash 0.6s ease-out both;
+  --animate-quest-rain: quest-rain 0.9s linear infinite;
+  --animate-quest-wind: quest-wind 1.6s ease-in infinite;
+
+  @keyframes quest-rain {
+    0% {
+      transform: translate(0, 0);
+    }
+    100% {
+      transform: translate(-60px, 120vh);
+    }
+  }
+  @keyframes quest-wind {
+    0% {
+      transform: translateX(0);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(160vw);
+      opacity: 0;
+    }
+  }
 
   @keyframes quest-fly {
     0% {
