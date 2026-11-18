@@ -882,7 +882,7 @@ export function QuestBattle(props: {
   return (
     <div class="game-motion relative flex h-full w-full flex-col overflow-hidden bg-game-night font-kid text-game-cream select-none">
       {/* turn order */}
-      <div class="flex min-h-14 items-center gap-1.5 bg-game-ink/70 px-3 pt-16 pb-1.5 sm:pt-1.5 sm:pr-44 sm:pl-20">
+      <div class="flex min-h-14 items-center gap-1.5 bg-game-ink/70 px-3 pt-16 pb-1.5 sm:pt-1.5 sm:pr-60 sm:pl-20">
         <span class="mr-1 text-xs font-bold tracking-wide text-game-grey uppercase">
           Turns
         </span>
@@ -922,7 +922,7 @@ export function QuestBattle(props: {
       {/* battlefield */}
       <div
         class={cn(
-          "relative grid min-h-60 flex-1 grid-cols-2 bg-linear-to-b transition-colors duration-700",
+          "[container-type:size] relative grid min-h-52 flex-1 grid-cols-2 overflow-hidden bg-linear-to-b transition-colors duration-700",
           land() === "mountain"
             ? "from-game-night via-game-blue/60 to-game-mint"
             : land() === "castle"
@@ -947,7 +947,7 @@ export function QuestBattle(props: {
             </div>
           )}
         </Show>
-        <div class="flex flex-col items-center justify-center gap-3 p-3">
+        <div class="flex flex-wrap content-center items-center justify-center gap-x-4 gap-y-1 p-2">
           <Index each={monsters()}>
             {(m, i) => (
               <div
@@ -984,10 +984,10 @@ export function QuestBattle(props: {
                     class={cn(
                       "h-auto object-contain transition-opacity duration-500 [image-rendering:pixelated]",
                       m().boss
-                        ? "w-44 sm:w-56"
+                        ? "h-[min(58cqh,14rem)] w-auto"
                         : m().mini === true
-                          ? "w-12 sm:w-14"
-                          : "w-20 sm:w-24",
+                          ? "h-[min(13cqh,3.5rem)] w-auto"
+                          : "h-[min(22cqh,6rem)] w-auto",
                       m().faded && "opacity-30",
                       hurt().has(`m${m().index}`)
                         ? "animate-quest-hit"
@@ -1020,7 +1020,7 @@ export function QuestBattle(props: {
             )}
           </Index>
         </div>
-        <div class="flex flex-col items-end justify-center gap-1 p-3 pr-6">
+        <div class="flex flex-col items-end justify-center gap-[1cqh] py-1 pr-6">
           <For each={party()}>
             {(h) => {
               const asleep = (): boolean => (heroHp()[h.slot] ?? 1) <= 0;
@@ -1047,7 +1047,7 @@ export function QuestBattle(props: {
                       src={HERO_ART[h.cls]}
                       alt={CLASS_INFO[h.cls].name}
                       class={cn(
-                        "h-auto w-16 transition-[rotate,opacity,filter] duration-300 [image-rendering:pixelated] sm:w-20",
+                        "h-[min(20cqh,5.5rem)] w-auto transition-[rotate,opacity,filter] duration-300 [image-rendering:pixelated]",
                         asleep() && "rotate-90 opacity-50 grayscale",
                         hurt().has(`h${h.slot}`) && "animate-quest-hit",
                         h.uid === props.myUid &&
