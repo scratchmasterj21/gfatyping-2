@@ -150,9 +150,9 @@ export function QuestBattle(props: {
   const [heroMax, setHeroMax] = createSignal<number[]>([]);
   /** monsters that just joined (slide in) */
   const [joined, setJoined] = createSignal<Set<number>>(new Set());
-  const motionClass = (id: string): string | false => {
+  const motionClass = (id: string): string | undefined => {
     const m = motion();
-    return m !== null && m.id === id && MOTION_CLASS[m.kind];
+    return m !== null && m.id === id ? MOTION_CLASS[m.kind] : undefined;
   };
   let popupId = 0;
   let finishedFired = false;
@@ -376,6 +376,10 @@ export function QuestBattle(props: {
       const m = e.monster;
       setMonsters((ms) => [...ms, { ...m }]);
       setJoined((j) => new Set([...j, m.index]));
+      setTimeout(
+        () => setJoined((j) => new Set([...j].filter((x) => x !== m.index))),
+        800,
+      );
       setMessage(
         m.kind === "slime"
           ? "💧 The slime splits in two!"
@@ -1045,10 +1049,13 @@ export function QuestBattle(props: {
               <div
                 class={cn(
                   "relative flex flex-col items-center",
-                  (entering() || joined().has(m().index)) &&
-                    "animate-quest-enter",
-                  motionClass(`m${m().index}`),
-                  m().hp <= 0 && "animate-quest-die",
+                  // one animation at a time: custom animate-* classes don't
+                  // override each other, so a leftover slide-in hid deaths
+                  m().hp <= 0
+                    ? "animate-quest-die"
+                    : (motionClass(`m${m().index}`) ??
+                        ((entering() || joined().has(m().index)) &&
+                          "animate-quest-enter")),
                 )}
                 style={{ "animation-delay": entering() ? `${i * 0.12}s` : "" }}
               >
