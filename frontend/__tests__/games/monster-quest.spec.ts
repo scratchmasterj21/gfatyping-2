@@ -275,6 +275,30 @@ describe("monster quest", () => {
     }
   });
 
+  it("levels up after the first fight and super moves recharge", () => {
+    const s = playThrough(solo(3), (st) =>
+      st.pending?.kind === "guard"
+        ? { kind: "guard", guards: { me: true } }
+        : { kind: "hero", action: "ultimate", power: 1.5 },
+    );
+    const lvl = s.events.findIndex((e) => e.type === "levelup");
+    const battle2 = s.events.findIndex(
+      (e) => e.type === "battle" && e.battle === 1,
+    );
+    expect(lvl).toBeGreaterThan(-1);
+    expect(lvl).toBeLessThan(battle2);
+    // used again in the same battle once it recharged
+    let battle = -1;
+    const perBattle: Record<number, number> = {};
+    for (const e of s.events) {
+      if (e.type === "battle") battle = e.battle;
+      if (e.type === "action" && e.actor === "h0" && e.ultimate !== undefined) {
+        perBattle[battle] = (perBattle[battle] ?? 0) + 1;
+      }
+    }
+    expect(Math.max(...Object.values(perBattle))).toBeGreaterThan(1);
+  });
+
   it("gives a turn deadline", () => {
     const s = started(solo());
     const d = pendingDeadline(s, 1000, [2000]);

@@ -44,6 +44,7 @@ import {
   QuestState,
   typingPower,
   ULTIMATES,
+  UltimateId,
   VOTE_MS,
   VoteOption,
   WEATHER_INFO,
@@ -53,16 +54,43 @@ import {
   SPIRIT_MAX,
   TWISTS,
 } from "./quest-rules";
+import { UltimateField } from "./UltimateField";
 
 type Popup = { id: number; target: string; text: string; tone: string };
 type Burst = { id: number; target: string; emoji: string };
 type Fx = { id: number; target: string; kind: FxKind; fromRight: boolean };
-type Motion = "lunge-left" | "lunge-right" | "cast";
+type Motion =
+  | "lunge-left"
+  | "lunge-right"
+  | "cast"
+  | "spin-dash"
+  | "leap"
+  | "stomp"
+  | "channel";
 const MOTION_CLASS: Record<Motion, string> = {
   "lunge-left": "animate-quest-lunge-left",
   "lunge-right": "animate-quest-lunge-right",
   cast: "animate-quest-cast",
+  "spin-dash": "animate-quest-spin-dash",
+  leap: "animate-quest-leap",
+  stomp: "animate-quest-stomp",
+  channel: "animate-quest-channel",
 };
+
+/** Each super move's hero motion and the effect on its targets. */
+const ULT_SHOW: Record<UltimateId, { motion: Motion; fx: FxKind }> = {
+  whirlwind: { motion: "spin-dash", fx: "tornado" },
+  mighty: { motion: "leap", fx: "megaimpact" },
+  icestorm: { motion: "channel", fx: "frost" },
+  thunder: { motion: "channel", fx: "bolt" },
+  groupheal: { motion: "channel", fx: "hearts" },
+  holy: { motion: "channel", fx: "pillar" },
+  wall: { motion: "channel", fx: "dome" },
+  slam: { motion: "stomp", fx: "eruption" },
+};
+/** cut-in first, then the effect, then the hits land */
+const CUT_IN_MS = 900;
+const ULT_HIT_MS = 1400;
 type Step = "menu" | "target" | "type";
 
 /** Hits land a little after the move name shows. */
@@ -103,6 +131,13 @@ export function QuestBattle(props: {
     null,
   );
   const [quake, setQuake] = createSignal(false);
+  const [bigQuake, setBigQuake] = createSignal(false);
+  const [cutIn, setCutIn] = createSignal<{
+    slot: number;
+    id: UltimateId;
+  } | null>(null);
+  const [ultField, setUltField] = createSignal<UltimateId | null>(null);
+  const [dim, setDim] = createSignal(false);
   const [effects, setEffects] = createSignal<Fx[]>([]);
   const [flash, setFlash] = createSignal<{
     id: number;
@@ -143,6 +178,10 @@ export function QuestBattle(props: {
     setEffects([]);
     setFlash(null);
     setQuake(false);
+    setBigQuake(false);
+    setCutIn(null);
+    setUltField(null);
+    setDim(false);
     setEntering(false);
     setVictory(false);
     setLand(null);
@@ -182,10 +221,51 @@ export function QuestBattle(props: {
     setTimeout(() => setBursts((b) => b.filter((q) => q.id !== id)), 700);
   };
 
-  const effect = (target: string, kind: FxKind, fromRight: boolean): void => {
+  const effect = (
+    target: string,
+    kind: FxKind,
+    fromRight: boolean,
+    ms = 1100,
+  ): void => {
     const id = ++popupId;
     setEffects((f) => [...f, { id, target, kind, fromRight }]);
-    setTimeout(() => setEffects((f) => f.filter((q) => q.id !== id)), 1100);
+    setTimeout(() => setEffects((f) => f.filter((q) => q.id !== id)), ms);
+  };
+
+  /** A super move: cut-in banner, the big effect, then the hits. */
+  const playUltimate = (
+    e: Extract<QuestEvent, { type: "action" }>,
+    u: UltimateId,
+  ): void => {
+    const slot = Number(e.actor.slice(1));
+    setActive(e.actor);
+    setMessage(
+      `⭐ SUPER MOVE! ${actorName(e.actor)}: ${e.emoji} ${e.move}!${e.combo !== undefined ? ` (${e.combo})` : ""}`,
+    );
+    setCutIn({ slot, id: u });
+    setDim(true);
+    setMotion({ id: e.actor, kind: "channel" });
+    sfx.great();
+    setTimeout(() => {
+      setCutIn(null);
+      setUltField(u);
+      setMotion({ id: e.actor, kind: ULT_SHOW[u].motion });
+      const targets = e.shields ?? e.hits.map((h) => h.id);
+      for (const t of targets) effect(t, ULT_SHOW[u].fx, true, 1700);
+      if (u === "mighty" || u === "slam") {
+        setTimeout(() => {
+          setBigQuake(true);
+          setTimeout(() => setBigQuake(false), 650);
+        }, 380);
+      }
+      sfx.boom();
+    }, CUT_IN_MS);
+    hitTimer = setTimeout(() => applyHits(e.hits), ULT_HIT_MS);
+    setTimeout(() => {
+      setUltField(null);
+      setDim(false);
+      setMotion(null);
+    }, 2300);
   };
 
   const applyHits = (hits: HitResult[]): void => {
@@ -419,6 +499,10 @@ export function QuestBattle(props: {
     if (e.type === "end") {
       setMessage(e.won ? "🎉 Victory!" : "💤 The party fell asleep…");
       setVictory(e.won);
+      return;
+    }
+    if (e.ultimate !== undefined) {
+      playUltimate(e, e.ultimate);
       return;
     }
     setActive(e.actor);
@@ -683,9 +767,12 @@ export function QuestBattle(props: {
         : [
             {
               action: "ultimate" as const,
-              label: `${ULTIMATES[ult() ?? "mighty"].name} (1x)`,
+              label:
+                (me()?.ultimateCooldown ?? 0) > 0
+                  ? `${ULTIMATES[ult() ?? "mighty"].name} (in ${me()?.ultimateCooldown})`
+                  : `${ULTIMATES[ult() ?? "mighty"].name} ⭐`,
               emoji: ULTIMATES[ult() ?? "mighty"].emoji,
-              off: me()?.ultimateUsed === true,
+              off: (me()?.ultimateCooldown ?? 0) > 0,
             },
           ]),
     ];
@@ -928,7 +1015,9 @@ export function QuestBattle(props: {
             : land() === "castle"
               ? "from-game-ink via-game-purple/60 to-game-grey"
               : "from-game-night via-game-navy to-game-grass-dark",
-          quake() && "animate-quest-quake motion-reduce:animate-none",
+          bigQuake()
+            ? "animate-quest-big-quake motion-reduce:animate-none"
+            : quake() && "animate-quest-quake motion-reduce:animate-none",
         )}
       >
         <Show when={weather() !== "clear"}>
@@ -947,7 +1036,10 @@ export function QuestBattle(props: {
             </div>
           )}
         </Show>
-        <div class="flex flex-wrap content-center items-center justify-center gap-x-4 gap-y-1 p-2">
+        <Show when={dim()}>
+          <div class="pointer-events-none absolute inset-0 animate-quest-dim bg-game-ink/65"></div>
+        </Show>
+        <div class="relative flex flex-wrap content-center items-center justify-center gap-x-4 gap-y-1 p-2">
           <Index each={monsters()}>
             {(m, i) => (
               <div
@@ -1020,7 +1112,7 @@ export function QuestBattle(props: {
             )}
           </Index>
         </div>
-        <div class="flex flex-col items-end justify-center gap-[1cqh] py-1 pr-6">
+        <div class="relative flex flex-col items-end justify-center gap-[1cqh] py-1 pr-6">
           <For each={party()}>
             {(h) => {
               const asleep = (): boolean => (heroHp()[h.slot] ?? 1) <= 0;
@@ -1073,6 +1165,43 @@ export function QuestBattle(props: {
                 FLASH_CLASS[f.kind],
               )}
             ></div>
+          )}
+        </Show>
+        <Show when={ultField()} keyed>
+          {(k) => <UltimateField kind={k} />}
+        </Show>
+        <Show when={cutIn()}>
+          {(c) => (
+            <div class="pointer-events-none absolute inset-0 z-20 grid items-center">
+              <div class="relative h-[min(40cqh,9rem)] origin-center animate-quest-cutin overflow-hidden border-y-4 border-game-yellow bg-linear-to-r from-game-ink via-game-purple to-game-ink shadow-[0_0_30px_var(--color-game-purple)]">
+                <For each={[0, 1, 2, 3, 4, 5, 6, 7]}>
+                  {(i) => (
+                    <span
+                      class="absolute h-0.5 w-1/3 animate-quest-streak bg-game-cream/50"
+                      style={{
+                        top: `${10 + i * 11}%`,
+                        "animation-delay": `${(i * 0.07) % 0.4}s`,
+                      }}
+                    ></span>
+                  )}
+                </For>
+                <div class="relative flex h-full animate-quest-cutin-slide items-center justify-center gap-4 px-4">
+                  <img
+                    src={HERO_ART[party()[c().slot]?.cls ?? "knight"]}
+                    alt=""
+                    class="h-[85%] w-auto drop-shadow-[0_0_14px_var(--color-game-yellow)] [image-rendering:pixelated]"
+                  />
+                  <div class="grid">
+                    <span class="text-sm font-bold tracking-widest text-game-cream uppercase">
+                      {heroName(c().slot)} · super move!
+                    </span>
+                    <span class="text-3xl leading-tight font-bold text-game-yellow sm:text-5xl">
+                      {ULTIMATES[c().id].emoji} {ULTIMATES[c().id].name}!
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </Show>
         <Show when={myVote()}>
@@ -1339,7 +1468,7 @@ export function QuestBattle(props: {
                     <Show
                       when={
                         live()?.ultimate !== undefined &&
-                        live()?.ultimateUsed !== true
+                        live()?.ultimateCooldown === 0
                       }
                     >
                       <span title="Super move ready">
@@ -1503,7 +1632,11 @@ function FxLayer(props: { effects: Fx[]; target: string }): JSXElement {
     <For each={props.effects.filter((f) => f.target === props.target)}>
       {(f) => (
         <For each={fxParticles(f.kind, f.fromRight)}>
-          {(p) => <span class={p.class} style={p.style}></span>}
+          {(p) => (
+            <span class={p.class} style={p.style}>
+              {p.text}
+            </span>
+          )}
         </For>
       )}
     </For>

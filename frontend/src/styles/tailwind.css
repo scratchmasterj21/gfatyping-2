@@ -655,6 +655,279 @@
       opacity: 0;
     }
   }
+  /* Monster Quest super moves */
+  --animate-quest-cutin: quest-cutin 0.9s ease-in-out both;
+  --animate-quest-cutin-slide: quest-cutin-slide 0.9s ease-in-out both;
+  --animate-quest-streak: quest-streak 0.45s linear infinite;
+  --animate-quest-dim: quest-dim 2.1s ease-in-out both;
+  --animate-quest-spin-dash: quest-spin-dash 0.9s ease-in-out;
+  --animate-quest-leap: quest-leap 0.9s ease-in;
+  --animate-quest-stomp: quest-stomp 0.8s ease-in;
+  --animate-quest-channel: quest-channel 1.2s ease-in-out;
+  --animate-quest-beam: quest-beam 1s ease-out both;
+  --animate-quest-bolt: quest-bolt 0.7s linear both;
+  --animate-quest-spin: quest-spin 0.5s linear infinite;
+  --animate-quest-tornado: quest-tornado 1s ease-in-out both;
+  --animate-quest-dome: quest-dome 1.3s ease-out both;
+  --animate-quest-crack: quest-crack 1.1s ease-out both;
+  --animate-quest-erupt: quest-erupt 0.9s cubic-bezier(0.2, 0.8, 0.4, 1) both;
+  --animate-quest-shard: quest-shard 0.7s ease-in both;
+  --animate-quest-big-quake: quest-big-quake 0.6s ease-in-out;
+
+  @keyframes quest-cutin {
+    0% {
+      transform: scaleY(0);
+      opacity: 0;
+    }
+    15% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+    85% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scaleY(0);
+      opacity: 0;
+    }
+  }
+  @keyframes quest-cutin-slide {
+    0% {
+      transform: translateX(70%);
+      opacity: 0;
+    }
+    25% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    80% {
+      transform: translateX(-4%);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(-70%);
+      opacity: 0;
+    }
+  }
+  @keyframes quest-streak {
+    0% {
+      transform: translateX(120%);
+    }
+    100% {
+      transform: translateX(-120%);
+    }
+  }
+  @keyframes quest-dim {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    15%,
+    80% {
+      opacity: 1;
+    }
+  }
+  @keyframes quest-spin-dash {
+    0% {
+      transform: translateX(0) rotate(0deg);
+    }
+    50% {
+      transform: translateX(-36cqw) rotate(-540deg) scale(1.15);
+    }
+    100% {
+      transform: translateX(0) rotate(-1080deg);
+    }
+  }
+  @keyframes quest-leap {
+    0% {
+      transform: translate(0, 0);
+    }
+    35% {
+      transform: translate(-10cqw, -22cqh) rotate(-15deg) scale(1.2);
+    }
+    55% {
+      transform: translate(-34cqw, -8cqh) rotate(-30deg) scale(1.2);
+    }
+    65% {
+      transform: translate(-36cqw, 2cqh) rotate(10deg) scale(1.1);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+  @keyframes quest-stomp {
+    0% {
+      transform: translateY(0) scale(1);
+    }
+    45% {
+      transform: translateY(-20cqh) scale(1.15);
+    }
+    60% {
+      transform: translateY(6px) scale(1.2, 0.85);
+    }
+    100% {
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes quest-channel {
+    0%,
+    100% {
+      transform: translateY(0) scale(1);
+      filter: brightness(1);
+    }
+    40%,
+    70% {
+      transform: translateY(-16px) scale(1.18);
+      filter: brightness(1.8) drop-shadow(0 0 16px var(--color-game-yellow));
+    }
+  }
+  @keyframes quest-beam {
+    0% {
+      transform: scaleX(0);
+      opacity: 0;
+    }
+    20% {
+      transform: scaleX(1.2);
+      opacity: 1;
+    }
+    70% {
+      transform: scaleX(1);
+      opacity: 0.9;
+    }
+    100% {
+      transform: scaleX(0.2);
+      opacity: 0;
+    }
+  }
+  @keyframes quest-bolt {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    10%,
+    30%,
+    50% {
+      opacity: 1;
+    }
+    20%,
+    40% {
+      opacity: 0.65;
+    }
+    80% {
+      opacity: 0.9;
+    }
+  }
+  @keyframes quest-spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes quest-tornado {
+    0% {
+      transform: translateY(20px) scale(0.3);
+      opacity: 0;
+    }
+    25% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    80% {
+      transform: translateY(-10px) scale(1.1);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-40px) scale(1.3);
+      opacity: 0;
+    }
+  }
+  @keyframes quest-dome {
+    0% {
+      transform: scaleY(0);
+      opacity: 0;
+    }
+    25% {
+      transform: scaleY(1.05);
+      opacity: 1;
+    }
+    40% {
+      transform: scaleY(1);
+    }
+    80% {
+      opacity: 0.9;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes quest-crack {
+    0% {
+      transform: scaleX(0);
+      opacity: 1;
+    }
+    35% {
+      transform: scaleX(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scaleX(1);
+      opacity: 0;
+    }
+  }
+  @keyframes quest-erupt {
+    0% {
+      transform: translate(0, 30px) rotate(0deg);
+      opacity: 0;
+    }
+    15% {
+      opacity: 1;
+    }
+    50% {
+      transform: translate(var(--fx-x, 0), -80px) rotate(200deg);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--fx-x, 0), 40px) rotate(400deg);
+      opacity: 0;
+    }
+  }
+  @keyframes quest-shard {
+    0% {
+      transform: translateY(-30cqh) rotate(30deg);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(110cqh) rotate(30deg);
+      opacity: 0.8;
+    }
+  }
+  @keyframes quest-big-quake {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+    15% {
+      transform: translate(-12px, 6px);
+    }
+    30% {
+      transform: translate(10px, -8px);
+    }
+    45% {
+      transform: translate(-8px, -4px);
+    }
+    60% {
+      transform: translate(8px, 6px);
+    }
+    80% {
+      transform: translate(-4px, 2px);
+    }
+  }
   @keyframes quest-aura {
     0%,
     100% {

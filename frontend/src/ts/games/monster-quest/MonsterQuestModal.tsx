@@ -542,7 +542,8 @@ export function MonsterQuestModal(props: {
                 <li>🗺️ Vote for a land, then pick which boss to face.</li>
                 <li>
                   🧰 Between fights: treasure, traps, fairies and a shop - and a
-                  ⭐ level up with a new super move before the boss!
+                  ⭐ level up after the first fight with a super move that
+                  recharges!
                 </li>
                 <li>
                   💡 Every monster has a trick - read the tip when it appears!

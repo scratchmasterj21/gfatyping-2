@@ -147,8 +147,8 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     words: MEDIUM_WORDS,
     skillWords: MEDIUM_WORDS,
     phrase: { attack: 2, skill: 3, defend: 2, potion: 2, ultimate: 3 },
-    hp: 1.1,
-    atk: 1.06,
+    hp: 1.2,
+    atk: 1.12,
   },
   {
     label: "Hard",
@@ -347,7 +347,7 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
   },
   golem: {
     name: "Rocky the Golem",
-    hp: 640,
+    hp: 570,
     atk: 42,
     speed: 4,
     boss: true,
@@ -363,7 +363,7 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
   },
   treant: {
     name: "Thornroot",
-    hp: 520,
+    hp: 460,
     atk: 36,
     speed: 3,
     boss: true,
@@ -515,7 +515,7 @@ export type UltimateInfo = {
   blurb: string;
 };
 
-/** Super moves picked at the level up (once per battle). */
+/** Super moves picked at the level up; they recharge after a few turns. */
 export const ULTIMATES: Record<UltimateId, UltimateInfo> = {
   whirlwind: {
     name: "Whirlwind",
@@ -582,8 +582,13 @@ export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
   guardian: ["wall", "slam"],
 };
 
-const BOSS_HP = 1.28;
+const BOSS_HP = 1.45;
 const BOSS_ATK = 1.1;
+
+/** A used super move comes back after this many of the hero's turns. */
+export const ULTIMATE_COOLDOWN = 3;
+/** Super moves get a longer show: cut-in, effect, then the hits. */
+export const ULTIMATE_MS = 2400;
 
 /** Level 2 heroes hit harder and have more HP. */
 export const LEVEL_BOOST = 1.15;
@@ -708,7 +713,8 @@ export type HeroState = HeroSetup & {
   sleepWhy?: "asleep" | "frozen";
   level: number;
   ultimate?: UltimateId;
-  ultimateUsed: boolean;
+  /** own turns until the super move is ready again (0 = ready) */
+  ultimateCooldown: number;
   /** fairy: next move is a critical */
   blessed: boolean;
 };
@@ -805,6 +811,8 @@ export type QuestEvent =
       flags?: MonsterFlags;
       /** combo name when two heroes' skills chained */
       combo?: string;
+      /** a super move (gets the big cut-in) */
+      ultimate?: UltimateId;
     }
   | { type: "angry"; actor: string }
   | { type: "rest"; hp: number[] }
@@ -1087,7 +1095,11 @@ function cpuChoice(
     target: weakest?.index ?? 0,
     power,
   };
-  if (hero.ultimate !== undefined && !hero.ultimateUsed && rng() < 0.35) {
+  if (
+    hero.ultimate !== undefined &&
+    hero.ultimateCooldown === 0 &&
+    rng() < 0.35
+  ) {
     return { ...attack, action: "ultimate" };
   }
   if (hero.cls === "healer") {
@@ -1244,9 +1256,9 @@ function applyHero(
   if (
     input.action === "ultimate" &&
     hero.ultimate !== undefined &&
-    !hero.ultimateUsed
+    hero.ultimateCooldown === 0
   ) {
-    hero.ultimateUsed = true;
+    hero.ultimateCooldown = ULTIMATE_COOLDOWN;
     const u = ULTIMATES[hero.ultimate];
     const actor = heroId(hero.slot);
     const live = alive(s.monsters);
@@ -1307,6 +1319,7 @@ function applyHero(
       actor,
       move: u.name,
       emoji: u.emoji,
+      ultimate: hero.ultimate,
       hits,
       ...(shields === undefined ? {} : { shields }),
     });
@@ -1642,7 +1655,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       poison: 0,
       sleep: 0,
       level: 1,
-      ultimateUsed: false,
+      ultimateCooldown: 0,
       blessed: false,
     })),
     monsters: [],
@@ -1685,6 +1698,14 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
   };
   const startBattle = (kinds: MonsterKind[]): void => {
     s.monsters = makeMonsters(kinds, d);
+    // battle 2 faces levelled-up heroes
+    if (s.battle === 1) {
+      for (const m of s.monsters) {
+        m.maxHp = Math.round(m.maxHp * 1.2);
+        m.hp = m.maxHp;
+        m.atk = Math.round(m.atk * 1.08);
+      }
+    }
     if (twist === "giant") {
       for (const m of s.monsters) {
         m.maxHp = Math.round(m.maxHp * 1.3);
@@ -1692,7 +1713,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       }
     }
     s.weather = twist === "rain" ? "rain" : battleWeather(setup.seed, s.battle);
-    for (const h of s.heroes) h.ultimateUsed = false;
+    for (const h of s.heroes) h.ultimateCooldown = 0;
     s.events.push({
       type: "battle",
       battle: s.battle,
@@ -1942,6 +1963,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           });
         }
       }
+      if (hero.ultimateCooldown > 0) hero.ultimateCooldown--;
       if (hero.sleep > 0) {
         hero.sleep--;
         s.events.push({
@@ -2054,7 +2076,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           if (m.kind === "snake") {
             victim.poison = 2;
             notes.push("poisoned!");
-          } else if (m.kind === "mushroom" && rng() < 0.35) {
+          } else if (m.kind === "mushroom" && rng() < 0.28) {
             victim.sleep = 1;
             victim.sleepWhy = "asleep";
             notes.push("fell asleep!");
@@ -2176,7 +2198,6 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         }
         s.events.push({ type: "rest", hp: s.heroes.map((h) => h.hp) });
         if (s.battle === BATTLE_COUNT - 1) {
-          if (!levelUp()) return s;
           if (!journeyStop(stopB, 2)) return s;
           const bossChoice =
             weekly === undefined
@@ -2193,6 +2214,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           });
           startBattle([bossChoice.id as MonsterKind]);
         } else {
+          if (!levelUp()) return s;
           if (!journeyStop(stopA, 1)) return s;
           startBattle(battleKinds(setup.seed, land, s.battle));
         }
@@ -2229,6 +2251,7 @@ export function eventMs(e: QuestEvent): number {
   if (e.type === "rest") return 1600;
   if (e.type === "angry") return 1500;
   if (e.type === "end") return 0;
+  if (e.ultimate !== undefined) return ULTIMATE_MS;
   return e.hits.length > 1 ? 1300 : 1100;
 }
 

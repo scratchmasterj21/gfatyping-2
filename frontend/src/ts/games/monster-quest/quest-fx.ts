@@ -23,11 +23,24 @@ export type FxKind =
   | "vine"
   | "charge"
   | "thunder"
-  | "holy";
+  | "holy"
+  // super moves
+  | "tornado"
+  | "megaimpact"
+  | "bolt"
+  | "pillar"
+  | "frost"
+  | "hearts"
+  | "dome"
+  | "eruption";
 
 export type FlashKind = "fire" | "rock" | "water" | "spore" | "ice" | "laser";
 
-export type Particle = { class: string; style: JSX.CSSProperties };
+export type Particle = {
+  class: string;
+  style: JSX.CSSProperties;
+  text?: string;
+};
 
 const BASE =
   "pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2";
@@ -221,8 +234,132 @@ const GOLD_SLASH =
 const CLAW =
   "h-1 w-24 rounded-full bg-linear-to-r from-transparent via-game-red to-transparent shadow-[0_0_8px_var(--color-game-red)]";
 
+/** Rocks / bits shooting up out of the ground. */
+function erupting(count: number, shape: string, start: number): Particle[] {
+  return Array.from({ length: count }, (_, i) => ({
+    class: `${BASE} ${shape} animate-quest-erupt`,
+    style: {
+      "--fx-x": `${((i * 37) % 120) - 60}px`,
+      "animation-delay": delay(start + (i % 4) * 0.05),
+    } as JSX.CSSProperties,
+  }));
+}
+
+/** From the target up to the top of the battlefield. */
+const COLUMN =
+  "pointer-events-none absolute bottom-1/2 left-1/2 h-[100cqh] -translate-x-1/2 origin-bottom";
+const BOLT_SHAPE =
+  "[clip-path:polygon(45%_0,75%_0,55%_38%,85%_38%,30%_100%,45%_58%,15%_58%)]";
+
 export function fxParticles(kind: FxKind, fromRight: boolean): Particle[] {
   switch (kind) {
+    case "tornado":
+      return [
+        ...[-36, -18, 0, 18].map((y, i) => ({
+          class: `${BASE} h-5 rounded-[50%] border-4 border-game-cream border-b-transparent animate-quest-tornado`,
+          style: {
+            width: `${44 + i * 14}px`,
+            "margin-top": `${y}px`,
+            "animation-delay": delay(i * 0.06),
+          },
+        })),
+        ...slashes(3, GOLD_SLASH, [-30, 30, 0], 10),
+        ring("h-24 w-24 rounded-full border-4 border-game-cream", 0.35),
+        ...spray(10, "h-2 w-2 rotate-45 bg-game-cream", 0.38, 75),
+      ];
+    case "megaimpact":
+      return [
+        ring(
+          "h-20 w-20 rounded-full bg-radial from-game-cream to-transparent",
+          0.32,
+        ),
+        ring("h-28 w-28 rounded-full border-8 border-game-yellow", 0.34),
+        ring("h-36 w-36 rounded-full border-4 border-game-orange", 0.42),
+        ...slashes(4, GOLD_SLASH, [0, 45, 90, 135]),
+        ...spray(14, "h-3 w-3 rounded-sm bg-game-tan", 0.36, 100),
+        ...spray(10, "h-2 w-2 rotate-45 bg-game-yellow", 0.38, 80),
+      ];
+    case "bolt":
+      return [
+        {
+          class: `${COLUMN} w-36 bg-game-yellow blur-lg ${BOLT_SHAPE} animate-quest-bolt`,
+          style: { "animation-delay": delay(0.2) },
+        },
+        {
+          class: `${COLUMN} w-20 bg-linear-to-b from-game-cream via-game-cream to-game-yellow ${BOLT_SHAPE} animate-quest-bolt`,
+          style: { "animation-delay": delay(0.2) },
+        },
+        ring("h-24 w-24 rounded-full border-4 border-game-yellow", 0.34),
+        ring(
+          "h-16 w-16 rounded-full bg-radial from-game-cream to-transparent",
+          0.34,
+        ),
+        ...spray(14, "h-2 w-2 rotate-45 bg-game-yellow", 0.36, 85),
+      ];
+    case "pillar":
+      return [
+        {
+          class: `${COLUMN} w-32 bg-game-gold/40 blur-lg animate-quest-beam`,
+          style: { "animation-delay": delay(0.05) },
+        },
+        {
+          class: `${COLUMN} w-16 bg-linear-to-t from-game-cream via-game-gold to-transparent animate-quest-beam`,
+          style: { "animation-delay": delay(0.05) },
+        },
+        ring("h-28 w-28 rounded-full border-4 border-game-gold", 0.34),
+        ...rising(
+          14,
+          [
+            "h-2.5 w-2.5 rotate-45 bg-game-gold",
+            "h-2 w-2 rounded-full bg-game-cream",
+          ],
+          60,
+        ),
+      ];
+    case "frost":
+      return [
+        ...falling(
+          5,
+          "h-7 w-2.5 rotate-45 bg-linear-to-b from-game-cream to-game-sky shadow-[0_0_8px_var(--color-game-sky)]",
+          fromRight,
+        ),
+        {
+          class: `${BASE} h-24 w-24 rounded-lg border-4 border-game-cream bg-game-sky/40 shadow-[0_0_20px_var(--color-game-sky)] animate-quest-bubble`,
+          style: { "animation-delay": delay(0.34) },
+        },
+        ring("h-28 w-28 rounded-full border-4 border-game-sky", 0.4),
+        ...spray(14, "h-2.5 w-2.5 rotate-45 bg-game-cream", 0.9, 80),
+      ];
+    case "hearts":
+      return [
+        ring(
+          "h-28 w-28 rounded-full bg-radial from-game-green/70 to-transparent",
+          0.1,
+        ),
+        ring("h-20 w-20 rounded-full border-4 border-game-green", 0.3),
+        ...rising(8, ["text-2xl"], 50).map((p, i) => ({
+          ...p,
+          text: i % 2 === 0 ? "💚" : "✨",
+        })),
+      ];
+    case "dome":
+      return [
+        {
+          class: `${BASE} h-28 w-28 rounded-full border-4 border-game-blue bg-game-blue/25 shadow-[0_0_24px_var(--color-game-blue)] animate-quest-bubble`,
+          style: { "animation-delay": delay(0.15) },
+        },
+        ...rising(8, ["h-2 w-2 rotate-45 bg-game-blue"], 50),
+      ];
+    case "eruption":
+      return [
+        ring("h-24 w-24 rounded-full bg-game-tan/60 blur-sm", 0.3),
+        ...erupting(
+          10,
+          "h-5 w-5 rounded-sm border-2 border-game-brown-dark bg-game-brown",
+          0.3,
+        ),
+        ...erupting(6, "h-3 w-3 rounded-sm bg-game-orange", 0.35),
+      ];
     case "fire":
       return [
         ...falling(5, FIREBALL, fromRight),
