@@ -2,10 +2,14 @@ import { Scene, GameObjects, Time } from "phaser";
 
 import { hex } from "../../shared/game-palette";
 import { popBanner, TappyBuddy } from "../../shared/phaser-ui";
+import { bossFinaleFx, bossHitFx, playCatchFx, StreakAura } from "../catch-fx";
 import { Ghost } from "../entities/Ghost";
 import { PowerUp, PowerUpKind } from "../entities/PowerUp";
 import {
   playBombExplode,
+  playBossDefeated,
+  playBossHit,
+  playCatchChime,
   playDeflect,
   playExplode,
   playGameOver,
@@ -90,6 +94,11 @@ export class GameScene extends Scene {
   private hits = 0;
   private misses = 0;
   private streak = 0;
+  /** mistakes while typing the current word (perfect word = 0) */
+  private wordMisses = 0;
+  private aura!: StreakAura;
+  /** <1 during the Ghost King's slow-motion finale */
+  private slowMo = 1;
   private gameOver = false;
 
   private baseSpeed = 30;
@@ -269,16 +278,20 @@ export class GameScene extends Scene {
       }
       const result = this.matcher.handleKey(char);
       if (result.status === "complete") {
+        const perfect = this.wordMisses === 0;
+        this.wordMisses = 0;
         if (this.powerUp !== null && result.word === this.powerUp.word) {
           this.onPowerUpCollected(this.powerUp);
         } else {
           if (this.multiplayerRole === "guest") {
             this.hits++;
+            this.streak++;
+            this.guestCatchFx(result.word, perfect);
             this.pendingRemoteWords.add(result.word);
             this.matcher.unregister(result.word);
             this.game.events.emit("multiplayer-word-action", result.word);
           } else {
-            this.onGhostDestroyed(result.word);
+            this.onGhostDestroyed(result.word, undefined, perfect);
           }
         }
       } else if (result.status === "miss") {
@@ -301,6 +314,7 @@ export class GameScene extends Scene {
       );
     });
 
+    this.aura = new StreakAura(this);
     this.scene.launch("UI");
     this.emitUI();
     if (this.multiplayerRole !== "guest") {
@@ -327,7 +341,11 @@ export class GameScene extends Scene {
 
   override update(time: number, delta: number): void {
     if (this.gameOver) return;
-    const dt = delta / 1000;
+    const dt = (delta / 1000) * this.slowMo;
+    const torch = this.flashlightAt(
+      this.facing === "left" ? this.centerX - 1 : this.centerX + 1,
+    );
+    this.aura.update(this, this.streak, torch.x, torch.y);
 
     if (this.movingUp) this.playerY -= PLAYER_SPEED * dt;
     if (this.movingDown) this.playerY += PLAYER_SPEED * dt;
@@ -597,24 +615,6 @@ export class GameScene extends Scene {
     g.fillStyle(hex("red"), 1);
     g.fillRoundedRect(cx - 11, gy - 12, 10, 12, 3);
     g.fillRoundedRect(cx + 1, gy - 12, 10, 12, 3);
-  }
-
-  /** A flash of light from the player to a ghost being caught. */
-  private beam(x: number, y: number): void {
-    const dir = x < this.centerX ? -1 : 1;
-    const fx = this.centerX + dir * 34;
-    const fy = this.playerY - 34;
-    const g = this.add.graphics();
-    g.lineStyle(14, hex("yellow"), 0.35);
-    g.lineBetween(fx, fy, x, y);
-    g.lineStyle(5, hex("cream"), 0.95);
-    g.lineBetween(fx, fy, x, y);
-    this.tweens.add({
-      targets: g,
-      alpha: 0,
-      duration: 260,
-      onComplete: () => g.destroy(),
-    });
   }
 
   private nextWord(): string {
@@ -911,7 +911,56 @@ export class GameScene extends Scene {
     this.spawnGhost();
   }
 
-  private onGhostDestroyed(word: string, playerUid?: string): void {
+  /** Where the flashlight is when aiming at x. */
+  private flashlightAt(x: number): { x: number; y: number } {
+    const dir = x < this.centerX ? -1 : 1;
+    return { x: this.centerX + dir * 34, y: this.playerY - 34 };
+  }
+
+  private catchFx(ghost: Ghost, points: number, perfect: boolean): void {
+    const from = this.flashlightAt(ghost.x);
+    playCatchFx(this, {
+      x: ghost.x,
+      y: ghost.y,
+      word: ghost.word,
+      points,
+      streak: this.streak,
+      perfect,
+      close: Math.abs(ghost.x - this.centerX) < LOG_X_OFFSET + 45,
+      fromX: from.x,
+      fromY: from.y,
+      image: ghost.picture(),
+    });
+    playCatchChime(this.streak);
+  }
+
+  /** Online guests see their own catch right away (the host removes it). */
+  private guestCatchFx(word: string, perfect: boolean): void {
+    const ghost = this.ghosts.find((g) => g.word === word);
+    if (ghost === undefined) return;
+    this.game.events.emit("ui-streak", this.streak);
+    playExplode();
+    this.catchFx(ghost, 10 + word.length * 2 + this.streak, perfect);
+    ghost.setVisible(false);
+  }
+
+  /** The Ghost King's last hit plays in slow motion for a moment. */
+  private slowMotion(ms: number): void {
+    this.slowMo = 0.3;
+    this.tweens.timeScale = 0.45;
+    this.time.timeScale = 0.45;
+    window.setTimeout(() => {
+      this.slowMo = 1;
+      this.tweens.timeScale = 1;
+      this.time.timeScale = 1;
+    }, ms);
+  }
+
+  private onGhostDestroyed(
+    word: string,
+    playerUid?: string,
+    perfect = false,
+  ): void {
     const idx = this.ghosts.findIndex((g) => g.word === word);
     if (idx === -1) return;
     const ghost = this.ghosts[idx] as Ghost;
@@ -925,8 +974,7 @@ export class GameScene extends Scene {
     playExplode();
     this.tappy.cheer();
 
-    this.beam(ghost.x, ghost.y - 30);
-    this.poof(ghost.x, ghost.y - 30);
+    this.catchFx(ghost, points, perfect);
     ghost.destroy();
     this.ghosts.splice(idx, 1);
     if (ghost.boss !== null) {
@@ -944,13 +992,17 @@ export class GameScene extends Scene {
           ghost.boss.maxHp,
         );
         king.staggeredUntil = this.time.now + BOSS_STAGGER_MS;
-        this.cameras.main.shake(120, 0.006);
+        this.cameras.main.shake(160, 0.01);
+        bossHitFx(this, ghost.x, ghost.y, ghost.side);
+        playBossHit();
       } else {
         this.score += BOSS_BONUS;
         this.game.events.emit("ui-score", this.score);
         this.cameras.main.flash(300, 255, 210, 63, false);
         this.cameras.main.shake(300, 0.015);
-        playBombExplode();
+        bossFinaleFx(this, ghost.x, ghost.y);
+        this.slowMotion(800);
+        playBossDefeated();
       }
     }
     if (this.multiplayerRole === "host") {
@@ -966,6 +1018,7 @@ export class GameScene extends Scene {
 
   private onMiss(): void {
     this.streak = 0;
+    this.wordMisses++;
     this.misses++;
     this.game.events.emit("ui-streak", 0);
     this.cameras.main.flash(100, 80, 0, 0);

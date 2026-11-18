@@ -12,6 +12,7 @@ export class Ghost extends GameObjects.Container {
   /** scene time (ms) until which the Ghost King stands still after a hit */
   staggeredUntil = 0;
   private ghostImg: GameObjects.Image;
+  private imgKey: string;
   private tag: WordTag;
   private bobPhase: number;
   private spawnY: number;
@@ -36,8 +37,9 @@ export class Ghost extends GameObjects.Container {
 
     // faces the middle of the lawn (art looks right by default)
     const tint = Math.floor(Math.random() * GHOST_TINTS.length);
+    this.imgKey = boss === null ? `gh-ghost-${tint}` : "gh-king";
     this.ghostImg = scene.add
-      .image(0, 10, boss === null ? `gh-ghost-${tint}` : "gh-king")
+      .image(0, 10, this.imgKey)
       .setDisplaySize(boss === null ? 56 : 105, boss === null ? 64 : 144)
       .setOrigin(0.5, 1)
       .setFlipX(side === "right");
@@ -71,6 +73,16 @@ export class Ghost extends GameObjects.Container {
     this.add(this.frozenBadge);
 
     scene.add.existing(this);
+  }
+
+  /** Its picture, so a catch effect can animate a copy. */
+  picture(): { key: string; w: number; h: number; flip: boolean } {
+    return {
+      key: this.imgKey,
+      w: this.ghostImg.displayWidth,
+      h: this.ghostImg.displayHeight,
+      flip: this.ghostImg.flipX,
+    };
   }
 
   updateTyped(typed: string): void {

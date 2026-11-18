@@ -39,6 +39,30 @@ export function playExplode(): void {
   osc.stop(t + 0.25);
 }
 
+/** A bright chime that climbs with the streak (one step per catch). */
+export function playCatchChime(step: number): void {
+  if (muted()) return;
+  const c = getCtx();
+  const t = c.currentTime;
+  const base = 523.25 * Math.pow(2, Math.min(step, 14) / 12);
+  for (const [mult, delay] of [
+    [1, 0],
+    [1.5, 0.05],
+  ] as const) {
+    const osc = c.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(base * mult, t + delay);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t + delay);
+    g.gain.exponentialRampToValueAtTime(0.12, t + delay + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.22);
+    osc.connect(g);
+    g.connect(c.destination);
+    osc.start(t + delay);
+    osc.stop(t + delay + 0.25);
+  }
+}
+
 export function playPop(): void {
   if (muted()) return;
   const c = getCtx();
