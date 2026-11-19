@@ -18,8 +18,8 @@ import {
 } from "../../firebase";
 
 /**
- * Real-time rooms for Word Defender (co-op: defenderRooms) and Balloon Pop
- * (versus: balloonRooms). Every player runs the same seeded game; the room
+ * Real-time rooms for Word Defender (co-op: defenderRooms), Balloon Pop
+ * (versus: balloonRooms) and Type Toss (one shared stall: tossArena). Every player runs the same seeded game; the room
  * only carries what can't be worked out locally:
  *   kills/{id}       who finished a target first (first write wins)
  *   hits/{id}        ships that reached the base (host decides)
@@ -28,7 +28,7 @@ import {
  * Players write their own score / lives about twice a second at most.
  */
 
-export type ArcadeKind = "defenderRooms" | "balloonRooms";
+export type ArcadeKind = "defenderRooms" | "balloonRooms" | "tossArena";
 
 export type ArcadePlayer = {
   uid: string;
@@ -63,6 +63,7 @@ export type ArcadeRoom = {
 const MAX_PLAYERS: Record<ArcadeKind, number> = {
   defenderRooms: 4,
   balloonRooms: 2,
+  tossArena: 4,
 };
 
 const path = (kind: ArcadeKind, code: string, sub = ""): DatabaseReference =>

@@ -13,6 +13,7 @@ import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
 import { getSnapshot } from "../../states/snapshot";
+import { DailyClassBoard } from "../components/DailyClassBoard";
 import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
@@ -27,10 +28,14 @@ import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
 import { InviteClassmates } from "../components/InviteClassmates";
+import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
+import { dailyDay } from "../ghost-hunter/daily-haunting";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
+import { submitDailyBest } from "../shared/daily-board";
+import { TypingTracker } from "../shared/typing-report";
 import {
   getWordListOptions,
   WordListOption,
@@ -38,6 +43,9 @@ import {
 import {
   createDigRoom,
   createProgressWriter,
+  DIG_REACTIONS,
+  rematchDigRoom,
+  sendDigReaction,
   digDifficultyFor,
   digEndsAt,
   DigRoom,
@@ -63,7 +71,16 @@ import {
   digScore,
   digStars,
   rankDiggers,
+  dailyDigPlan,
+  EXPLORE_TIME_MS,
+  GEMS,
+  gemsAt,
+  gemsByKind,
+  WorldId,
+  WORLDS,
+  worldById,
 } from "./dig-rules";
+import { GemBook } from "./GemBook";
 import { DigLane, GemDig } from "./GemDig";
 
 const OPTIONS = getWordListOptions();
@@ -101,6 +118,19 @@ export function GemDigModal(props: {
   const [now, setNow] = createSignal(Date.now());
   const [result, setResult] = createSignal<GameResultView | null>(null);
   const [claim, setClaim] = createSignal<MiniGameClaim | "pending">("pending");
+  const [kind, setKind] = createSignal<"race" | "explore" | "daily">("race");
+  const [world, setWorld] = createSignal<WorldId>("garden");
+  const [playWorld, setPlayWorld] = createSignal<WorldId>("garden");
+  const [book, setBook] = createSignal<Record<string, number>>({});
+  const [practice, setPractice] = createSignal<string[]>([]);
+  const [extraNote, setExtraNote] = createSignal<string>();
+  const [toast, setToast] = createSignal<string>();
+  let tracker = new TypingTracker();
+  let lastTick = 0;
+  let toastTimer: ReturnType<typeof setTimeout> | undefined;
+  const seenReacts: Record<string, number> = {};
+  const day = dailyDay();
+  const daily = dailyDigPlan(day);
 
   // the match (both modes)
   const [shaft, setShaft] = createSignal<DigBlock[]>([]);
@@ -126,7 +156,15 @@ export function GemDigModal(props: {
 
   createEffect(() => {
     if (phase() !== "playing") return;
-    const t = setInterval(() => setNow(clock()), 100);
+    lastTick = Date.now();
+    const t = setInterval(() => {
+      const n = Date.now();
+      if (clock() >= startedAt() && untrack(phase) === "playing") {
+        tracker.tick(n - lastTick);
+      }
+      lastTick = n;
+      setNow(clock());
+    }, 100);
     onCleanup(() => clearInterval(t));
   });
 
@@ -141,6 +179,7 @@ export function GemDigModal(props: {
       gems: my.gems,
       finished: my.finishedMs !== undefined,
     };
+    if (mode() === "solo" && kind() === "explore") return [meLane];
     if (mode() === "solo") {
       const b = bot();
       return [
@@ -190,7 +229,11 @@ export function GemDigModal(props: {
     const first = Math.min(
       ...Object.values(finishTimes()).map((f) => f ?? Infinity),
     );
-    const byTime = start + DIG_TIME_MS;
+    const byTime =
+      start +
+      (mode() === "solo" && kind() === "explore"
+        ? EXPLORE_TIME_MS
+        : DIG_TIME_MS);
     if (mode() === "together") {
       const r = room();
       const fromRoom = r === null ? undefined : digEndsAt(r);
@@ -218,24 +261,63 @@ export function GemDigModal(props: {
     const won = place === 1 && my.depth > 0;
     const score = digScore(my.depth, my.gems, won);
     if (won) sfx.finish();
+    const report = tracker.report();
+    const exploring = mode() === "solo" && kind() === "explore";
+    const found = gemsByKind(shaft(), my.depth);
+    setPractice(report.hardest);
+    setExtraNote(
+      Object.keys(found).length > 0
+        ? `Found: ${Object.entries(found)
+            .map(([g, n]) => `${GEMS[g as keyof typeof GEMS].emoji}×${n}`)
+            .join(" ")}`
+        : undefined,
+    );
     setResult({
-      headline: won
-        ? "You win! 💎"
-        : my.finishedMs !== undefined
-          ? "Treasure found!"
-          : "Good digging!",
+      headline: exploring
+        ? my.finishedMs !== undefined
+          ? "Treasure found! 🧰"
+          : "Nice exploring!"
+        : won
+          ? "You win! 💎"
+          : my.finishedMs !== undefined
+            ? "Treasure found!"
+            : "Good digging!",
       score,
-      stars: digStars(my.depth, won),
+      stars: exploring
+        ? digStars(my.depth, my.finishedMs !== undefined)
+        : digStars(my.depth, won),
       stats: [
         { label: "blocks dug", value: `${my.depth}/${DIG_DEPTH}` },
         { label: "gems", value: String(my.gems) },
-        { label: "place", value: `${ordinal(place)} of ${ranked.length}` },
+        exploring
+          ? { label: "words per minute", value: String(report.wpm) }
+          : { label: "place", value: `${ordinal(place)} of ${ranked.length}` },
+        { label: "accuracy", value: `${report.accuracy}%` },
       ],
     });
     setPhase("result");
     props.onResult?.(score);
     setClaim("pending");
-    void claimMiniGameReward("gem-dig", score).then(setClaim);
+    void claimMiniGameReward("gem-dig", score, { gems: found }).then((c) => {
+      setClaim(c);
+      if (c.digGems !== undefined) setBook(c.digGems);
+    });
+    if (
+      mode() === "solo" &&
+      kind() === "daily" &&
+      score > 0 &&
+      me() !== undefined
+    ) {
+      void submitDailyBest("dailyDig", day, score)
+        .then((best) => {
+          if (best) {
+            setExtraNote((n) =>
+              `${n ?? ""} 🏆 A new best for your class today!`.trim(),
+            );
+          }
+        })
+        .catch(() => undefined);
+    }
     const r = untrack(room);
     if (r !== null && r.hostUid === me()) void finishDigRoom(r.code);
   };
@@ -249,25 +331,35 @@ export function GemDigModal(props: {
     if (now() >= endsAt() || allDone) untrack(finishGame);
   });
 
-  const dig = (): void => {
+  const dig = (blocks = 1): void => {
     const t = clock();
     if (t < startedAt()) return;
     const cur = mine();
     if (cur.finishedMs !== undefined) return;
-    const block = shaft()[cur.depth];
-    const depth = cur.depth + 1;
-    const gems = cur.gems + (block?.gem === true ? 1 : 0);
-    const next: Progress = { depth, gems };
+    const depth = Math.min(DIG_DEPTH, cur.depth + blocks);
+    const next: Progress = { depth, gems: gemsAt(shaft(), depth) };
     if (depth >= DIG_DEPTH) {
       next.finishedMs = Math.max(0, t - startedAt());
       sfx.finish();
-    } else if (block?.gem === true) {
-      sfx.great();
-    } else {
-      sfx.good();
     }
     setMine(next);
     writer?.push(next);
+  };
+
+  /** Lava pushed me back up a block. */
+  const pushBack = (): void => {
+    const cur = mine();
+    if (cur.finishedMs !== undefined || cur.depth === 0) return;
+    const depth = cur.depth - 1;
+    const next: Progress = { depth, gems: gemsAt(shaft(), depth) };
+    setMine(next);
+    writer?.push(next);
+  };
+
+  const say = (text: string): void => {
+    clearTimeout(toastTimer);
+    setToast(text);
+    toastTimer = setTimeout(() => setToast(undefined), 2000);
   };
 
   // ---------------- solo vs Tappy ----------------
@@ -288,15 +380,35 @@ export function GemDigModal(props: {
         });
         botStep();
       },
-      botBlockDelay(difficulty(), block, Math.random),
+      botBlockDelay(
+        kind() === "daily"
+          ? (DIG_DIFFICULTIES[1] as DigDifficulty)
+          : difficulty(),
+        block,
+        Math.random,
+      ),
     );
   };
 
   const startSolo = async (): Promise<void> => {
     setPhase("loading");
-    const words = await selected().getWords();
+    const isDaily = kind() === "daily";
+    const option = isDaily
+      ? OPTIONS.find((o) => o.id === daily.listId)
+      : undefined;
+    const words = await (option ?? selected()).getWords();
     clearTimeout(botTimer);
-    setShaft(buildShaft(words, Math.floor(Math.random() * 1e9), difficulty()));
+    tracker = new TypingTracker();
+    const w = isDaily ? daily.world : world();
+    setPlayWorld(w);
+    setShaft(
+      buildShaft(
+        words,
+        isDaily ? daily.seed : Math.floor(Math.random() * 1e9),
+        isDaily ? (DIG_DIFFICULTIES[1] as DigDifficulty) : difficulty(),
+        w,
+      ),
+    );
     setMine({ depth: 0, gems: 0 });
     setBot({ depth: 0, gems: 0 });
     setResult(null);
@@ -304,7 +416,9 @@ export function GemDigModal(props: {
     setStartedAt(start);
     setNow(Date.now());
     setPhase("playing");
-    botTimer = setTimeout(botStep, START_COUNTDOWN_MS);
+    if (kind() !== "explore") {
+      botTimer = setTimeout(botStep, START_COUNTDOWN_MS);
+    }
   };
   onCleanup(() => clearTimeout(botTimer));
 
@@ -330,16 +444,28 @@ export function GemDigModal(props: {
       return;
     }
     setRoom(next);
+    for (const [uid, r] of Object.entries(next.react ?? {})) {
+      if (r.at > (seenReacts[uid] ?? 0)) {
+        const fresh = seenReacts[uid] !== undefined || Date.now() - r.at < 3000;
+        seenReacts[uid] = r.at;
+        const who = next.players[uid]?.name ?? "Someone";
+        if (fresh && uid !== me()) say(`${who} ${r.e}`);
+      }
+    }
     if (
       next.status === "playing" &&
       next.startedAt !== undefined &&
-      phase() === "lobby"
+      (phase() === "lobby" ||
+        (phase() === "result" && next.startedAt !== startedAt()))
     ) {
+      tracker = new TypingTracker();
+      setPlayWorld(next.world ?? "garden");
       setShaft(
         buildShaft(
           next.words,
           next.seed,
           digDifficultyFor(next.difficultyLabel),
+          next.world ?? "garden",
         ),
       );
       setMine({ depth: 0, gems: 0 });
@@ -359,6 +485,7 @@ export function GemDigModal(props: {
         difficultyLabel: difficulty().label,
         wordListLabel: selected().label,
         words,
+        world: world(),
       });
       watchRoom(code);
     } catch (e) {
@@ -399,8 +526,17 @@ export function GemDigModal(props: {
     void leaveRoom();
   };
   createEffect(() => {
-    if (!props.open) untrack(reset);
-    else setMode(props.initialMode ?? "solo");
+    if (!props.open) {
+      untrack(reset);
+    } else {
+      setMode(props.initialMode ?? "solo");
+      // read my gem book (no coins: score 0)
+      if (me() !== undefined) {
+        void claimMiniGameReward("gem-dig", 0, { gems: {} }).then((c) => {
+          if (c.digGems !== undefined) setBook(c.digGems);
+        });
+      }
+    }
   });
   onCleanup(() => void leaveRoom());
 
@@ -431,7 +567,13 @@ export function GemDigModal(props: {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
-                    text="Race Tappy"
+                    text={
+                      kind() === "explore"
+                        ? `Explore ${worldById(world()).name}`
+                        : kind() === "daily"
+                          ? "Start today's dig"
+                          : `Race Tappy in ${worldById(world()).name}`
+                    }
                     onClick={() => void startSolo()}
                   />
                 }
@@ -451,8 +593,18 @@ export function GemDigModal(props: {
             <GameSetupSection title="How to play" accent>
               <ul class="grid gap-2 font-kid text-base text-text">
                 <li>⛏️ Type the word on the block to dig through it.</li>
-                <li>💎 Some blocks hide gems - dig them for bonus points.</li>
-                <li>🪨 Rocks have longer words.</li>
+                <li>
+                  ✨ Sparkles hide gems for your gem book. 🎁 Treasure blocks
+                  hold two!
+                </li>
+                <li>
+                  🪨 Stone: longer words · 🧊 Ice: type it twice · 🌋 Lava: be
+                  quick!
+                </li>
+                <li>
+                  🧰 4 clean blocks in a row earn a tool: 🧨 dynamite, 🔩 drill,
+                  🔦 lantern.
+                </li>
                 <li>
                   🧰 First to the treasure at block {DIG_DEPTH} wins! The others
                   then get {FINISH_GRACE_MS / 1000} seconds to finish.
@@ -469,6 +621,98 @@ export function GemDigModal(props: {
                 togetherLabel={`friends (up to ${MAX_DIGGERS})`}
               />
             </GameSetupSection>
+            <Show when={mode() === "solo"}>
+              <div class="grid grid-cols-3 gap-2">
+                <For
+                  each={[
+                    {
+                      id: "race" as const,
+                      emoji: "🏁",
+                      label: "Race Tappy",
+                      hint: "first to the treasure",
+                    },
+                    {
+                      id: "explore" as const,
+                      emoji: "🔎",
+                      label: "Explore",
+                      hint: "no rival, take your time",
+                    },
+                    {
+                      id: "daily" as const,
+                      emoji: "📅",
+                      label: "Daily dig",
+                      hint: "same shaft for everyone",
+                    },
+                  ]}
+                >
+                  {(b) => (
+                    <button
+                      type="button"
+                      class={
+                        kind() === b.id
+                          ? "grid cursor-pointer place-items-center gap-0.5 rounded-xl border-2 border-main bg-main/15 p-2 text-center text-text"
+                          : "grid cursor-pointer place-items-center gap-0.5 rounded-xl border-2 border-transparent bg-sub-alt p-2 text-center text-sub"
+                      }
+                      onClick={() => setKind(b.id)}
+                    >
+                      <span class="text-2xl">{b.emoji}</span>
+                      <span class="text-sm font-bold">{b.label}</span>
+                      <span class="text-xs">{b.hint}</span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+            <Show
+              when={mode() === "solo" && kind() === "daily"}
+              fallback={
+                <GameSetupSection title="Where to dig?">
+                  <div class="grid grid-cols-4 gap-2">
+                    <For each={WORLDS}>
+                      {(w) => (
+                        <button
+                          type="button"
+                          class={
+                            world() === w.id
+                              ? "grid cursor-pointer place-items-center rounded-xl border-2 border-main bg-main/15 p-2 text-center text-xs text-text"
+                              : "grid cursor-pointer place-items-center rounded-xl border-2 border-transparent bg-sub-alt p-2 text-center text-xs text-sub"
+                          }
+                          onClick={() => setWorld(w.id)}
+                        >
+                          <span class="text-2xl">{w.emoji}</span>
+                          <span class="font-bold">{w.name}</span>
+                          <span>
+                            {w.gems.map((g) => GEMS[g].emoji).join(" ")}
+                          </span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </GameSetupSection>
+              }
+            >
+              <GameSetupSection title="📅 Today's dig">
+                <div class="grid gap-2 text-sm text-sub">
+                  <div>
+                    {worldById(daily.world).emoji} {worldById(daily.world).name}{" "}
+                    · Medium · race Tappy
+                  </div>
+                  <Show
+                    when={me() !== undefined}
+                    fallback={<div>Sign in to see the class board.</div>}
+                  >
+                    <DailyClassBoard
+                      collection="dailyDig"
+                      day={day}
+                      unit="pts"
+                    />
+                  </Show>
+                </div>
+              </GameSetupSection>
+            </Show>
+            <Show when={me() !== undefined}>
+              <GemBook gems={book()} />
+            </Show>
             <GameSetupSection title="Words">
               <DifficultySegmented
                 options={DIG_DIFFICULTIES}
@@ -572,17 +816,50 @@ export function GemDigModal(props: {
             timeLeftMs={Math.max(0, endsAt() - Math.max(now(), startedAt()))}
             hurry={Object.values(finishTimes()).some((f) => f !== undefined)}
             over={phase() === "result"}
+            world={playWorld()}
             onDig={dig}
+            onPushBack={pushBack}
+            onWord={(w, m) => tracker.word(w, m)}
+            onMiss={() => tracker.miss()}
+            {...(roomCode() === undefined
+              ? {}
+              : {
+                  reactions: DIG_REACTIONS,
+                  onReact: (e: string) => {
+                    const code = roomCode();
+                    if (code !== undefined) {
+                      say(`You ${e}`);
+                      void sendDigReaction(code, e).catch(() => undefined);
+                    }
+                  },
+                })}
+            {...(toast() === undefined ? {} : { toast: toast() })}
           />
           <Show when={result()}>
             {(r) => (
               <GameResultOverlay
                 result={r()}
-                note={claimNote(claim())}
+                note={[claimNote(claim()), extraNote()]
+                  .filter((n) => n !== undefined)
+                  .join(" ")}
                 onPlayAgain={
-                  mode() === "solo" ? () => void startSolo() : undefined
+                  mode() === "solo"
+                    ? () => void startSolo()
+                    : room()?.hostUid === me()
+                      ? () => {
+                          const rm = room();
+                          if (rm !== null) void rematchDigRoom(rm);
+                        }
+                      : undefined
                 }
+                playAgainLabel={mode() === "solo" ? "Dig again" : "Rematch!"}
                 onExit={() => props.onClose()}
+                extra={
+                  <div class="grid gap-2">
+                    <PracticeWords words={practice()} />
+                    <GemBook gems={book()} />
+                  </div>
+                }
               />
             )}
           </Show>

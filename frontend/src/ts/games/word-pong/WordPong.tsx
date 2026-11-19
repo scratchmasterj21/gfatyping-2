@@ -207,11 +207,22 @@ export function WordPong(props: {
     ),
   );
 
-  const progress = (): number =>
+  /** time used, 0-1 */
+  const timeUsed = (): number =>
     Math.max(
       0,
       Math.min(1, (props.now - props.game.sentAt) / props.game.speedMs),
     );
+  /**
+   * Where the ball is, 0-1. A smash (or fire ball) rockets over the net
+   * and then slows down near the paddle; other balls fly evenly.
+   */
+  const progress = (): number => {
+    const t = timeUsed();
+    return props.game.smash === true || props.game.ball === "fire"
+      ? 1 - (1 - t) ** 3
+      : t;
+  };
   // ball x in %: travels toward whoever has to answer (you are on the left)
   const xAt = (p: number): number => (mine() ? 84 - 68 * p : 16 + 68 * p);
   /** one bounce on the receiver's half */

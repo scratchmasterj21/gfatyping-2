@@ -123,7 +123,7 @@ export function initialPong(
   };
 }
 
-const SMASH_SPEED = 0.65;
+const SMASH_SPEED = 0.5;
 const FIRE_SPEED = 0.6;
 const GIANT_SPEED = 1.3;
 
@@ -138,7 +138,9 @@ export function speedFor(
   if (ball.smash === true) factor *= SMASH_SPEED;
   if (ball.ball === "fire") factor *= FIRE_SPEED;
   if (ball.ball === "giant") factor *= GIANT_SPEED;
-  return Math.round(Math.max(d.minMs * 0.55, base * factor));
+  // smashes can go faster than any normal ball
+  const floor = d.minMs * (ball.smash === true ? 0.42 : 0.55);
+  return Math.round(Math.max(floor, base * factor));
 }
 
 const cleanWords = (pool: string[]): string[] =>

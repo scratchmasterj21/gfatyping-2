@@ -90,7 +90,7 @@ export const games: Game[] = [
     id: "gem-dig",
     name: "Gem Dig",
     description:
-      "Type words to dig down for gems - race Tappy or up to 7 friends!",
+      "Dig through ice, lava and treasure in 4 worlds - collect gems, race Tappy or friends!",
     icon: "fa-gem",
     words: "lessons",
   },
@@ -178,7 +178,7 @@ export const games: Game[] = [
     id: "type-toss",
     name: "Type Toss",
     description:
-      "Type as many words as you can before time runs out — shoot the shelf targets!",
+      "A fair-ground stall: ducks, cans and moles - win tickets for prizes!",
     icon: "fa-hourglass",
     words: "lessons",
   },

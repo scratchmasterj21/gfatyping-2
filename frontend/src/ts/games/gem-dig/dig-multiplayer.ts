@@ -16,7 +16,12 @@ import {
   getRealtimeDb,
   trackRealtimeListener,
 } from "../../firebase";
-import { DIG_DIFFICULTIES, DIG_TIME_MS, DigDifficulty } from "./dig-rules";
+import {
+  DIG_DIFFICULTIES,
+  DIG_TIME_MS,
+  DigDifficulty,
+  WorldId,
+} from "./dig-rules";
 
 /**
  * Gem Dig rooms (RTDB digRooms/{code}). Each player only writes their own
@@ -47,6 +52,10 @@ export type DigRoom = {
   /** server-clock ms when digging starts (after a short countdown) */
   startedAt?: number;
   players: Record<string, DigPlayer>;
+  /** which dig (look + gems) */
+  world?: WorldId;
+  /** emoji reactions: uid -> latest */
+  react?: Record<string, { e: string; at: number }>;
 };
 
 export const MAX_DIGGERS = 8;
@@ -120,6 +129,7 @@ export async function createDigRoom(input: {
   difficultyLabel: string;
   wordListLabel: string;
   words: string[];
+  world?: WorldId;
 }): Promise<string> {
   const user = currentUser();
   const words = input.words
@@ -139,6 +149,7 @@ export async function createDigRoom(input: {
         wordListLabel: input.wordListLabel,
         words,
         seed: Math.floor(Math.random() * 1_000_000_000),
+        world: input.world ?? "garden",
         players: { [user.uid]: newPlayer(user) },
       } satisfies DigRoom;
     });
@@ -195,6 +206,40 @@ export async function startDigRoom(room: DigRoom): Promise<void> {
   await update(roomRef(room.code), {
     status: "playing",
     startedAt: digServerNow() + START_COUNTDOWN_MS,
+  });
+}
+
+/** Host: dig again with everyone still here (a new shaft). */
+export async function rematchDigRoom(room: DigRoom): Promise<void> {
+  const players: Record<string, DigPlayer> = {};
+  for (const p of Object.values(room.players ?? {})) {
+    if (!p.online) continue;
+    players[p.uid] = {
+      uid: p.uid,
+      name: p.name,
+      joinedAt: p.joinedAt,
+      online: true,
+      depth: 0,
+      gems: 0,
+    };
+  }
+  await update(roomRef(room.code), {
+    players,
+    status: "playing",
+    seed: Math.floor(Math.random() * 1_000_000_000),
+    startedAt: digServerNow() + START_COUNTDOWN_MS,
+    react: null,
+  });
+}
+
+/** Emoji reactions for dig rooms. */
+export const DIG_REACTIONS = ["👍", "😂", "😮", "🔥", "💎"];
+
+export async function sendDigReaction(code: string, e: string): Promise<void> {
+  const user = currentUser();
+  await set(ref(getRealtimeDb(), `digRooms/${code}/react/${user.uid}`), {
+    e,
+    at: Date.now(),
   });
 }
 

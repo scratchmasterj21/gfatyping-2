@@ -30,13 +30,15 @@ export type MiniGameClaim = (
 ) & {
   /** Rescue Ship: my whole pet collection after this run */
   shipPets?: Record<string, number>;
+  /** Gem Dig: my whole gem collection after this run */
+  digGems?: Record<string, number>;
 };
 
 /** Asks the server for this run's coins (one transaction, capped per day). */
 export async function claimMiniGameReward(
   gameId: MiniGameId,
   score: number,
-  extra?: { pets?: Record<string, number> },
+  extra?: { pets?: Record<string, number>; gems?: Record<string, number> },
 ): Promise<MiniGameClaim> {
   if (!isAuthenticated()) return { kind: "signedOut" };
   try {
@@ -45,9 +47,12 @@ export async function claimMiniGameReward(
       coins: number;
       capped?: boolean;
       shipPets?: Record<string, number>;
+      digGems?: Record<string, number>;
     }>("/api/claim-reward", { type: "miniGame", gameId, score, ...extra });
-    const pets =
-      result.shipPets === undefined ? {} : { shipPets: result.shipPets };
+    const pets = {
+      ...(result.shipPets === undefined ? {} : { shipPets: result.shipPets }),
+      ...(result.digGems === undefined ? {} : { digGems: result.digGems }),
+    };
     if (result.coins > 0) {
       invalidateCoinQueries();
       return { kind: "coins", coins: result.coins, ...pets };

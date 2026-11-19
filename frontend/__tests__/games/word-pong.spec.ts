@@ -81,10 +81,15 @@ describe("word ping-pong", () => {
     expect(speedFor(easy, 2, { smash: true })).toBeLessThan(base);
     expect(speedFor(easy, 2, { ball: "fire" })).toBeLessThan(base);
     expect(speedFor(easy, 2, { ball: "giant" })).toBeGreaterThan(base);
+    // a smash takes about half the time
+    expect(speedFor(easy, 2, { smash: true })).toBeLessThanOrEqual(base * 0.5);
     // never impossibly fast
     expect(
       speedFor(easy, 99, { smash: true, ball: "fire" }),
-    ).toBeGreaterThanOrEqual(easy.minMs * 0.55);
+    ).toBeGreaterThanOrEqual(easy.minMs * 0.42);
+    expect(speedFor(easy, 99, { ball: "fire" })).toBeGreaterThanOrEqual(
+      easy.minMs * 0.55,
+    );
   });
 
   it("a return carries the shot, the next return clears it", () => {

@@ -142,6 +142,88 @@ async function claimHouseChore(
   }
 }
 
+/** Type Toss prize booth: plushies and their ticket prices. */
+const TOSS_PRIZES: Record<string, number> = {
+  teddy: 100,
+  chick: 150,
+  frog: 200,
+  panda: 250,
+  dino: 300,
+  octopus: 350,
+  unicorn: 400,
+  fox: 450,
+  whale: 500,
+  dragon: 600,
+  lion: 700,
+  trophy: 1000,
+};
+/** Most tickets one Type Toss round can bank. */
+const MAX_TOSS_TICKETS = 1500;
+
+/**
+ * Type Toss prize booth: bank a round's tickets and/or buy a prize with
+ * banked tickets. Cosmetic only (no coins). One read, plus one write.
+ */
+async function claimTossBooth(
+  uid: string,
+  rawTickets: unknown,
+  rawBuy: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  const add = Math.floor(Number(rawTickets ?? 0));
+  const buy = typeof rawBuy === "string" ? rawBuy : undefined;
+  if (
+    !Number.isFinite(add) ||
+    add < 0 ||
+    add > MAX_TOSS_TICKETS ||
+    (buy !== undefined && TOSS_PRIZES[buy] === undefined)
+  ) {
+    res.status(400).json({ tickets: 0, prizes: [] });
+    return;
+  }
+  const userRef = getAdminApp().firestore().collection("users").doc(uid);
+  try {
+    let tickets = 0;
+    let prizes: string[] = [];
+    let bought = false;
+    await getAdminApp()
+      .firestore()
+      .runTransaction(async (tx: admin.firestore.Transaction) => {
+        const data = ((await tx.get(userRef)).data() ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const booth = (data["tossBooth"] ?? {}) as {
+          tickets?: unknown;
+          prizes?: Record<string, unknown>;
+        };
+        tickets = (typeof booth.tickets === "number" ? booth.tickets : 0) + add;
+        const owned: Record<string, unknown> = { ...booth.prizes };
+        bought = false;
+        if (buy !== undefined && owned[buy] !== true) {
+          const price = TOSS_PRIZES[buy] ?? Infinity;
+          if (tickets >= price) {
+            tickets -= price;
+            owned[buy] = true;
+            bought = true;
+          }
+        }
+        prizes = Object.keys(owned).filter((k) => owned[k] === true);
+        if (add > 0 || bought) {
+          tx.set(
+            userRef,
+            { tossBooth: { tickets, prizes: owned } },
+            { mergeFields: ["tossBooth"] },
+          );
+        }
+      });
+    res.status(200).json({ tickets, prizes, bought });
+  } catch (e) {
+    console.error("claim-reward (tossBooth) failed:", e);
+    res.status(500).json({ tickets: 0, prizes: [] });
+  }
+}
+
 /**
  * Balloon Pop levels: keep my best stars (0-3) for a level (1-12) and return
  * all of them. level 0 just reads. One read, plus one write on a new best.
@@ -252,17 +334,42 @@ const SHIP_PET_KEYS = new Set([
   "golden",
 ]);
 
-/** Rescue Ship pets from one run: known kinds, 1-40 each. */
-function readShipPets(raw: unknown): Record<string, number> | undefined {
+const DIG_GEM_KEYS = new Set([
+  "ruby",
+  "emerald",
+  "amethyst",
+  "diamond",
+  "fireopal",
+  "obsidian",
+  "fossil",
+  "amber",
+]);
+
+/** Items found in one run (pets, gems): known kinds, 1-40 each. */
+function readItems(
+  raw: unknown,
+  keys: Set<string>,
+): Record<string, number> | undefined {
   if (typeof raw !== "object" || raw === null) return undefined;
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!SHIP_PET_KEYS.has(k) || typeof v !== "number") continue;
+    if (!keys.has(k) || typeof v !== "number") continue;
     const n = Math.floor(v);
     if (n >= 1 && n <= 40) out[k] = n;
   }
   return out;
 }
+
+/** Collections that grow from mini game runs: user field + what may be in it. */
+const COLLECTIONS: Partial<
+  Record<
+    MiniGameId,
+    { field: string; body: "pets" | "gems"; keys: Set<string> }
+  >
+> = {
+  "rescue-ship": { field: "shipPets", body: "pets", keys: SHIP_PET_KEYS },
+  "gem-dig": { field: "digGems", body: "gems", keys: DIG_GEM_KEYS },
+};
 
 /**
  * Per-run coins for the solo mini games, capped to a few paid runs per game
@@ -273,7 +380,7 @@ async function claimMiniGame(
   gameId: MiniGameId,
   score: number,
   res: VercelResponse,
-  shipPets?: Record<string, number>,
+  found?: { field: string; items: Record<string, number> },
 ): Promise<void> {
   const userRef = getAdminApp().firestore().collection("users").doc(uid);
   try {
@@ -292,10 +399,10 @@ async function claimMiniGame(
         );
         coins = result.coins;
         capped = result.capped;
-        // Rescue Ship: the pets I rescued join my collection (same write)
-        const petEntries = Object.entries(shipPets ?? {});
-        if (shipPets !== undefined) {
-          const old = (data["shipPets"] ?? {}) as Record<string, unknown>;
+        // pets rescued / gems dug join my collection (same write)
+        const petEntries = Object.entries(found?.items ?? {});
+        if (found !== undefined) {
+          const old = (data[found.field] ?? {}) as Record<string, unknown>;
           petTotals = {};
           for (const [k, v] of Object.entries(old)) {
             if (typeof v === "number") petTotals[k] = v;
@@ -314,14 +421,14 @@ async function claimMiniGame(
           fields["coins"] = admin.firestore.FieldValue.increment(coins);
           paths.push("miniGameRewards", "coins");
         }
-        if (petEntries.length > 0) {
-          fields["shipPets"] = Object.fromEntries(
+        if (petEntries.length > 0 && found !== undefined) {
+          fields[found.field] = Object.fromEntries(
             petEntries.map(([k, n]) => [
               k,
               admin.firestore.FieldValue.increment(n),
             ]),
           );
-          paths.push(...petEntries.map(([k]) => `shipPets.${k}`));
+          paths.push(...petEntries.map(([k]) => `${found.field}.${k}`));
         }
         tx.set(userRef, fields, { mergeFields: paths });
       });
@@ -329,7 +436,9 @@ async function claimMiniGame(
       claimed: coins > 0,
       coins,
       capped,
-      ...(petTotals === undefined ? {} : { shipPets: petTotals }),
+      ...(petTotals === undefined || found === undefined
+        ? {}
+        : { [found.field]: petTotals }),
     });
   } catch (e) {
     console.error("claim-reward (miniGame) failed:", e);
@@ -369,6 +478,7 @@ export default async function handler(
     mode?: unknown;
     category?: unknown;
     pets?: unknown;
+    gems?: unknown;
   };
   if (body.type === "avatarCollection") {
     const category = body.category;
@@ -385,6 +495,10 @@ export default async function handler(
       )
       .map(([id]) => id);
     await claimCollection(auth.uid, category, "ownedCostumes", required, res);
+    return;
+  }
+  if (body.type === "tossBooth") {
+    await claimTossBooth(auth.uid, body.score, body.category, res);
     return;
   }
   if (body.type === "balloonStars") {
@@ -410,12 +524,19 @@ export default async function handler(
       res.status(400).json({ claimed: false, coins: 0, capped: false });
       return;
     }
+    const col = COLLECTIONS[body.gameId];
+    const items =
+      col === undefined
+        ? undefined
+        : readItems(col.body === "pets" ? body.pets : body.gems, col.keys);
     await claimMiniGame(
       auth.uid,
       body.gameId,
       Math.floor(score),
       res,
-      body.gameId === "rescue-ship" ? readShipPets(body.pets) : undefined,
+      col === undefined || items === undefined
+        ? undefined
+        : { field: col.field, items },
     );
     return;
   }

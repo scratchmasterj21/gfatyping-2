@@ -12,7 +12,9 @@ export type DailyCollection =
   | "dailyGhost"
   | "dailyRally"
   | "dailyRace"
-  | "dailyDefender";
+  | "dailyDefender"
+  | "dailyDig"
+  | "dailyToss";
 
 export type DailyClassScore = { classId: string; score: number; name: string };
 

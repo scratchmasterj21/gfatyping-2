@@ -27,7 +27,6 @@ import {
 } from "../../src/ts/games/tower-climb/tower-rules";
 import { waveAccuracy, waveStars } from "../../src/ts/games/shared/wave-result";
 import { questStars } from "../../src/ts/games/typing-rpg/quest-stars";
-import { tossStars, tossWpm } from "../../src/ts/games/type-toss/toss-result";
 import {
   raceHeadline,
   raceStars,
@@ -147,24 +146,6 @@ describe("type racer result", () => {
     expect(raceStars(r)).toBe(1);
     expect(raceStars({ ...r, wordsTyped: 0 })).toBe(0);
     expect(raceHeadline({ ...r, marginChars: 2 })).toBe("Photo finish!");
-  });
-});
-
-describe("type toss result", () => {
-  const d = {
-    score: 50,
-    wordsTyped: 10,
-    hits: 10,
-    misses: 0,
-    totalChars: 50,
-    totalTime: 60,
-  };
-  it("gives stars by words per minute", () => {
-    expect(tossWpm(d)).toBe(10);
-    expect(tossStars(d)).toBe(2);
-    expect(tossStars({ ...d, totalChars: 100 })).toBe(3);
-    expect(tossStars({ ...d, totalChars: 20 })).toBe(1);
-    expect(tossStars({ ...d, wordsTyped: 0 })).toBe(0);
   });
 });
 

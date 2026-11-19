@@ -1,22 +1,20 @@
-import type Phaser from "phaser";
-
 import {
   createEffect,
   createMemo,
   createSignal,
   For,
   JSXElement,
+  on,
   onCleanup,
   Show,
   untrack,
 } from "solid-js";
 
-import type { GameOverScene } from "./scenes/GameOverScene";
-
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
+import { DailyClassBoard } from "../components/DailyClassBoard";
 import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
@@ -32,49 +30,46 @@ import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
 import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS } from "../components/multiplayer-unlock-hints";
+import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
+import { dailyDay } from "../ghost-hunter/daily-haunting";
+import {
+  arcadeNow,
+  ArcadeRoom,
+  claimKill,
+  createArcadeRoom,
+  finishArcadeRoom,
+  joinArcadeRoom,
+  leaveArcadeRoom,
+  startArcadeRoom,
+  subscribeArcadeRoom,
+  syncArcadeClock,
+  updateArcadePlayer,
+} from "../shared/arcade-room";
+import { submitDailyBest } from "../shared/daily-board";
 import {
   getWordListOptions,
   WordListOption,
 } from "../word-defender/systems/vocab-pool";
+import { PrizeBooth } from "./PrizeBooth";
 import {
-  createTypeTossGame,
-  TYPE_TOSS_DIFFICULTIES,
-  GameDifficulty,
-} from "./game-config";
-import { tossAccuracy, TossEnd, tossStars, tossWpm } from "./toss-result";
-import {
-  createTossRoom,
-  finishTossRoom,
-  joinTossRoom,
-  leaveTossRoom,
-  markTossRoomPlaying,
-  startTossRoom,
-  subscribeTossRoom,
-  TossPlayer,
-  TossRoom,
-  updateTossPlayer,
-} from "./type-toss-multiplayer";
-
-const toView = (d: TossEnd): GameResultView => ({
-  headline: tossStars(d) >= 3 ? "Prize champion!" : "Time's up!",
-  score: d.score,
-  scoreLabel: "tickets",
-  stars: tossStars(d),
-  stats: [
-    { label: "prizes won", value: String(d.wordsTyped) },
-    { label: "words per minute", value: String(tossWpm(d)) },
-    { label: "accuracy", value: `${tossAccuracy(d)}%` },
-    { label: "missed", value: String(d.misses) },
-  ],
-});
-
-/** Minimum gap between live multiplayer stat writes. */
-const STATS_INTERVAL_MS = 350;
+  dailyTossPlan,
+  Stall,
+  STALL_IDS,
+  STALLS,
+  TOSS_DIFFICULTIES,
+  TossDifficulty,
+  tossStars,
+} from "./toss-rules";
+import { Booth, boothRequest } from "./toss-store";
+import { TossEnd, TossGame, TossShared } from "./TossGame";
 
 const OPTIONS = getWordListOptions();
 const GROUPS = groupWordListOptions(OPTIONS);
+const KIND = "tossArena" as const;
+const MEDIUM = TOSS_DIFFICULTIES[1] as TossDifficulty;
+const HOT_HAND_TEXT = "5 in a row with no mistakes = 🔥 hot hand (2× tickets).";
 
 type Props = {
   open: boolean;
@@ -91,217 +86,232 @@ type Props = {
   ) => void;
 };
 
+type Run = {
+  key: number;
+  stall: Stall;
+  words: string[];
+  seed: number;
+  difficulty: TossDifficulty;
+  daily: boolean;
+  lesson: boolean;
+  shared?: TossShared;
+};
+
 export function TypeTossModal(props: Props): JSXElement {
   const [selected, setSelected] = createSignal<WordListOption>(
     OPTIONS[0] as WordListOption,
   );
-  const [difficulty, setDifficulty] = createSignal<GameDifficulty>(
-    TYPE_TOSS_DIFFICULTIES[1] as GameDifficulty,
-  );
-  const [phase, setPhase] = createSignal<
-    "pick" | "loading" | "lobby" | "playing" | "results"
-  >("pick");
+  const [difficulty, setDifficulty] = createSignal<TossDifficulty>(MEDIUM);
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
-  const [matchLength, setMatchLength] = createSignal<30 | 60>(60);
-  const [roomCode, setRoomCode] = createSignal<string>();
-  const [joinCode, setJoinCode] = createSignal("");
-  const [room, setRoom] = createSignal<TossRoom>();
-  const [roomBusy, setRoomBusy] = createSignal(false);
-  const [avatarVisible, setAvatarVisible] = createSignal(false);
+  const [stall, setStall] = createSignal<Stall | "daily">("ducks");
+  const [phase, setPhase] = createSignal<
+    "pick" | "booth" | "loading" | "playing" | "lobby" | "arena-results"
+  >("pick");
+  const [run, setRun] = createSignal<Run | null>(null);
+  const [booth, setBooth] = createSignal<Booth>({ tickets: 0, prizes: [] });
   const [result, setResult] = createSignal<{
     view: GameResultView;
-    multiplayer: boolean;
+    practice: string[];
+    note?: string;
   } | null>(null);
-  let containerRef: HTMLDivElement | undefined;
-  let game: Phaser.Game | null = null;
-  let unsubscribeRoom: (() => void) | undefined;
-  let startTimer: ReturnType<typeof setTimeout> | undefined;
-  let multiplayerGameStarted = false;
+  // online
+  const [roomCode, setRoomCode] = createSignal<string>();
+  const [joinCode, setJoinCode] = createSignal("");
+  const [room, setRoom] = createSignal<ArcadeRoom>();
+  const [roomBusy, setRoomBusy] = createSignal(false);
+  let unsubscribe: (() => void) | undefined;
+  let startedAt = 0;
+  let runKey = 0;
 
-  const players = createMemo(() =>
-    Object.values(room()?.players ?? {}).sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      if (b.words !== a.words) return b.words - a.words;
-      return b.accuracy - a.accuracy;
-    }),
-  );
+  const myUid = (): string | undefined => getAuthenticatedUser()?.uid;
+  const isLesson = (): boolean => props.lessonWords !== undefined;
+  const day = dailyDay();
+  const daily = dailyTossPlan(day);
 
-  const startGame = async (
-    wordsOverride?: string[],
-    multiplayerRoom?: TossRoom,
-  ): Promise<void> => {
-    const onClose = props.onClose;
-    const onResult = props.onResult;
+  // ------------------------------------------------------------ solo
+  const start = async (wordsOverride?: string[]): Promise<void> => {
     setResult(null);
     setPhase("loading");
-    const words = wordsOverride ?? (await selected().getWords());
-    setPhase("playing");
-    await Promise.resolve();
-    if (containerRef === undefined) return;
-    const lessonCheckpoint = wordsOverride !== undefined;
-    const usedDifficulty =
-      multiplayerRoom === undefined
-        ? lessonCheckpoint
-          ? ({
-              label: "Medium",
-              cols: 3,
-              time: 60,
-            } satisfies GameDifficulty)
-          : difficulty()
-        : ({
-            label: "Medium",
-            cols: 3,
-            time: multiplayerRoom.durationSec,
-          } satisfies GameDifficulty);
-    const usedGroup = selected().group;
-    game = await createTypeTossGame(
-      containerRef,
+    const lesson = wordsOverride !== undefined;
+    const isDaily = !lesson && stall() === "daily";
+    const option = isDaily
+      ? OPTIONS.find((o) => o.id === daily.listId)
+      : undefined;
+    const words = wordsOverride ?? (await (option ?? selected()).getWords());
+    const picked = stall();
+    setRun({
+      key: ++runKey,
+      stall: lesson
+        ? "ducks"
+        : isDaily
+          ? daily.stall
+          : picked === "daily"
+            ? "ducks"
+            : picked,
       words,
-      usedDifficulty,
-      multiplayerRoom !== undefined,
-      multiplayerRoom?.seed,
-      lessonCheckpoint,
+      seed: isDaily ? daily.seed : Math.floor(Math.random() * 2 ** 31),
+      difficulty: lesson || isDaily ? MEDIUM : difficulty(),
+      daily: isDaily,
+      lesson,
+    });
+    setPhase("playing");
+  };
+
+  const onEnd = async (e: TossEnd): Promise<void> => {
+    const r = untrack(run);
+    if (r === null) return;
+    props.onResult?.(
+      e.tickets,
+      e.words,
+      r.difficulty.label,
+      r.lesson ? "" : selected().group,
+      r.lesson,
     );
-    setAvatarVisible(true);
-    game.events.on("game-avatar-visible", setAvatarVisible);
-    game.events.on(
-      "game-result",
-      (data: { score: number; wave: number; cleared?: boolean }) => {
-        setAvatarVisible(false);
-        if (multiplayerRoom === undefined) {
-          onResult?.(
-            data.score,
-            data.wave,
-            usedDifficulty.label,
-            usedGroup,
-            data.cleared,
-          );
-        }
+    const notes: string[] = [];
+    if (myUid() !== undefined && e.tickets > 0) {
+      const b = await boothRequest(e.tickets).catch(() => null);
+      if (b !== null) {
+        setBooth(b);
+        notes.push(
+          `🎟️ ${e.tickets} tickets banked - ${b.tickets} to spend at the prize booth!`,
+        );
+      }
+    }
+    if (r.daily && e.tickets > 0 && myUid() !== undefined) {
+      const best = await submitDailyBest("dailyToss", day, e.tickets).catch(
+        () => false,
+      );
+      if (best) notes.push("🏆 A new best for your class today!");
+    }
+    if (r.shared !== undefined) return; // the room shows the results
+    const stars = r.lesson ? 3 : tossStars(e.tickets, e.words, e.timeMs);
+    setResult({
+      view: {
+        headline: stars >= 3 ? "Prize champion! 🏆" : "Time's up!",
+        score: e.tickets,
+        scoreLabel: "tickets",
+        stars,
+        stats: [
+          { label: "targets hit", value: String(e.words) },
+          { label: "words per minute", value: String(e.wpm) },
+          { label: "accuracy", value: `${e.accuracy}%` },
+          { label: "best streak", value: `🔥 ${e.bestStreak}` },
+        ],
       },
-    );
-    if (multiplayerRoom !== undefined) {
-      // Every word or typo emits stats; send at most ~3 a second (always the
-      // latest, and the final one immediately) so key-mashing can't flood
-      // the Realtime Database.
-      type TossStats = Pick<
-        TossPlayer,
-        "score" | "words" | "accuracy" | "finished"
-      >;
-      let lastSent = 0;
-      let pending: TossStats | null = null;
-      let flushTimer: ReturnType<typeof setTimeout> | undefined;
-      const send = (stats: TossStats): void => {
-        lastSent = Date.now();
-        pending = null;
-        void updateTossPlayer(multiplayerRoom.code, stats);
-      };
-      game.events.on("type-toss-local-stats", (stats: TossStats) => {
-        clearTimeout(flushTimer);
-        const wait = STATS_INTERVAL_MS - (Date.now() - lastSent);
-        if (stats.finished || wait <= 0) {
-          send(stats);
-          return;
-        }
-        pending = stats;
-        flushTimer = setTimeout(() => {
-          if (pending !== null) send(pending);
-        }, wait);
-      });
-    }
-    game.events.on("game-over-screen", (d: TossEnd) => {
-      setResult({ view: toView(d), multiplayer: d.multiplayer === true });
-    });
-    game.events.on("exit-game", () => {
-      onClose();
+      practice: e.report.hardest,
+      note: notes.join(" "),
     });
   };
 
-  const playAgain = (): void => {
-    setResult(null);
-    const over = game?.scene.getScene("GameOver") as GameOverScene | null;
-    over?.playAgain();
+  const buy = async (id: string): Promise<void> => {
+    const b = await boothRequest(0, id).catch(() => null);
+    if (b !== null) setBooth(b);
   };
 
-  const cleanup = (): void => {
-    if (game !== null) {
-      game.destroy(true);
-      game = null;
-    }
-    setPhase("pick");
-    setAvatarVisible(false);
-    setResult(null);
-  };
+  // ------------------------------------------------------------ online
+  const players = createMemo(() =>
+    Object.values(room()?.players ?? {}).sort(
+      (a, b) => a.joinedAt - b.joinedAt,
+    ),
+  );
+  const online = (): ArcadeRoom["players"][string][] =>
+    players().filter((p) => p.online);
+  const isHost = (): boolean => room()?.hostUid === myUid();
 
-  const disconnectRoom = async (): Promise<void> => {
-    const code = roomCode();
-    unsubscribeRoom?.();
-    unsubscribeRoom = undefined;
-    if (startTimer !== undefined) clearTimeout(startTimer);
-    startTimer = undefined;
-    setRoom(undefined);
-    setRoomCode(undefined);
-    multiplayerGameStarted = false;
-    if (code !== undefined) await leaveTossRoom(code).catch(() => undefined);
-  };
+  const sharedFor = (r: ArcadeRoom): TossShared => ({
+    myUid: myUid() ?? "",
+    startAt: r.startAt ?? arcadeNow(),
+    now: arcadeNow,
+    kills: () => room()?.kills ?? {},
+    claim: (id) => void claimKill(KIND, r.code, id).catch(() => undefined),
+    report: (tickets, done) =>
+      void updateArcadePlayer(KIND, r.code, {
+        score: tickets,
+        lives: 1,
+        done,
+      }).catch(() => undefined),
+    others: () =>
+      Object.values(room()?.players ?? {})
+        .filter((p) => p.uid !== myUid() && p.online)
+        .map((p) => ({ name: p.name, score: p.score })),
+  });
 
-  const watchRoom = (code: string): void => {
-    unsubscribeRoom?.();
+  const watch = (code: string): void => {
+    unsubscribe?.();
     setRoomCode(code);
     setPhase("lobby");
-    unsubscribeRoom = subscribeTossRoom(code, (next) => {
+    void syncArcadeClock();
+    unsubscribe = subscribeArcadeRoom(KIND, code, (next) => {
       if (next === null) {
         setRoom(undefined);
         setRoomCode(undefined);
+        setRun(null);
         setPhase("pick");
-        showErrorNotification("The Type Toss room was closed");
+        showErrorNotification("The room was closed");
         return;
       }
       setRoom(next);
-      if (next.status === "countdown" && next.startAt !== undefined) {
-        if (startTimer !== undefined) clearTimeout(startTimer);
-        startTimer = setTimeout(
-          () => {
-            if (next.hostUid === getAuthenticatedUser()?.uid) {
-              void markTossRoomPlaying(code);
-            }
-          },
-          Math.max(0, next.startAt - Date.now()),
-        );
-      }
-      if (next.status === "playing" && !multiplayerGameStarted) {
-        multiplayerGameStarted = true;
-        untrack(() => void startGame(next.words, next));
+      if (
+        next.status === "playing" &&
+        next.startAt !== undefined &&
+        next.startAt !== startedAt
+      ) {
+        startedAt = next.startAt;
+        const st = (
+          STALL_IDS.includes(next.difficultyLabel as Stall)
+            ? next.difficultyLabel
+            : "ducks"
+        ) as Stall;
+        setResult(null);
+        setRun({
+          key: ++runKey,
+          stall: st,
+          words: next.words ?? [],
+          seed: next.seed ?? 1,
+          difficulty: MEDIUM,
+          daily: false,
+          lesson: false,
+          shared: sharedFor(next),
+        });
+        setPhase("playing");
       }
       if (next.status === "finished") {
-        if (game !== null) {
-          game.destroy(true);
-          game = null;
-        }
-        setAvatarVisible(false);
-        setPhase("results");
+        setRun(null);
+        setPhase("arena-results");
       }
     });
   };
+
+  createEffect(() => {
+    const r = room();
+    if (r?.status !== "playing" || r.hostUid !== myUid()) return;
+    const on = Object.values(r.players ?? {}).filter((p) => p.online);
+    if (on.length > 0 && on.every((p) => p.done)) {
+      void finishArcadeRoom(KIND, r.code).catch(() => undefined);
+    }
+  });
 
   const createRoom = async (): Promise<void> => {
     if (props.multiplayerUnlocked !== true) return;
     setRoomBusy(true);
     try {
       const option = selected();
-      watchRoom(
-        await createTossRoom({
-          durationSec: matchLength(),
+      const st = stall();
+      watch(
+        await createArcadeRoom(KIND, {
+          // the room's stall rides in the difficulty field
+          difficultyLabel: st === "daily" ? "ducks" : st,
           wordListLabel: option.label,
           words: await option.getWords(),
+          lives: 1,
         }),
       );
     } catch (error) {
-      showErrorNotification("Could not create Type Toss room", { error });
+      showErrorNotification("Could not create a room", { error });
     } finally {
       setRoomBusy(false);
     }
   };
-
   const joinRoom = async (): Promise<void> => {
     if (!/^\d{6}$/.test(joinCode())) {
       showErrorNotification("Enter the 6-digit room code");
@@ -309,69 +319,89 @@ export function TypeTossModal(props: Props): JSXElement {
     }
     setRoomBusy(true);
     try {
-      watchRoom(await joinTossRoom(joinCode()));
+      watch(await joinArcadeRoom(KIND, joinCode(), 1));
     } catch (error) {
-      showErrorNotification("Could not join Type Toss room", { error });
+      showErrorNotification("Could not join the room", { error });
     } finally {
       setRoomBusy(false);
     }
   };
-
-  createEffect(() => {
-    if (!props.open) {
-      cleanup();
-      void disconnectRoom();
-      return;
+  const leave = async (): Promise<void> => {
+    const code = roomCode();
+    unsubscribe?.();
+    unsubscribe = undefined;
+    setRoom(undefined);
+    setRoomCode(undefined);
+    startedAt = 0;
+    if (code !== undefined) {
+      await leaveArcadeRoom(KIND, code).catch(() => undefined);
     }
-    setMode(
-      props.initialMode === "together" && props.multiplayerUnlocked === true
-        ? "together"
-        : "solo",
-    );
-    const words = props.lessonWords;
-    if (words !== undefined) {
-      void startGame(words);
-    }
-  });
+  };
 
-  onCleanup(() => {
-    cleanup();
-    void disconnectRoom();
-  });
-
-  createEffect(() => {
-    const current = room();
-    if (
-      current?.status !== "playing" ||
-      current.hostUid !== getAuthenticatedUser()?.uid
-    ) {
-      return;
-    }
-    const online = Object.values(current.players ?? {}).filter(
-      (player) => player.online,
-    );
-    if (online.length > 0 && online.every((player) => player.finished)) {
-      void finishTossRoom(current.code);
-    }
-  });
-
-  const frameLayout = createMemo((): "pick" | "playing" | "compact" => {
-    if (phase() === "playing") return "playing";
-    if (phase() === "pick" && props.lessonWords === undefined) return "pick";
-    return "compact";
-  });
-
-  const tossDifficultyOptions = createMemo(() =>
-    TYPE_TOSS_DIFFICULTIES.map((d) => ({
-      ...d,
-      hint: `${d.time}s · ${d.cols * 3} targets`,
-    })),
+  // ------------------------------------------------------------ open/close
+  createEffect(
+    on(
+      () => props.open,
+      (open) => {
+        if (!open) {
+          setRun(null);
+          setResult(null);
+          setPhase("pick");
+          void leave();
+          return;
+        }
+        setMode(
+          untrack(() => props.initialMode) === "together" &&
+            untrack(() => props.multiplayerUnlocked) === true
+            ? "together"
+            : "solo",
+        );
+        const words = untrack(() => props.lessonWords);
+        if (words !== undefined) {
+          void start(words);
+          return;
+        }
+        if (myUid() !== undefined) {
+          void boothRequest(0)
+            .then(setBooth)
+            .catch(() => undefined);
+        }
+      },
+    ),
   );
+  onCleanup(() => void leave());
+
+  const layout = (): "pick" | "playing" | "compact" =>
+    phase() === "playing"
+      ? "playing"
+      : (phase() === "pick" || phase() === "booth") && !isLesson()
+        ? "pick"
+        : "compact";
+
+  const STALL_BUTTONS: {
+    id: Stall | "daily";
+    emoji: string;
+    label: string;
+    hint: string;
+  }[] = [
+    ...STALL_IDS.map((id) => ({
+      id,
+      emoji: STALLS[id].emoji,
+      label: STALLS[id].name,
+      hint: STALLS[id].tip,
+    })),
+    {
+      id: "daily",
+      emoji: "📅",
+      label: "Daily toss",
+      hint: "same stall for everyone today",
+    },
+  ];
 
   return (
     <Show when={props.open}>
-      <GameModalFrame layout={frameLayout()} onClose={() => props.onClose()}>
-        <Show when={phase() === "pick" && props.lessonWords === undefined}>
+      <GameModalFrame layout={layout()} onClose={() => props.onClose()}>
+        <Show when={phase() === "pick" && !isLesson()}>
           <GamePickLayout
             header={
               <GameModalHeader
@@ -384,8 +414,12 @@ export function TypeTossModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
-                    text="Start game"
-                    onClick={() => void startGame()}
+                    text={
+                      stall() === "daily"
+                        ? "Start today's toss"
+                        : `Play ${STALLS[stall() as Stall].name}`
+                    }
+                    onClick={() => void start()}
                   />
                 }
               >
@@ -393,6 +427,7 @@ export function TypeTossModal(props: Props): JSXElement {
                   gameId="type-toss"
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
+                  createLabel="Open a stall for friends"
                   onJoinCodeChange={setJoinCode}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
@@ -402,53 +437,92 @@ export function TypeTossModal(props: Props): JSXElement {
           >
             <GameSetupSection title="How to play" accent>
               <p class="text-em-sm text-sub">
-                {mode() === "solo"
-                  ? "Type as many words as you can before time runs out! Watch for ⏱️ bonus time and ✨ double points — avoid the 💣 trap."
-                  : "Everyone gets the same starting board and words. Score the most points before time runs out!"}
+                🎪 Type a target&apos;s word to throw a ball at it and win 🎟️
+                tickets! {HOT_HAND_TEXT} Hit 🏆 for 5× tickets, ⏱️ for more
+                time, ✨ for double tickets - but never the 💣! Spend your
+                tickets at the prize booth.
               </p>
             </GameSetupSection>
-
-            <Show when={mode() === "solo"}>
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <For
+                each={
+                  mode() === "solo"
+                    ? STALL_BUTTONS
+                    : STALL_BUTTONS.filter((b) => b.id !== "daily")
+                }
+              >
+                {(b) => (
+                  <button
+                    type="button"
+                    class={cn(
+                      "grid cursor-pointer place-items-center gap-0.5 rounded-xl border-2 p-2 text-center",
+                      stall() === b.id
+                        ? "border-main bg-main/15 text-text"
+                        : "border-transparent bg-sub-alt text-sub",
+                    )}
+                    onClick={() => setStall(b.id)}
+                  >
+                    <span class="text-2xl">{b.emoji}</span>
+                    <span class="text-sm font-bold">{b.label}</span>
+                    <span class="text-xs">{b.hint}</span>
+                  </button>
+                )}
+              </For>
+            </div>
+            <Show when={mode() === "solo" && stall() === "daily"}>
+              <GameSetupSection title="📅 Today's toss">
+                <div class="grid gap-2 text-sm text-sub">
+                  <div>
+                    {STALLS[daily.stall].emoji} {STALLS[daily.stall].name} ·
+                    Medium · 60 seconds
+                  </div>
+                  <Show
+                    when={myUid() !== undefined}
+                    fallback={<div>Sign in to see the class board.</div>}
+                  >
+                    <DailyClassBoard
+                      collection="dailyToss"
+                      day={day}
+                      unit="🎟️"
+                    />
+                  </Show>
+                </div>
+              </GameSetupSection>
+            </Show>
+            <Show when={mode() === "solo" && stall() !== "daily"}>
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
-                  options={tossDifficultyOptions()}
+                  options={TOSS_DIFFICULTIES}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(d)}
                 />
               </GameSetupSection>
             </Show>
-
+            <button
+              type="button"
+              class="flex w-full cursor-pointer items-center gap-3 rounded-xl bg-sub-alt p-3 text-left"
+              onClick={() => setPhase("booth")}
+            >
+              <span class="text-3xl">🎪</span>
+              <span class="grid">
+                <span class="font-bold text-text">Prize booth</span>
+                <span class="text-sm text-sub">
+                  🎟️ {booth().tickets} tickets · {booth().prizes.length} prizes
+                  on your shelf
+                </span>
+              </span>
+            </button>
             <GameSetupMore>
               <GameSetupSection title="Mode">
                 <SoloTogetherToggle
                   mode={mode()}
+                  soloLabel="Play alone"
+                  togetherLabel="Share a stall"
                   multiplayerUnlocked={props.multiplayerUnlocked === true}
                   unlockHint={MULTIPLAYER_UNLOCK_HINT_TYPE_TOSS}
                   onModeChange={setMode}
                 />
               </GameSetupSection>
-              <Show when={mode() === "together"}>
-                <GameSetupSection title="Match length">
-                  <div class="grid grid-cols-2 gap-2">
-                    <For each={[30, 60] as const}>
-                      {(seconds) => (
-                        <button
-                          type="button"
-                          class={cn(
-                            "min-h-12 rounded-xl px-3 py-3 text-base font-semibold",
-                            matchLength() === seconds
-                              ? "bg-main text-bg"
-                              : "bg-bg text-sub",
-                          )}
-                          onClick={() => setMatchLength(seconds)}
-                        >
-                          {seconds}s
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                </GameSetupSection>
-              </Show>
               <GameSetupSection title="Choose a word list">
                 <WordListPicker
                   groups={GROUPS}
@@ -460,6 +534,30 @@ export function TypeTossModal(props: Props): JSXElement {
           </GamePickLayout>
         </Show>
 
+        <Show when={phase() === "booth"}>
+          <GamePickLayout
+            header={
+              <GameModalHeader
+                title="🎪 Prize booth"
+                onClose={() => setPhase("pick")}
+              />
+            }
+            footer={
+              <GameSetupPrimaryAction
+                text="Done"
+                showArrow={false}
+                onClick={() => setPhase("pick")}
+              />
+            }
+          >
+            <PrizeBooth
+              booth={booth()}
+              signedIn={myUid() !== undefined}
+              onBuy={(id) => void buy(id)}
+            />
+          </GamePickLayout>
+        </Show>
+
         <Show when={phase() === "loading"}>
           <div class="flex items-center justify-center py-12 text-sub">
             Loading…
@@ -467,7 +565,7 @@ export function TypeTossModal(props: Props): JSXElement {
         </Show>
 
         <Show when={phase() === "lobby"}>
-          <div class="grid min-h-0 gap-4 overflow-y-auto pt-12">
+          <div class="grid gap-4 pt-12">
             <div class="text-center">
               <div class="text-em-xs font-bold tracking-widest text-sub uppercase">
                 room code
@@ -476,125 +574,128 @@ export function TypeTossModal(props: Props): JSXElement {
                 {roomCode()}
               </div>
               <div class="mt-2 text-sm text-sub">
-                {room()?.wordListLabel} · {room()?.durationSec}s
+                🎪 One stall for everyone - a target goes to whoever finishes
+                its word first ·{" "}
+                {STALLS[(room()?.difficultyLabel ?? "ducks") as Stall]?.name ??
+                  ""}{" "}
+                · {room()?.wordListLabel}
               </div>
             </div>
-            <For each={players()}>
-              {(player) => (
-                <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
-                  <UserAvatar uid={player.uid} class="h-8 w-8" />
-                  <span class="flex-1 truncate text-text">
-                    {player.name}
-                    {player.uid === room()?.hostUid ? " · host" : ""}
-                  </span>
-                  <span class={player.online ? "text-main" : "text-sub"}>
-                    {player.online ? "ready" : "offline"}
-                  </span>
-                </div>
-              )}
-            </For>
+            <div class="grid gap-2">
+              <For each={players()}>
+                {(p) => (
+                  <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
+                    <UserAvatar uid={p.uid} class="h-8 w-8" />
+                    <span class="flex-1 truncate text-text">
+                      {p.name}
+                      {p.uid === room()?.hostUid ? " · host" : ""}
+                    </span>
+                    <span class={p.online ? "text-main" : "text-sub"}>
+                      {p.online ? "ready" : "offline"}
+                    </span>
+                  </div>
+                )}
+              </For>
+            </div>
             <InviteClassmates
               gameId="type-toss"
               code={roomCode()}
-              show={
-                room()?.hostUid === getAuthenticatedUser()?.uid &&
-                room()?.status !== "countdown"
-              }
+              show={isHost()}
             />
             <Show
-              when={room()?.status === "countdown"}
+              when={isHost()}
               fallback={
-                <Show
-                  when={room()?.hostUid === getAuthenticatedUser()?.uid}
-                  fallback={
-                    <div class="text-center text-sub">Waiting for host…</div>
-                  }
-                >
-                  <GameSetupPrimaryAction
-                    text="Start match"
-                    disabled={
-                      players().filter((player) => player.online).length < 2
-                    }
-                    onClick={() => {
-                      const code = roomCode();
-                      if (code !== undefined) void startTossRoom(code);
-                    }}
-                  />
-                </Show>
+                <div class="text-center text-sub">Waiting for the host…</div>
               }
             >
-              <div class="text-center text-xl font-bold text-main">
-                Get ready…
-              </div>
+              <GameSetupPrimaryAction
+                text="Open the stall"
+                disabled={online().length < 2}
+                onClick={() => {
+                  const r = room();
+                  if (r !== undefined) {
+                    void startArcadeRoom(KIND, r, 1);
+                  }
+                }}
+              />
             </Show>
           </div>
         </Show>
 
         <Show when={phase() === "playing"}>
-          <Show when={roomCode() !== undefined}>
-            <div class="pointer-events-none absolute top-3 left-16 z-20 rounded bg-bg/90 px-3 py-2 text-em-xs shadow">
-              <div class="font-bold text-main">Type Toss {roomCode()}</div>
-              <For each={players()}>
-                {(player, index) => (
-                  <div class="flex min-w-44 gap-2 text-sub">
-                    <span>{index() + 1}.</span>
-                    <span class="max-w-24 flex-1 truncate">{player.name}</span>
-                    <span>{player.score}</span>
-                  </div>
-                )}
-              </For>
-            </div>
-          </Show>
-          <Show when={avatarVisible() && getAuthenticatedUser()?.uid}>
-            {(uid) => (
-              <div class="pointer-events-none absolute bottom-8 left-[4.5%] z-10 flex flex-col items-center">
-                <UserAvatar
-                  uid={uid()}
-                  class="h-10 w-10 rounded-full bg-sub-alt ring-2 ring-main"
-                />
-                <div class="-mt-1 h-9 w-6 rounded-t-lg bg-main/80"></div>
-              </div>
+          <Show when={run()} keyed>
+            {(r) => (
+              <TossGame
+                stall={r.stall}
+                words={r.words}
+                seed={r.seed}
+                difficulty={r.difficulty}
+                {...(r.shared === undefined ? {} : { shared: r.shared })}
+                onEnd={(e) => void onEnd(e)}
+              />
             )}
           </Show>
-          <div
-            ref={(el) => {
-              containerRef = el;
-            }}
-            class="h-full w-full"
-          ></div>
           <Show when={result()}>
             {(r) => (
               <GameResultOverlay
                 result={r().view}
-                onPlayAgain={r().multiplayer ? undefined : playAgain}
-                note={
-                  r().multiplayer ? "Waiting for the other players…" : undefined
-                }
+                {...(isLesson() ? {} : { onPlayAgain: () => void start() })}
+                {...(r().note === undefined || r().note === ""
+                  ? {}
+                  : { note: r().note })}
                 onExit={() => props.onClose()}
+                extra={<PracticeWords words={r().practice} />}
               />
             )}
           </Show>
         </Show>
 
-        <Show when={phase() === "results"}>
+        <Show when={phase() === "arena-results"}>
           <div class="grid gap-3 pt-12">
             <div class="text-center text-2xl font-bold text-main">
-              Match complete!
+              {(() => {
+                const best = [...online()].sort((a, b) => b.score - a.score)[0];
+                return best === undefined
+                  ? "Stall closed!"
+                  : best.uid === myUid()
+                    ? "🏆 You won the most tickets!"
+                    : `🏆 ${best.name} won the most tickets!`;
+              })()}
             </div>
-            <For each={players()}>
-              {(player, index) => (
-                <div class="flex items-center gap-3 rounded bg-sub-alt px-3 py-2">
-                  <span class="w-6 font-bold text-main">{index() + 1}</span>
-                  <UserAvatar uid={player.uid} class="h-9 w-9" />
+            <For each={[...online()].sort((a, b) => b.score - a.score)}>
+              {(p, i) => (
+                <div
+                  class={cn(
+                    "flex items-center gap-3 rounded px-3 py-2",
+                    p.uid === myUid() ? "bg-main/20" : "bg-sub-alt",
+                  )}
+                >
+                  <span class="w-6 font-bold text-main">{i() + 1}</span>
+                  <UserAvatar uid={p.uid} class="h-9 w-9" />
                   <span class="min-w-0 flex-1 truncate text-text">
-                    {player.name}
+                    {p.name}
                   </span>
-                  <span class="text-right text-em-xs text-sub">
-                    {player.score} pts · {player.accuracy}%
-                  </span>
+                  <span class="font-mono text-sub">🎟️ {p.score}</span>
                 </div>
               )}
             </For>
+            <Show
+              when={isHost()}
+              fallback={
+                <div class="text-center text-sub">Waiting for the host…</div>
+              }
+            >
+              <GameSetupPrimaryAction
+                text="Play again"
+                disabled={online().length < 2}
+                onClick={() => {
+                  const r = room();
+                  if (r !== undefined) {
+                    void startArcadeRoom(KIND, r, 1);
+                  }
+                }}
+              />
+            </Show>
             <GameSetupPrimaryAction
               text="Back to lessons"
               showArrow={false}

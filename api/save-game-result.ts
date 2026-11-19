@@ -92,6 +92,16 @@ export default async function handler(
     await saveDailyBest(auth.uid, rallyBody, res, "dailyRally", MAX_RALLY_HITS);
     return;
   }
+  for (const [key, max] of [
+    ["dailyDig", MAX_DIG_SCORE],
+    ["dailyToss", MAX_TOSS_SCORE],
+  ] as const) {
+    const daily = (req.body as Record<string, unknown>)[key];
+    if (daily !== undefined) {
+      await saveDailyBest(auth.uid, daily, res, key, max);
+      return;
+    }
+  }
   const missionBody = (req.body as { dailyDefender?: unknown }).dailyDefender;
   if (missionBody !== undefined) {
     await saveDailyBest(
@@ -321,6 +331,9 @@ async function saveWeeklyQuest(
 const MAX_DAILY_SCORE = 20_000;
 /** Word Ping-Pong daily rally: longest rally (hits) anyone could manage. */
 const MAX_RALLY_HITS = 400;
+/** Gem Dig daily dig (points) and Type Toss daily toss (tickets). */
+const MAX_DIG_SCORE = 2000;
+const MAX_TOSS_SCORE = 5000;
 /** Word Defender's 8-wave daily mission. */
 const MAX_MISSION_SCORE = 30_000;
 /** Type Racer daily race: words per minute. */
@@ -336,7 +349,13 @@ async function saveDailyBest(
   uid: string,
   raw: unknown,
   res: VercelResponse,
-  collection: "dailyGhost" | "dailyRally" | "dailyRace" | "dailyDefender",
+  collection:
+    | "dailyGhost"
+    | "dailyRally"
+    | "dailyRace"
+    | "dailyDefender"
+    | "dailyDig"
+    | "dailyToss",
   max: number,
 ): Promise<void> {
   const body = (raw ?? {}) as { day?: unknown; score?: unknown };

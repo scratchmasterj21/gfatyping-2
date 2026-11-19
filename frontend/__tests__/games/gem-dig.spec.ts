@@ -7,6 +7,7 @@ import {
   DIG_DIFFICULTIES,
   digScore,
   digStars,
+  gemCount,
   gemsAt,
   rankDiggers,
 } from "../../src/ts/games/gem-dig/dig-rules";
@@ -49,7 +50,7 @@ describe("gem dig", () => {
   it("counts gems dug so far", () => {
     const s = buildShaft(pool, 3, easy);
     expect(gemsAt(s, 0)).toBe(0);
-    expect(gemsAt(s, DIG_DEPTH)).toBe(s.filter((b) => b.gem).length);
+    expect(gemsAt(s, DIG_DEPTH)).toBe(s.reduce((n, b) => n + gemCount(b), 0));
   });
 
   it("ranks finishers first, then depth, then gems", () => {
