@@ -78,7 +78,18 @@ export default async function handler(
 
   const dailyBody = (req.body as { dailyGhost?: unknown }).dailyGhost;
   if (dailyBody !== undefined) {
-    await saveDailyGhost(auth.uid, dailyBody, res);
+    await saveDailyBest(
+      auth.uid,
+      dailyBody,
+      res,
+      "dailyGhost",
+      MAX_DAILY_SCORE,
+    );
+    return;
+  }
+  const rallyBody = (req.body as { dailyRally?: unknown }).dailyRally;
+  if (rallyBody !== undefined) {
+    await saveDailyBest(auth.uid, rallyBody, res, "dailyRally", MAX_RALLY_HITS);
     return;
   }
 
@@ -292,16 +303,20 @@ async function saveWeeklyQuest(
 
 /** A 5-wave Daily Haunting can't score more than this. */
 const MAX_DAILY_SCORE = 20_000;
+/** Word Ping-Pong daily rally: longest rally (hits) anyone could manage. */
+const MAX_RALLY_HITS = 400;
 
 /**
- * Ghost Hunter Daily Haunting: best score per class today, in
- * dailyGhost/{day} (one small doc, read once by the game menu).
- * Body: { dailyGhost: { day, score } }.
+ * Daily class bests: Ghost Hunter's Daily Haunting (dailyGhost/{day}) and
+ * Word Ping-Pong's Daily Rally (dailyRally/{day}). One small doc per day,
+ * read once by the game menu. Body: { dailyGhost | dailyRally: { day, score } }.
  */
-async function saveDailyGhost(
+async function saveDailyBest(
   uid: string,
   raw: unknown,
   res: VercelResponse,
+  collection: "dailyGhost" | "dailyRally",
+  max: number,
 ): Promise<void> {
   const body = (raw ?? {}) as { day?: unknown; score?: unknown };
   const day = Number(body.day);
@@ -310,13 +325,8 @@ async function saveDailyGhost(
   // a run started just before midnight still counts
   const validDay =
     day === tokyoDayId(now) || day === tokyoDayId(now - 30 * 60 * 1000);
-  if (
-    !validDay ||
-    !Number.isFinite(score) ||
-    score <= 0 ||
-    score > MAX_DAILY_SCORE
-  ) {
-    res.status(400).json({ ok: false, reason: "Invalid daily haunting" });
+  if (!validDay || !Number.isFinite(score) || score <= 0 || score > max) {
+    res.status(400).json({ ok: false, reason: "Invalid daily score" });
     return;
   }
   const db = getAdminApp().firestore();
@@ -335,7 +345,7 @@ async function saveDailyGhost(
   }
   const name =
     typeof user?.name === "string" ? user.name.slice(0, 40) : "Student";
-  const ref = db.collection("dailyGhost").doc(String(day));
+  const ref = db.collection(collection).doc(String(day));
   try {
     const best = await db.runTransaction(
       async (tx: admin.firestore.Transaction) => {

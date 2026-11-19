@@ -1,7 +1,8 @@
-import { doc, getDoc } from "firebase/firestore";
-
-import { callApi } from "../../api-client";
-import { getDb } from "../../firebase";
+import {
+  DailyClassScore,
+  getDailyClassBoard,
+  submitDailyBest,
+} from "../shared/daily-board";
 import { getWordListOptions } from "../word-defender/systems/vocab-pool";
 import { seededRng } from "./ghost-kinds";
 
@@ -64,33 +65,14 @@ export async function getDailyWords(plan: DailyPlan): Promise<string[]> {
   return words.slice(0, DAILY_WORDS);
 }
 
-export type DailyClassScore = { classId: string; score: number; name: string };
+export type { DailyClassScore } from "../shared/daily-board";
 
 /** Best classes first. */
-export async function getDailyBoard(day: number): Promise<DailyClassScore[]> {
-  const snap = await getDoc(doc(getDb(), "dailyGhost", String(day)));
-  const classes = (snap.data()?.["classes"] ?? {}) as Record<
-    string,
-    { score?: unknown; name?: unknown }
-  >;
-  return Object.entries(classes)
-    .filter(([, v]) => typeof v.score === "number")
-    .map(([classId, v]) => ({
-      classId,
-      score: v.score as number,
-      name: typeof v.name === "string" ? v.name : "",
-    }))
-    .sort((a, b) => b.score - a.score);
-}
+export const getDailyBoard = async (day: number): Promise<DailyClassScore[]> =>
+  getDailyClassBoard("dailyGhost", day);
 
 /** Send my score; true if it's my class's new best today. */
-export async function submitDailyScore(
+export const submitDailyScore = async (
   day: number,
   score: number,
-): Promise<boolean> {
-  const res = await callApi<{ ok: boolean; best?: boolean }>(
-    "/api/save-game-result",
-    { dailyGhost: { day, score: Math.round(score) } },
-  );
-  return res.best === true;
-}
+): Promise<boolean> => submitDailyBest("dailyGhost", day, score);

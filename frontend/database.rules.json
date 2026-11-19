@@ -64,6 +64,12 @@
             ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && (newData.child('side').val() == 'left' || newData.child('side').val() == 'right') && newData.child('online').isBoolean())"
           }
         },
+        "react": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && root.child('pongRooms').child($code).child('players').child(auth.uid).exists()",
+            ".validate": "newData.hasChildren(['e', 'at']) && newData.child('e').isString() && newData.child('e').val().length <= 8 && newData.child('at').isNumber()"
+          }
+        },
         "game": {
           ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('pongRooms').child($code).child('players').child(auth.uid).exists() && root.child('pongRooms').child($code).child('status').val() == 'playing'",
           ".validate": "newData.hasChildren(['seq', 'toSide', 'word', 'score', 'sentAt', 'speedMs']) && (!data.exists() || newData.child('seq').val() == data.child('seq').val() + 1) && newData.child('word').isString() && newData.child('word').val().length <= 30"

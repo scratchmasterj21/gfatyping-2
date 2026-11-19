@@ -23,6 +23,8 @@ export function GameResultOverlay(props: {
   result: GameResultView;
   /** Omit to hide "Play again" (e.g. multiplayer). */
   onPlayAgain?: () => void;
+  /** Text on the play-again button (default "Play again"). */
+  playAgainLabel?: string;
   onExit: () => void;
   /** Small line under the stats, e.g. "Waiting for the other racers…". */
   note?: string;
@@ -76,7 +78,7 @@ export function GameResultOverlay(props: {
                 size="lg"
                 active
                 fa={{ icon: "fa-redo-alt" }}
-                text="Play again"
+                text={props.playAgainLabel ?? "Play again"}
                 onClick={() => play()()}
               />
             )}

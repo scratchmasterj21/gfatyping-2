@@ -17,7 +17,9 @@ import {
   trackRealtimeListener,
 } from "../../firebase";
 import {
+  HitOpts,
   initialPong,
+  nextWord,
   onMiss,
   onReturn,
   PongState,
@@ -60,7 +62,12 @@ export type PongRoom = {
   words: string[];
   players: Record<string, PongPlayer>;
   game?: PongGame;
+  /** quick emoji reactions: uid -> latest */
+  react?: Record<string, { e: string; at: number }>;
 };
+
+/** Emoji reactions players can send during a match. */
+export const REACTIONS = ["👏", "😮", "😂", "🔥"];
 
 const MAX_PLAYERS = 2;
 /** Pause before the next ball after a point (and before the first serve). */
@@ -182,7 +189,10 @@ export function subscribePongRoom(
   );
 }
 
-/** Host serves: the guest (right) gets the first ball. */
+/**
+ * Host serves: the guest (right) gets the first ball. Also used for a
+ * rematch: the game carries on (seq keeps counting, series kept).
+ */
 export async function startPongRoom(room: PongRoom): Promise<void> {
   const host = getAuthenticatedUser();
   // The match is under way: keep the room if the host drops now. Cancelling
@@ -194,7 +204,12 @@ export async function startPongRoom(room: PongRoom): Promise<void> {
     });
   }
   const d = difficultyFor(room.difficultyLabel);
-  const first = initialPong(wordForRally(room.words, 0, 1), "right");
+  const prev = room.game;
+  const seq = prev === undefined ? 1 : prev.seq + 1;
+  const first = initialPong(wordForRally(room.words, 0, seq), "right", {
+    seq,
+    ...(prev?.series === undefined ? {} : { series: prev.series }),
+  });
   await update(roomRef(room.code), {
     status: "playing",
     game: {
@@ -226,7 +241,7 @@ async function advance(
     return {
       ...state,
       sentAt: serverNow() + delayMs,
-      speedMs: speedFor(d, state.hits),
+      speedMs: speedFor(d, state.hits, state),
     };
   });
   const after = result.snapshot.val() as PongGame | null;
@@ -237,10 +252,24 @@ async function advance(
 export async function returnPongBall(
   room: PongRoom,
   game: PongGame,
+  opts: HitOpts = {},
 ): Promise<boolean> {
   return advance(room, game.seq, (g) =>
-    onReturn(g, wordForRally(room.words, g.hits + 1, g.seq + 1)),
+    onReturn(g, nextWord(room.words, g.hits + 1, g.seq + 1, opts.shot), opts),
   );
+}
+
+/** Send a quick emoji reaction (shown over my paddle). */
+export async function sendPongReaction(
+  code: string,
+  emoji: string,
+): Promise<void> {
+  const user = getAuthenticatedUser();
+  if (user === null) return;
+  await set(ref(getRealtimeDb(), `pongRooms/${code}/react/${user.uid}`), {
+    e: emoji,
+    at: serverNow(),
+  });
 }
 
 /**

@@ -222,6 +222,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /dailyRally/{day} {
+      allow read: if isDomainUser();
+      allow write: if false;
+    }
+
     match /weeklyXpLeaderboards/{week} {
       allow read: if isDomainUser();
       match /entries/{uid} {
