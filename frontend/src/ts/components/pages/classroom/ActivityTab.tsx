@@ -47,6 +47,13 @@ import {
   setClassThemePolicy,
   setStudentHomeRowOff,
 } from "../../../lessons/lesson-settings";
+import {
+  CLASS_GOALS,
+  getClassGoals,
+  getImprovedBoard,
+  Improver,
+  weekId,
+} from "../../../practice/practice-state";
 import { queryClient } from "../../../queries";
 import {
   showErrorNotification,
@@ -151,6 +158,9 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     }
     if (merged.mode === "earn") {
       next.earnLessons = merged.earnLessons ?? EARN_LESSONS_DEFAULT;
+      if ((merged.earnTypingMin ?? 0) > 0) {
+        next.earnTypingMin = merged.earnTypingMin;
+      }
     }
     if (merged.blocked !== undefined && merged.blocked.length > 0) {
       next.blocked = merged.blocked;
@@ -345,6 +355,11 @@ export function ActivityTab(props: { classId: string }): JSXElement {
             disabled={saving()}
             onChange={(n) => setClassPolicy({ earnLessons: n })}
           />
+          <TypingStepper
+            value={classPolicy().earnTypingMin ?? 0}
+            disabled={saving()}
+            onChange={(n) => setClassPolicy({ earnTypingMin: n })}
+          />
         </Show>
         <div>
           <div class="mb-2 flex flex-wrap items-center gap-2 text-sm text-sub">
@@ -382,6 +397,8 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           />
         </div>
       </div>
+
+      <WeekBoards classId={props.classId} />
 
       {/* students */}
       <div class="flex flex-wrap items-center gap-2">
@@ -456,6 +473,82 @@ export function ActivityTab(props: { classId: string }): JSXElement {
         </Show>
       </Show>
     </section>
+  );
+}
+
+/** This week: the class's word goal and its most improved typists. */
+function WeekBoards(props: { classId: string }): JSXElement {
+  const week = weekId();
+  const goals = useQuery(() => ({
+    queryKey: ["classGoals", week],
+    queryFn: async () => getClassGoals(week),
+    staleTime: 5 * 60 * 1000,
+  }));
+  const improved = useQuery(() => ({
+    queryKey: ["improvedBoard", gradeOf(props.classId), week],
+    queryFn: async () => getImprovedBoard(gradeOf(props.classId), week),
+    staleTime: 5 * 60 * 1000,
+  }));
+  const words = (): number => goals.data?.[props.classId] ?? 0;
+  const medals = (): string =>
+    CLASS_GOALS.filter((g) => words() >= g.words)
+      .map((g) => g.medal)
+      .join("");
+  const mine = (): Improver[] =>
+    (improved.data ?? []).filter((r) => r.classId === props.classId);
+  return (
+    <div class="grid gap-2 rounded bg-sub-alt p-3 text-sm">
+      <div class="font-semibold text-text">
+        ⌨️ This week in free typing {medals()}
+      </div>
+      <div class="text-sub">
+        🏫 Class words:{" "}
+        <span class="text-text">{words().toLocaleString()}</span> (medals at{" "}
+        {CLASS_GOALS.map((g) => `${g.medal} ${g.words.toLocaleString()}`).join(
+          " · ",
+        )}
+        )
+      </div>
+      <div class="text-sub">
+        🌟 Most improved:{" "}
+        <Show
+          when={mine().length > 0}
+          fallback={<span>nobody yet this week</span>}
+        >
+          <span class="text-text">
+            {mine()
+              .map((r) => `${r.name} +${r.gain} WPM`)
+              .join(" · ")}
+          </span>
+        </Show>
+      </div>
+    </div>
+  );
+}
+
+/** "+ N minutes of typing" before games (0 = lessons only). */
+function TypingStepper(props: {
+  value: number;
+  disabled: boolean;
+  onChange: (n: number) => void;
+}): JSXElement {
+  return (
+    <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+      ⌨️ Also type
+      <For each={[0, 3, 5, 10, 15]}>
+        {(n) => (
+          <button
+            type="button"
+            class={chip(props.value === n)}
+            disabled={props.disabled}
+            onClick={() => props.onChange(n)}
+          >
+            {n === 0 ? "no extra" : `${n} min`}
+          </button>
+        )}
+      </For>
+      of typing (lessons or Practice) each day before games.
+    </div>
   );
 }
 
@@ -843,6 +936,16 @@ function StudentRow(props: {
                 const id = uid();
                 void props.save(async () =>
                   updateStudentGamePolicy(id, { earnLessons: n }),
+                );
+              }}
+            />
+            <TypingStepper
+              value={own().earnTypingMin ?? policy().earnTypingMin}
+              disabled={props.saving}
+              onChange={(n) => {
+                const id = uid();
+                void props.save(async () =>
+                  updateStudentGamePolicy(id, { earnTypingMin: n }),
                 );
               }}
             />

@@ -266,6 +266,42 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 }
 
 const TRY_COIN_DAILY_CAP = 5;
+/** Free typing: a coin every this many seconds of typing. */
+const SECONDS_PER_COIN = 20;
+/** Bonus coins for 95%+ accuracy (tests of 15 s or more). */
+const ACCURACY_COINS = 2;
+/** The first tests each day pay double ("warm-up"). */
+const WARM_UP_TESTS = 3;
+/** Garden: words counted from one test at most. */
+const MAX_WORDS_PER_TEST = 400;
+
+/** Correct words in a result (correct characters / 5). */
+export function correctWords(raw: RawResultInput): number {
+  const stats = raw["charStats"];
+  const correct = Array.isArray(stats) ? Number(stats[0]) : NaN;
+  if (!Number.isFinite(correct) || correct <= 0) return 0;
+  return Math.min(MAX_WORDS_PER_TEST, Math.floor(correct / 5));
+}
+
+type WeekBest = { weekId?: number; wpm?: number; prev?: number };
+
+/**
+ * This week's best speed and the best from before it, for "most improved".
+ * Only steady tests count (15 s+, 80%+ accuracy) so mashing can't win.
+ */
+export function nextWeekBest(
+  old: WeekBest | undefined,
+  weekId: number,
+  wpm: number,
+  counts: boolean,
+): { best: WeekBest; gain: number } {
+  const sameWeek = old?.weekId === weekId;
+  const prev = sameWeek ? (old?.prev ?? 0) : (old?.wpm ?? old?.prev ?? 0);
+  const before = sameWeek ? (old?.wpm ?? 0) : 0;
+  const wpmNow = counts ? Math.max(before, Math.round(wpm)) : before;
+  const best: WeekBest = { weekId, wpm: wpmNow, prev };
+  return { best, gain: prev > 0 && wpmNow > prev ? wpmNow - prev : 0 };
+}
 
 // Weekly quests - mirrors coins.ts's WEEKLY_QUESTS/bumpWeeklyQuestCounter.
 // Duplicated locally for the same reason as everything else in api/.
@@ -341,6 +377,70 @@ function bumpQuest(
       questDedupe: dedupe,
     },
   };
+}
+
+/** Most-improved board: this many students per grade per week. */
+const IMPROVED_TOP = 10;
+
+/**
+ * Best effort, after the result is saved: add my words to my class's weekly
+ * goal (classGoals/{weekId}) and, if I beat last week's best, put me on my
+ * grade's most-improved board (improvedBoard/{grade}-{weekId}).
+ */
+async function updateClassBoards(
+  db: admin.firestore.Firestore,
+  uid: string,
+  o: {
+    classId?: string;
+    wordsAdded: number;
+    gain: number;
+    weekWpm: number;
+    name: string;
+  },
+  weekId: number,
+): Promise<void> {
+  const classId = o.classId;
+  if (typeof classId !== "string" || !/^G[1-6][A-Z]$/.test(classId)) return;
+  if (o.wordsAdded > 0) {
+    await db
+      .collection("classGoals")
+      .doc(String(weekId))
+      .set(
+        {
+          weekId,
+          classes: {
+            [classId]: {
+              words: admin.firestore.FieldValue.increment(o.wordsAdded),
+            },
+          },
+        },
+        { merge: true },
+      );
+  }
+  if (o.gain <= 0) return;
+  const ref = db
+    .collection("improvedBoard")
+    .doc(`${classId.slice(0, 2)}-${weekId}`);
+  await db.runTransaction(async (tx: admin.firestore.Transaction) => {
+    const snap = await tx.get(ref);
+    const students = {
+      ...((snap.data()?.["students"] ?? {}) as Record<
+        string,
+        { gain?: number }
+      >),
+    };
+    if ((students[uid]?.gain ?? 0) >= o.gain) return;
+    students[uid] = {
+      gain: o.gain,
+      wpm: o.weekWpm,
+      name: o.name.slice(0, 40),
+      classId,
+    } as { gain: number };
+    const top = Object.entries(students)
+      .sort((a, b) => (b[1].gain ?? 0) - (a[1].gain ?? 0))
+      .slice(0, IMPROVED_TOP);
+    tx.set(ref, { weekId, students: Object.fromEntries(top) });
+  });
 }
 
 export default async function handler(
@@ -502,17 +602,41 @@ export default async function handler(
         }
         const tryCoin = tryCoinEligible ? 1 : 0;
 
-        // Mirrors test-logic.ts's post-submit coin math (timeCoins + pbCoins)
-        // plus coins.ts's bumpWeeklyQuestCounter("typingSeconds", ...).
-        const timeCoins = Math.floor(activeSeconds / 30);
+        // Coins for free typing: a try coin, a coin per 20 s, an accuracy
+        // bonus, all doubled for the first tests of the day; PB bonus on top.
+        const practiceDay = user["practiceDay"] as
+          | { date?: string; tests?: number }
+          | undefined;
+        const testsToday =
+          practiceDay?.date === today ? (practiceDay.tests ?? 0) : 0;
+        const timeCoins = Math.floor(activeSeconds / SECONDS_PER_COIN);
+        const accuracyCoins =
+          acc >= 95 && activeSeconds >= 15 ? ACCURACY_COINS : 0;
+        const warmUp = testsToday < WARM_UP_TESTS && activeSeconds >= 10;
+        const warmUpCoins = warmUp ? tryCoin + timeCoins + accuracyCoins : 0;
         const pbCoins = isPb ? Math.floor(wpm / 5) : 0;
+        // the word garden grows with correct words
+        const wordsAdded = activeSeconds >= 5 ? correctWords(result) : 0;
+        const typedWords = (Number(user["typedWords"]) || 0) + wordsAdded;
+        const week = nextWeekBest(
+          user["weekBest"] as WeekBest | undefined,
+          currentWeekId(0),
+          wpm,
+          activeSeconds >= 15 && acc >= 80,
+        );
         const quest = bumpQuest(
           user as QuestState,
           "typingSeconds",
           activeSeconds,
           currentWeekId(0),
         );
-        const totalCoins = tryCoin + timeCoins + pbCoins + quest.coinsToAward;
+        const totalCoins =
+          tryCoin +
+          timeCoins +
+          accuracyCoins +
+          warmUpCoins +
+          pbCoins +
+          quest.coinsToAward;
 
         tx.set(
           resultRef,
@@ -535,6 +659,9 @@ export default async function handler(
             completedTests,
             typingQuestFastQualifiers,
             weeklyPeriod,
+            typedWords,
+            practiceDay: { date: today, tests: testsToday + 1 },
+            weekBest: week.best,
             ...quest.update,
             ...(totalCoins > 0
               ? { coins: admin.firestore.FieldValue.increment(totalCoins) }
@@ -552,6 +679,24 @@ export default async function handler(
           activeSeconds,
           name: (user["name"] as string | undefined) ?? "",
           newlyCompletedQuests: quest.newlyCompleted,
+          coins: totalCoins,
+          coinParts: {
+            try: tryCoin,
+            time: timeCoins,
+            accuracy: accuracyCoins,
+            warmUp: warmUpCoins,
+            pb: pbCoins,
+            quests: quest.coinsToAward,
+          },
+          testsToday: testsToday + 1,
+          wordsAdded,
+          typedWords,
+          gain: week.gain,
+          weekWpm: week.best.wpm ?? 0,
+          classId:
+            user["role"] === "teacher" || user["graduated"] === true
+              ? undefined
+              : (user["classId"] as string | undefined),
         };
       },
     );
@@ -645,6 +790,10 @@ export default async function handler(
       })(),
     ]);
 
+    await updateClassBoards(db, auth.uid, outcome, weekId).catch((e: unknown) =>
+      console.error("submit-result class boards failed:", e),
+    );
+
     res.status(200).json({
       ok: true,
       insertedId: resultRef.id,
@@ -653,6 +802,12 @@ export default async function handler(
       xpBreakdown: outcome.xpBreakdown,
       streak: outcome.streakLength,
       newlyCompletedQuests: outcome.newlyCompletedQuests,
+      coins: outcome.coins,
+      coinParts: outcome.coinParts,
+      testsToday: outcome.testsToday,
+      wordsAdded: outcome.wordsAdded,
+      typedWords: outcome.typedWords,
+      gain: outcome.gain,
     });
   } catch (e) {
     console.error("submit-result failed:", e);

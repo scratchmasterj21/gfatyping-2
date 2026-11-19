@@ -167,6 +167,7 @@ import { LessonsCollapsibleHeader } from "./LessonsCollapsibleHeader";
 import { LessonsTabBar } from "./LessonsTabBar";
 import { LookSetupsBar } from "./LookSetupsBar";
 import { NextStepCard } from "./NextStepCard";
+import { PracticeHub } from "./PracticeHub";
 import { StickerBook } from "./StickerBook";
 import { WeeklyQuests } from "./WeeklyQuests";
 
@@ -329,8 +330,9 @@ function GamesByWordSource(props: {
 /** Why games are locked (or how much bonus time is left), above the tabs. */
 function GameAccessBanner(props: {
   access: GameAccess;
-  policy: { mode: string; earnLessons: number };
+  policy: { mode: string; earnLessons: number; earnTypingMin: number };
   lessonsPassed: number;
+  typingSec: number;
 }): JSXElement {
   const text = (): string | undefined => {
     const a = props.access;
@@ -340,7 +342,19 @@ function GameAccessBanner(props: {
         : undefined;
     }
     if (a.reason === "earn") {
-      return `🎮 Get ⭐⭐ (2 stars or more) on ${props.policy.earnLessons} lessons today to unlock games - ${Math.min(props.lessonsPassed, props.policy.earnLessons)}/${props.policy.earnLessons} done! Retrying an old lesson counts too.`;
+      const p = props.policy;
+      const steps: string[] = [];
+      if (p.earnLessons > 0) {
+        steps.push(
+          `⭐⭐ (2 stars or more) on ${p.earnLessons} lessons - ${Math.min(props.lessonsPassed, p.earnLessons)}/${p.earnLessons} done`,
+        );
+      }
+      if (p.earnTypingMin > 0) {
+        steps.push(
+          `⌨️ ${p.earnTypingMin} minutes of typing (lessons or Practice) - ${Math.min(Math.floor(props.typingSec / 60), p.earnTypingMin)}/${p.earnTypingMin} done`,
+        );
+      }
+      return `🎮 To unlock games today: ${steps.join(" and ")}! Retrying an old lesson counts too.`;
     }
     if (a.reason === "off") {
       return "⏸️ Your teacher turned games off for now. Keep practicing your lessons!";
@@ -2049,6 +2063,9 @@ export function LessonsPage(): JSXElement {
                 adaptiveLoading={reviewLoading()}
                 onAdaptiveReview={() => void reviewWeakKeys()}
               />
+              <div class="mt-4">
+                <PracticeHub />
+              </div>
             </Show>
             {/* Class word lists + reading passages */}
             <Show
@@ -2123,6 +2140,7 @@ export function LessonsPage(): JSXElement {
                   access={gameAccess()}
                   policy={gamePolicy()}
                   lessonsPassed={myToday().lessonsPassed}
+                  typingSec={myToday().typingSec}
                 />
                 <div
                   role="tablist"

@@ -1,11 +1,24 @@
-import { createSignal, JSXElement, Show } from "solid-js";
+import { createSignal, For, JSXElement, Show } from "solid-js";
 
+import { Grade, gradeOf, GRADES } from "../../../constants/classes";
 import { isKidThemeActive } from "../../../controllers/kid-theme-controller";
 import { createEffectOn } from "../../../hooks/effects";
 import {
   getActiveLesson,
   isCurriculumLesson,
 } from "../../../lessons/lesson-progress";
+import { practiceReward } from "../../../practice/practice-reward";
+import {
+  activeStory,
+  badgesFor,
+  bestWpm,
+  finishStoryChapter,
+  gardenSize,
+  plantFor,
+  practiceStars,
+  startStoryChapter,
+} from "../../../practice/practice-state";
+import { getSnapshot } from "../../../states/snapshot";
 import { getLastResult, getResultVisible } from "../../../states/test";
 import { qs } from "../../../utils/dom";
 import { Button } from "../../common/Button";
@@ -59,8 +72,21 @@ export function KidResultHero(): JSXElement {
     return lesson === null || !isCurriculumLesson(lesson);
   };
 
-  // Each new result starts with details collapsed.
-  createEffectOn(getLastResult, () => setDetailsOpen(false));
+  const [story, setStory] =
+    createSignal<ReturnType<typeof finishStoryChapter>>(null);
+  // Each new result starts with details collapsed; a story chapter is done.
+  createEffectOn(getLastResult, (r) => {
+    setDetailsOpen(false);
+    const lesson = getActiveLesson();
+    setStory(
+      r !== null &&
+        r.mode === "custom" &&
+        lesson === null &&
+        activeStory() !== null
+        ? finishStoryChapter()
+        : null,
+    );
+  });
 
   // Legacy result markup is styled from these classes (kid-theme.scss).
   createEffectOn([show, detailsOpen], ([visible, open]) => {
@@ -72,6 +98,23 @@ export function KidResultHero(): JSXElement {
   const wpm = () => Math.round(getLastResult()?.wpm ?? 0);
   const acc = () => Math.floor(getLastResult()?.acc ?? 0);
   const verdict = () => verdictFor(wpm(), acc());
+  const grade = (): Grade | undefined =>
+    GRADES.find((g) => g === gradeOf(getSnapshot()?.classId));
+  const stars = (): number => practiceStars(wpm(), acc(), grade(), bestWpm());
+  /** what this test earned (once the server answered) */
+  const reward = () => {
+    const r = practiceReward();
+    return r !== null && r.at === getLastResult()?.timestamp ? r : null;
+  };
+  const newPlant = (): boolean => {
+    const r = reward();
+    return (
+      r !== null &&
+      r.wordsAdded > 0 &&
+      gardenSize(r.typedWords) > gardenSize(r.typedWords - r.wordsAdded)
+    );
+  };
+  const topBadge = (): number | undefined => badgesFor(wpm()).at(-1);
 
   return (
     <Show when={show()}>
@@ -103,6 +146,76 @@ export function KidResultHero(): JSXElement {
             </div>
           </div>
         </div>
+        <div
+          class="flex justify-center gap-1 text-4xl"
+          aria-label={`${stars()} stars`}
+        >
+          <For each={[1, 2, 3]}>
+            {(n) => (
+              <span class={n <= stars() ? "" : "opacity-25 grayscale"}>⭐</span>
+            )}
+          </For>
+        </div>
+        <Show when={reward()}>
+          {(r) => (
+            <div class="flex flex-wrap justify-center gap-2 text-sm font-bold">
+              <Show when={r().coins > 0}>
+                <span class="rounded-full bg-game-gold px-3 py-1 text-game-ink">
+                  🪙 +{r().coins} coins
+                  {(r().parts?.warmUp ?? 0) > 0 ? " (warm-up ×2!)" : ""}
+                </span>
+              </Show>
+              <Show when={(r().parts?.accuracy ?? 0) > 0}>
+                <span class="rounded-full bg-bg px-3 py-1">
+                  🎯 careful typing bonus
+                </span>
+              </Show>
+              <Show when={r().wordsAdded > 0}>
+                <span class="rounded-full bg-bg px-3 py-1">
+                  🌱 +{r().wordsAdded} words for your garden
+                  {newPlant()
+                    ? ` - a new ${plantFor(gardenSize(r().typedWords) - 1)} grew!`
+                    : ""}
+                </span>
+              </Show>
+              <Show when={r().gain > 0}>
+                <span class="rounded-full bg-main px-3 py-1 text-bg">
+                  🌟 +{r().gain} WPM faster than last week!
+                </span>
+              </Show>
+              <Show when={(r().parts?.pb ?? 0) > 0 && topBadge() !== undefined}>
+                <span class="rounded-full bg-game-yellow px-3 py-1 text-game-ink">
+                  👑 New best! ⚡ {topBadge()} WPM badge
+                </span>
+              </Show>
+            </div>
+          )}
+        </Show>
+        <Show when={story()}>
+          {(st) => (
+            <div class="grid justify-items-center gap-2 rounded-double bg-bg p-3 text-center">
+              <div class="text-lg font-bold">
+                {st().story.emoji} {st().story.title}: chapter{" "}
+                {st().chapter + 1} done!
+              </div>
+              <Show
+                when={st().next}
+                fallback={
+                  <div class="text-sub">🎉 You finished the whole story!</div>
+                }
+              >
+                {(n) => (
+                  <Button
+                    class="font-bold"
+                    text={`Next: chapter ${n() + 1} - ${st().story.chapters[n()]?.title ?? ""}`}
+                    fa={{ icon: "fa-book-open" }}
+                    onClick={() => startStoryChapter(st().story.id, n())}
+                  />
+                )}
+              </Show>
+            </div>
+          )}
+        </Show>
         <Button
           variant="text"
           class="justify-self-center text-sm"

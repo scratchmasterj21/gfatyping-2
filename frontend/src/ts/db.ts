@@ -138,6 +138,7 @@ export async function initSnapshot(): Promise<Snapshot | false> {
         ? "teacher"
         : undefined;
     snap.raceWins = (userData as { raceWins?: number }).raceWins ?? 0;
+    snap.typedWords = (userData as { typedWords?: number }).typedWords ?? 0;
     snap.championWins =
       (userData as { championWins?: number }).championWins ?? 0;
     snap.activityDays = parseActivityDays(

@@ -75,6 +75,8 @@ export type Snapshot = Omit<
   role?: "teacher";
   /** per-day lesson/game activity (see classroom/activity.ts) */
   activityDays?: ActivityDays;
+  /** correct words typed ever (the word garden; api/submit-result) */
+  typedWords?: number;
   /** class race wins (written by the teacher's race host) */
   raceWins?: number;
   /** Class Championships won (written by the teacher's host page) */

@@ -45,7 +45,12 @@ describe("game access", () => {
     const p = resolvePolicy(access, "G5A", "x", today);
     expect(
       checkGameAccess("word-pong", p, { lessonsPassed: 1, gameSec: 0 }),
-    ).toEqual({ allowed: false, reason: "earn", lessonsLeft: 1 });
+    ).toEqual({
+      allowed: false,
+      reason: "earn",
+      lessonsLeft: 1,
+      typingMinLeft: 0,
+    });
     expect(
       checkGameAccess("word-pong", p, { lessonsPassed: 2, gameSec: 0 }).allowed,
     ).toBe(true);

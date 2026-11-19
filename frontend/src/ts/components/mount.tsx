@@ -34,6 +34,7 @@ import { FingerLegend } from "./pages/test/FingerLegend";
 import { KidResultHero } from "./pages/test/KidResultHero";
 import { LessonFingerHint } from "./pages/test/LessonFingerHint";
 import { TestModesNotice } from "./pages/test/modes-notice/TestModesNotice";
+import { PracticeCombo } from "./pages/test/PracticeCombo";
 import { ResultsLessonActions } from "./pages/test/ResultsLessonActions";
 import { SideImagePanels } from "./pages/test/SideImagePanels";
 import { TestConfig } from "./pages/test/TestConfig";
@@ -77,6 +78,7 @@ const components: Record<string, () => JSXElement> = {
   blockedusers: () => <BlockedUsers />,
   sideimagepanels: () => <SideImagePanels />,
   typingbuddy: () => <TypingBuddy />,
+  practicecombo: () => <PracticeCombo />,
   notfoundpage: () => <NotFoundPage />,
 };
 

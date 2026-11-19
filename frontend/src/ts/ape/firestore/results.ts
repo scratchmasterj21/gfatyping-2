@@ -1,3 +1,5 @@
+import { noteTypingSeconds } from "../../games/game-access";
+import { CoinParts, notePracticeReward } from "../../practice/practice-reward";
 import { CompletedEvent, XpBreakdown } from "@monkeytype/schemas/results";
 import {
   collection,
@@ -41,6 +43,12 @@ type SubmitResultResponse = {
   xpBreakdown?: XpBreakdown;
   streak?: number;
   newlyCompletedQuests?: { name: string; coinReward: number }[];
+  coins?: number;
+  coinParts?: CoinParts;
+  testsToday?: number;
+  wordsAdded?: number;
+  typedWords?: number;
+  gain?: number;
 };
 
 /**
@@ -91,6 +99,24 @@ export const add: Handler = async (ctx) => {
     throw new HandlerError(500, response.reason ?? "Failed to save result");
   }
   await forgetPendingResult(uid, result.timestamp).catch(() => undefined);
+
+  notePracticeReward({
+    at: result.timestamp,
+    coins: response.coins ?? 0,
+    ...(response.coinParts === undefined ? {} : { parts: response.coinParts }),
+    testsToday: response.testsToday ?? 0,
+    wordsAdded: response.wordsAdded ?? 0,
+    typedWords: response.typedWords ?? 0,
+    gain: response.gain ?? 0,
+  });
+  noteTypingSeconds(
+    Math.max(
+      0,
+      result.testDuration +
+        (result.incompleteTestSeconds ?? 0) -
+        (result.afkDuration ?? 0),
+    ),
+  );
 
   for (const quest of response.newlyCompletedQuests ?? []) {
     triggerCelebration({

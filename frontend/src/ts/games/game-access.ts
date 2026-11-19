@@ -23,6 +23,8 @@ export type GamePolicy = {
   mode?: GameMode;
   /** "earn": distinct lessons to pass with 2+ stars today to unlock games */
   earnLessons?: number;
+  /** "earn": also this many minutes of typing today (lessons or practice) */
+  earnTypingMin?: number;
   /** game ids that stay locked */
   blocked?: string[];
 };
@@ -56,6 +58,8 @@ export type GameAccessDoc = {
 
 export const EARN_LESSONS_DEFAULT = 2;
 export const EARN_LESSONS_MAX = 10;
+/** Most typing minutes a teacher can ask for before games. */
+export const EARN_TYPING_MAX = 30;
 const MAX_BONUS_MINUTES = 240;
 
 function accessRef(): ReturnType<typeof doc> {
@@ -70,8 +74,12 @@ function parsePolicy(raw: unknown): StudentPolicy {
     out.mode = r["mode"];
   }
   const earn = Number(r["earnLessons"]);
-  if (Number.isFinite(earn) && earn >= 1) {
+  if (Number.isFinite(earn) && earn >= 0) {
     out.earnLessons = Math.min(EARN_LESSONS_MAX, Math.round(earn));
+  }
+  const typing = Number(r["earnTypingMin"]);
+  if (Number.isFinite(typing) && typing >= 0) {
+    out.earnTypingMin = Math.min(EARN_TYPING_MAX, Math.round(typing));
   }
   if (Array.isArray(r["blocked"])) {
     out.blocked = (r["blocked"] as unknown[]).filter(
@@ -191,6 +199,8 @@ export async function giveBonusGameTime(
 export type EffectivePolicy = {
   mode: GameMode;
   earnLessons: number;
+  /** minutes of typing today also needed (0 = none) */
+  earnTypingMin: number;
   blocked: string[];
   /** bonus minutes valid today (0 = none) */
   bonusMinutes: number;
@@ -215,11 +225,13 @@ export function resolvePolicy(
   return {
     mode: stu.mode ?? cls.mode ?? "on",
     earnLessons: stu.earnLessons ?? cls.earnLessons ?? EARN_LESSONS_DEFAULT,
+    earnTypingMin: stu.earnTypingMin ?? cls.earnTypingMin ?? 0,
     blocked: stu.blocked ?? cls.blocked ?? [],
     bonusMinutes: stu.bonusDate === today ? (stu.bonusMinutes ?? 0) : 0,
     personal:
       stu.mode !== undefined ||
       stu.earnLessons !== undefined ||
+      stu.earnTypingMin !== undefined ||
       stu.blocked !== undefined,
     ...(stu.pauseUntil !== undefined && stu.pauseUntil >= today
       ? { pause: { until: stu.pauseUntil, reason: stu.pauseReason ?? "other" } }
@@ -234,6 +246,8 @@ export type GameAccess =
       reason: "blocked" | "off" | "earn" | "paused";
       /** "earn": lessons still to pass today */
       lessonsLeft?: number;
+      /** "earn": minutes of typing still to do today */
+      typingMinLeft?: number;
       /** "paused": why and until when */
       pause?: { until: string; reason: PauseReason };
     };
@@ -242,8 +256,12 @@ export type GameAccess =
 export function checkGameAccess(
   gameId: string | undefined,
   policy: EffectivePolicy,
-  today: { lessonsPassed: number; gameSec: number },
+  today: { lessonsPassed: number; gameSec: number; typingSec?: number },
 ): GameAccess {
+  const typingMinLeft = Math.max(
+    0,
+    Math.ceil(policy.earnTypingMin - (today.typingSec ?? 0) / 60),
+  );
   // a teacher's pause beats everything, bonus time included
   if (policy.pause !== undefined) {
     return { allowed: false, reason: "paused", pause: policy.pause };
@@ -252,7 +270,11 @@ export function checkGameAccess(
     return { allowed: false, reason: "blocked" };
   }
   if (policy.mode === "on") return { allowed: true };
-  if (policy.mode === "earn" && today.lessonsPassed >= policy.earnLessons) {
+  if (
+    policy.mode === "earn" &&
+    today.lessonsPassed >= policy.earnLessons &&
+    typingMinLeft === 0
+  ) {
     return { allowed: true };
   }
   // teacher-given time: spends today's game minutes until it runs out
@@ -266,6 +288,7 @@ export function checkGameAccess(
         allowed: false,
         reason: "earn",
         lessonsLeft: Math.max(0, policy.earnLessons - today.lessonsPassed),
+        typingMinLeft,
       };
 }
 
@@ -296,6 +319,23 @@ export function pauseMessage(pause: {
   return `⏸️ Your teacher paused your games${end}. Keep practicing your lessons!`;
 }
 
+/** "Get ⭐⭐ on 1 more lesson and type 3 more minutes" */
+export function earnTodo(lessonsLeft: number, typingMinLeft: number): string {
+  const parts: string[] = [];
+  if (lessonsLeft > 0) {
+    parts.push(
+      `get ⭐⭐ on ${lessonsLeft} more lesson${lessonsLeft === 1 ? "" : "s"}`,
+    );
+  }
+  if (typingMinLeft > 0) {
+    parts.push(
+      `type ${typingMinLeft} more minute${typingMinLeft === 1 ? "" : "s"}`,
+    );
+  }
+  const text = parts.join(" and ") || "keep typing";
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)} today`;
+}
+
 /** Kid-friendly lock message. */
 export function gameLockMessage(access: GameAccess): string {
   if (access.allowed) return "";
@@ -308,31 +348,43 @@ export function gameLockMessage(access: GameAccess): string {
   if (access.reason === "off") {
     return "🔒 Your teacher turned games off for now";
   }
-  const n = access.lessonsLeft ?? 1;
-  return `🔒 Get ⭐⭐ on ${n} more lesson${n === 1 ? "" : "s"} today to unlock games`;
+  return `🔒 ${earnTodo(access.lessonsLeft ?? 0, access.typingMinLeft ?? 0)} to unlock games`;
 }
 
 // ---- the signed-in student's own activity today ----
 // The snapshot holds what the server had at sign-in; add what happened on
 // this device since then so locks/unlocks update without a reload.
 
-const [localToday, setLocalToday] = createSignal<{
+type LocalToday = {
   date: string;
   gameSec: number;
+  typingSec: number;
   lessons: string[];
-}>({ date: tokyoDate(), gameSec: 0, lessons: [] });
+};
+const [localToday, setLocalToday] = createSignal<LocalToday>({
+  date: tokyoDate(),
+  gameSec: 0,
+  typingSec: 0,
+  lessons: [],
+});
 
-function freshLocal(): { date: string; gameSec: number; lessons: string[] } {
+function freshLocal(): LocalToday {
   const cur = localToday();
   return cur.date === tokyoDate()
     ? cur
-    : { date: tokyoDate(), gameSec: 0, lessons: [] };
+    : { date: tokyoDate(), gameSec: 0, typingSec: 0, lessons: [] };
 }
 
 export function noteLessonPassed(lessonId: string): void {
   const cur = freshLocal();
   if (cur.lessons.includes(lessonId)) return;
   setLocalToday({ ...cur, lessons: [...cur.lessons, lessonId] });
+}
+
+/** A typing test was saved on this device (seconds of typing). */
+export function noteTypingSeconds(seconds: number): void {
+  const cur = freshLocal();
+  setLocalToday({ ...cur, typingSec: cur.typingSec + Math.max(0, seconds) });
 }
 
 /** `serverTotal` from the API (today's game seconds incl. this session). */
@@ -357,14 +409,19 @@ export function myLocalTodayLessons(): string[] {
   return freshLocal().lessons;
 }
 
-/** Reactive: lessons passed + game seconds today for the signed-in user. */
-export function myToday(): { lessonsPassed: number; gameSec: number } {
+/** Reactive: lessons passed, game and typing seconds today for the signed-in user. */
+export function myToday(): {
+  lessonsPassed: number;
+  gameSec: number;
+  typingSec: number;
+} {
   const snap = snapshotToday();
   const local = freshLocal();
   const lessons = new Set([...(snap.lx ?? []), ...local.lessons]);
   return {
     lessonsPassed: lessons.size,
     gameSec: (snap.g ?? 0) + local.gameSec,
+    typingSec: (snap.t ?? 0) + local.typingSec,
   };
 }
 

@@ -247,6 +247,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // weekly class word goals and most-improved boards (api/submit-result)
+    match /classGoals/{week} {
+      allow read: if isDomainUser();
+      allow write: if false;
+    }
+
+    match /improvedBoard/{key} {
+      allow read: if isDomainUser();
+      allow write: if false;
+    }
+
     match /weeklyXpLeaderboards/{week} {
       allow read: if isDomainUser();
       match /entries/{uid} {
