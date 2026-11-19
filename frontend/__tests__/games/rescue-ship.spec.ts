@@ -9,6 +9,7 @@ import {
   shipDifficultyFor,
   ShipFacts,
   ShipSetup,
+  shipStars,
   shipTasks,
   shipView,
   START_HP,
@@ -140,7 +141,7 @@ describe("rescue ship", () => {
         crew: buildCrew([]),
         captain: "me",
       };
-      const tasks = shipTasks(seed, setup.difficulty);
+      const tasks = shipTasks(seed, setup.difficulty, { captain: true });
       const facts: ShipFacts = { startAt: 0, done: {}, hands: {} };
       for (const task of tasks) {
         if (task.kind === "hands")
@@ -151,7 +152,7 @@ describe("rescue ship", () => {
       expect(v.reason).toBe("home");
       expect(v.boss).toBe("won");
       expect(v.perfect).toBe(true);
-      expect(v.pets).toBeGreaterThanOrEqual(18);
+      expect(shipStars(v)).toBe(3);
       expect(v.stats["helper"]).toBeUndefined();
       expect(v.stats["me"]?.boss).toBe(v.bossMax);
     }
@@ -166,7 +167,7 @@ describe("rescue ship", () => {
     };
     const v = shipView(
       setup,
-      shipTasks(4, setup.difficulty),
+      shipTasks(4, setup.difficulty, { captain: true }),
       { startAt: 0, done: {}, hands: {} },
       RUN_MS,
     );
@@ -216,5 +217,14 @@ describe("rescue ship", () => {
       40_000,
     );
     expect(boosted.shield).toBeGreaterThan(plain.shield);
+  });
+
+  it("captain mode has fewer jobs that wait longer", () => {
+    const d = shipDifficultyFor("Medium");
+    const crew = shipTasks(5, d);
+    const solo = shipTasks(5, d, { captain: true });
+    expect(solo.length).toBeLessThan(crew.length * 0.75);
+    const firstPet = (list: typeof crew) => list.find((t) => t.kind === "pet")!;
+    expect(firstPet(solo).window).toBeGreaterThan(firstPet(crew).window);
   });
 });

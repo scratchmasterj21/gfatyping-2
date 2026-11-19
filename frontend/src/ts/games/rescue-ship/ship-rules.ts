@@ -561,11 +561,26 @@ export type Task = {
   dock?: boolean;
 };
 
+/**
+ * Solo captain pace: one player does every station's jobs, so jobs come
+ * less often and wait longer (and long phrases always get enough time).
+ */
+const CAPTAIN_GAP = 1.6;
+const CAPTAIN_WINDOW = 1.4;
+const captainFit = (word: string): number => 2500 + word.length * 400;
+
 /** Every task in the run - the same for everyone with this seed. */
-export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
+export function shipTasks(
+  seed: number,
+  d: ShipDifficulty,
+  opts: { captain?: boolean } = {},
+): Task[] {
   const tasks: Task[] = [];
   const rng = seededRandom(seed ^ 0x51ab);
-  const w = (ms: number): number => Math.round(ms * d.windowScale);
+  const captain = opts.captain === true;
+  const gap = captain ? CAPTAIN_GAP : 1;
+  const w = (ms: number): number =>
+    Math.round(ms * d.windowScale * (captain ? CAPTAIN_WINDOW : 1));
   const zones = shipZones(seed);
   const short = d.petStyle === "short" ? "short" : "long";
   const n = { p: 0, s: 0, e: 0, r: 0, x: 0 };
@@ -575,7 +590,9 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
 
     // pilot: asteroids, faster each zone (and in a meteor storm)
     const every = Math.round(
-      ([7000, 6000, 5000][zi] as number) * (z.kind === "meteors" ? 0.75 : 1),
+      ([7000, 6000, 5000][zi] as number) *
+        (z.kind === "meteors" ? 0.75 : 1) *
+        gap,
     );
     for (let t = z.start + 2500; t < z.end - 2000; t += every) {
       const frozen = z.kind === "ice";
@@ -591,19 +608,22 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
     }
 
     // shields: a charge word every 4s
-    for (let t = z.start + 1500; t < z.end; t += 4000) {
+    const chargeEvery = Math.round(4000 * gap);
+    for (let t = z.start + 1500; t < z.end; t += chargeEvery) {
       tasks.push({
         id: `s${n.s++}`,
         kind: "charge",
         station: "shields",
         at: t,
-        window: 4000,
+        window: chargeEvery,
         word: pickWords(rng, d.words, d.shieldLength),
       });
     }
 
     // engineer: parts break, more later on and in a meteor storm
-    const count = ([2, 4, 4][zi] as number) + (z.kind === "meteors" ? 1 : 0);
+    const count =
+      ((captain ? [1, 3, 3] : [2, 4, 4])[zi] as number) +
+      (z.kind === "meteors" ? 1 : 0);
     const slot = (FLY_MS - 10_000) / count;
     for (let i = 0; i < count; i++) {
       const part = PARTS[(n.e + Math.floor(rng() * 3)) % 3] as Part;
@@ -621,7 +641,7 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
     }
 
     // rescuer: stranded pets (now and then a golden one)
-    const petEvery = [13_000, 11_500, 10_500][zi] as number;
+    const petEvery = Math.round(([13_000, 11_500, 10_500][zi] as number) * gap);
     for (let t = z.start + 5000; t < z.end - 6000; t += petEvery) {
       const pet = pickOne(rng, PET_KINDS);
       const golden = rng() < 0.06;
@@ -687,16 +707,17 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
   // the big visitor: phrases anyone can type
   const boss = zones[3] as Zone;
   const phrases = shuffled(rng, d.label === "Easy" ? BOSS_EASY : BOSS_LONG);
-  bossPhraseCount(d).forEach((i) => {
+  const bossCount = d.label === "Easy" ? (captain ? 5 : 6) : captain ? 6 : 8;
+  for (let i = 0; i < bossCount; i++) {
     tasks.push({
       id: `b${i}`,
       kind: "boss",
       station: "any",
-      at: boss.start + 2500 + i * 2800,
+      at: boss.start + 2500 + i * (captain ? 4000 : 2800),
       window: w(9000),
       word: phrases[i % phrases.length] as string,
     });
-  });
+  }
 
   const station = zones[4] as Zone;
   tasks.push({
@@ -709,11 +730,16 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
     dock: true,
   });
 
+  if (captain) {
+    // long phrases always get enough time to type
+    for (const task of tasks) {
+      if (task.kind !== "break") {
+        task.window = Math.max(task.window, captainFit(task.word));
+      }
+    }
+  }
   return tasks.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
 }
-
-const bossPhraseCount = (d: ShipDifficulty): number[] =>
-  Array.from({ length: d.label === "Easy" ? 6 : 8 }, (_, i) => i);
 
 /** A combo shield boost's task id (unique per crew slot). */
 export const boostId = (slot: number, n: number): string =>
@@ -733,6 +759,8 @@ export type ShipFacts = {
 export const START_HP = 10;
 const SHIELD_MAX = 100;
 const SHIELD_DRAIN_PER_S = 2.0;
+/** the solo captain has fewer shield jobs, so the shield drains slower */
+const CAPTAIN_DRAIN_PER_S = 1.3;
 /** the goo cloud eats the shield this much faster */
 const GOO_DRAIN = 1.6;
 const SHIELD_CHARGE = 22;
@@ -843,6 +871,8 @@ export type ShipView = {
   stats: Record<string, CrewStats>;
   bossHits: number;
   bossMax: number;
+  /** pets a perfect crew would bring home */
+  maxPets: number;
   boss?: "won" | "left";
   /** no crew call missed and the boss sent off */
   perfect: boolean;
@@ -1072,7 +1102,9 @@ export function shipView(
     for (const z of gooZones) {
       goo += Math.max(0, Math.min(to, z.end) - Math.max(from, z.start));
     }
-    return ((to - from + goo * (GOO_DRAIN - 1)) / 1000) * SHIELD_DRAIN_PER_S;
+    const rate =
+      setup.captain === undefined ? SHIELD_DRAIN_PER_S : CAPTAIN_DRAIN_PER_S;
+    return ((to - from + goo * (GOO_DRAIN - 1)) / 1000) * rate;
   };
 
   const byId = new Map(tasks.map((x) => [x.id, x]));
@@ -1214,6 +1246,10 @@ export function shipView(
     stats,
     bossHits,
     bossMax: bossTasks.length,
+    maxPets:
+      tasks.reduce((sum, x) => sum + (x.kind === "pet" ? petWorth(x) : 0), 0) +
+      DOCK_BONUS_PETS +
+      (bossTasks.length > 0 ? BOSS_BONUS_PETS : 0),
     ...(boss === undefined ? {} : { boss }),
     perfect: over && reason === "home" && !missedCall && boss === "won",
   };
@@ -1259,8 +1295,9 @@ export function shipScore(input: { view: ShipView; mine: CrewStats }): number {
 
 export function shipStars(v: ShipView): number {
   if (v.reason !== "home") return 1;
-  if (v.pets >= 18 && v.hp >= 6) return 3;
-  return v.pets >= 12 ? 2 : 1;
+  const share = v.pets / Math.max(1, v.maxPets);
+  if (share >= 0.75 && v.hp >= 6) return 3;
+  return share >= 0.5 ? 2 : 1;
 }
 
 /** Pets I beamed aboard myself, by kind ("golden" counts golden ones). */

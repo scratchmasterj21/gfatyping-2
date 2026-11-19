@@ -145,7 +145,11 @@ export function RescueShipModal(props: {
   });
   const tasks = createMemo(() => {
     const s = setup();
-    return s === null ? [] : shipTasks(s.seed, s.difficulty);
+    return s === null
+      ? []
+      : shipTasks(s.seed, s.difficulty, {
+          captain: s.captain !== undefined,
+        });
   });
   const facts = createMemo((): ShipFacts | null => {
     if (mode() === "solo") return solo()?.facts ?? null;
