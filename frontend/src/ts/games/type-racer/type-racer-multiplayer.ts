@@ -33,6 +33,8 @@ export type RacerPlayer = {
   completed?: boolean;
   /** ms from their own race start to the end of their race */
   raceMs?: number;
+  /** last emoji reaction */
+  react?: { e: string; at: number };
 };
 
 export type RacerRoom = {
@@ -46,7 +48,39 @@ export type RacerRoom = {
   wordListLabel: string;
   words: string[];
   players: Record<string, RacerPlayer>;
+  /** race number (rematches count up) */
+  round?: number;
+  /** race wins per player across rematches (best of 3) */
+  series?: Record<string, number>;
+  /** computer racers filling empty spots this race */
+  bots?: number;
+  /** this race's word order / track */
+  seed?: number;
 };
+
+/** Emoji reactions players can send. */
+export const RACER_REACTIONS = ["👍", "😂", "😮", "🔥", "🏎️", "👏"];
+/** Rooms fill up to this many racers with computer racers. */
+export const FILL_TO = 4;
+/** A series is won with this many race wins. */
+export const SERIES_WINS = 2;
+
+/** Same words for everyone, shuffled by this race's seed. */
+export function raceWords(room: RacerRoom): string[] {
+  const words = [...(room.words ?? [])];
+  let a = (room.seed ?? 1) >>> 0 || 1;
+  const rng = (): number => {
+    a = (a * 1103515245 + 12345) >>> 0;
+    return a / 4294967296;
+  };
+  if (room.seed !== undefined) {
+    for (let i = words.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [words[i], words[j]] = [words[j] as string, words[i] as string];
+    }
+  }
+  return words;
+}
 
 const MAX_PLAYERS = 8;
 
@@ -146,7 +180,10 @@ export function subscribeRacerRoom(
   );
 }
 
-export async function startRacerRoom(code: string): Promise<void> {
+export async function startRacerRoom(
+  code: string,
+  onlineCount: number,
+): Promise<void> {
   // The game is under way: keep the room if the host drops now. Cancelling
   // also clears the host's own presence hook, so set that one again.
   await onDisconnect(roomRef(code)).cancel();
@@ -157,15 +194,67 @@ export async function startRacerRoom(code: string): Promise<void> {
   await update(roomRef(code), {
     status: "countdown",
     startAt: Date.now() + 3000,
+    round: 1,
+    bots: Math.max(0, FILL_TO - onlineCount),
+    seed: Math.floor(Math.random() * 2 ** 31),
   });
+}
+
+/** Host: race again with the same players (series keeps counting). */
+export async function rematchRacerRoom(room: RacerRoom): Promise<void> {
+  const players: Record<string, RacerPlayer> = {};
+  for (const [uid, p] of Object.entries(room.players ?? {})) {
+    if (!p.online) continue;
+    players[uid] = {
+      uid,
+      name: p.name,
+      joinedAt: p.joinedAt,
+      online: true,
+      progress: 0,
+      wpm: 0,
+      accuracy: 100,
+      finished: false,
+      finishedAt: 0,
+    };
+  }
+  const n = Object.keys(players).length;
+  await update(roomRef(room.code), {
+    players,
+    status: "countdown",
+    startAt: Date.now() + 3000,
+    round: (room.round ?? 1) + 1,
+    bots: Math.max(0, FILL_TO - n),
+    seed: Math.floor(Math.random() * 2 ** 31),
+    // a won series starts over
+    series: seriesOver(room.series) ? {} : (room.series ?? {}),
+  });
+}
+
+export const seriesOver = (
+  series: Record<string, number> | undefined,
+): boolean => Object.values(series ?? {}).some((w) => w >= SERIES_WINS);
+
+export async function sendRacerReaction(
+  code: string,
+  e: string,
+): Promise<void> {
+  const user = currentUser();
+  await update(playerRef(code, user.uid), { react: { e, at: Date.now() } });
 }
 
 export async function markRacerRoomPlaying(code: string): Promise<void> {
   await update(roomRef(code), { status: "playing" });
 }
 
-export async function finishRacerRoom(code: string): Promise<void> {
-  await update(roomRef(code), { status: "finished" });
+/** Host: everyone's done - the winner gets a series point. */
+export async function finishRacerRoom(
+  code: string,
+  winnerUid: string | undefined,
+  series: Record<string, number> | undefined,
+): Promise<void> {
+  const next = { ...series };
+  if (winnerUid !== undefined) next[winnerUid] = (next[winnerUid] ?? 0) + 1;
+  await update(roomRef(code), { status: "finished", series: next });
 }
 
 export async function updateRacerPlayer(

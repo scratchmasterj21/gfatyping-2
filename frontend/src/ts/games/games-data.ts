@@ -194,7 +194,8 @@ export const games: Game[] = [
     type: "builtin",
     id: "type-racer",
     name: "Type Racer",
-    description: "Race the CPU — type words to speed ahead!",
+    description:
+      "Race 4 wacky racers - nitro, ramps, Grand Prix, a daily race and a garage!",
     icon: "fa-car",
     words: "lessons",
   },

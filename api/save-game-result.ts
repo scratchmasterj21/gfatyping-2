@@ -92,6 +92,11 @@ export default async function handler(
     await saveDailyBest(auth.uid, rallyBody, res, "dailyRally", MAX_RALLY_HITS);
     return;
   }
+  const raceBody = (req.body as { dailyRace?: unknown }).dailyRace;
+  if (raceBody !== undefined) {
+    await saveDailyBest(auth.uid, raceBody, res, "dailyRace", MAX_RACE_WPM);
+    return;
+  }
 
   const body = req.body as {
     key?: unknown;
@@ -305,17 +310,20 @@ async function saveWeeklyQuest(
 const MAX_DAILY_SCORE = 20_000;
 /** Word Ping-Pong daily rally: longest rally (hits) anyone could manage. */
 const MAX_RALLY_HITS = 400;
+/** Type Racer daily race: words per minute. */
+const MAX_RACE_WPM = 250;
 
 /**
  * Daily class bests: Ghost Hunter's Daily Haunting (dailyGhost/{day}) and
- * Word Ping-Pong's Daily Rally (dailyRally/{day}). One small doc per day,
- * read once by the game menu. Body: { dailyGhost | dailyRally: { day, score } }.
+ * Word Ping-Pong's Daily Rally (dailyRally/{day}) and Type Racer's Daily
+ * Race (dailyRace/{day}). One small doc per day, read once by the game menu.
+ * Body: { dailyGhost | dailyRally | dailyRace: { day, score } }.
  */
 async function saveDailyBest(
   uid: string,
   raw: unknown,
   res: VercelResponse,
-  collection: "dailyGhost" | "dailyRally",
+  collection: "dailyGhost" | "dailyRally" | "dailyRace",
   max: number,
 ): Promise<void> {
   const body = (raw ?? {}) as { day?: unknown; score?: unknown };

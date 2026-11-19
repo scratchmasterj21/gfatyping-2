@@ -142,6 +142,51 @@ async function claimHouseChore(
   }
 }
 
+/** Type Racer garage points from one race (1st-3rd, Grand Prix win). */
+const MAX_RACER_POINTS = 8;
+
+/**
+ * Type Racer garage: add this race's points (0 just reads the total) and
+ * return the total, which unlocks car colours, stickers and drivers.
+ * Cosmetic only - no coins. One read, plus one write when points > 0.
+ */
+async function claimRacerGarage(
+  uid: string,
+  raw: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  const points = Math.floor(Number(raw ?? 0));
+  if (!Number.isFinite(points) || points < 0 || points > MAX_RACER_POINTS) {
+    res.status(400).json({ points: 0 });
+    return;
+  }
+  const userRef = getAdminApp().firestore().collection("users").doc(uid);
+  try {
+    let total = 0;
+    await getAdminApp()
+      .firestore()
+      .runTransaction(async (tx: admin.firestore.Transaction) => {
+        const data = ((await tx.get(userRef)).data() ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const old = data["racerPoints"];
+        total = (typeof old === "number" ? old : 0) + points;
+        if (points > 0) {
+          tx.set(
+            userRef,
+            { racerPoints: admin.firestore.FieldValue.increment(points) },
+            { mergeFields: ["racerPoints"] },
+          );
+        }
+      });
+    res.status(200).json({ points: total });
+  } catch (e) {
+    console.error("claim-reward (racerGarage) failed:", e);
+    res.status(500).json({ points: 0 });
+  }
+}
+
 const SHIP_PET_KEYS = new Set([
   "bunny",
   "pup",
@@ -285,6 +330,10 @@ export default async function handler(
       )
       .map(([id]) => id);
     await claimCollection(auth.uid, category, "ownedCostumes", required, res);
+    return;
+  }
+  if (body.type === "racerGarage") {
+    await claimRacerGarage(auth.uid, body.score, res);
     return;
   }
   if (body.type === "houseChore") {

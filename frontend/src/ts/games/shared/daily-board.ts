@@ -5,10 +5,10 @@ import { getDb } from "../../firebase";
 
 /**
  * Daily class bests (one small Firestore doc per day, written by
- * api/save-game-result.ts): Ghost Hunter's Daily Haunting and Word
- * Ping-Pong's Daily Rally.
+ * api/save-game-result.ts): Ghost Hunter's Daily Haunting, Word
+ * Ping-Pong's Daily Rally and Type Racer's Daily Race.
  */
-export type DailyCollection = "dailyGhost" | "dailyRally";
+export type DailyCollection = "dailyGhost" | "dailyRally" | "dailyRace";
 
 export type DailyClassScore = { classId: string; score: number; name: string };
 
