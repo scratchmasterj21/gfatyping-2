@@ -145,9 +145,18 @@ export const RACE_DIFFICULTIES: RaceDifficulty[] = [
 
 export const cpsFor = (wpm: number): number => (wpm * 5) / 60;
 
-/** Finish line: Tappy gets there in about `raceSec` seconds. */
-export const targetFor = (wpm: number, raceSec: number): number =>
-  Math.max(40, Math.round(cpsFor(wpm) * raceSec));
+/**
+ * Finish line in characters: the same track on every difficulty (about 16
+ * words short, 32 long), so a fast typist on Easy still gets a real race.
+ * Difficulty only changes how fast the computer racers go.
+ */
+export const TRACK_CHARS = { short: 80, long: 160 } as const;
+export const targetFor = (seconds: 30 | 60): number =>
+  seconds === 30 ? TRACK_CHARS.short : TRACK_CHARS.long;
+
+/** About how long Tappy takes (the robot's pit stop is timed from this). */
+export const tappySeconds = (target: number, cps: number): number =>
+  target / Math.max(0.1, cps);
 
 /** Computer racers for `n` empty spots (online). */
 export const botsFor = (n: number): CpuId[] =>
@@ -203,6 +212,12 @@ export const SPIN_MISSES = 3;
 export const SLIP_GAP = 6;
 
 const BOOST_MS = 1800;
+/** Nitro moves you this share of the track. */
+const NITRO_SHARE = 0.04;
+/** A clean ramp jump (about half a word). */
+const JUMP_CHARS = 2.5;
+/** Extra per word in the slipstream. */
+const SLIP_CHARS = 0.75;
 const JUMP_MS = 700;
 const SPIN_MS = 600;
 
@@ -369,18 +384,18 @@ export class RaceRun {
     this.keys += done.text.length - this.typed.length;
     // slipstream: just behind another car
     const slip = others.some((o) => o > before && o - before <= SLIP_GAP);
-    if (slip) this.pushes.push({ at: now, ms: 300, chars: 1.5 });
+    if (slip) this.pushes.push({ at: now, ms: 300, chars: SLIP_CHARS });
     events.push({ type: "word", word: done.text, clean: isClean, slip });
     if (done.kind === "nitro") {
       this.pushes.push({
         at: now,
         ms: BOOST_MS,
-        chars: Math.max(6, this.target * 0.07),
+        chars: Math.max(4, this.target * NITRO_SHARE),
       });
       events.push({ type: "boost" });
     } else if (done.kind === "jump") {
       if (isClean) {
-        this.pushes.push({ at: now, ms: JUMP_MS, chars: 5 });
+        this.pushes.push({ at: now, ms: JUMP_MS, chars: JUMP_CHARS });
         events.push({ type: "jump" });
       } else {
         events.push({ type: "bump" });
@@ -555,6 +570,22 @@ export function soloRaceOver(input: {
       cpuFinishSec(id, input.cps, input.target, input.raceSec) * 1000 <=
       input.elapsedMs,
   );
+}
+
+/** Won by a lot: 1st, and 2nd needed 40%+ longer (or didn't finish). */
+export function wonBig(standings: Standing[]): boolean {
+  const [first, second] = standings;
+  if (first?.me !== true || first.finishMs === undefined) return false;
+  if (second === undefined) return false;
+  return second.finishMs === undefined
+    ? second.progress < 0.8
+    : second.finishMs >= first.finishMs * 1.4;
+}
+
+/** The next difficulty up, if any. */
+export function nextDifficulty(label: string): string | undefined {
+  const i = RACE_DIFFICULTIES.findIndex((d) => d.label === label);
+  return i < 0 ? undefined : RACE_DIFFICULTIES[i + 1]?.label;
 }
 
 export const placeName = (place: number): string =>

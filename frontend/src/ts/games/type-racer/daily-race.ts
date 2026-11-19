@@ -29,7 +29,7 @@ export type RacePlan = {
 
 /** Daily races are Medium, standard length. */
 export const DAILY_DIFFICULTY = RACE_DIFFICULTIES[1] as RaceDifficulty;
-export const DAILY_SECONDS = 60;
+export const DAILY_SECONDS = 60 as const;
 
 export function racePlan(day: number): RacePlan {
   const listId = RACE_LISTS[day % RACE_LISTS.length] ?? "home-words";

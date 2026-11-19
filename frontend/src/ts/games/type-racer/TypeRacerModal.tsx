@@ -63,6 +63,7 @@ import {
   GpTable,
   GRAND_PRIX,
   newUnlocks,
+  nextDifficulty,
   placeName,
   placePoints,
   RACE_DIFFICULTIES,
@@ -70,8 +71,10 @@ import {
   raceStars,
   safeLook,
   Standing,
+  tappySeconds,
   targetFor,
   trackForSeed,
+  wonBig,
   TRACKS,
 } from "./race-rules";
 import {
@@ -195,14 +198,15 @@ export function TypeRacerModal(props: Props): JSXElement {
     words: string[],
     opts: {
       wpm: number;
-      seconds: number;
+      seconds: 30 | 60;
       track: RaceSetup["track"];
       seed: number;
       keepOrder: boolean;
       ghost: boolean;
     },
   ): RaceSetup => {
-    const target = targetFor(opts.wpm, opts.seconds);
+    const target = targetFor(opts.seconds);
+    const cps = cpsFor(opts.wpm);
     const uid = myUid();
     return {
       words,
@@ -211,8 +215,8 @@ export function TypeRacerModal(props: Props): JSXElement {
       keepOrder: opts.keepOrder,
       track: opts.track,
       cpus: SOLO_CPUS,
-      cps: cpsFor(opts.wpm),
-      raceSec: opts.seconds,
+      cps,
+      raceSec: tappySeconds(target, cps),
       startAt: Date.now() + COUNTDOWN_MS,
       look: safe(),
       myName: myName(),
@@ -282,6 +286,10 @@ export function TypeRacerModal(props: Props): JSXElement {
     const notes: string[] = [];
     if (k === "race" && r.ghost !== undefined && offerGhost(r.ghost)) {
       notes.push("👻 New personal best! Your ghost will race you next time.");
+    }
+    const harder = nextDifficulty(difficulty().label);
+    if (k !== "daily" && harder !== undefined && wonBig(r.standings)) {
+      notes.push(`😎 Too easy? Try ${harder}!`);
     }
     if (k === "daily" && r.wpm > 0 && signedIn()) {
       const best = await submitDailyBest("dailyRace", day, r.wpm).catch(

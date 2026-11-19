@@ -17,7 +17,10 @@ import {
   soloRaceOver,
   soloStandings,
   SPIN_MISSES,
+  tappySeconds,
   targetFor,
+  wonBig,
+  nextDifficulty,
 } from "../../src/ts/games/type-racer/race-rules";
 
 const WORDS = ["cat", "dog", "sun", "red", "big", "elephant", "rainbow", "go"];
@@ -53,14 +56,53 @@ describe("type racer rules", () => {
     expect(cpuDistance("fox", cps, 5, 60)).toBeGreaterThan(
       cpuDistance("tappy", cps, 5, 60),
     );
-    const target = targetFor(28, 60);
-    const turtle = cpuFinishSec("turtle", cps, target, 60);
+    const target = targetFor(60);
+    const sec = tappySeconds(target, cps);
+    const turtle = cpuFinishSec("turtle", cps, target, sec);
     for (const id of ["tappy", "fox", "robot"] as CpuId[]) {
-      expect(cpuFinishSec(id, cps, target, 60)).toBeLessThan(turtle);
+      expect(cpuFinishSec(id, cps, target, sec)).toBeLessThan(turtle);
     }
-    // Tappy gets there in about the race length
-    expect(cpuFinishSec("tappy", cps, target, 60)).toBeGreaterThan(55);
-    expect(cpuFinishSec("tappy", cps, target, 60)).toBeLessThan(65);
+    expect(
+      Math.abs(cpuFinishSec("tappy", cps, target, sec) - sec),
+    ).toBeLessThan(4);
+  });
+
+  it("every difficulty uses the same track; boosts stay small", () => {
+    expect(targetFor(30)).toBe(80);
+    expect(targetFor(60)).toBe(160);
+    // a 60 WPM typist on the long track: 32 s typing, boosts save < 20%
+    const run = new RaceRun({ words: WORDS, target: targetFor(60), seed: 9 });
+    const msPerChar = 60_000 / (60 * 5);
+    let t = 0;
+    let done = 0;
+    while (done === 0 && t < 120_000) {
+      const w = run.current.text;
+      for (let i = 1; i <= w.length && done === 0; i++) {
+        t += msPerChar;
+        run.input(w.slice(0, i), t);
+        if (run.distance(t) >= run.target) done = t;
+      }
+      t += msPerChar;
+    }
+    expect(done).toBeGreaterThan(32_000 * 0.8);
+  });
+
+  it("suggests a harder level after a big win", () => {
+    const me = {
+      id: "me",
+      name: "Me",
+      me: true,
+      progress: 1,
+      finishMs: 20_000,
+    };
+    expect(
+      wonBig([me, { id: "fox", name: "F", progress: 1, finishMs: 40_000 }]),
+    ).toBe(true);
+    expect(
+      wonBig([me, { id: "fox", name: "F", progress: 1, finishMs: 22_000 }]),
+    ).toBe(false);
+    expect(nextDifficulty("Easy")).toBe("Medium");
+    expect(nextDifficulty("Hard")).toBeUndefined();
   });
 
   it("typing a word moves the car its length + 1", () => {
@@ -87,7 +129,8 @@ describe("type racer rules", () => {
     const before = run.distance(10_000);
     const ev = typeWord(run, run.current.text, 10_000);
     expect(ev.some((e) => e.type === "boost")).toBe(true);
-    expect(run.distance(20_000) - before).toBeGreaterThan(20);
+    // the nitro word itself + 4% of the track
+    expect(run.distance(20_000) - before).toBeGreaterThan(400 * 0.04);
   });
 
   it("three wrong keys in a row spin you out", () => {
