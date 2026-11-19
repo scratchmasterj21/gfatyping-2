@@ -289,6 +289,13 @@ export function BalloonGame(props: {
         ? sim.typed.length
         : 0,
     );
+  /** A bunch shows its word once, under the middle balloon. */
+  const bunchLabel = (b: Balloon): boolean => {
+    const group = balloons().filter(
+      (x) => x.kind === "bunch" && x.word === b.word,
+    );
+    return group[Math.floor(group.length / 2)]?.id === b.id;
+  };
   const countdown = (): number =>
     live(() =>
       vs === undefined ? 0 : Math.ceil((vs.startAt - vs.now()) / 1000),
@@ -444,14 +451,7 @@ export function BalloonGame(props: {
                     <span class="absolute -inset-3 text-5xl">☁️</span>
                   </Show>
                 </div>
-                <Show
-                  when={
-                    b().kind !== "bunch" ||
-                    balloons().find(
-                      (x) => x.word === b().word && x.kind === "bunch",
-                    ) === b()
-                  }
-                >
+                <Show when={b().kind !== "bunch" || bunchLabel(b())}>
                   <span
                     class={cn(
                       "-mt-1 rounded-lg px-2 font-mono text-base font-bold shadow sm:text-lg",

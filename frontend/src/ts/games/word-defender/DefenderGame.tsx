@@ -17,6 +17,14 @@ import { sfx } from "../mini/mini-sounds";
 import { MiniTypingInput } from "../mini/MiniTypingInput";
 import { TypingReport, TypingTracker } from "../shared/typing-report";
 import {
+  heroUrl,
+  moonUrl,
+  mothershipUrl,
+  orbUrl,
+  planetUrl,
+  shipUrl,
+} from "./defender-art";
+import {
   BASE_Y,
   comboTier,
   DefEvent,
@@ -25,7 +33,6 @@ import {
   POWER_INFO,
   PowerKind,
   Ship,
-  ShipKind,
   START_LIVES,
   UpgradeId,
   UPGRADES,
@@ -57,15 +64,6 @@ export type DefenderCoop = {
   report: (score: number, lives: number, done: boolean) => void;
 };
 
-const SHIP_EMOJI: Record<ShipKind, string> = {
-  basic: "👾",
-  shield: "👾",
-  splitter: "🦠",
-  zigzag: "🛸",
-  scout: "🚀",
-  cloak: "👻",
-  mini: "🦠",
-};
 const LASER = [
   "var(--color-game-blue)",
   "var(--color-game-green)",
@@ -439,18 +437,33 @@ export function DefenderGame(props: {
             )}
           </For>
         </div>
-        {/* base */}
+        {/* far-away planet and moon */}
+        <img
+          src={planetUrl()}
+          alt=""
+          class="pointer-events-none absolute top-[12%] right-[6%] w-28 opacity-80 sm:w-40"
+        />
+        <img
+          src={moonUrl()}
+          alt=""
+          class="pointer-events-none absolute top-[45%] left-[5%] w-10 opacity-70 sm:w-14"
+        />
+        {/* my ship's force field: ships that reach it hurt my ship */}
         <div
-          class="absolute inset-x-0 bottom-0 border-t-4 border-game-blue/60 bg-game-navy/80"
-          style={{ height: `${100 - BASE_Y}%` }}
-        >
-          <Show when={live(() => sim.shields) > 0}>
-            <div class="absolute inset-x-0 -top-6 h-6 rounded-t-[100%] border-t-4 border-game-blue/80 bg-game-blue/20"></div>
-          </Show>
-          <div class="absolute bottom-0 left-1/2 -translate-x-1/2 text-3xl">
-            🏰
-          </div>
-        </div>
+          class={cn(
+            "absolute inset-x-0 h-1.5 rounded-full",
+            live(() => sim.shields) > 0
+              ? "bg-game-blue shadow-[0_0_16px_var(--color-game-blue)]"
+              : "bg-game-blue/40",
+          )}
+          style={{ top: `${BASE_Y}%` }}
+        ></div>
+        {/* my ship */}
+        <img
+          src={heroUrl()}
+          alt="your ship"
+          class="pointer-events-none absolute bottom-0 left-1/2 z-10 h-[13%] min-h-12 w-auto -translate-x-1/2 drop-shadow-[0_0_10px_var(--color-game-blue)]"
+        />
         {/* laser */}
         <Show when={laser()} keyed>
           {(l) => (
@@ -461,7 +474,7 @@ export function DefenderGame(props: {
             >
               <line
                 x1="50"
-                y1="96"
+                y1="88"
                 x2={l.x}
                 y2={l.y}
                 stroke={LASER[l.tier] ?? LASER[0]}
@@ -478,9 +491,11 @@ export function DefenderGame(props: {
               class="absolute left-1/2 z-10 flex -translate-x-1/2 flex-col items-center"
               style={{ top: `${live(() => b().y)}%` }}
             >
-              <span class="text-7xl drop-shadow-[0_0_12px_var(--color-game-purple)]">
-                🛸
-              </span>
+              <img
+                src={mothershipUrl()}
+                alt="mothership"
+                class="w-44 drop-shadow-[0_0_12px_var(--color-game-purple)] sm:w-56"
+              />
               <div class="flex flex-wrap justify-center gap-1">
                 <For each={live(() => b().parts)}>
                   {(p) => {
@@ -521,14 +536,20 @@ export function DefenderGame(props: {
               class="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
               style={{ left: `${s().x}%`, top: `${s().y}%` }}
             >
-              <span
-                class={cn(
-                  "relative leading-none",
-                  s().kind === "mini" ? "text-3xl" : "text-5xl",
-                  s().kind === "scout" && "rotate-180",
-                )}
-              >
-                {SHIP_EMOJI[s().kind]}
+              <span class="relative">
+                <img
+                  src={shipUrl(s().kind)}
+                  alt={s().kind}
+                  class={cn(
+                    "h-auto",
+                    s().kind === "mini"
+                      ? "w-10 sm:w-12"
+                      : s().kind === "scout"
+                        ? "w-9 rotate-180 sm:w-11"
+                        : "w-16 sm:w-20",
+                    s().kind === "cloak" && "opacity-70",
+                  )}
+                />
                 <Show when={s().kind === "shield" && s().hp > 1}>
                   <span class="absolute -inset-2 rounded-full border-2 border-game-blue bg-game-blue/20"></span>
                 </Show>
@@ -554,8 +575,13 @@ export function DefenderGame(props: {
               class="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 animate-game-bob flex-col items-center"
               style={{ left: `${o().x}%`, top: `${o().y}%` }}
             >
-              <span class="grid h-11 w-11 place-items-center rounded-full border-2 border-game-yellow bg-game-yellow/30 text-2xl">
-                {POWER_INFO[o().kind].emoji}
+              <span class="relative grid h-14 w-14 place-items-center text-2xl">
+                <img
+                  src={orbUrl(o().kind)}
+                  alt=""
+                  class="absolute inset-0 h-full w-full"
+                />
+                <span class="relative">{POWER_INFO[o().kind].emoji}</span>
               </span>
               <span class="rounded-lg bg-game-yellow px-2 font-mono font-bold text-game-ink">
                 <Word word={o().word} typed={typedFor(o().word)} />
