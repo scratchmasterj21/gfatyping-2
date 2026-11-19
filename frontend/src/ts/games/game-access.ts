@@ -23,7 +23,7 @@ export type GamePolicy = {
   mode?: GameMode;
   /** "earn": distinct lessons to pass with 2+ stars today to unlock games */
   earnLessons?: number;
-  /** "earn": also this many minutes of typing today (lessons or practice) */
+  /** "earn": also this many minutes of free typing today (Practice, not lessons) */
   earnTypingMin?: number;
   /** game ids that stay locked */
   blocked?: string[];
@@ -199,7 +199,7 @@ export async function giveBonusGameTime(
 export type EffectivePolicy = {
   mode: GameMode;
   earnLessons: number;
-  /** minutes of typing today also needed (0 = none) */
+  /** minutes of free typing (Practice) today also needed (0 = none) */
   earnTypingMin: number;
   blocked: string[];
   /** bonus minutes valid today (0 = none) */
@@ -246,7 +246,7 @@ export type GameAccess =
       reason: "blocked" | "off" | "earn" | "paused";
       /** "earn": lessons still to pass today */
       lessonsLeft?: number;
-      /** "earn": minutes of typing still to do today */
+      /** "earn": minutes of free typing still to do today */
       typingMinLeft?: number;
       /** "paused": why and until when */
       pause?: { until: string; reason: PauseReason };
@@ -256,11 +256,11 @@ export type GameAccess =
 export function checkGameAccess(
   gameId: string | undefined,
   policy: EffectivePolicy,
-  today: { lessonsPassed: number; gameSec: number; typingSec?: number },
+  today: { lessonsPassed: number; gameSec: number; practiceSec?: number },
 ): GameAccess {
   const typingMinLeft = Math.max(
     0,
-    Math.ceil(policy.earnTypingMin - (today.typingSec ?? 0) / 60),
+    Math.ceil(policy.earnTypingMin - (today.practiceSec ?? 0) / 60),
   );
   // a teacher's pause beats everything, bonus time included
   if (policy.pause !== undefined) {
@@ -329,7 +329,7 @@ export function earnTodo(lessonsLeft: number, typingMinLeft: number): string {
   }
   if (typingMinLeft > 0) {
     parts.push(
-      `type ${typingMinLeft} more minute${typingMinLeft === 1 ? "" : "s"}`,
+      `type ${typingMinLeft} more minute${typingMinLeft === 1 ? "" : "s"} in Practice`,
     );
   }
   const text = parts.join(" and ") || "keep typing";
@@ -359,12 +359,15 @@ type LocalToday = {
   date: string;
   gameSec: number;
   typingSec: number;
+  /** free typing only (not lessons) */
+  practiceSec: number;
   lessons: string[];
 };
 const [localToday, setLocalToday] = createSignal<LocalToday>({
   date: tokyoDate(),
   gameSec: 0,
   typingSec: 0,
+  practiceSec: 0,
   lessons: [],
 });
 
@@ -372,7 +375,13 @@ function freshLocal(): LocalToday {
   const cur = localToday();
   return cur.date === tokyoDate()
     ? cur
-    : { date: tokyoDate(), gameSec: 0, typingSec: 0, lessons: [] };
+    : {
+        date: tokyoDate(),
+        gameSec: 0,
+        typingSec: 0,
+        practiceSec: 0,
+        lessons: [],
+      };
 }
 
 export function noteLessonPassed(lessonId: string): void {
@@ -381,10 +390,15 @@ export function noteLessonPassed(lessonId: string): void {
   setLocalToday({ ...cur, lessons: [...cur.lessons, lessonId] });
 }
 
-/** A typing test was saved on this device (seconds of typing). */
-export function noteTypingSeconds(seconds: number): void {
+/** A typing test was saved on this device (seconds; `lesson`: a lesson try). */
+export function noteTypingSeconds(seconds: number, lesson = false): void {
   const cur = freshLocal();
-  setLocalToday({ ...cur, typingSec: cur.typingSec + Math.max(0, seconds) });
+  const s = Math.max(0, seconds);
+  setLocalToday({
+    ...cur,
+    typingSec: cur.typingSec + s,
+    practiceSec: cur.practiceSec + (lesson ? 0 : s),
+  });
 }
 
 /** `serverTotal` from the API (today's game seconds incl. this session). */
@@ -414,6 +428,7 @@ export function myToday(): {
   lessonsPassed: number;
   gameSec: number;
   typingSec: number;
+  practiceSec: number;
 } {
   const snap = snapshotToday();
   const local = freshLocal();
@@ -422,6 +437,7 @@ export function myToday(): {
     lessonsPassed: lessons.size,
     gameSec: (snap.g ?? 0) + local.gameSec,
     typingSec: (snap.t ?? 0) + local.typingSec,
+    practiceSec: Math.max(0, (snap.t ?? 0) - (snap.l ?? 0)) + local.practiceSec,
   };
 }
 

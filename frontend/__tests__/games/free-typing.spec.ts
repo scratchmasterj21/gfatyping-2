@@ -6,6 +6,7 @@ vi.mock("../../src/ts/firebase", () => ({
 }));
 
 import { tokyoWeekId } from "../../../api/_lib/time";
+import { summarizeActivity, tokyoDate } from "../../src/ts/classroom/activity";
 import {
   checkGameAccess,
   earnTodo,
@@ -84,7 +85,7 @@ describe("free typing extras", () => {
     const locked = checkGameAccess("gem-dig", p, {
       lessonsPassed: 1,
       gameSec: 0,
-      typingSec: 120,
+      practiceSec: 120,
     });
     expect(locked.allowed).toBe(false);
     expect(!locked.allowed && locked.typingMinLeft).toBe(3);
@@ -92,7 +93,7 @@ describe("free typing extras", () => {
       checkGameAccess("gem-dig", p, {
         lessonsPassed: 1,
         gameSec: 0,
-        typingSec: 300,
+        practiceSec: 300,
       }).allowed,
     ).toBe(true);
     // a student set back to lessons only
@@ -100,9 +101,25 @@ describe("free typing extras", () => {
       resolvePolicy(access, "G3A", "lessonsOnly", "2026-11-05").earnTypingMin,
     ).toBe(0);
     expect(earnTodo(1, 3)).toBe(
-      "Get ⭐⭐ on 1 more lesson and type 3 more minutes today",
+      "Get ⭐⭐ on 1 more lesson and type 3 more minutes in Practice today",
     );
-    expect(earnTodo(0, 1)).toBe("Type 1 more minute today");
+    expect(earnTodo(0, 1)).toBe("Type 1 more minute in Practice today");
+    // free typing only, no lessons needed
+    const practiceOnly = parseGameAccess({
+      classes: { G2A: { mode: "earn", earnLessons: 0, earnTypingMin: 3 } },
+    });
+    const pp = resolvePolicy(practiceOnly, "G2A", "kid", "2026-11-05");
+    expect(pp.earnLessons).toBe(0);
+    expect(
+      checkGameAccess("gem-dig", pp, {
+        lessonsPassed: 0,
+        gameSec: 0,
+        practiceSec: 200,
+      }).allowed,
+    ).toBe(true);
+    // lesson time doesn't count as free typing
+    const today = summarizeActivity({ [tokyoDate()]: { t: 600, l: 480 } }, 1);
+    expect(today.practiceSec).toBe(120);
   });
 });
 

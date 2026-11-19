@@ -83,7 +83,7 @@ const ACCESS_KEY = ["gameAccess"];
 const MODE_LABEL: Record<GameMode, string> = {
   on: "Games on",
   off: "Games off",
-  earn: "Earn with lessons",
+  earn: "Earn games",
 };
 
 function chip(active: boolean): string {
@@ -526,7 +526,7 @@ function WeekBoards(props: { classId: string }): JSXElement {
   );
 }
 
-/** "+ N minutes of typing" before games (0 = lessons only). */
+/** "+ N minutes of free typing (Practice)" before games (0 = none). */
 function TypingStepper(props: {
   value: number;
   disabled: boolean;
@@ -534,7 +534,7 @@ function TypingStepper(props: {
 }): JSXElement {
   return (
     <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
-      ⌨️ Also type
+      ⌨️ Free typing:
       <For each={[0, 3, 5, 10, 15]}>
         {(n) => (
           <button
@@ -547,7 +547,7 @@ function TypingStepper(props: {
           </button>
         )}
       </For>
-      of typing (lessons or Practice) each day before games.
+      in the Practice tab each day (lessons don&apos;t count here).
     </div>
   );
 }
@@ -566,7 +566,7 @@ function EarnStepper(props: {
         type="button"
         class={stepBtn}
         aria-label="Fewer lessons"
-        disabled={props.disabled || props.value <= 1}
+        disabled={props.disabled || props.value <= 0}
         onClick={() => props.onChange(props.value - 1)}
       >
         <Fa icon="fa-minus" />
@@ -584,7 +584,7 @@ function EarnStepper(props: {
         <Fa icon="fa-plus" />
       </button>
       different lessons with ⭐⭐ (2+ stars on that try) each day to unlock
-      games. Retries of old lessons count.
+      games (0 = no lessons needed). Retries of old lessons count.
     </div>
   );
 }
@@ -653,6 +653,7 @@ function StudentRow(props: {
     checkGameAccess(undefined, policy(), {
       lessonsPassed: props.today.lessonsPassed,
       gameSec: props.today.gameSec,
+      practiceSec: props.today.practiceSec,
     }),
   );
   const pauseFor = (days: number | "forever"): void => {
@@ -678,7 +679,18 @@ function StudentRow(props: {
         : "Can play";
     }
     if (s.reason === "earn") {
-      return `Locked: ${props.today.lessonsPassed}/${policy().earnLessons} ⭐⭐ lessons`;
+      const need: string[] = [];
+      if (policy().earnLessons > 0) {
+        need.push(
+          `${props.today.lessonsPassed}/${policy().earnLessons} ⭐⭐ lessons`,
+        );
+      }
+      if (policy().earnTypingMin > 0) {
+        need.push(
+          `${Math.floor(props.today.practiceSec / 60)}/${policy().earnTypingMin} min Practice`,
+        );
+      }
+      return `Locked: ${need.join(" · ")}`;
     }
     return "Games off";
   };

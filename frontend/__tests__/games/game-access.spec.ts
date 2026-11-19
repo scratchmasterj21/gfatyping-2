@@ -92,6 +92,7 @@ describe("activity summary", () => {
   it("sums today and the last 7 days", () => {
     expect(summarizeActivity(days, 1, now)).toEqual({
       typingSec: 600,
+      practiceSec: 200,
       gameSec: 1200,
       gamesOpened: 3,
       lessonsPassed: 2,

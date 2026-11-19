@@ -58,6 +58,8 @@ export function parseActivityDays(raw: unknown): ActivityDays {
 export type ActivitySummary = {
   /** typing seconds (lessons + practice) */
   typingSec: number;
+  /** free typing only (Practice), lessons not counted */
+  practiceSec: number;
   gameSec: number;
   gamesOpened: number;
   lessonsPassed: number;
@@ -71,6 +73,7 @@ export function summarizeActivity(
 ): ActivitySummary {
   const out: ActivitySummary = {
     typingSec: 0,
+    practiceSec: 0,
     gameSec: 0,
     gamesOpened: 0,
     lessonsPassed: 0,
@@ -82,6 +85,8 @@ export function summarizeActivity(
     // lessons also go through free-practice results, so t usually includes
     // l; max() keeps lessons counted when result saving was off
     out.typingSec += Math.max(d.t ?? 0, d.l ?? 0);
+    // free typing (Practice) = all typing minus lessons
+    out.practiceSec += Math.max(0, (d.t ?? 0) - (d.l ?? 0));
     out.gameSec += d.g ?? 0;
     out.gamesOpened += d.gp ?? 0;
     out.lessonsPassed += d.lx?.length ?? 0;
@@ -110,6 +115,7 @@ export function summarizeDates(
 ): ActivitySummary & { daysPracticed: number } {
   const out = {
     typingSec: 0,
+    practiceSec: 0,
     gameSec: 0,
     gamesOpened: 0,
     lessonsPassed: 0,
@@ -121,6 +127,7 @@ export function summarizeDates(
     if (d === undefined) continue;
     const typing = Math.max(d.t ?? 0, d.l ?? 0);
     out.typingSec += typing;
+    out.practiceSec += Math.max(0, (d.t ?? 0) - (d.l ?? 0));
     out.gameSec += d.g ?? 0;
     out.gamesOpened += d.gp ?? 0;
     out.lessonsPassed += d.lx?.length ?? 0;

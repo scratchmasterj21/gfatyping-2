@@ -1,3 +1,4 @@
+import { getActiveLesson } from "../../lessons/lesson-progress";
 import { noteTypingSeconds } from "../../games/game-access";
 import { CoinParts, notePracticeReward } from "../../practice/practice-reward";
 import { CompletedEvent, XpBreakdown } from "@monkeytype/schemas/results";
@@ -116,6 +117,7 @@ export const add: Handler = async (ctx) => {
         (result.incompleteTestSeconds ?? 0) -
         (result.afkDuration ?? 0),
     ),
+    getActiveLesson() !== null,
   );
 
   for (const quest of response.newlyCompletedQuests ?? []) {

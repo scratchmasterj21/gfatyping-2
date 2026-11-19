@@ -332,7 +332,7 @@ function GameAccessBanner(props: {
   access: GameAccess;
   policy: { mode: string; earnLessons: number; earnTypingMin: number };
   lessonsPassed: number;
-  typingSec: number;
+  practiceSec: number;
 }): JSXElement {
   const text = (): string | undefined => {
     const a = props.access;
@@ -351,10 +351,10 @@ function GameAccessBanner(props: {
       }
       if (p.earnTypingMin > 0) {
         steps.push(
-          `⌨️ ${p.earnTypingMin} minutes of typing (lessons or Practice) - ${Math.min(Math.floor(props.typingSec / 60), p.earnTypingMin)}/${p.earnTypingMin} done`,
+          `⌨️ ${p.earnTypingMin} minutes of free typing in Practice - ${Math.min(Math.floor(props.practiceSec / 60), p.earnTypingMin)}/${p.earnTypingMin} done`,
         );
       }
-      return `🎮 To unlock games today: ${steps.join(" and ")}! Retrying an old lesson counts too.`;
+      return `🎮 To unlock games today: ${steps.join(" and ")}!${p.earnLessons > 0 ? " Retrying an old lesson counts too." : ""}`;
     }
     if (a.reason === "off") {
       return "⏸️ Your teacher turned games off for now. Keep practicing your lessons!";
@@ -2140,7 +2140,7 @@ export function LessonsPage(): JSXElement {
                   access={gameAccess()}
                   policy={gamePolicy()}
                   lessonsPassed={myToday().lessonsPassed}
-                  typingSec={myToday().typingSec}
+                  practiceSec={myToday().practiceSec}
                 />
                 <div
                   role="tablist"
