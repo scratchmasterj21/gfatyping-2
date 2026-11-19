@@ -142,6 +142,61 @@ async function claimHouseChore(
   }
 }
 
+/**
+ * Balloon Pop levels: keep my best stars (0-3) for a level (1-12) and return
+ * all of them. level 0 just reads. One read, plus one write on a new best.
+ */
+async function claimBalloonStars(
+  uid: string,
+  rawLevel: unknown,
+  rawStars: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  const level = Math.floor(Number(rawLevel ?? 0));
+  const stars = Math.floor(Number(rawStars ?? 0));
+  if (
+    !Number.isFinite(level) ||
+    !Number.isFinite(stars) ||
+    level < 0 ||
+    level > 12 ||
+    stars < 0 ||
+    stars > 3
+  ) {
+    res.status(400).json({ stars: {} });
+    return;
+  }
+  const userRef = getAdminApp().firestore().collection("users").doc(uid);
+  try {
+    let out: Record<string, number> = {};
+    await getAdminApp()
+      .firestore()
+      .runTransaction(async (tx: admin.firestore.Transaction) => {
+        const data = ((await tx.get(userRef)).data() ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const old = (data["balloonStars"] ?? {}) as Record<string, unknown>;
+        out = {};
+        for (const [k, v] of Object.entries(old)) {
+          if (typeof v === "number") out[k] = v;
+        }
+        const key = `l${level}`;
+        if (level > 0 && stars > (out[key] ?? 0)) {
+          out[key] = stars;
+          tx.set(
+            userRef,
+            { balloonStars: { [key]: stars } },
+            { mergeFields: [`balloonStars.${key}`] },
+          );
+        }
+      });
+    res.status(200).json({ stars: out });
+  } catch (e) {
+    console.error("claim-reward (balloonStars) failed:", e);
+    res.status(500).json({ stars: {} });
+  }
+}
+
 /** Type Racer garage points from one race (1st-3rd, Grand Prix win). */
 const MAX_RACER_POINTS = 8;
 
@@ -330,6 +385,10 @@ export default async function handler(
       )
       .map(([id]) => id);
     await claimCollection(auth.uid, category, "ownedCostumes", required, res);
+    return;
+  }
+  if (body.type === "balloonStars") {
+    await claimBalloonStars(auth.uid, body.wave, body.score, res);
     return;
   }
   if (body.type === "racerGarage") {

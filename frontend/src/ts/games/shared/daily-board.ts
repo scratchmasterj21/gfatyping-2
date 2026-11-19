@@ -8,7 +8,11 @@ import { getDb } from "../../firebase";
  * api/save-game-result.ts): Ghost Hunter's Daily Haunting, Word
  * Ping-Pong's Daily Rally and Type Racer's Daily Race.
  */
-export type DailyCollection = "dailyGhost" | "dailyRally" | "dailyRace";
+export type DailyCollection =
+  | "dailyGhost"
+  | "dailyRally"
+  | "dailyRace"
+  | "dailyDefender";
 
 export type DailyClassScore = { classId: string; score: number; name: string };
 

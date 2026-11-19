@@ -230,7 +230,8 @@ export const games: Game[] = [
     type: "builtin",
     id: "balloon-pop",
     name: "Balloon Pop",
-    description: "Type the words on balloons before they float away!",
+    description:
+      "12 balloon levels with surprises - win balloon animals, or battle a classmate!",
     icon: "fa-circle",
     words: "lessons",
   },
@@ -238,7 +239,8 @@ export const games: Game[] = [
     type: "builtin",
     id: "word-defender",
     name: "Word Defender",
-    description: "Type the words on enemy ships before they reach your base!",
+    description:
+      "Zap space ships, pick upgrades, beat the mothership - alone or co-op!",
     icon: "fa-rocket",
     words: "lessons",
   },

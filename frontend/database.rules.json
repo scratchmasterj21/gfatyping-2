@@ -131,7 +131,6 @@
           ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('karutaRooms').child($code).child('players').child(auth.uid).exists() && root.child('karutaRooms').child($code).child('status').val() == 'playing'",
           ".validate": "newData.hasChildren(['seq', 'order']) && (!data.exists() || newData.child('seq').val() == data.child('seq').val() + 1)"
         },
-
         "status": {
           ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
@@ -164,7 +163,6 @@
             ".validate": "newData.isString() && newData.val() == auth.uid && $index.matches(/^[0-9]+$/)"
           }
         },
-
         "status": {
           ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
@@ -192,7 +190,6 @@
           ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('shiritoriRooms').child($code).child('players').child(auth.uid).exists() && root.child('shiritoriRooms').child($code).child('status').val() == 'playing'",
           ".validate": "newData.hasChildren(['seq', 'order']) && (!data.exists() || newData.child('seq').val() == data.child('seq').val() + 1)"
         },
-
         "status": {
           ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
@@ -392,7 +389,9 @@
         "seed": {
           ".validate": "newData.isNumber() && (!data.exists() || newData.val() == data.val())"
         },
-        "startedAt": { ".validate": "newData.isNumber()" },
+        "startedAt": {
+          ".validate": "newData.isNumber()"
+        },
         "words": {
           ".validate": "newData.hasChildren()",
           "$index": {
@@ -484,15 +483,21 @@
           "$uid": {
             ".write": "auth != null && auth.uid == $uid && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
             ".validate": "!newData.exists() || auth.token.email == 'john.limpiada@felice.ed.jp' || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 80 && newData.child('finished').isBoolean())",
-            "uid": { ".validate": "newData.val() == $uid" },
+            "uid": {
+              ".validate": "newData.val() == $uid"
+            },
             "name": {
               ".validate": "newData.isString() && newData.val().length <= 80"
             },
             "avatarUrl": {
               ".validate": "newData.isString() && newData.val().length <= 2000"
             },
-            "joinedAt": { ".validate": "newData.isNumber()" },
-            "lastSeen": { ".validate": "newData.isNumber()" },
+            "joinedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "lastSeen": {
+              ".validate": "newData.isNumber()"
+            },
             "wordIndex": {
               ".validate": "newData.isNumber() && newData.val() >= 0"
             },
@@ -517,7 +522,9 @@
             "submitted": {
               ".validate": "newData.isBoolean() && (newData.val() == false || auth.token.email == 'john.limpiada@felice.ed.jp')"
             },
-            "$other": { ".validate": false }
+            "$other": {
+              ".validate": false
+            }
           }
         }
       }
@@ -535,6 +542,98 @@
         "$actionId": {
           ".write": "auth != null && root.child('ghostRooms').child($code).child('status').val() == 'playing' && !data.exists() && newData.child('uid').val() == auth.uid",
           ".validate": "newData.hasChildren(['uid', 'word', 'createdAt']) && newData.child('uid').isString() && newData.child('word').isString() && newData.child('word').val().length > 0 && newData.child('word').val().length <= 60 && newData.child('createdAt').isNumber()"
+        }
+      }
+    },
+    "defenderRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('defenderRooms').child($code).child('status').val() == 'lobby') || data.exists())",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('online').isBoolean() && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('lives').isNumber() && newData.child('lives').val() >= 0 && newData.child('lives').val() <= 9 && newData.child('done').isBoolean())"
+          }
+        },
+        "kills": {
+          "$id": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('defenderRooms').child($code).child('players').child(auth.uid).exists() && root.child('defenderRooms').child($code).child('status').val() == 'playing' && !data.exists()",
+            ".validate": "newData.val() == auth.uid && $id.length <= 24"
+          }
+        },
+        "fx": {
+          "$n": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('defenderRooms').child($code).child('players').child(auth.uid).exists() && root.child('defenderRooms').child($code).child('status').val() == 'playing' && !data.exists()",
+            ".validate": "newData.hasChildren(['kind', 'at', 'uid']) && newData.child('kind').isString() && newData.child('kind').val().length <= 12 && newData.child('uid').val() == auth.uid && newData.child('at').isNumber()"
+          }
+        },
+        "sends": {
+          "$to": {
+            "$n": {
+              ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('defenderRooms').child($code).child('players').child(auth.uid).exists() && root.child('defenderRooms').child($code).child('status').val() == 'playing' && $to != auth.uid && !data.exists()",
+              ".validate": "newData.hasChildren(['word', 'at']) && newData.child('word').isString() && newData.child('word').val().length > 0 && newData.child('word').val().length <= 30 && newData.child('at').isNumber()"
+            }
+          }
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          }
+        }
+      }
+    },
+    "balloonRooms": {
+      ".read": "auth != null && auth.token.email == 'john.limpiada@felice.ed.jp'",
+      ".indexOn": ["createdAt"],
+      "$code": {
+        ".read": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/)",
+        ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && ((!data.exists() && newData.child('hostUid').val() == auth.uid) || data.child('hostUid').val() == auth.uid)",
+        "players": {
+          "$uid": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('balloonRooms').child($code).child('status').val() == 'lobby') || data.exists())",
+            ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('online').isBoolean() && newData.child('score').isNumber() && newData.child('score').val() >= 0 && newData.child('lives').isNumber() && newData.child('lives').val() >= 0 && newData.child('lives').val() <= 9 && newData.child('done').isBoolean())"
+          }
+        },
+        "kills": {
+          "$id": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('balloonRooms').child($code).child('players').child(auth.uid).exists() && root.child('balloonRooms').child($code).child('status').val() == 'playing' && !data.exists()",
+            ".validate": "newData.val() == auth.uid && $id.length <= 24"
+          }
+        },
+        "fx": {
+          "$n": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('balloonRooms').child($code).child('players').child(auth.uid).exists() && root.child('balloonRooms').child($code).child('status').val() == 'playing' && !data.exists()",
+            ".validate": "newData.hasChildren(['kind', 'at', 'uid']) && newData.child('kind').isString() && newData.child('kind').val().length <= 12 && newData.child('uid').val() == auth.uid && newData.child('at').isNumber()"
+          }
+        },
+        "sends": {
+          "$to": {
+            "$n": {
+              ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('balloonRooms').child($code).child('players').child(auth.uid).exists() && root.child('balloonRooms').child($code).child('status').val() == 'playing' && $to != auth.uid && !data.exists()",
+              ".validate": "newData.hasChildren(['word', 'at']) && newData.child('word').isString() && newData.child('word').val().length > 0 && newData.child('word').val().length <= 30 && newData.child('at').isNumber()"
+            }
+          }
+        },
+        "status": {
+          ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "words": {
+          ".validate": "newData.hasChildren()",
+          "$index": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+          }
         }
       }
     }

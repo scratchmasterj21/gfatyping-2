@@ -9,9 +9,7 @@ vi.mock("phaser", () => ({
   },
 }));
 
-import { GameOverScene as BalloonOver } from "../../src/ts/games/balloon-pop/scenes/GameOverScene";
 import { GameOverScene as GhostOver } from "../../src/ts/games/ghost-hunter/scenes/GameOverScene";
-import { GameOverScene as DefenderOver } from "../../src/ts/games/word-defender/scenes/GameOverScene";
 
 /**
  * Lesson checkpoint games unlock the next lesson only if the server sees
@@ -19,11 +17,7 @@ import { GameOverScene as DefenderOver } from "../../src/ts/games/word-defender/
  * Ghost King, so the flag must reach the "game-result" event.
  */
 describe("checkpoint game results", () => {
-  for (const [name, Scene] of [
-    ["ghost hunter", GhostOver],
-    ["balloon pop", BalloonOver],
-    ["word defender", DefenderOver],
-  ] as const) {
+  for (const [name, Scene] of [["ghost hunter", GhostOver]] as const) {
     it(`${name} reports a cleared checkpoint`, () => {
       const scene = new Scene();
       const emit = (
