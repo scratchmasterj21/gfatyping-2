@@ -1,5 +1,6 @@
 import { FunboxName } from "@monkeytype/schemas/configs";
 
+import { Grade, GRADES } from "../constants/classes";
 import { FaSolidIcon } from "../types/font-awesome";
 
 export type FunboxGame = {
@@ -37,7 +38,24 @@ export type BuiltinGame = {
   icon: FaSolidIcon;
   /** where the words come from: lesson word lists, easy/medium/hard, or kana */
   words: GameWordSource;
+  /** grades the game suits best (reading level, speed, how much to manage) */
+  grades: Grade[];
 };
+
+/** G{from}..G{to}, e.g. grades(1, 3) -> G1, G2, G3. */
+const grades = (from: number, to: number): Grade[] =>
+  GRADES.filter((g) => {
+    const n = Number(g.slice(1));
+    return n >= from && n <= to;
+  });
+
+/** "G1-G3" for a game card. */
+export const gradeRange = (list: Grade[]): string =>
+  list.length === 0
+    ? ""
+    : list.length === 1
+      ? (list[0] as string)
+      : `${list[0]}-${list[list.length - 1]}`;
 
 export type GameWordSource = "lessons" | "levels" | "romaji";
 
@@ -84,6 +102,7 @@ export const games: Game[] = [
       "Type the word on the ball to hit it back - play Tappy or a friend!",
     icon: "fa-table-tennis",
     words: "lessons",
+    grades: grades(2, 6),
   },
   {
     type: "builtin",
@@ -93,6 +112,7 @@ export const games: Game[] = [
       "Dig through ice, lava and treasure in 4 worlds - collect gems, race Tappy or friends!",
     icon: "fa-gem",
     words: "lessons",
+    grades: grades(2, 5),
   },
   {
     type: "builtin",
@@ -102,6 +122,7 @@ export const games: Game[] = [
       "Type a column's word to drop your piece - get 4 in a row to win!",
     icon: "fa-th",
     words: "levels",
+    grades: grades(2, 6),
   },
   {
     type: "builtin",
@@ -111,6 +132,7 @@ export const games: Game[] = [
       "Type the word to pass the bomb before it goes BOOM - up to 6 players!",
     icon: "fa-bomb",
     words: "levels",
+    grades: grades(3, 6),
   },
   {
     type: "builtin",
@@ -120,6 +142,7 @@ export const games: Game[] = [
       "Romaji: see the picture, type the hiragana card first to take it!",
     icon: "fa-clone",
     words: "romaji",
+    grades: grades(3, 6),
   },
   {
     type: "builtin",
@@ -129,6 +152,7 @@ export const games: Game[] = [
       "Romaji: type the hiragana on the goldfish to scoop them - 60 seconds!",
     icon: "fa-fish",
     words: "romaji",
+    grades: grades(1, 3),
   },
   {
     type: "builtin",
@@ -138,6 +162,7 @@ export const games: Game[] = [
       "Romaji: keep the word chain going and pass the bomb before it blows!",
     icon: "fa-link",
     words: "romaji",
+    grades: grades(4, 6),
   },
   {
     type: "builtin",
@@ -147,6 +172,7 @@ export const games: Game[] = [
       "Type each word to help Tappy climb - careful typing earns double jumps!",
     icon: "fa-building",
     words: "lessons",
+    grades: grades(1, 3),
   },
   {
     type: "builtin",
@@ -155,6 +181,7 @@ export const games: Game[] = [
     description: "Type customers' orders before they get tired of waiting!",
     icon: "fa-cookie-bite",
     words: "lessons",
+    grades: grades(3, 5),
   },
   {
     type: "builtin",
@@ -163,6 +190,7 @@ export const games: Game[] = [
     description: "Watch Tappy's key pattern, then repeat it from memory!",
     icon: "fa-lightbulb",
     words: "levels",
+    grades: grades(1, 2),
   },
   {
     type: "builtin",
@@ -172,6 +200,7 @@ export const games: Game[] = [
       "Explore a forest, defeat monsters by typing, and find the treasure!",
     icon: "fa-map",
     words: "levels",
+    grades: grades(3, 6),
   },
   {
     type: "builtin",
@@ -181,6 +210,7 @@ export const games: Game[] = [
       "A fair-ground stall: ducks, cans and moles - win tickets for prizes!",
     icon: "fa-hourglass",
     words: "lessons",
+    grades: grades(1, 4),
   },
   {
     type: "builtin",
@@ -189,6 +219,7 @@ export const games: Game[] = [
     description: "Type the words on falling fruits before they hit the ground!",
     icon: "fa-lemon",
     words: "lessons",
+    grades: grades(2, 4),
   },
   {
     type: "builtin",
@@ -198,6 +229,7 @@ export const games: Game[] = [
       "Race 4 wacky racers - nitro, ramps, Grand Prix, a daily race and a garage!",
     icon: "fa-car",
     words: "lessons",
+    grades: grades(3, 6),
   },
   {
     type: "builtin",
@@ -207,6 +239,7 @@ export const games: Game[] = [
       "Turn-based hero battles! Pick a move, type its word, beat the boss.",
     icon: "fa-dragon",
     words: "levels",
+    grades: grades(4, 6),
   },
   {
     type: "builtin",
@@ -216,6 +249,7 @@ export const games: Game[] = [
       "Crew a spaceship with friends - everyone has a job. Save the space pets!",
     icon: "fa-rocket",
     words: "levels",
+    grades: grades(4, 6),
   },
   {
     type: "builtin",
@@ -225,6 +259,7 @@ export const games: Game[] = [
       "Ghosts swarm from both sides — type their words before they reach you!",
     icon: "fa-ghost",
     words: "lessons",
+    grades: grades(3, 6),
   },
   {
     type: "builtin",
@@ -234,6 +269,7 @@ export const games: Game[] = [
       "12 balloon levels with surprises - win balloon animals, or battle a classmate!",
     icon: "fa-circle",
     words: "lessons",
+    grades: grades(1, 3),
   },
   {
     type: "builtin",
@@ -243,6 +279,7 @@ export const games: Game[] = [
       "Zap space ships, pick upgrades, beat the mothership - alone or co-op!",
     icon: "fa-rocket",
     words: "lessons",
+    grades: grades(3, 6),
   },
   {
     type: "funbox",

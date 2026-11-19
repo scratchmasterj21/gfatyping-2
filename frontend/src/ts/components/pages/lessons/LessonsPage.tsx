@@ -44,7 +44,7 @@ import {
   LessonLeaderboardEntry,
 } from "../../../classroom/classroom";
 import { getWeeklyQuestState } from "../../../coins";
-import { gradeOf } from "../../../constants/classes";
+import { Grade, gradeOf, GRADES } from "../../../constants/classes";
 import { getAuthenticatedUser } from "../../../firebase";
 import { BalloonPopModal } from "../../../games/balloon-pop/BalloonPopModal";
 import { EchoKeysModal } from "../../../games/echo-keys/EchoKeysModal";
@@ -54,6 +54,7 @@ import {
   checkGameAccess,
   GameAccess,
   gameLockMessage,
+  pauseMessage,
   getGameAccess,
   myToday,
   resolvePolicy,
@@ -68,6 +69,7 @@ import {
 import {
   BuiltinGame,
   GAME_WORD_SOURCE_GROUPS,
+  gradeRange,
   games,
 } from "../../../games/games-data";
 import { GemDigModal } from "../../../games/gem-dig/GemDigModal";
@@ -215,6 +217,10 @@ function GameButton(props: {
   recommended?: boolean;
   /** also playable with friends */
   together?: boolean;
+  /** best grades, e.g. "G1-G3" */
+  grades?: string;
+  /** suits the player's own grade */
+  fit?: boolean;
   onClick: () => void;
 }): JSXElement {
   return (
@@ -239,6 +245,20 @@ function GameButton(props: {
           </span>
           <span class="text-lg font-semibold">{props.name}</span>
         </div>
+        <Show when={props.grades}>
+          {(g) => (
+            <span
+              class={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold",
+                props.fit === true ? "bg-main text-bg" : "bg-bg text-sub",
+              )}
+              title="Best for these grades"
+            >
+              {props.fit === true ? "⭐ " : ""}
+              {g()}
+            </span>
+          )}
+        </Show>
         <Show when={props.recommended === true}>
           <span class="shrink-0 rounded-full bg-main px-2.5 py-1 text-xs font-semibold text-bg">
             Today
@@ -269,18 +289,32 @@ function GameButton(props: {
 /** Game cards split into sections by where their words come from. */
 function GamesByWordSource(props: {
   games: BuiltinGame[];
+  /** the player's grade: their games first (or only, with onlyGrade) */
+  grade?: Grade;
+  onlyGrade?: boolean;
   children: (game: BuiltinGame) => JSXElement;
 }): JSXElement {
+  const shown = (): BuiltinGame[] => {
+    const grade = props.grade;
+    const fits = (g: BuiltinGame): boolean =>
+      grade !== undefined && g.grades.includes(grade);
+    const list =
+      props.onlyGrade === true && grade !== undefined
+        ? props.games.filter(fits)
+        : props.games;
+    // best-fit games first in each section
+    return [...list].sort((a, b) => Number(fits(b)) - Number(fits(a)));
+  };
   return (
     <div class="grid gap-6">
       <For each={GAME_WORD_SOURCE_GROUPS}>
         {(group) => (
-          <Show when={props.games.some((g) => g.words === group.id)}>
+          <Show when={shown().some((g) => g.words === group.id)}>
             <div>
               <H3 fa={{ icon: group.icon }} text={group.title} />
               <p class="mb-3 text-em-sm text-sub">{group.description}</p>
               <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <For each={props.games.filter((g) => g.words === group.id)}>
+                <For each={shown().filter((g) => g.words === group.id)}>
                   {(game) => props.children(game)}
                 </For>
               </div>
@@ -310,6 +344,9 @@ function GameAccessBanner(props: {
     }
     if (a.reason === "off") {
       return "⏸️ Your teacher turned games off for now. Keep practicing your lessons!";
+    }
+    if (a.reason === "paused" && a.pause !== undefined) {
+      return pauseMessage(a.pause);
     }
     return undefined;
   };
@@ -818,6 +855,8 @@ export function LessonsPage(): JSXElement {
   const shopItems = createMemo(() =>
     SHOP_ITEMS.filter((item) => item.tab === shopTab()),
   );
+  /** students see the games for their grade first (toggle: all games) */
+  const [gradeOnly, setGradeOnly] = createSignal(true);
   const [gamesTab, setGamesTab] = createSignal<
     "solo" | "multiplayer" | "rewards"
   >("solo");
@@ -1130,6 +1169,19 @@ export function LessonsPage(): JSXElement {
   // ?? undefined: classId can come back as a literal null from Firestore
   // even though the type says string | undefined.
   const classId = (): string | undefined => getSnapshot()?.classId ?? undefined;
+  /** the student's grade ("G3"); undefined for staff */
+  const myGrade = (): Grade | undefined => {
+    const g = gradeOf(classId());
+    return GRADES.find((x) => x === g);
+  };
+  const fitsMyGrade = (game: BuiltinGame): boolean => {
+    const g = myGrade();
+    return g !== undefined && game.grades.includes(g);
+  };
+  const gradeProps = (): { grade?: Grade; onlyGrade?: boolean } => {
+    const g = myGrade();
+    return g === undefined ? {} : { grade: g, onlyGrade: gradeOnly() };
+  };
 
   const assignmentsQuery = useQuery(() => ({
     queryKey: ["studentAssignments", classId(), getAuthenticatedUser()?.uid],
@@ -2125,6 +2177,28 @@ export function LessonsPage(): JSXElement {
                     )}
                   </For>
                 </div>
+                <Show when={myGrade()}>
+                  {(g) => (
+                    <div class="mb-3 flex flex-wrap items-center gap-2 font-kid">
+                      <For each={[true, false]}>
+                        {(only) => (
+                          <button
+                            type="button"
+                            class={cn(
+                              "cursor-pointer rounded-full px-4 py-1.5 text-sm font-semibold",
+                              gradeOnly() === only
+                                ? "bg-main text-bg"
+                                : "bg-sub-alt text-sub hover:text-text",
+                            )}
+                            onClick={() => setGradeOnly(only)}
+                          >
+                            {only ? `⭐ Best for ${g()}` : "🎮 All games"}
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  )}
+                </Show>
                 <div
                   id="games-tab-panel"
                   role="tabpanel"
@@ -2135,12 +2209,15 @@ export function LessonsPage(): JSXElement {
                       games={games.filter(
                         (g): g is BuiltinGame => g.type === "builtin",
                       )}
+                      {...gradeProps()}
                     >
                       {(game) => (
                         <GameButton
                           name={game.name}
                           description={game.description}
                           icon={game.icon}
+                          grades={gradeRange(game.grades)}
+                          fit={fitsMyGrade(game)}
                           recommended={recommendedGameId() === game.id}
                           together={TOGETHER_GAME_IDS.includes(game.id)}
                           locked={
@@ -2167,6 +2244,7 @@ export function LessonsPage(): JSXElement {
                           g.type === "builtin" &&
                           TOGETHER_GAME_IDS.includes(g.id),
                       )}
+                      {...gradeProps()}
                     >
                       {(game) => {
                         const requiredLesson =
@@ -2202,6 +2280,8 @@ export function LessonsPage(): JSXElement {
                             name={game.name}
                             description={game.description}
                             icon={game.icon}
+                            grades={gradeRange(game.grades)}
+                            fit={fitsMyGrade(game)}
                             locked={locked()}
                             lockedMessage={
                               gameAccess(game.id).allowed

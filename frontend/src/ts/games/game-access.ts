@@ -27,10 +27,26 @@ export type GamePolicy = {
   blocked?: string[];
 };
 
+/** Why a teacher paused a student's games. */
+export type PauseReason = "fingers" | "behaviour" | "other";
+export const PAUSE_REASONS: Record<
+  PauseReason,
+  { emoji: string; label: string }
+> = {
+  fingers: { emoji: "🖐️", label: "Finger placement" },
+  behaviour: { emoji: "🙅", label: "Behaviour" },
+  other: { emoji: "⏸️", label: "Other" },
+};
+/** "Until I unpause" */
+export const PAUSE_FOREVER = "9999-12-31";
+
 export type StudentPolicy = GamePolicy & {
   /** teacher-given game time, valid on bonusDate (Japan date) only */
   bonusDate?: string;
   bonusMinutes?: number;
+  /** all games paused through this Japan date (inclusive) */
+  pauseUntil?: string;
+  pauseReason?: PauseReason;
 };
 
 export type GameAccessDoc = {
@@ -63,6 +79,19 @@ function parsePolicy(raw: unknown): StudentPolicy {
     );
   }
   if (typeof r["bonusDate"] === "string") out.bonusDate = r["bonusDate"];
+  if (
+    typeof r["pauseUntil"] === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(r["pauseUntil"])
+  ) {
+    out.pauseUntil = r["pauseUntil"];
+  }
+  if (
+    r["pauseReason"] === "fingers" ||
+    r["pauseReason"] === "behaviour" ||
+    r["pauseReason"] === "other"
+  ) {
+    out.pauseReason = r["pauseReason"];
+  }
   const bonus = Number(r["bonusMinutes"]);
   if (Number.isFinite(bonus) && bonus > 0) {
     out.bonusMinutes = Math.min(MAX_BONUS_MINUTES, Math.round(bonus));
@@ -118,6 +147,32 @@ export async function updateStudentGamePolicy(
   await setDoc(accessRef(), { students: { [uid]: fields } }, { merge: true });
 }
 
+/** A Japan date `days` after `from` (YYYY-MM-DD). */
+export function addDays(from: string, days: number): string {
+  const d = new Date(`${from}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Admin only: pause all of a student's free-play games through `until`
+ * (Japan date, inclusive; PAUSE_FOREVER = until unpaused).
+ */
+export async function pauseStudentGames(
+  uid: string,
+  until: string,
+  reason: PauseReason,
+): Promise<void> {
+  await updateStudentGamePolicy(uid, {
+    pauseUntil: until,
+    pauseReason: reason,
+  });
+}
+
+export async function unpauseStudentGames(uid: string): Promise<void> {
+  await updateStudentGamePolicy(uid, { pauseUntil: null, pauseReason: null });
+}
+
 /** Admin only: give a student extra game time for today. */
 export async function giveBonusGameTime(
   uid: string,
@@ -141,6 +196,8 @@ export type EffectivePolicy = {
   bonusMinutes: number;
   /** true when any setting comes from the student's own override */
   personal: boolean;
+  /** games paused by the teacher (today is on or before `until`) */
+  pause?: { until: string; reason: PauseReason };
 };
 
 /** Student override wins field by field over the class setting. */
@@ -164,6 +221,9 @@ export function resolvePolicy(
       stu.mode !== undefined ||
       stu.earnLessons !== undefined ||
       stu.blocked !== undefined,
+    ...(stu.pauseUntil !== undefined && stu.pauseUntil >= today
+      ? { pause: { until: stu.pauseUntil, reason: stu.pauseReason ?? "other" } }
+      : {}),
   };
 }
 
@@ -171,9 +231,11 @@ export type GameAccess =
   | { allowed: true; bonusLeftMin?: number }
   | {
       allowed: false;
-      reason: "blocked" | "off" | "earn";
+      reason: "blocked" | "off" | "earn" | "paused";
       /** "earn": lessons still to pass today */
       lessonsLeft?: number;
+      /** "paused": why and until when */
+      pause?: { until: string; reason: PauseReason };
     };
 
 /** Whether a free-play game can be opened right now. */
@@ -182,6 +244,10 @@ export function checkGameAccess(
   policy: EffectivePolicy,
   today: { lessonsPassed: number; gameSec: number },
 ): GameAccess {
+  // a teacher's pause beats everything, bonus time included
+  if (policy.pause !== undefined) {
+    return { allowed: false, reason: "paused", pause: policy.pause };
+  }
   if (gameId !== undefined && policy.blocked.includes(gameId)) {
     return { allowed: false, reason: "blocked" };
   }
@@ -203,9 +269,39 @@ export function checkGameAccess(
       };
 }
 
+/** "until Friday" / "for today" / "" (no end) for a pause. */
+export function pauseUntilText(until: string, today = tokyoDate()): string {
+  if (until >= PAUSE_FOREVER) return "";
+  if (until === today) return "for today";
+  const day = new Date(`${until}T00:00:00Z`).toLocaleDateString("en", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+  return `until ${day} (${until.slice(5).replace("-", "/")})`;
+}
+
+/** What the student sees when their games are paused. */
+export function pauseMessage(pause: {
+  until: string;
+  reason: PauseReason;
+}): string {
+  const when = pauseUntilText(pause.until);
+  const end = when === "" ? "" : ` ${when}`;
+  if (pause.reason === "fingers") {
+    return `🖐️ Games are paused${end}. Practice your lessons with your fingers on the home row (F and J bumps!) and show your teacher.`;
+  }
+  if (pause.reason === "behaviour") {
+    return `⏸️ Your teacher paused your games${end}. Show great typing in your lessons to get them back!`;
+  }
+  return `⏸️ Your teacher paused your games${end}. Keep practicing your lessons!`;
+}
+
 /** Kid-friendly lock message. */
 export function gameLockMessage(access: GameAccess): string {
   if (access.allowed) return "";
+  if (access.reason === "paused" && access.pause !== undefined) {
+    return pauseMessage(access.pause);
+  }
   if (access.reason === "blocked") {
     return "🔒 Your teacher turned this game off";
   }

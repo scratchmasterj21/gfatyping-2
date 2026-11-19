@@ -8,7 +8,9 @@ import {
   isMostlyGames,
   StudentActivity,
   summarizeActivity,
+  tokyoDate,
 } from "../../../classroom/activity";
+import { gradeOf } from "../../../constants/classes";
 import { KID_THEME_NAMES, ThemesList } from "../../../constants/themes";
 import {
   ClassThemePolicy,
@@ -23,13 +25,20 @@ import {
   GameMode,
   GamePolicy,
   getGameAccess,
+  addDays,
   giveBonusGameTime,
+  PAUSE_FOREVER,
+  PAUSE_REASONS,
+  pauseStudentGames,
+  PauseReason,
+  pauseUntilText,
   resolvePolicy,
   setClassGamePolicy,
   StudentPolicy,
+  unpauseStudentGames,
   updateStudentGamePolicy,
 } from "../../../games/game-access";
-import { games } from "../../../games/games-data";
+import { BuiltinGame, games, gradeRange } from "../../../games/games-data";
 import {
   classThemePolicy,
   getLessonSettings,
@@ -46,7 +55,15 @@ import {
 import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
 
-const FREE_PLAY = games.filter((g) => g.type === "builtin");
+const FREE_PLAY = games.filter((g): g is BuiltinGame => g.type === "builtin");
+
+/** How long a pause lasts: days after today (0 = today only). */
+const PAUSE_LENGTHS: { label: string; days: number | "forever" }[] = [
+  { label: "Today", days: 0 },
+  { label: "3 days", days: 2 },
+  { label: "1 week", days: 6 },
+  { label: "Until I unpause", days: "forever" },
+];
 /** kids' themes first, then the other readable ones A-Z */
 const LOCKABLE_THEMES: ThemeName[] = [
   ...KID_THEME_NAMES.filter((n) => READABLE_THEME_NAMES.has(n)),
@@ -166,9 +183,15 @@ export function ActivityTab(props: { classId: string }): JSXElement {
   );
   const flaggedCount = (): number => rows().filter((r) => r.flagged).length;
   const [flaggedOnly, setFlaggedOnly] = createSignal(false);
+  const [pausedOnly, setPausedOnly] = createSignal(false);
+  const isPaused = (uid: string): boolean =>
+    resolvePolicy(access(), props.classId, uid).pause !== undefined;
+  const pausedCount = (): number =>
+    rows().filter((r) => isPaused(r.student.uid)).length;
   const shown = createMemo(() =>
     [...rows()]
       .filter((r) => !flaggedOnly() || r.flagged)
+      .filter((r) => !pausedOnly() || isPaused(r.student.uid))
       .sort((a, b) => Number(b.flagged) - Number(a.flagged)),
   );
 
@@ -324,13 +347,38 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           />
         </Show>
         <div>
-          <div class="mb-2 text-sm text-sub">
+          <div class="mb-2 flex flex-wrap items-center gap-2 text-sm text-sub">
             Turn off single games for the whole class (tap to block):
+            <button
+              type="button"
+              class={chip(false)}
+              disabled={saving()}
+              title="Block the games that aren't a good fit for this grade"
+              onClick={() => {
+                const grade = gradeOf(props.classId);
+                setClassPolicy({
+                  blocked: FREE_PLAY.filter(
+                    (g) => !g.grades.some((x) => x === grade),
+                  ).map((g) => g.id),
+                });
+              }}
+            >
+              ⭐ Only {gradeOf(props.classId)} games
+            </button>
+            <button
+              type="button"
+              class={chip(false)}
+              disabled={saving() || (classPolicy().blocked ?? []).length === 0}
+              onClick={() => setClassPolicy({ blocked: [] })}
+            >
+              Unblock all
+            </button>
           </div>
           <GameChips
             blocked={classPolicy().blocked ?? []}
             disabled={saving()}
             onToggle={toggleClassBlocked}
+            grade={gradeOf(props.classId)}
           />
         </div>
       </div>
@@ -339,17 +387,33 @@ export function ActivityTab(props: { classId: string }): JSXElement {
       <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class={chip(!flaggedOnly())}
-          onClick={() => setFlaggedOnly(false)}
+          class={chip(!flaggedOnly() && !pausedOnly())}
+          onClick={() => {
+            setFlaggedOnly(false);
+            setPausedOnly(false);
+          }}
         >
           All {rows().length}
         </button>
         <button
           type="button"
           class={chip(flaggedOnly())}
-          onClick={() => setFlaggedOnly(true)}
+          onClick={() => {
+            setFlaggedOnly(true);
+            setPausedOnly(false);
+          }}
         >
           Mostly games {flaggedCount()}
+        </button>
+        <button
+          type="button"
+          class={chip(pausedOnly())}
+          onClick={() => {
+            setPausedOnly(true);
+            setFlaggedOnly(false);
+          }}
+        >
+          🚫 Paused {pausedCount()}
         </button>
       </div>
 
@@ -361,9 +425,11 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           when={shown().length > 0}
           fallback={
             <div class="text-sub">
-              {flaggedOnly()
-                ? "Nobody is mostly playing games."
-                : "No students in this class yet."}
+              {pausedOnly()
+                ? "Nobody's games are paused."
+                : flaggedOnly()
+                  ? "Nobody is mostly playing games."
+                  : "No students in this class yet."}
             </div>
           }
         >
@@ -434,6 +500,8 @@ function GameChips(props: {
   blocked: string[];
   disabled: boolean;
   onToggle: (gameId: string) => void;
+  /** class grade: games that fit it are marked ⭐ */
+  grade?: string;
 }): JSXElement {
   return (
     <div class="flex flex-wrap gap-2">
@@ -455,6 +523,10 @@ function GameChips(props: {
             >
               <Fa icon={isBlocked() ? "fa-ban" : game.icon} />
               {game.name}
+              <span class="text-xs opacity-70">
+                {game.grades.some((g) => g === props.grade) ? "⭐ " : ""}
+                {gradeRange(game.grades)}
+              </span>
             </button>
           );
         }}
@@ -477,6 +549,8 @@ function StudentRow(props: {
   classHomeRowOff: boolean;
 }): JSXElement {
   const [open, setOpen] = createSignal(false);
+  const [pausing, setPausing] = createSignal(false);
+  const [reason, setReason] = createSignal<PauseReason>("fingers");
   const uid = (): string => props.student.uid;
   const own = (): StudentPolicy => props.access?.students[uid()] ?? {};
   const policy = createMemo(() =>
@@ -488,8 +562,23 @@ function StudentRow(props: {
       gameSec: props.today.gameSec,
     }),
   );
+  const pauseFor = (days: number | "forever"): void => {
+    const id = uid();
+    const why = reason();
+    const until =
+      days === "forever" ? PAUSE_FOREVER : addDays(tokyoDate(), days);
+    setPausing(false);
+    void props.save(
+      async () => pauseStudentGames(id, until, why),
+      `Paused ${props.student.name}'s games ${pauseUntilText(until) || "until you unpause"}`,
+    );
+  };
   const statusText = (): string => {
     const s = status();
+    if (!s.allowed && s.reason === "paused" && s.pause !== undefined) {
+      const when = pauseUntilText(s.pause.until);
+      return `🚫 Paused ${PAUSE_REASONS[s.pause.reason].emoji} ${when === "" ? "until unpaused" : when}`;
+    }
     if (s.allowed) {
       return s.bonusLeftMin !== undefined
         ? `🎁 Bonus: ${s.bonusLeftMin}m left`
@@ -620,6 +709,38 @@ function StudentRow(props: {
             <option value="off">Games off</option>
             <option value="earn">Earn with lessons</option>
           </select>
+          <Show
+            when={policy().pause === undefined}
+            fallback={
+              <button
+                type="button"
+                class={chip(false)}
+                disabled={props.saving}
+                onClick={() => {
+                  const id = uid();
+                  void props.save(
+                    async () => unpauseStudentGames(id),
+                    `${props.student.name} can play games again`,
+                  );
+                }}
+              >
+                ▶️ Unpause
+              </button>
+            }
+          >
+            <button
+              type="button"
+              class={cn(
+                chip(pausing()),
+                !pausing() && "bg-error text-bg hover:bg-error",
+              )}
+              aria-expanded={pausing()}
+              disabled={props.saving}
+              onClick={() => setPausing((p) => !p)}
+            >
+              🚫 Pause games
+            </button>
+          </Show>
           <button
             type="button"
             class={chip(false)}
@@ -646,6 +767,44 @@ function StudentRow(props: {
           </button>
         </div>
       </div>
+
+      <Show when={pausing()}>
+        <div class="grid gap-2 rounded bg-sub-alt p-3 text-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sub">Why?</span>
+            <For each={Object.keys(PAUSE_REASONS) as PauseReason[]}>
+              {(r) => (
+                <button
+                  type="button"
+                  class={chip(reason() === r)}
+                  onClick={() => setReason(r)}
+                >
+                  {PAUSE_REASONS[r].emoji} {PAUSE_REASONS[r].label}
+                </button>
+              )}
+            </For>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sub">For how long?</span>
+            <For each={PAUSE_LENGTHS}>
+              {(l) => (
+                <button
+                  type="button"
+                  class={chip(false)}
+                  disabled={props.saving}
+                  onClick={() => pauseFor(l.days)}
+                >
+                  {l.label}
+                </button>
+              )}
+            </For>
+          </div>
+          <div class="text-xs text-sub">
+            {props.student.name} sees why on the games page. Lessons and
+            checkpoint games still work.
+          </div>
+        </div>
+      </Show>
 
       <Show when={open()}>
         <div class="grid gap-3 border-t border-sub-alt pt-3">

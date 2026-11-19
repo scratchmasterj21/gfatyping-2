@@ -7,11 +7,17 @@ import {
   summarizeActivity,
   tokyoDate,
 } from "../../src/ts/classroom/activity";
+import { GRADES } from "../../src/ts/constants/classes";
 import {
+  addDays,
   checkGameAccess,
+  gameLockMessage,
+  PAUSE_FOREVER,
   parseGameAccess,
+  pauseUntilText,
   resolvePolicy,
 } from "../../src/ts/games/game-access";
+import { games, gradeRange } from "../../src/ts/games/games-data";
 
 const today = "2026-11-05";
 const access = parseGameAccess({
@@ -100,5 +106,63 @@ describe("activity summary", () => {
         lessonsPassed: 0,
       }),
     ).toBe(false);
+  });
+});
+
+describe("teacher pauses", () => {
+  const paused = parseGameAccess({
+    students: {
+      fingers: {
+        mode: "on",
+        bonusDate: today,
+        bonusMinutes: 30,
+        pauseUntil: "2026-11-07",
+        pauseReason: "fingers",
+      },
+      ended: { pauseUntil: "2026-11-04", pauseReason: "behaviour" },
+      forever: { pauseUntil: PAUSE_FOREVER },
+      bad: { pauseUntil: "soon", pauseReason: "naughty" },
+    },
+  });
+  const day = { lessonsPassed: 5, gameSec: 0 };
+
+  it("a pause beats games on and bonus time, until its last day", () => {
+    const p = resolvePolicy(paused, "G1A", "fingers", today);
+    const a = checkGameAccess("word-pong", p, day);
+    expect(a.allowed).toBe(false);
+    expect(!a.allowed && a.reason).toBe("paused");
+    expect(gameLockMessage(a)).toContain("home row");
+    expect(gameLockMessage(a)).toContain("until Saturday");
+    // the last day still counts, the next day doesn't
+    expect(
+      resolvePolicy(paused, "G1A", "fingers", "2026-11-07").pause,
+    ).toBeDefined();
+    expect(
+      resolvePolicy(paused, "G1A", "fingers", "2026-11-08").pause,
+    ).toBeUndefined();
+  });
+
+  it("old pauses end; 'until I unpause' doesn't; bad data is ignored", () => {
+    expect(resolvePolicy(paused, "G1A", "ended", today).pause).toBeUndefined();
+    const f = resolvePolicy(paused, "G1A", "forever", today);
+    expect(f.pause?.reason).toBe("other");
+    expect(pauseUntilText(PAUSE_FOREVER, today)).toBe("");
+    expect(resolvePolicy(paused, "G1A", "bad", today).pause).toBeUndefined();
+    expect(pauseUntilText(today, today)).toBe("for today");
+    expect(addDays("2026-11-30", 2)).toBe("2026-12-02");
+  });
+
+  it("every free-play game says which grades it suits", () => {
+    for (const g of games) {
+      if (g.type !== "builtin") continue;
+      expect(g.grades.length).toBeGreaterThan(0);
+      expect(gradeRange(g.grades)).toMatch(/^G\d(-G\d)?$/);
+    }
+    for (const grade of GRADES) {
+      const fit = games.filter(
+        (g) => g.type === "builtin" && g.grades.includes(grade),
+      );
+      expect(fit.length).toBeGreaterThanOrEqual(5);
+    }
   });
 });
