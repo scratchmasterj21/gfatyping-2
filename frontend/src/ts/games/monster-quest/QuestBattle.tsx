@@ -1632,7 +1632,7 @@ export function QuestBattle(props: {
                 : myVote() !== null && voted() === undefined
                   ? "type your choice"
                   : step() === "type"
-                    ? "type the sentence"
+                    ? "type the words"
                     : myHero() !== null
                       ? "type a move or name"
                       : "wait for your turn"

@@ -566,7 +566,7 @@ export function MonsterQuestModal(props: {
                 <li>🔁 Heroes and monsters take turns.</li>
                 <li>
                   ⌨️ On your turn, type a move&apos;s name (like
-                  &ldquo;attack&rdquo;), then type its sentence - fast and no
+                  &ldquo;attack&rdquo;), then type its words - fast and no
                   mistakes = ⭐ critical hit! Clean turns in a row = 🔥 streak.
                 </li>
                 <li>

@@ -1,7 +1,6 @@
 import type { DifficultyOption } from "../components/DifficultySegmented";
 
 import { EASY_WORDS, HARD_WORDS, MEDIUM_WORDS } from "../shared/kid-words";
-import { guardPhrase, PhraseLevel, storyPhrase } from "./quest-phrases";
 
 /**
  * Monster Quest: a turn-based party battle. Four heroes (players + computer
@@ -125,10 +124,8 @@ export type QuestDifficulty = DifficultyOption & {
   words: string[];
   /** longer words for skills */
   skillWords: string[];
-  /** how many words each move asks for (story sentences) */
+  /** how many words each move asks for */
   phrase: Record<HeroAction | "guard", number>;
-  /** word pool size for the sentences: short / everyday / long words */
-  level: PhraseLevel;
   /** monster HP multiplier */
   hp: number;
   /** monster attack multiplier */
@@ -142,14 +139,13 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     words: EASY_WORDS,
     skillWords: EASY_WORDS,
     phrase: {
-      attack: 3,
-      skill: 4,
-      defend: 3,
-      potion: 3,
-      ultimate: 5,
-      guard: 2,
+      attack: 2,
+      skill: 3,
+      defend: 2,
+      potion: 2,
+      ultimate: 3,
+      guard: 1,
     },
-    level: 0,
     hp: 0.85,
     atk: 0.8,
   },
@@ -158,14 +154,13 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     words: MEDIUM_WORDS,
     skillWords: MEDIUM_WORDS,
     phrase: {
-      attack: 4,
-      skill: 5,
-      defend: 3,
-      potion: 3,
-      ultimate: 6,
-      guard: 2,
+      attack: 2,
+      skill: 3,
+      defend: 2,
+      potion: 2,
+      ultimate: 3,
+      guard: 1,
     },
-    level: 1,
     hp: 1.2,
     atk: 1.12,
   },
@@ -175,14 +170,13 @@ export const QUEST_DIFFICULTIES: QuestDifficulty[] = [
     words: HARD_WORDS,
     skillWords: HARD_WORDS,
     phrase: {
-      attack: 5,
-      skill: 6,
-      defend: 4,
-      potion: 4,
-      ultimate: 7,
-      guard: 3,
+      attack: 3,
+      skill: 3,
+      defend: 2,
+      potion: 2,
+      ultimate: 4,
+      guard: 1,
     },
-    level: 2,
     hp: 1.28,
     atk: 1.3,
   },
@@ -963,7 +957,7 @@ export const POTION_HEAL = 50;
 export const GUARD_SHARE = 0.4;
 /** computer helpers guard this often */
 const CPU_GUARD_CHANCE = 0.6;
-/** missed this many turns in a row: a helper takes over */
+/** missed this many turns in a row: a helper takes over (online only) */
 const AWAY_AFTER = 2;
 const REST_HEAL = 0.3;
 /** safety stop for the turn loop */
@@ -1186,29 +1180,29 @@ function cpuChoice(
 const keyRng = (seed: number, key: number): (() => number) =>
   seededRandom(seed ^ Math.imul(key + 1, 0x9e3779b1));
 
+/** `count` different words joined by spaces. */
+function pickWords(rng: () => number, words: string[], count: number): string {
+  const out: string[] = [];
+  for (let tries = 0; out.length < count && tries < count * 10; tries++) {
+    const w = words[Math.floor(rng() * words.length)] ?? "go";
+    if (!out.includes(w) || tries >= count * 5) out.push(w);
+  }
+  return out.join(" ");
+}
+
 function heroMoveWords(
   seed: number,
   step: number,
   d: QuestDifficulty,
-  hero: HeroState,
-  land: string,
 ): Record<HeroAction, string> {
-  const say = (kind: string, n: number, key: number): string =>
-    storyPhrase(
-      keyRng(seed, step * 8 + key),
-      kind,
-      n,
-      d.level,
-      hero.cls,
-      hero.ultimate === undefined ? "power" : ULTIMATES[hero.ultimate].name,
-      land,
-    );
+  const say = (words: string[], n: number, key: number): string =>
+    pickWords(keyRng(seed, step * 8 + key), words, n);
   return {
-    attack: say("attack", d.phrase.attack, 1),
-    skill: say("skill", d.phrase.skill, 2),
-    defend: say("defend", d.phrase.defend, 3),
-    potion: say("potion", d.phrase.potion, 4),
-    ultimate: say("ultimate", d.phrase.ultimate, 6),
+    attack: say(d.words, d.phrase.attack, 1),
+    skill: say(d.skillWords, d.phrase.skill, 2),
+    defend: say(d.words, d.phrase.defend, 3),
+    potion: say(d.words, d.phrase.potion, 4),
+    ultimate: say(d.skillWords, d.phrase.ultimate, 6),
   };
 }
 
@@ -1218,7 +1212,11 @@ function guardWord(
   slot: number,
   d: QuestDifficulty,
 ): string {
-  return guardPhrase(keyRng(seed, step * 8 + 5 + slot * 101), d.phrase.guard);
+  return pickWords(
+    keyRng(seed, step * 8 + 5 + slot * 101),
+    d.words,
+    d.phrase.guard,
+  );
 }
 
 /** Time to type the longest of these phrases: a base plus some per letter. */
@@ -1715,6 +1713,7 @@ function ultimateOptions(cls: HeroClass): VoteOption[] {
 
 /** Run the quest from the start through every input given. */
 export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
+  const playerCount = setup.party.filter((h) => h.uid !== null).length;
   const d = setup.difficulty;
   const weekly = setup.weekly;
   const twist = weekly?.twist;
@@ -1816,17 +1815,13 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       const words: Record<string, string> = Object.fromEntries(
         players.map((h) => [
           h.uid,
-          storyPhrase(
+          pickWords(
             keyRng(
               setup.seed,
               9000 + step * 10 + (what === "team" ? 0 : h.slot),
             ),
-            what,
-            what === "team" ? d.phrase.ultimate : d.phrase.guard + 1,
-            d.level,
-            h.cls,
-            "power",
-            s.land ?? "any",
+            d.words,
+            what === "team" ? 3 : 2,
           ),
         ]),
       );
@@ -2078,7 +2073,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             n: s.used,
             slot: hero.slot,
             uid: hero.uid,
-            words: heroMoveWords(setup.seed, step, d, hero, s.land ?? "any"),
+            words: heroMoveWords(setup.seed, step, d),
           };
           s.upNext = queue;
           return s;
@@ -2090,7 +2085,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             ? given
             : { kind: "hero", action: "attack", power: TIMEOUT_POWER };
         hero.timeouts = input.timeout === true ? hero.timeouts + 1 : 0;
-        if (hero.timeouts >= AWAY_AFTER) hero.away = true;
+        if (hero.timeouts >= AWAY_AFTER && playerCount > 1) hero.away = true;
       } else {
         input = cpuChoice(s, hero, rng);
       }
@@ -2347,10 +2342,9 @@ export function eventMs(e: QuestEvent): number {
   return e.hits.length > 1 ? 1300 : 1100;
 }
 
-/** Time to make a move / guard, ms. */
-/** Longer story sentences + typing the move name need more time. */
+/** Time to make a move (typing the move name, a target and the words), ms. */
 export const HERO_TURN_MS = 45_000;
-const GUARD_BASE_MS = 2500;
+const GUARD_BASE_MS = 3500;
 const CHALLENGE_BASE_MS = 4000;
 export const VOTE_MS = 20_000;
 export const START_PAUSE_MS = 3000;

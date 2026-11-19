@@ -154,20 +154,29 @@ describe("monster quest", () => {
     }
   });
 
-  it("an idle player is taken over by a helper", () => {
+  it("an idle player is taken over by a helper (online only)", () => {
     const timeout: HeroInput = {
       kind: "hero",
       action: "attack",
       power: 0.4,
       timeout: true,
     };
-    const s = playThrough(solo(9), (st) =>
-      st.pending?.kind === "guard" ? { kind: "guard", guards: {} } : timeout,
+    const answer = (st: ReturnType<typeof runQuest>): QuestInput =>
+      st.pending?.kind === "guard" ? { kind: "guard", guards: {} } : timeout;
+    const online = playThrough(
+      {
+        ...solo(9),
+        party: buildParty([
+          { uid: "a", name: "A", cls: "mage" },
+          { uid: "b", name: "B", cls: "knight" },
+        ]),
+      },
+      answer,
     );
-    expect(s.over).toBe(true);
-    expect(s.heroes[0]?.away).toBe(true);
-    // only a couple of prompts before the helper took over
-    expect(s.used).toBeLessThan(15);
+    expect(online.heroes[0]?.away).toBe(true);
+    // solo: never handed over - the player keeps their turns
+    const s = playThrough(solo(9), answer);
+    expect(s.heroes[0]?.away).toBe(false);
   });
 
   it("has journey stops, weather and a level up before the boss", () => {
@@ -309,17 +318,17 @@ describe("monster quest", () => {
     const p = started(solo()).pending;
     expect(p?.kind).toBe("hero");
     if (p?.kind !== "hero") return;
-    expect(p.words.attack.split(" ")).toHaveLength(3);
-    expect(p.words.skill.split(" ")).toHaveLength(4);
-    expect(p.words.defend.split(" ")).toHaveLength(3);
-    expect(p.words.ultimate.split(" ")).toHaveLength(5);
+    expect(p.words.attack.split(" ")).toHaveLength(2);
+    expect(p.words.skill.split(" ")).toHaveLength(3);
+    expect(p.words.defend.split(" ")).toHaveLength(2);
+    expect(p.words.ultimate.split(" ")).toHaveLength(3);
     const hard = started({
       ...solo(),
       difficulty: questDifficultyFor("Hard"),
     }).pending;
     if (hard?.kind === "hero") {
-      expect(hard.words.attack.split(" ")).toHaveLength(5);
-      expect(hard.words.skill.split(" ")).toHaveLength(6);
+      expect(hard.words.attack.split(" ")).toHaveLength(3);
+      expect(hard.words.skill.split(" ")).toHaveLength(3);
     }
   });
 });
