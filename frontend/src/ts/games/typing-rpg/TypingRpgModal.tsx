@@ -25,7 +25,13 @@ import { GameSetupSection } from "../components/GameSetupSection";
 import { Confetti } from "../mini/Confetti";
 import { StarRating } from "../mini/StarRating";
 import { monsterSvg } from "./art";
-import { playerMaxHp, type QuestMode } from "./endless-rules";
+import { gainXp, LEVEL_UP_HEAL, START_POTIONS } from "./battle-engine";
+import { BattleEnd, BattleScreen, Encounter } from "./BattleScreen";
+import {
+  playerMaxHp,
+  turnSecondsForWave,
+  type QuestMode,
+} from "./endless-rules";
 import { createTypingRpgGame } from "./game-config";
 import { questStars } from "./quest-stars";
 import { prepareRpgWords } from "./rpg-words";
@@ -129,6 +135,17 @@ export function TypingRpgModal(props: Props): JSXElement {
     TypingQuestReward | "pending" | "error"
   >();
   const [impact, setImpact] = createSignal<Impact | null>(null);
+  // monster battles (BattleScreen) and the hero's level for this run
+  const [encounter, setEncounter] = createSignal<
+    (Encounter & { playerHp: number; key: number }) | null
+  >(null);
+  const [hero, setHero] = createSignal({
+    level: 1,
+    xp: 0,
+    potions: START_POTIONS,
+  });
+  const [levelUp, setLevelUp] = createSignal<string>();
+  let encounterKey = 0;
   let containerRef: HTMLDivElement | undefined;
   let inputRef: HTMLInputElement | undefined;
   let game: Phaser.Game | null = null;
@@ -211,6 +228,8 @@ export function TypingRpgModal(props: Props): JSXElement {
     game = null;
     latestBattle = null;
     setBattle(null);
+    setEncounter(null);
+    setHero({ level: 1, xp: 0, potions: START_POTIONS });
     setDialogue(null);
     setTyped("");
     setObjective("Defeat the monsters · 0/3");
@@ -239,6 +258,8 @@ export function TypingRpgModal(props: Props): JSXElement {
     game = null;
     latestBattle = null;
     setBattle(null);
+    setEncounter(null);
+    setHero({ level: 1, xp: 0, potions: START_POTIONS });
     setDialogue(null);
     setTyped("");
     setObjective("Defeat the monsters · 0/3");
@@ -279,7 +300,17 @@ export function TypingRpgModal(props: Props): JSXElement {
       });
       game.events.on("rpg-prompt", setPrompt);
       game.events.on("rpg-objective", setObjective);
-      game.events.on("rpg-wave-clear", setWaveClear);
+      game.events.on("rpg-wave-clear", (next: WaveClear | null) => {
+        setWaveClear(next);
+        // a fresh heal for each new wave
+        if (next !== null) setHero((h) => ({ ...h, potions: h.potions + 1 }));
+      });
+      game.events.on(
+        "rpg-encounter",
+        (next: Encounter & { playerHp: number }) => {
+          setEncounter({ ...next, key: ++encounterKey });
+        },
+      );
       game.events.on("rpg-battle", (next: Battle | null) => {
         const current = latestBattle;
         latestBattle = next;
@@ -311,6 +342,7 @@ export function TypingRpgModal(props: Props): JSXElement {
       game.events.on("rpg-result", (next: Result) => {
         setResult(next);
         setBattle(null);
+        setEncounter(null);
         setWaveClear(null);
         setReward(undefined);
         setPhase("results");
@@ -323,6 +355,31 @@ export function TypingRpgModal(props: Props): JSXElement {
       setPhase("intro");
       showErrorNotification("Could not start Typing Quest", { error });
     }
+  };
+
+  /** A battle finished: XP, level ups, then back to the map. */
+  const onBattleEnd = (e: BattleEnd): void => {
+    const enc = encounter();
+    let heroHp = e.heroHp;
+    const h = hero();
+    if (e.won && enc !== null) {
+      const next = gainXp(h.level, h.xp, enc.maxHp);
+      if (next.levelsUp > 0) {
+        heroHp = Math.min(
+          playerMaxHp(mode()),
+          heroHp + LEVEL_UP_HEAL * next.levelsUp,
+        );
+        setLevelUp(
+          `⭐ Level up! You're level ${next.level} - stronger hits and +${LEVEL_UP_HEAL} HP`,
+        );
+        setTimeout(() => setLevelUp(undefined), 2600);
+      }
+      setHero({ level: next.level, xp: next.xp, potions: e.potions });
+    } else {
+      setHero({ ...h, potions: e.potions });
+    }
+    setEncounter(null);
+    game?.events.emit("rpg-battle-end", { ...e, heroHp });
   };
 
   const handleTyping = (value: string): void => {
@@ -409,11 +466,17 @@ export function TypingRpgModal(props: Props): JSXElement {
                   Walk with the arrow keys (or WASD).
                 </HowToLine>
                 <HowToLine icon="⚔️">
-                  Bump into a monster, then type words fast to attack!
+                  Bump into a monster to start a battle! Type a move&apos;s name
+                  - quick, power, guard or heal - then type its words before the
+                  timer runs out.
+                </HowToLine>
+                <HowToLine icon="⭐">
+                  Fast and no mistakes = a critical hit. Win battles to earn XP
+                  and level up!
                 </HowToLine>
                 <HowToLine icon="❤️">
-                  You have {playerMaxHp("normal")} HP and no healing - be
-                  careful.
+                  You have {playerMaxHp("normal")} HP and {START_POTIONS} heals
+                  (one more each wave) - be careful.
                 </HowToLine>
                 <HowToLine icon="🪙">
                   Beat every monster, then keep going or leave with coins.
@@ -605,6 +668,33 @@ export function TypingRpgModal(props: Props): JSXElement {
                     />
                   </div>
                 </div>
+              </div>
+            )}
+          </Show>
+          <Show when={encounter()} keyed>
+            {(enc) => (
+              <BattleScreen
+                encounter={enc}
+                hero={{
+                  hp: enc.playerHp,
+                  maxHp: playerMaxHp(mode()),
+                  level: hero().level,
+                  xp: hero().xp,
+                  potions: hero().potions,
+                }}
+                words={cachedWords ?? []}
+                turnSeconds={turnSecondsForWave(enc.wave, mode())}
+                {...(getAuthenticatedUser()?.uid === undefined
+                  ? {}
+                  : { avatarUid: getAuthenticatedUser()?.uid })}
+                onEnd={onBattleEnd}
+              />
+            )}
+          </Show>
+          <Show when={levelUp()}>
+            {(t) => (
+              <div class="pointer-events-none absolute top-24 left-1/2 z-40 -translate-x-1/2 animate-game-pop rounded-full bg-game-yellow px-5 py-2 font-kid text-lg font-bold whitespace-nowrap text-game-ink shadow-lg">
+                {t()}
               </div>
             )}
           </Show>

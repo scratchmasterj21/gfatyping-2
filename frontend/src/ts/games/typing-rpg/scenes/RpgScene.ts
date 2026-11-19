@@ -228,6 +228,7 @@ export class RpgScene extends Scene {
     this.game.events.on("rpg-attack", this.attackHandler);
     this.game.events.on("rpg-miss", this.missHandler);
     this.game.events.on("rpg-continue", this.continueWave, this);
+    this.game.events.on("rpg-battle-end", this.onBattleEnd, this);
     this.game.events.on("rpg-leave", this.endRun, this);
     this.focusHandler = () => {
       if (
@@ -947,14 +948,45 @@ export class RpgScene extends Scene {
       monster.vx = 0;
       monster.vy = 0;
     }
-    this.battleStage = "typing";
-    this.turnWords = 0;
-    this.turnNumber++;
-    this.turnMistakes = 0;
+    // the battle itself runs in the modal (BattleScreen); typing turns here
+    // stay idle until it reports back with "rpg-battle-end"
+    this.battleStage = "enemy";
     this.turnEndsAt = 0;
-    this.turnRemainingMs = this.turnMs();
     this.game.events.emit("rpg-dialogue", null);
-    this.emitBattle();
+    const monster = this.monsters[index];
+    if (monster === undefined) return;
+    this.game.events.emit("rpg-encounter", {
+      name: monster.name,
+      kind: monster.kind,
+      wave: this.wave,
+      floorIndex: appearanceForWave(this.wave).floorIndex,
+      hp: monster.hp,
+      maxHp: monster.maxHp,
+      attack: monster.attack,
+      playerHp: this.playerHp,
+    });
+  }
+
+  /** The modal's battle finished. */
+  private onBattleEnd(r: {
+    won: boolean;
+    heroHp: number;
+    hits: number;
+    mistakes: number;
+  }): void {
+    if (this.targetIndex === null || this.finished) return;
+    const monster = this.monsters[this.targetIndex];
+    if (monster === undefined) return;
+    this.hits += r.hits;
+    this.mistakes += r.mistakes;
+    this.playerHp = Math.max(0, Math.round(r.heroHp));
+    if (!r.won) {
+      this.draw();
+      this.endRun("defeated");
+      return;
+    }
+    monster.hp = 0;
+    this.afterMonsterDefeated();
   }
 
   private emitBattle(message?: string): void {
@@ -1002,48 +1034,56 @@ export class RpgScene extends Scene {
     );
     this.draw();
     if (monster.hp === 0) {
-      this.time.delayedCall(1100, () => {
-        this.targetIndex = null;
-        this.safeUntilAt = performance.now() + POST_BATTLE_SAFETY_MS;
-        this.game.events.emit("rpg-battle", null);
-        if (this.monsters.every((next) => next.hp === 0)) {
-          this.completedWaves = this.wave;
-          this.betweenWaves = true;
-          this.heldDirections.clear();
-          this.playerVelocity = { x: 0, y: 0 };
-          this.game.events.emit("rpg-wave-clear", {
-            wave: this.wave,
-            hp: this.playerHp,
-            nextTurnSeconds: turnSecondsForWave(this.wave + 1, this.mode),
-            nextMonsterCount: monsterCountForWave(this.wave + 1),
-            nextFloorName: appearanceForWave(this.wave + 1).name,
-          });
-        }
-        this.draw();
-      });
+      this.time.delayedCall(1100, () => this.afterMonsterDefeated());
       return;
     }
     this.time.delayedCall(1200, () => {
-      if (this.targetIndex === null || this.finished) return;
-      this.playerHp = Math.max(0, this.playerHp - monster.attack);
-      this.game.events.emit("rpg-enemy-hit", monster.attack);
-      this.emitBattle(`${monster.name} hit you for ${monster.attack}!`);
-      this.draw();
-      if (this.playerHp === 0) {
-        this.time.delayedCall(900, () => this.endRun("defeated"));
-      } else {
-        this.time.delayedCall(900, () => {
-          if (this.finished) return;
-          this.battleStage = "typing";
-          this.turnWords = 0;
-          this.turnNumber++;
-          this.turnMistakes = 0;
-          this.turnEndsAt = 0;
-          this.turnRemainingMs = this.turnMs();
-          this.emitBattle();
-        });
-      }
+      this.enemyTurn(monster);
     });
+  }
+
+  /** A monster is down: back to the map (or the wave is cleared). */
+  private afterMonsterDefeated(): void {
+    this.targetIndex = null;
+    this.safeUntilAt = performance.now() + POST_BATTLE_SAFETY_MS;
+    this.game.events.emit("rpg-battle", null);
+    if (this.monsters.every((next) => next.hp === 0)) {
+      this.completedWaves = this.wave;
+      this.betweenWaves = true;
+      this.heldDirections.clear();
+      this.playerVelocity = { x: 0, y: 0 };
+      this.game.events.emit("rpg-wave-clear", {
+        wave: this.wave,
+        hp: this.playerHp,
+        nextTurnSeconds: turnSecondsForWave(this.wave + 1, this.mode),
+        nextMonsterCount: monsterCountForWave(this.wave + 1),
+        nextFloorName: appearanceForWave(this.wave + 1).name,
+      });
+    }
+    this.draw();
+  }
+
+  /** Old in-scene typing turn: the monster hits back. */
+  private enemyTurn(monster: Monster): void {
+    if (this.targetIndex === null || this.finished) return;
+    this.playerHp = Math.max(0, this.playerHp - monster.attack);
+    this.game.events.emit("rpg-enemy-hit", monster.attack);
+    this.emitBattle(`${monster.name} hit you for ${monster.attack}!`);
+    this.draw();
+    if (this.playerHp === 0) {
+      this.time.delayedCall(900, () => this.endRun("defeated"));
+    } else {
+      this.time.delayedCall(900, () => {
+        if (this.finished) return;
+        this.battleStage = "typing";
+        this.turnWords = 0;
+        this.turnNumber++;
+        this.turnMistakes = 0;
+        this.turnEndsAt = 0;
+        this.turnRemainingMs = this.turnMs();
+        this.emitBattle();
+      });
+    }
   }
 
   private chooseMonsterDestination(monster: Monster): void {
@@ -1223,6 +1263,7 @@ export class RpgScene extends Scene {
     }
     this.game.events.off("rpg-interact", this.interact, this);
     this.game.events.off("rpg-continue", this.continueWave, this);
+    this.game.events.off("rpg-battle-end", this.onBattleEnd, this);
     this.game.events.off("rpg-leave", this.endRun, this);
     if (this.attackHandler !== undefined) {
       this.game.events.off("rpg-attack", this.attackHandler);
