@@ -3,13 +3,15 @@ import type { DifficultyOption } from "../components/DifficultySegmented";
 import { EASY_WORDS, HARD_WORDS, MEDIUM_WORDS } from "../shared/kid-words";
 
 /**
- * Rescue Ship: a crew of four flies through space rescuing lost pets. Each
- * player runs one station (computer helpers run the rest):
- *   pilot    - type direction words to dodge asteroids
+ * Rescue Ship: a crew of four flies through space rescuing lost pets.
+ *   pilot    - type moves to dodge asteroids
  *   shields  - type shield words to keep the shield charged
- *   engineer - type repair phrases when parts break
+ *   engineer - type repair steps when parts break
  *   rescuer  - type pet phrases to beam stranded pets aboard
- * Now and then everyone must type the same "all hands" word together.
+ * Solo: you're the captain and can do any job (slow helpers back you up).
+ * Together: each player runs one station, and stations swap every zone.
+ * Every run: 3 random zones, a surprise in each, a big visitor (boss) the
+ * whole crew types at, then everyone docks at the Rescue Station.
  *
  * Everything (the ship's health, shield, pets...) is worked out from the
  * seed, the crew and the facts "who finished which task when", so every
@@ -88,13 +90,14 @@ export function buildCrew(
 // ---------------------------------------------------------------- difficulty
 
 export type ShipDifficulty = DifficultyOption & {
-  /** pilot / shield / all-hands words */
+  /** shield / all-hands words */
   words: string[];
-  /** repair phrase words */
-  repairWords: string[];
-  repairLength: number;
-  /** words in a pet phrase (adjectives + pet) */
-  petLength: number;
+  /** words in a pilot move (frozen rocks add one) */
+  pilotLength: number;
+  shieldLength: number;
+  /** repair steps per broken part */
+  repairSteps: number;
+  petStyle: "short" | "medium" | "story";
   /** task windows are multiplied by this */
   windowScale: number;
 };
@@ -104,27 +107,30 @@ export const SHIP_DIFFICULTIES: ShipDifficulty[] = [
     label: "Easy",
     hint: "short words",
     words: EASY_WORDS,
-    repairWords: EASY_WORDS,
-    repairLength: 2,
-    petLength: 2,
+    pilotLength: 1,
+    shieldLength: 1,
+    repairSteps: 1,
+    petStyle: "short",
     windowScale: 1.25,
   },
   {
     label: "Medium",
     words: MEDIUM_WORDS,
-    repairWords: MEDIUM_WORDS,
-    repairLength: 2,
-    petLength: 2,
+    pilotLength: 2,
+    shieldLength: 1,
+    repairSteps: 2,
+    petStyle: "medium",
     windowScale: 1,
   },
   {
     label: "Hard",
-    hint: "long words",
+    hint: "long phrases",
     words: HARD_WORDS,
-    repairWords: HARD_WORDS,
-    repairLength: 3,
-    petLength: 3,
-    windowScale: 0.85,
+    pilotLength: 2,
+    shieldLength: 2,
+    repairSteps: 3,
+    petStyle: "story",
+    windowScale: 0.9,
   },
 ];
 
@@ -139,32 +145,11 @@ export type ShipSetup = {
   seed: number;
   difficulty: ShipDifficulty;
   crew: CrewMember[];
+  /** solo: this player can do every job (helpers are slow backups) */
+  captain?: string;
+  /** together: stations move one along every zone */
+  rotate?: boolean;
 };
-
-// ---------------------------------------------------------------- zones
-
-export type Zone = {
-  name: string;
-  emoji: string;
-  start: number;
-  end: number;
-};
-
-export const ZONES: Zone[] = [
-  { name: "Asteroid Field", emoji: "🌌", start: 0, end: 90_000 },
-  { name: "Meteor Storm", emoji: "☄️", start: 90_000, end: 180_000 },
-  { name: "Space Goo Cloud", emoji: "👾", start: 180_000, end: 270_000 },
-  { name: "Rescue Station", emoji: "🏠", start: 270_000, end: 300_000 },
-];
-export const RUN_MS = 300_000;
-export const START_PAUSE_MS = 3000;
-
-export function zoneAt(t: number): Zone {
-  return (
-    ZONES.find((z) => t >= z.start && t < z.end) ??
-    (ZONES[ZONES.length - 1] as Zone)
-  );
-}
 
 // ---------------------------------------------------------------- random
 
@@ -188,6 +173,9 @@ function hashString(text: string): number {
   return h >>> 0;
 }
 
+const pickOne = <T>(rng: () => number, list: readonly T[]): T =>
+  list[Math.floor(rng() * list.length)] as T;
+
 function pickWords(rng: () => number, words: string[], count: number): string {
   const out: string[] = [];
   for (let tries = 0; out.length < count && tries < 50; tries++) {
@@ -197,8 +185,171 @@ function pickWords(rng: () => number, words: string[], count: number): string {
   return out.join(" ");
 }
 
-// ---------------------------------------------------------------- tasks
+function shuffled<T>(rng: () => number, list: readonly T[]): T[] {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j] as T, out[i] as T];
+  }
+  return out;
+}
 
+// ---------------------------------------------------------------- zones
+
+export type ZoneKind =
+  | "asteroids"
+  | "meteors"
+  | "goo"
+  | "ice"
+  | "blackhole"
+  | "boss"
+  | "station";
+
+export const ZONE_INFO: Record<
+  Exclude<ZoneKind, "boss">,
+  { name: string; emoji: string; tip: string }
+> = {
+  asteroids: {
+    name: "Asteroid Field",
+    emoji: "🌌",
+    tip: "dodge the space rocks!",
+  },
+  meteors: {
+    name: "Meteor Storm",
+    emoji: "☄️",
+    tip: "lots more rocks - and things break!",
+  },
+  goo: {
+    name: "Space Goo Cloud",
+    emoji: "👾",
+    tip: "the goo eats the shield - keep charging!",
+  },
+  ice: {
+    name: "Ice Comets",
+    emoji: "🧊",
+    tip: "frozen rocks need one more word!",
+  },
+  blackhole: {
+    name: "Black Hole",
+    emoji: "🕳️",
+    tip: "everything drifts away faster - be quick!",
+  },
+  station: {
+    name: "Rescue Station",
+    emoji: "🏠",
+    tip: "everyone type together to dock!",
+  },
+};
+const FLY_KINDS = ["asteroids", "meteors", "goo", "ice", "blackhole"] as const;
+
+export type BossKind = "whale" | "octopus";
+export const BOSS_INFO: Record<
+  BossKind,
+  { name: string; emoji: string; tip: string; win: string }
+> = {
+  whale: {
+    name: "Sleepy Space Whale",
+    emoji: "🐋",
+    tip: "is napping in the way - type to wake it up!",
+    win: "The whale woke up and swam off!",
+  },
+  octopus: {
+    name: "Giant Space Octopus",
+    emoji: "🐙",
+    tip: "is hugging the ship - type to make it let go!",
+    win: "The octopus let go and waved bye!",
+  },
+};
+
+export type Zone = {
+  kind: ZoneKind;
+  name: string;
+  emoji: string;
+  tip: string;
+  start: number;
+  end: number;
+  index: number;
+};
+
+export const FLY_MS = 70_000;
+const BOSS_MS = 30_000;
+const STATION_MS = 25_000;
+export const RUN_MS = FLY_MS * 3 + BOSS_MS + STATION_MS;
+export const START_PAUSE_MS = 3000;
+
+export const shipBoss = (seed: number): BossKind =>
+  seededRandom(seed ^ 0xb055)() < 0.5 ? "whale" : "octopus";
+
+/** 3 of the 5 flying zones (random order), the boss, then the station. */
+export function shipZones(seed: number): Zone[] {
+  const rng = seededRandom(seed ^ 0x2077);
+  const zones: Zone[] = shuffled(rng, FLY_KINDS)
+    .slice(0, 3)
+    .map((kind, index) => ({
+      kind,
+      ...ZONE_INFO[kind],
+      start: index * FLY_MS,
+      end: (index + 1) * FLY_MS,
+      index,
+    }));
+  const boss = BOSS_INFO[shipBoss(seed)];
+  const bossStart = 3 * FLY_MS;
+  zones.push({
+    kind: "boss",
+    name: boss.name,
+    emoji: boss.emoji,
+    tip: boss.tip,
+    start: bossStart,
+    end: bossStart + BOSS_MS,
+    index: 3,
+  });
+  zones.push({
+    kind: "station",
+    ...ZONE_INFO.station,
+    start: bossStart + BOSS_MS,
+    end: RUN_MS,
+    index: 4,
+  });
+  return zones;
+}
+
+export function zoneAt(zones: Zone[], t: number): Zone {
+  return (
+    zones.find((z) => t >= z.start && t < z.end) ??
+    (zones[zones.length - 1] as Zone)
+  );
+}
+
+/** Which crew slot runs `station` at time t (stations swap each zone). */
+export function memberIndex(
+  setup: ShipSetup,
+  zones: Zone[],
+  station: Station,
+  t: number,
+): number {
+  const si = STATIONS.indexOf(station);
+  if (setup.rotate !== true) return si;
+  const z = Math.min(zoneAt(zones, t).index, 2);
+  return (si - z + CREW_SIZE) % CREW_SIZE;
+}
+
+/** The station this player runs at time t. */
+export function stationOf(
+  setup: ShipSetup,
+  zones: Zone[],
+  uid: string,
+  t: number,
+): Station | undefined {
+  const i = setup.crew.findIndex((c) => c.uid === uid);
+  if (i < 0) return undefined;
+  if (setup.rotate !== true) return setup.crew[i]?.station;
+  const z = Math.min(zoneAt(zones, t).index, 2);
+  return STATIONS[(i + z) % CREW_SIZE];
+}
+
+// ---------------------------------------------------------------- words
+
+/** Easy pilot words (one word). */
 export const PILOT_WORDS = [
   "up",
   "down",
@@ -215,6 +366,42 @@ export const PILOT_WORDS = [
   "swerve",
   "climb",
 ];
+const PILOT_MOVES = [
+  "dodge",
+  "duck",
+  "dive",
+  "zoom",
+  "swerve",
+  "spin",
+  "roll",
+  "turn",
+  "climb",
+  "jump",
+  "glide",
+  "flip",
+];
+const PILOT_WAYS = [
+  "up",
+  "down",
+  "left",
+  "right",
+  "low",
+  "high",
+  "away",
+  "around",
+];
+const PILOT_EXTRA = ["fast", "now", "quick", "twice"];
+
+function pilotMove(
+  rng: () => number,
+  d: ShipDifficulty,
+  frozen: boolean,
+): string {
+  const length = d.pilotLength + (frozen ? 1 : 0);
+  if (length <= 1) return pickOne(rng, PILOT_WORDS);
+  const move = `${pickOne(rng, PILOT_MOVES)} ${pickOne(rng, PILOT_WAYS)}`;
+  return length >= 3 ? `${move} ${pickOne(rng, PILOT_EXTRA)}` : move;
+}
 
 export type Part = "engine" | "lights" | "leak";
 export const PART_INFO: Record<
@@ -233,6 +420,32 @@ export const PART_INFO: Record<
     effect: "the ship slowly loses health",
   },
 };
+const PARTS: Part[] = ["engine", "lights", "leak"];
+/** Repair steps, typed in order: [get ready, fix it, test it]. */
+const REPAIR_STEPS: Record<Part, [string[], string[], string[]]> = {
+  engine: [
+    ["open panel", "grab wrench", "get toolbox"],
+    ["tighten bolt", "oil gears", "swap belt", "clean pipe"],
+    ["test engine", "start motor", "rev engine"],
+  ],
+  lights: [
+    ["open panel", "grab ladder", "get toolbox"],
+    ["new bulb", "fix wire", "swap fuse", "tape cable"],
+    ["flip switch", "lights on", "test lamp"],
+  ],
+  leak: [
+    ["find hole", "grab patch", "get tape"],
+    ["seal crack", "patch hole", "tape it", "glue patch"],
+    ["check air", "pump air", "test seal"],
+  ],
+};
+
+function repairSteps(rng: () => number, part: Part, count: number): string[] {
+  const [ready, fix, test] = REPAIR_STEPS[part];
+  if (count <= 1) return [pickOne(rng, fix)];
+  if (count === 2) return [pickOne(rng, fix), pickOne(rng, test)];
+  return [pickOne(rng, ready), pickOne(rng, fix), pickOne(rng, test)];
+}
 
 export type PetKind = "bunny" | "pup" | "kitty" | "hamster" | "duck" | "turtle";
 export const PET_KINDS: PetKind[] = [
@@ -255,20 +468,95 @@ const PET_ADJECTIVES = [
   "chubby",
   "fuzzy",
 ];
+const PET_MEDIUM = ["save the", "help the", "find the", "hug the"];
+const PET_STORY = [
+  "the # is lost",
+  "the # needs help",
+  "beam up the #",
+  "the # wants home",
+];
 
-export type TaskKind = "hazard" | "charge" | "break" | "pet" | "hands";
+function petPhrase(
+  rng: () => number,
+  d: ShipDifficulty,
+  pet: PetKind,
+  golden: boolean,
+): string {
+  const adjective = golden ? "golden" : pickOne(rng, PET_ADJECTIVES);
+  const name = `${adjective} ${pet}`;
+  if (d.petStyle === "short") return name;
+  if (d.petStyle === "medium") return `${pickOne(rng, PET_MEDIUM)} ${name}`;
+  return pickOne(rng, PET_STORY).replace("#", name);
+}
+
+const BOSS_EASY = [
+  "wake up",
+  "hello",
+  "move over",
+  "swim away",
+  "go home",
+  "nap later",
+  "big yawn",
+  "wave bye",
+  "time to go",
+  "be nice",
+  "say hi",
+  "good day",
+];
+const BOSS_LONG = [
+  "please wake up",
+  "time to swim",
+  "move over please",
+  "go find a snack",
+  "sing us a song",
+  "wave goodbye",
+  "you are so big",
+  "nap time is over",
+  "say hello friend",
+  "swim home now",
+  "you can nap later",
+  "thank you big friend",
+];
+const SUPPLY_WORDS = {
+  short: ["catch box", "grab box", "get fuel", "grab it"],
+  long: ["catch the crate", "grab the box", "get the snacks", "catch the fuel"],
+};
+const FLARE_WORDS = {
+  short: ["shields up", "block it", "stay safe"],
+  long: ["shields up now", "block the flare", "hold the shield"],
+};
+
+// ---------------------------------------------------------------- tasks
+
+export type TaskKind =
+  | "hazard"
+  | "charge"
+  | "break"
+  | "pet"
+  | "hands"
+  | "boss"
+  | "supply"
+  | "flare";
 
 export type Task = {
   id: string;
   kind: TaskKind;
-  /** the station that does it ("hands" = everyone) */
-  station: Station | "all";
+  /** the station that does it ("all" = everyone types it, "any" = first wins) */
+  station: Station | "all" | "any";
   at: number;
   /** ms to finish it (breaks: until the end of the run) */
   window: number;
   word: string;
+  /** repairs: typed one after another (word is them all) */
+  steps?: string[];
   part?: Part;
   pet?: PetKind;
+  /** a rare golden pet: worth 3 */
+  golden?: boolean;
+  /** an SOS pet: worth 2, not much time */
+  sos?: boolean;
+  /** an ice comet rock */
+  frozen?: boolean;
   /** the last all-hands call at the Rescue Station: bonus pets */
   dock?: boolean;
 };
@@ -278,93 +566,145 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
   const tasks: Task[] = [];
   const rng = seededRandom(seed ^ 0x51ab);
   const w = (ms: number): number => Math.round(ms * d.windowScale);
-  const flyZones = ZONES.slice(0, 3);
+  const zones = shipZones(seed);
+  const short = d.petStyle === "short" ? "short" : "long";
+  const n = { p: 0, s: 0, e: 0, r: 0, x: 0 };
 
-  // pilot: asteroids, faster each zone
-  let n = 0;
-  flyZones.forEach((z, zi) => {
-    const every = [7000, 6000, 5000][zi] as number;
+  zones.slice(0, 3).forEach((z, zi) => {
+    const fast = z.kind === "blackhole" ? 0.85 : 1;
+
+    // pilot: asteroids, faster each zone (and in a meteor storm)
+    const every = Math.round(
+      ([7000, 6000, 5000][zi] as number) * (z.kind === "meteors" ? 0.75 : 1),
+    );
     for (let t = z.start + 2500; t < z.end - 2000; t += every) {
+      const frozen = z.kind === "ice";
       tasks.push({
-        id: `p${n++}`,
+        id: `p${n.p++}`,
         kind: "hazard",
         station: "pilot",
         at: t + Math.round(rng() * 1500),
-        window: w(5000),
-        word: pickWords(rng, PILOT_WORDS, 1),
+        window: Math.round(w(frozen ? 6500 : 5500) * fast),
+        word: pilotMove(rng, d, frozen),
+        ...(frozen ? { frozen } : {}),
       });
     }
-  });
 
-  // shields: a charge word every 4s, all run long
-  n = 0;
-  for (let t = 1500; t < (ZONES[2]?.end ?? 0); t += 4000) {
-    tasks.push({
-      id: `s${n++}`,
-      kind: "charge",
-      station: "shields",
-      at: t,
-      window: 4000,
-      word: pickWords(rng, d.words, 1),
-    });
-  }
-
-  // engineer: parts break, more in the storm
-  n = 0;
-  const parts: Part[] = ["engine", "lights", "leak"];
-  flyZones.forEach((z, zi) => {
-    const count = [2, 5, 4][zi] as number;
-    const slot = (z.end - z.start - 10_000) / count;
-    for (let i = 0; i < count; i++) {
+    // shields: a charge word every 4s
+    for (let t = z.start + 1500; t < z.end; t += 4000) {
       tasks.push({
-        id: `e${n}`,
+        id: `s${n.s++}`,
+        kind: "charge",
+        station: "shields",
+        at: t,
+        window: 4000,
+        word: pickWords(rng, d.words, d.shieldLength),
+      });
+    }
+
+    // engineer: parts break, more later on and in a meteor storm
+    const count = ([2, 4, 4][zi] as number) + (z.kind === "meteors" ? 1 : 0);
+    const slot = (FLY_MS - 10_000) / count;
+    for (let i = 0; i < count; i++) {
+      const part = PARTS[(n.e + Math.floor(rng() * 3)) % 3] as Part;
+      const steps = repairSteps(rng, part, d.repairSteps);
+      tasks.push({
+        id: `e${n.e++}`,
         kind: "break",
         station: "engineer",
         at: z.start + 6000 + Math.round(slot * i + rng() * slot * 0.6),
         window: RUN_MS,
-        word: pickWords(rng, d.repairWords, d.repairLength),
-        part: parts[(n + Math.floor(rng() * 3)) % 3] as Part,
+        word: steps.join(" "),
+        steps,
+        part,
       });
-      n++;
     }
-  });
 
-  // rescuer: stranded pets
-  n = 0;
-  flyZones.forEach((z, zi) => {
-    const every = [14_000, 12_000, 11_000][zi] as number;
-    for (let t = z.start + 5000; t < z.end - 6000; t += every) {
-      const pet = PET_KINDS[Math.floor(rng() * PET_KINDS.length)] as PetKind;
-      const adjectives = pickWords(rng, PET_ADJECTIVES, d.petLength - 1);
+    // rescuer: stranded pets (now and then a golden one)
+    const petEvery = [13_000, 11_500, 10_500][zi] as number;
+    for (let t = z.start + 5000; t < z.end - 6000; t += petEvery) {
+      const pet = pickOne(rng, PET_KINDS);
+      const golden = rng() < 0.06;
       tasks.push({
-        id: `r${n++}`,
+        id: `r${n.r++}`,
         kind: "pet",
         station: "rescuer",
         at: t + Math.round(rng() * 2000),
-        window: w(9000),
-        word: `${adjectives} ${pet}`,
+        window: Math.round(w(11_000) * fast),
+        word: petPhrase(rng, d, pet, golden),
         pet,
+        ...(golden ? { golden } : {}),
       });
     }
-  });
 
-  // all hands: one near the end of each zone, then the dock call
-  [84_000, 172_000, 262_000].forEach((t, i) => {
+    // one surprise per zone
+    const at = z.start + 20_000 + Math.round(rng() * 30_000);
+    const surprise = Math.floor(rng() * 3);
+    const id = `x${n.x++}`;
+    if (surprise === 0) {
+      const pet = pickOne(rng, PET_KINDS);
+      tasks.push({
+        id,
+        kind: "pet",
+        station: "rescuer",
+        at,
+        window: w(8000),
+        word: short === "short" ? `sos ${pet}` : `sos save the ${pet}`,
+        pet,
+        sos: true,
+      });
+    } else if (surprise === 1) {
+      tasks.push({
+        id,
+        kind: "supply",
+        station: "any",
+        at,
+        window: w(8000),
+        word: pickOne(rng, SUPPLY_WORDS[short]),
+      });
+    } else {
+      tasks.push({
+        id,
+        kind: "flare",
+        station: "shields",
+        at,
+        window: w(7000),
+        word: pickOne(rng, FLARE_WORDS[short]),
+      });
+    }
+
+    // all hands near the end of the zone
     tasks.push({
-      id: `a${i}`,
+      id: `a${zi}`,
       kind: "hands",
       station: "all",
-      at: t,
+      at: z.end - 6000,
       window: w(7000),
       word: pickWords(rng, d.words, d.label === "Easy" ? 1 : 2),
     });
   });
+
+  // the big visitor: phrases anyone can type
+  const boss = zones[3] as Zone;
+  const phrases = shuffled(rng, d.label === "Easy" ? BOSS_EASY : BOSS_LONG);
+  bossPhraseCount(d).forEach((i) => {
+    tasks.push({
+      id: `b${i}`,
+      kind: "boss",
+      station: "any",
+      at: boss.start + 2500 + i * 2800,
+      window: w(9000),
+      word: phrases[i % phrases.length] as string,
+    });
+  });
+
+  const station = zones[4] as Zone;
   tasks.push({
     id: "a3",
     kind: "hands",
     station: "all",
-    at: (ZONES[3]?.start ?? 0) + 4000,
-    window: w(18_000),
+    at: station.start + 3000,
+    window: Math.min(w(17_000), STATION_MS - 3500),
     word: pickWords(rng, d.words, 3),
     dock: true,
   });
@@ -372,12 +712,19 @@ export function shipTasks(seed: number, d: ShipDifficulty): Task[] {
   return tasks.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
 }
 
+const bossPhraseCount = (d: ShipDifficulty): number[] =>
+  Array.from({ length: d.label === "Easy" ? 6 : 8 }, (_, i) => i);
+
+/** A combo shield boost's task id (unique per crew slot). */
+export const boostId = (slot: number, n: number): string =>
+  `c${slot}${String(n % 100).padStart(2, "0")}`;
+
 // ---------------------------------------------------------------- facts
 
 export type ShipFacts = {
   /** ms since the start (server time) */
   startAt: number;
-  /** taskId -> who finished it and when (absolute time) */
+  /** taskId -> who finished it and when (absolute time); "c..." = boosts */
   done: Record<string, { by: string; at: number }>;
   /** all-hands taskId -> uid -> when */
   hands: Record<string, Record<string, number>>;
@@ -386,11 +733,16 @@ export type ShipFacts = {
 export const START_HP = 10;
 const SHIELD_MAX = 100;
 const SHIELD_DRAIN_PER_S = 2.0;
+/** the goo cloud eats the shield this much faster */
+const GOO_DRAIN = 1.6;
 const SHIELD_CHARGE = 22;
 const SHIELD_BLOCK_COST = 35;
+export const BOOST_SHIELD = 30;
 const LEAK_EVERY_MS = 10_000;
 const ENGINE_PET_WINDOW = 0.65;
 export const DOCK_BONUS_PETS = 3;
+export const BOSS_BONUS_PETS = 3;
+const SUPPLY_HP = 2;
 /** missed this many in a row: a helper takes over that station */
 const AWAY_AFTER: Record<Station, number> = {
   pilot: 4,
@@ -401,19 +753,29 @@ const AWAY_AFTER: Record<Station, number> = {
 /** an unfixed break counts as missed after this long */
 const BREAK_MISS_MS = 25_000;
 
+export const petWorth = (task: Task): number =>
+  task.golden === true ? 3 : task.sos === true ? 2 : 1;
+
+type HelperMode = "normal" | "autopilot" | "backup";
+
 /** When a computer helper finishes a task (or undefined: it doesn't). */
 function helperDoneAt(
   seed: number,
   task: Task,
-  autopilot = false,
+  mode: HelperMode,
 ): number | undefined {
   const rng = seededRandom(seed ^ hashString(task.id));
   if (task.kind === "break") {
-    return task.at + (autopilot ? 9000 : 5000) + rng() * 5000;
+    const wait = mode === "normal" ? 5000 : mode === "autopilot" ? 9000 : 14000;
+    return task.at + wait + rng() * 5000;
   }
-  const chance = task.kind === "charge" ? 0.5 : 0.8;
-  // the auto-pilot that covers for an idle player is not as good
-  if (rng() > (autopilot ? chance * 0.55 : chance)) return undefined;
+  const base = task.kind === "charge" ? 0.5 : 0.8;
+  // the auto-pilot that covers for an idle player is not as good, and a
+  // backup (solo captain, boss) waits to give the players a go first
+  const chance =
+    mode === "normal" ? base : mode === "autopilot" ? base * 0.55 : base * 0.9;
+  if (rng() > chance) return undefined;
+  if (mode === "backup") return task.at + task.window * (0.7 + rng() * 0.25);
   return task.at + 900 + rng() * task.window * 0.7;
 }
 
@@ -431,7 +793,14 @@ export type ShipEvent = {
     | "petLost"
     | "hands"
     | "handsMiss"
-    | "dock";
+    | "dock"
+    | "supply"
+    | "flareBlock"
+    | "flareHit"
+    | "bossHit"
+    | "bossWin"
+    | "bossLeft"
+    | "boost";
   /** uid / "helper" */
   by?: string;
   taskId?: string;
@@ -444,35 +813,49 @@ export type CrewStats = {
   fixes: number;
   rescues: number;
   hands: number;
+  /** boss phrases */
+  boss: number;
+  /** supply crates caught, solar flares blocked */
+  extras: number;
 };
+
+export type Rescued = { pet: PetKind; by: string; golden: boolean };
 
 export type ShipView = {
   /** ms since the start */
   t: number;
+  zones: Zone[];
   zone: Zone;
   hp: number;
   shield: number;
   pets: number;
-  petKinds: PetKind[];
+  rescued: Rescued[];
   broken: Part[];
   over: boolean;
   /** why it ended */
   reason?: "home" | "wrecked";
   /** tasks open right now */
   open: Task[];
-  /** stations a helper has taken over */
+  /** stations a helper has taken over (right now) */
   away: Set<Station>;
   events: ShipEvent[];
   /** by uid (helpers under "helper") */
   stats: Record<string, CrewStats>;
+  bossHits: number;
+  bossMax: number;
+  boss?: "won" | "left";
+  /** no crew call missed and the boss sent off */
+  perfect: boolean;
 };
 
-const emptyStats = (): CrewStats => ({
+export const emptyStats = (): CrewStats => ({
   dodges: 0,
   charges: 0,
   fixes: 0,
   rescues: 0,
   hands: 0,
+  boss: 0,
+  extras: 0,
 });
 
 /** The ship as it is `now` (absolute time). */
@@ -483,42 +866,50 @@ export function shipView(
   now: number,
 ): ShipView {
   const t = Math.min(RUN_MS, Math.max(0, now - facts.startAt));
-  const humanOf = (station: Station): string | null =>
-    setup.crew.find((c) => c.station === station)?.uid ?? null;
+  const zones = shipZones(setup.seed);
+  const slotOf = (task: Task): number | null =>
+    task.station === "all" || task.station === "any"
+      ? null
+      : memberIndex(setup, zones, task.station, task.at);
+  const awayAfter = (task: Task): number =>
+    AWAY_AFTER[task.station as Station] ?? 3;
 
   // ---- who finishes what, when (relative ms), with helpers filling in
-  const away = new Set<Station>();
-  const awayFrom: Partial<Record<Station, number>> = {};
-  const misses: Record<Station, number> = {
-    pilot: 0,
-    shields: 0,
-    engineer: 0,
-    rescuer: 0,
-  };
+  const away = new Set<number>();
+  const awayFrom: (number | undefined)[] = [];
+  const misses = [0, 0, 0, 0];
   const finish = new Map<string, { at: number; by: string }>();
 
-  // breaks first: the engine being broken shortens pet windows
+  // the engine being broken shortens pet windows
   const fixedAt = new Map<string, number>();
-  const ordered = [...tasks];
-  for (const task of ordered) {
+  const petWindow = (task: Task): number =>
+    task.kind === "pet" && engineBrokenAt(task.at, tasks, fixedAt)
+      ? Math.round(task.window * ENGINE_PET_WINDOW)
+      : task.window;
+  for (const task of tasks) {
     if (task.kind === "hands") continue;
-    const station = task.station as Station;
-    const human = humanOf(station);
+    const slot = slotOf(task);
+    const human = slot === null ? null : (setup.crew[slot]?.uid ?? null);
     const fact = facts.done[task.id];
     const playerAt = fact === undefined ? undefined : fact.at - facts.startAt;
-    let window = task.window;
-    if (task.kind === "pet" && engineBrokenAt(task.at, tasks, fixedAt)) {
-      window = Math.round(window * ENGINE_PET_WINDOW);
-    }
+    const window = petWindow(task);
     // only what has happened by now counts
     const inTime = (at: number | undefined): at is number =>
       at !== undefined && at >= task.at && at <= task.at + window && at <= t;
-    const helperOn =
-      human === null ||
-      (awayFrom[station] !== undefined && task.at >= (awayFrom[station] ?? 0));
+    const slotAway =
+      slot !== null &&
+      awayFrom[slot] !== undefined &&
+      task.at >= (awayFrom[slot] ?? 0);
+    const helperOn = human === null || slotAway;
+    const mode: HelperMode =
+      slot === null || setup.captain !== undefined
+        ? "backup"
+        : human === null
+          ? "normal"
+          : "autopilot";
     // a break nobody fixes for a while gets fixed by a helper anyway
     const helperAt = helperOn
-      ? helperDoneAt(setup.seed, task, human !== null)
+      ? helperDoneAt(setup.seed, task, mode)
       : task.kind === "break"
         ? task.at + BREAK_MISS_MS + 2000
         : undefined;
@@ -526,10 +917,10 @@ export function shipView(
     if (inTime(playerAt) && fact !== undefined) {
       done = { at: playerAt, by: fact.by };
       // typing again takes the station back from the helper
-      if (helperOn && human !== null && awayFrom[station] !== undefined) {
-        awayFrom[station] = undefined;
-        away.delete(station);
-        misses[station] = 0;
+      if (slot !== null && slotAway && fact.by === human) {
+        awayFrom[slot] = undefined;
+        away.delete(slot);
+        misses[slot] = 0;
       }
     }
     if (inTime(helperAt) && (done === undefined || helperAt < done.at)) {
@@ -541,7 +932,7 @@ export function shipView(
     }
 
     // a player who stops answering gets a helper
-    if (human !== null && !helperOn) {
+    if (slot !== null && human !== null && !helperOn) {
       const missDeadline =
         task.kind === "break" ? task.at + BREAK_MISS_MS : task.at + window;
       const missed =
@@ -549,12 +940,12 @@ export function shipView(
           ? missDeadline <= t
           : task.kind === "break" && done.at > task.at + BREAK_MISS_MS;
       if (done !== undefined && !missed) {
-        misses[station] = 0;
+        misses[slot] = 0;
       } else if (missed) {
-        misses[station]++;
-        if (misses[station] >= AWAY_AFTER[station]) {
-          away.add(station);
-          awayFrom[station] = missDeadline;
+        misses[slot] = (misses[slot] ?? 0) + 1;
+        if ((misses[slot] ?? 0) >= awayAfter(task)) {
+          away.add(slot);
+          awayFrom[slot] = missDeadline;
         }
       }
     }
@@ -562,37 +953,25 @@ export function shipView(
 
   // ---- play the run forward to t
   const events: ShipEvent[] = [];
+  const bossTasks: Task[] = [];
   for (const task of tasks) {
     const done = finish.get(task.id);
+    const by = done?.by;
     if (task.kind === "hazard") {
-      if (done !== undefined) {
-        events.push({
-          t: done.at,
-          kind: "dodge",
-          by: done.by,
-          taskId: task.id,
-        });
-      } else {
-        events.push({
-          t: task.at + task.window,
-          kind: "bump",
-          taskId: task.id,
-        });
-      }
+      events.push(
+        done !== undefined
+          ? { t: done.at, kind: "dodge", by, taskId: task.id }
+          : { t: task.at + task.window, kind: "bump", taskId: task.id },
+      );
     } else if (task.kind === "charge") {
       if (done !== undefined) {
-        events.push({
-          t: done.at,
-          kind: "charge",
-          by: done.by,
-          taskId: task.id,
-        });
+        events.push({ t: done.at, kind: "charge", by, taskId: task.id });
       }
     } else if (task.kind === "break") {
       events.push({ t: task.at, kind: "break", taskId: task.id });
       const end = done?.at ?? RUN_MS;
       if (done !== undefined) {
-        events.push({ t: done.at, kind: "fix", by: done.by, taskId: task.id });
+        events.push({ t: done.at, kind: "fix", by, taskId: task.id });
       }
       if (task.part === "leak") {
         for (let lt = task.at + LEAK_EVERY_MS; lt < end; lt += LEAK_EVERY_MS) {
@@ -600,24 +979,40 @@ export function shipView(
         }
       }
     } else if (task.kind === "pet") {
-      const window = engineBrokenAt(task.at, tasks, fixedAt)
-        ? Math.round(task.window * ENGINE_PET_WINDOW)
-        : task.window;
+      events.push(
+        done !== undefined
+          ? {
+              t: done.at,
+              kind: "rescue",
+              by,
+              taskId: task.id,
+              amount: petWorth(task),
+            }
+          : { t: task.at + petWindow(task), kind: "petLost", taskId: task.id },
+      );
+    } else if (task.kind === "supply") {
       if (done !== undefined) {
-        events.push({
-          t: done.at,
-          kind: "rescue",
-          by: done.by,
-          taskId: task.id,
-        });
-      } else {
-        events.push({ t: task.at + window, kind: "petLost", taskId: task.id });
+        events.push({ t: done.at, kind: "supply", by, taskId: task.id });
+      }
+    } else if (task.kind === "flare") {
+      events.push(
+        done !== undefined
+          ? { t: done.at, kind: "flareBlock", by, taskId: task.id }
+          : { t: task.at + task.window, kind: "flareHit", taskId: task.id },
+      );
+    } else if (task.kind === "boss") {
+      bossTasks.push(task);
+      if (done !== undefined) {
+        events.push({ t: done.at, kind: "bossHit", by, taskId: task.id });
       }
     } else {
-      // all hands: every player still at their station must type it
-      const needed = setup.crew
-        .filter((c) => c.uid !== null && !away.has(c.station))
-        .map((c) => c.uid as string);
+      // all hands: the captain, or every player still at their station
+      const needed =
+        setup.captain !== undefined
+          ? [setup.captain]
+          : setup.crew
+              .filter((c, i) => c.uid !== null && !away.has(i))
+              .map((c) => c.uid as string);
       const typed = facts.hands[task.id] ?? {};
       const deadline = task.at + task.window;
       const inTime = (u: string): boolean => {
@@ -646,12 +1041,48 @@ export function shipView(
       });
     }
   }
+  // the boss: sent off once every phrase is typed, else it wanders away
+  const bossDone = bossTasks.map((b) => finish.get(b.id));
+  if (bossTasks.length > 0) {
+    if (bossDone.every((d) => d !== undefined)) {
+      events.push({
+        t: Math.max(...bossDone.map((d) => d?.at ?? 0)) + 1,
+        kind: "bossWin",
+      });
+    } else {
+      events.push({
+        t: Math.max(...bossTasks.map((b) => b.at + b.window)) + 1,
+        kind: "bossLeft",
+      });
+    }
+  }
+  // combo shield boosts
+  for (const [id, f] of Object.entries(facts.done)) {
+    if (!/^c\d+$/.test(id)) continue;
+    const at = f.at - facts.startAt;
+    if (at >= 0 && at <= RUN_MS) {
+      events.push({ t: at, kind: "boost", by: f.by, taskId: id });
+    }
+  }
   events.sort((a, b) => a.t - b.t);
 
+  const gooZones = zones.filter((z) => z.kind === "goo");
+  const drain = (from: number, to: number): number => {
+    let goo = 0;
+    for (const z of gooZones) {
+      goo += Math.max(0, Math.min(to, z.end) - Math.max(from, z.start));
+    }
+    return ((to - from + goo * (GOO_DRAIN - 1)) / 1000) * SHIELD_DRAIN_PER_S;
+  };
+
+  const byId = new Map(tasks.map((x) => [x.id, x]));
   let hp = START_HP;
   let shield = SHIELD_MAX;
   let pets = 0;
-  const petKinds: PetKind[] = [];
+  let bossHits = 0;
+  let boss: ShipView["boss"];
+  let missedCall = false;
+  const rescued: Rescued[] = [];
   let last = 0;
   let wreckedAt: number | undefined;
   const stats: Record<string, CrewStats> = {};
@@ -663,9 +1094,9 @@ export function shipView(
   const played: ShipEvent[] = [];
   for (const e of events) {
     if (e.t > t) break;
-    shield = Math.max(0, shield - ((e.t - last) / 1000) * SHIELD_DRAIN_PER_S);
+    shield = Math.max(0, shield - drain(last, e.t));
     last = e.t;
-    const task = tasks.find((x) => x.id === e.taskId);
+    const task = e.taskId === undefined ? undefined : byId.get(e.taskId);
     switch (e.kind) {
       case "dodge":
         stat(e.by).dodges++;
@@ -682,21 +1113,51 @@ export function shipView(
         shield = Math.min(SHIELD_MAX, shield + SHIELD_CHARGE);
         stat(e.by).charges++;
         break;
+      case "boost":
+        shield = Math.min(SHIELD_MAX, shield + BOOST_SHIELD);
+        break;
       case "fix":
         stat(e.by).fixes++;
         break;
       case "leak":
+      case "flareHit":
         hp -= 1;
         break;
       case "rescue":
-        pets++;
-        if (task?.pet !== undefined) petKinds.push(task.pet);
+        pets += e.amount ?? 1;
+        if (task?.pet !== undefined) {
+          rescued.push({
+            pet: task.pet,
+            by: e.by ?? "helper",
+            golden: task.golden === true,
+          });
+        }
         stat(e.by).rescues++;
+        break;
+      case "supply":
+        hp = Math.min(START_HP, hp + SUPPLY_HP);
+        stat(e.by).extras++;
+        break;
+      case "flareBlock":
+        stat(e.by).extras++;
+        break;
+      case "bossHit":
+        bossHits++;
+        stat(e.by).boss++;
+        break;
+      case "bossWin":
+        boss = "won";
+        pets += BOSS_BONUS_PETS;
+        hp = Math.min(START_HP, hp + 2);
+        break;
+      case "bossLeft":
+        boss = "left";
         break;
       case "hands":
         if (e.by !== undefined) stat(e.by).hands++;
         break;
       case "handsMiss":
+        missedCall = true;
         hp -= Math.min(2, e.amount ?? 1);
         break;
       case "dock":
@@ -713,7 +1174,7 @@ export function shipView(
     }
   }
   if (wreckedAt === undefined) {
-    shield = Math.max(0, shield - ((t - last) / 1000) * SHIELD_DRAIN_PER_S);
+    shield = Math.max(0, shield - drain(last, t));
   }
 
   const now_ = wreckedAt ?? t;
@@ -728,31 +1189,33 @@ export function shipView(
   const open = tasks.filter((x) => {
     if (x.at > now_ || finish.has(x.id)) return false;
     if (x.kind === "break") return (fixedAt.get(x.id) ?? Infinity) > now_;
-    if (x.kind === "hands") {
-      return now_ <= x.at + x.window;
-    }
-    const window =
-      x.kind === "pet" && engineBrokenAt(x.at, tasks, fixedAt)
-        ? Math.round(x.window * ENGINE_PET_WINDOW)
-        : x.window;
-    return now_ <= x.at + window;
+    return now_ <= x.at + petWindow(x);
   });
+  const awayStations = new Set(
+    STATIONS.filter((s) => away.has(memberIndex(setup, zones, s, now_))),
+  );
 
   const over = wreckedAt !== undefined || t >= RUN_MS || dockDone(played);
+  const reason = wreckedAt !== undefined ? "wrecked" : "home";
   return {
     t: now_,
-    zone: zoneAt(now_),
+    zones,
+    zone: zoneAt(zones, now_),
     hp,
     shield: Math.round(shield),
     pets,
-    petKinds,
+    rescued,
     broken: [...new Set(broken)],
     over,
-    ...(over ? { reason: wreckedAt !== undefined ? "wrecked" : "home" } : {}),
+    ...(over ? { reason } : {}),
     open,
-    away,
+    away: awayStations,
     events: played,
     stats,
+    bossHits,
+    bossMax: bossTasks.length,
+    ...(boss === undefined ? {} : { boss }),
+    perfect: over && reason === "home" && !missedCall && boss === "won",
   };
 }
 
@@ -778,22 +1241,40 @@ function engineBrokenAt(
 
 export function shipScore(input: { view: ShipView; mine: CrewStats }): number {
   const v = input.view;
+  const m = input.mine;
   return Math.round(
     v.pets * 6 +
       v.hp * 2 +
       (v.reason === "home" ? 30 : 0) +
-      input.mine.dodges * 2 +
-      input.mine.charges +
-      input.mine.fixes * 4 +
-      input.mine.rescues * 3 +
-      input.mine.hands * 2,
+      (v.perfect ? 25 : 0) +
+      m.dodges * 2 +
+      m.charges +
+      m.fixes * 4 +
+      m.rescues * 3 +
+      m.hands * 2 +
+      m.boss * 3 +
+      m.extras * 4,
   );
 }
 
 export function shipStars(v: ShipView): number {
   if (v.reason !== "home") return 1;
-  if (v.pets >= 20 && v.hp >= 6) return 3;
-  return v.pets >= 15 ? 2 : 1;
+  if (v.pets >= 18 && v.hp >= 6) return 3;
+  return v.pets >= 12 ? 2 : 1;
+}
+
+/** Pets I beamed aboard myself, by kind ("golden" counts golden ones). */
+export function myPetCounts(
+  v: ShipView,
+  uid: string,
+): Partial<Record<PetKind | "golden", number>> {
+  const out: Partial<Record<PetKind | "golden", number>> = {};
+  for (const r of v.rescued) {
+    if (r.by !== uid) continue;
+    out[r.pet] = (out[r.pet] ?? 0) + 1;
+    if (r.golden) out.golden = (out.golden ?? 0) + 1;
+  }
+  return out;
 }
 
 export type ShipAward = {
@@ -830,6 +1311,7 @@ export function shipAwards(
     award("🛡️", "Shield hero", (s) => s.charges),
     award("🔧", "Fix-it master", (s) => s.fixes),
     award("🐾", "Top rescuer", (s) => s.rescues),
+    award("🐋", "Visitor tamer", (s) => s.boss),
     award("⚡", "Crew calls", (s) => s.hands),
   ].filter((a): a is ShipAward => a !== null);
 }

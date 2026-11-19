@@ -21,17 +21,22 @@ export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 /** Mirrors api/_lib/mini-game-reward.ts: Monster Quest pays 5 quests a day. */
 export const MONSTER_QUEST_PAID_RUNS_PER_DAY = 5;
 
-export type MiniGameClaim =
+export type MiniGameClaim = (
   | { kind: "coins"; coins: number }
   | { kind: "capped" }
   | { kind: "none" }
   | { kind: "signedOut" }
-  | { kind: "error" };
+  | { kind: "error" }
+) & {
+  /** Rescue Ship: my whole pet collection after this run */
+  shipPets?: Record<string, number>;
+};
 
 /** Asks the server for this run's coins (one transaction, capped per day). */
 export async function claimMiniGameReward(
   gameId: MiniGameId,
   score: number,
+  extra?: { pets?: Record<string, number> },
 ): Promise<MiniGameClaim> {
   if (!isAuthenticated()) return { kind: "signedOut" };
   try {
@@ -39,12 +44,17 @@ export async function claimMiniGameReward(
       claimed: boolean;
       coins: number;
       capped?: boolean;
-    }>("/api/claim-reward", { type: "miniGame", gameId, score });
+      shipPets?: Record<string, number>;
+    }>("/api/claim-reward", { type: "miniGame", gameId, score, ...extra });
+    const pets =
+      result.shipPets === undefined ? {} : { shipPets: result.shipPets };
     if (result.coins > 0) {
       invalidateCoinQueries();
-      return { kind: "coins", coins: result.coins };
+      return { kind: "coins", coins: result.coins, ...pets };
     }
-    return result.capped === true ? { kind: "capped" } : { kind: "none" };
+    return result.capped === true
+      ? { kind: "capped", ...pets }
+      : { kind: "none", ...pets };
   } catch (e) {
     console.error("Failed to claim mini game reward:", e);
     return { kind: "error" };

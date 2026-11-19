@@ -24,7 +24,7 @@ import {
   SPEEDY_BONUS,
   SPEEDY_FACTOR,
 } from "../ghost-kinds";
-import { TypingTracker } from "../typing-report";
+import { TypingTracker } from "../../shared/typing-report";
 import {
   playBombExplode,
   playBossDefeated,

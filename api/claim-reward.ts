@@ -142,6 +142,28 @@ async function claimHouseChore(
   }
 }
 
+const SHIP_PET_KEYS = new Set([
+  "bunny",
+  "pup",
+  "kitty",
+  "hamster",
+  "duck",
+  "turtle",
+  "golden",
+]);
+
+/** Rescue Ship pets from one run: known kinds, 1-40 each. */
+function readShipPets(raw: unknown): Record<string, number> | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!SHIP_PET_KEYS.has(k) || typeof v !== "number") continue;
+    const n = Math.floor(v);
+    if (n >= 1 && n <= 40) out[k] = n;
+  }
+  return out;
+}
+
 /**
  * Per-run coins for the solo mini games, capped to a few paid runs per game
  * per Tokyo day (see _lib/mini-game-reward.ts). One read + one write.
@@ -151,11 +173,13 @@ async function claimMiniGame(
   gameId: MiniGameId,
   score: number,
   res: VercelResponse,
+  shipPets?: Record<string, number>,
 ): Promise<void> {
   const userRef = getAdminApp().firestore().collection("users").doc(uid);
   try {
     let coins = 0;
     let capped = false;
+    let petTotals: Record<string, number> | undefined;
     await getAdminApp()
       .firestore()
       .runTransaction(async (tx: admin.firestore.Transaction) => {
@@ -168,19 +192,45 @@ async function claimMiniGame(
         );
         coins = result.coins;
         capped = result.capped;
-        if (coins === 0) return;
-        // mergeFields replaces miniGameRewards whole, so yesterday's
-        // run counts don't linger after the date rolls over.
-        tx.set(
-          userRef,
-          {
-            miniGameRewards: result.next,
-            coins: admin.firestore.FieldValue.increment(coins),
-          },
-          { mergeFields: ["miniGameRewards", "coins"] },
-        );
+        // Rescue Ship: the pets I rescued join my collection (same write)
+        const petEntries = Object.entries(shipPets ?? {});
+        if (shipPets !== undefined) {
+          const old = (data["shipPets"] ?? {}) as Record<string, unknown>;
+          petTotals = {};
+          for (const [k, v] of Object.entries(old)) {
+            if (typeof v === "number") petTotals[k] = v;
+          }
+          for (const [k, n] of petEntries) {
+            petTotals[k] = (petTotals[k] ?? 0) + n;
+          }
+        }
+        if (coins === 0 && petEntries.length === 0) return;
+        const fields: Record<string, unknown> = {};
+        const paths: string[] = [];
+        if (coins > 0) {
+          // mergeFields replaces miniGameRewards whole, so yesterday's
+          // run counts don't linger after the date rolls over.
+          fields["miniGameRewards"] = result.next;
+          fields["coins"] = admin.firestore.FieldValue.increment(coins);
+          paths.push("miniGameRewards", "coins");
+        }
+        if (petEntries.length > 0) {
+          fields["shipPets"] = Object.fromEntries(
+            petEntries.map(([k, n]) => [
+              k,
+              admin.firestore.FieldValue.increment(n),
+            ]),
+          );
+          paths.push(...petEntries.map(([k]) => `shipPets.${k}`));
+        }
+        tx.set(userRef, fields, { mergeFields: paths });
       });
-    res.status(200).json({ claimed: coins > 0, coins, capped });
+    res.status(200).json({
+      claimed: coins > 0,
+      coins,
+      capped,
+      ...(petTotals === undefined ? {} : { shipPets: petTotals }),
+    });
   } catch (e) {
     console.error("claim-reward (miniGame) failed:", e);
     res.status(500).json({ claimed: false, coins: 0, capped: false });
@@ -218,6 +268,7 @@ export default async function handler(
     runId?: unknown;
     mode?: unknown;
     category?: unknown;
+    pets?: unknown;
   };
   if (body.type === "avatarCollection") {
     const category = body.category;
@@ -251,7 +302,13 @@ export default async function handler(
       res.status(400).json({ claimed: false, coins: 0, capped: false });
       return;
     }
-    await claimMiniGame(auth.uid, body.gameId, Math.floor(score), res);
+    await claimMiniGame(
+      auth.uid,
+      body.gameId,
+      Math.floor(score),
+      res,
+      body.gameId === "rescue-ship" ? readShipPets(body.pets) : undefined,
+    );
     return;
   }
   if (body.type === "shopCollection") {

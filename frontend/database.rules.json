@@ -340,7 +340,7 @@
         "done": {
           "$task": {
             ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && !data.exists() && root.child('shipRooms').child($code).child('status').val() == 'playing' && root.child('shipRooms').child($code).child('players').child(auth.uid).exists()",
-            ".validate": "$task.matches(/^[pser][0-9]{1,3}$/) && newData.child('by').val() == auth.uid && newData.child('at').isNumber() && newData.child('at').val() <= now + 60000"
+            ".validate": "$task.matches(/^[pserxbc][0-9]{1,3}$/) && newData.child('by').val() == auth.uid && newData.child('at').isNumber() && newData.child('at').val() <= now + 60000"
           }
         },
         "hands": {

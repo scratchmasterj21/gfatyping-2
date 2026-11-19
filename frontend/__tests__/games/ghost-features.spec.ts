@@ -4,7 +4,7 @@ import {
   pickKind,
   seededRng,
 } from "../../src/ts/games/ghost-hunter/ghost-kinds";
-import { TypingTracker } from "../../src/ts/games/ghost-hunter/typing-report";
+import { TypingTracker } from "../../src/ts/games/shared/typing-report";
 
 describe("ghost kinds", () => {
   it("only normal ghosts in wave 1", () => {

@@ -11,8 +11,8 @@ import {
   untrack,
 } from "solid-js";
 
+import type { TypingReport } from "../shared/typing-report";
 import type { GameOverScene } from "./scenes/GameOverScene";
-import type { TypingReport } from "./typing-report";
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
@@ -35,6 +35,7 @@ import { GameSetupSection } from "../components/GameSetupSection";
 import { groupWordListOptions } from "../components/groupWordListOptions";
 import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_GHOST } from "../components/multiplayer-unlock-hints";
+import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { waveAccuracy, WaveEnd, waveStars } from "../shared/wave-result";
@@ -784,24 +785,7 @@ export function GhostHunterModal(props: Props): JSXElement {
                 onPlayAgain={r().multiplayer ? undefined : playAgain}
                 note={r().multiplayer ? "Waiting for your team…" : dailyNote()}
                 onExit={() => props.onClose()}
-                extra={
-                  <Show when={r().practice.length > 0}>
-                    <div class="grid w-full gap-1">
-                      <div class="text-sm font-bold text-sub">
-                        📝 Practice these words
-                      </div>
-                      <div class="flex flex-wrap justify-center gap-2">
-                        <For each={r().practice}>
-                          {(w) => (
-                            <span class="rounded-lg bg-sub-alt px-3 py-1 font-mono text-lg font-bold text-text">
-                              {w}
-                            </span>
-                          )}
-                        </For>
-                      </div>
-                    </div>
-                  </Show>
-                }
+                extra={<PracticeWords words={r().practice} />}
               />
             )}
           </Show>

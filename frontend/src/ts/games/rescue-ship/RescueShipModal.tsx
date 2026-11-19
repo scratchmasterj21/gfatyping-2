@@ -12,7 +12,6 @@ import {
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
-import { getSnapshot } from "../../states/snapshot";
 import { cn } from "../../utils/cn";
 import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
@@ -27,9 +26,11 @@ import { GameSetupPrimaryAction } from "../components/GameSetupPrimaryAction";
 import { GameSetupSection } from "../components/GameSetupSection";
 import { InviteClassmates } from "../components/InviteClassmates";
 import { MULTIPLAYER_UNLOCK_HINT_GENERIC } from "../components/multiplayer-unlock-hints";
+import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
+import { TypingReport, TypingTracker } from "../shared/typing-report";
 import { PET_ART } from "./ship-art";
 import {
   createShipRoom,
@@ -47,8 +48,13 @@ import {
   writeHands,
 } from "./ship-multiplayer";
 import {
+  BOSS_INFO,
   buildCrew,
   CREW_SIZE,
+  emptyStats,
+  myPetCounts,
+  PET_KINDS,
+  shipBoss,
   SHIP_DIFFICULTIES,
   shipAwards,
   shipDifficultyFor,
@@ -60,8 +66,8 @@ import {
   shipTasks,
   shipView,
   START_PAUSE_MS,
-  Station,
   STATION_INFO,
+  Station,
   STATIONS,
   Task,
 } from "./ship-rules";
@@ -97,6 +103,8 @@ export function RescueShipModal(props: {
   const [now, setNow] = createSignal(Date.now());
   const [result, setResult] = createSignal<GameResultView | null>(null);
   const [claim, setClaim] = createSignal<MiniGameClaim | "pending">("pending");
+  const [report, setReport] = createSignal<TypingReport | null>(null);
+  let tracker = new TypingTracker();
   let resultTimer: ReturnType<typeof setTimeout> | undefined;
   let finished = false;
 
@@ -132,6 +140,7 @@ export function RescueShipModal(props: {
       seed: r.seed,
       difficulty: shipDifficultyFor(r.difficultyLabel),
       crew: roomCrew(r),
+      rotate: true,
     };
   });
   const tasks = createMemo(() => {
@@ -183,6 +192,18 @@ export function RescueShipModal(props: {
     }
   };
 
+  /** a perfect streak: a shield boost (written like a finished task) */
+  const onBoost = (id: string): void => {
+    onDone({
+      id,
+      kind: "charge",
+      station: "shields",
+      at: 0,
+      window: 0,
+      word: "",
+    });
+  };
+
   const onHands = (task: Task): void => {
     if (mode() === "solo") {
       setSolo((s) =>
@@ -213,14 +234,12 @@ export function RescueShipModal(props: {
     const s = setup();
     if (v === null || s === null || !v.over || finished) return;
     finished = true;
-    const mine = v.stats[myId()] ?? {
-      dodges: 0,
-      charges: 0,
-      fixes: 0,
-      rescues: 0,
-      hands: 0,
-    };
+    const mine = v.stats[myId()] ?? emptyStats();
     const score = shipScore({ view: v, mine });
+    tracker.tick(v.t);
+    const typing = tracker.report();
+    const pets = myPetCounts(v, myId());
+    const boss = BOSS_INFO[shipBoss(s.seed)];
     if (v.reason === "home") sfx.finish();
     const r = untrack(room);
     if (r !== null && r.hostUid === uid() && r.status === "playing") {
@@ -246,15 +265,28 @@ export function RescueShipModal(props: {
             ),
           },
           { label: "crew calls", value: `⚡ ${mine.hands}` },
+          { label: "words per minute", value: String(typing.wpm) },
+          { label: "accuracy", value: `${typing.accuracy}%` },
+          ...(v.boss === undefined
+            ? []
+            : [
+                {
+                  label: boss.name,
+                  value:
+                    v.boss === "won" ? `${boss.emoji} sent off!` : "got away",
+                },
+              ]),
+          ...(v.perfect ? [{ label: "medal", value: "🏅 Perfect crew!" }] : []),
           ...awards.map((a) => ({
             label: `${a.icon} ${a.title}`,
             value: `${a.names.join(" & ")} (${a.value})`,
           })),
         ],
       });
+      setReport(typing);
       setPhase("result");
       setClaim("pending");
-      void claimMiniGameReward(GAME_ID, score).then(setClaim);
+      void claimMiniGameReward(GAME_ID, score, { pets }).then(setClaim);
     }, RESULT_PAUSE_MS);
   });
 
@@ -263,14 +295,16 @@ export function RescueShipModal(props: {
     clearTimeout(resultTimer);
     resultTimer = undefined;
     finished = false;
+    tracker = new TypingTracker();
     setResult(null);
+    setReport(null);
     setSolo({
       setup: {
         seed: Math.floor(Math.random() * 2 ** 31),
         difficulty: difficulty(),
-        crew: buildCrew([
-          { uid: ME, name: getSnapshot()?.name ?? "You", station: station() },
-        ]),
+        // you're the captain: every station is yours, helpers back you up
+        crew: buildCrew([]),
+        captain: ME,
       },
       facts: { startAt: Date.now() + START_PAUSE_MS, done: {}, hands: {} },
     });
@@ -282,6 +316,8 @@ export function RescueShipModal(props: {
   const watchRoom = (code: string): void => {
     unsubscribeRoom?.();
     finished = false;
+    tracker = new TypingTracker();
+    setReport(null);
     setRoomCode(code);
     setPhase("lobby");
     void syncShipClock();
@@ -443,18 +479,26 @@ export function RescueShipModal(props: {
                 </For>
               </div>
               <ul class="grid gap-2 font-kid text-base text-text">
-                <li>🚀 Fly your ship through space and rescue lost pets!</li>
+                <li>🚀 Fly through 3 random zones and rescue lost pets!</li>
+                <Show
+                  when={mode() === "together"}
+                  fallback={
+                    <li>
+                      👩‍✈️ You are the captain - type ANY job: dodge, shields,
+                      repairs, pets!
+                    </li>
+                  }
+                >
+                  <li>
+                    👩‍🚀 Everyone has a station - and you swap jobs every zone!
+                  </li>
+                </Show>
+                <li>⚡ 5 jobs with no mistakes = a shield boost.</li>
                 <li>
-                  👩‍🚀 Everyone has a job - type the words for YOUR station.
-                </li>
-                <li>
-                  🚨 ALL HANDS! means everyone types the same word - quick!
+                  🐋 A big space visitor blocks the way - type to send it off!
                 </li>
                 <li>🏠 Get home safe with as many pets as you can.</li>
               </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Pick your station">
-              <StationPicker selected={station()} onSelect={setStation} />
             </GameSetupSection>
             <GameSetupSection title="Who do you want to play with?">
               <SoloTogetherToggle
@@ -462,7 +506,7 @@ export function RescueShipModal(props: {
                 multiplayerUnlocked={props.multiplayerUnlocked === true}
                 unlockHint={MULTIPLAYER_UNLOCK_HINT_GENERIC}
                 onModeChange={setMode}
-                soloLabel="me + helpers"
+                soloLabel="captain + helpers"
                 togetherLabel={`friends (up to ${CREW_SIZE})`}
               />
             </GameSetupSection>
@@ -586,13 +630,16 @@ export function RescueShipModal(props: {
                 {(v) => (
                   <ShipGame
                     setup={s()}
+                    tasks={tasks()}
                     view={v()}
                     myUid={myId()}
                     now={now()}
                     startAt={facts()?.startAt ?? 0}
                     myHands={myHands()}
+                    tracker={tracker}
                     onDone={onDone}
                     onHands={onHands}
+                    onBoost={onBoost}
                   />
                 )}
               </Show>
@@ -605,6 +652,12 @@ export function RescueShipModal(props: {
                 note={claimNote(claim())}
                 onPlayAgain={mode() === "solo" ? startSolo : undefined}
                 onExit={() => props.onClose()}
+                extra={
+                  <>
+                    <PracticeWords words={report()?.hardest ?? []} />
+                    <PetCollection claim={claim()} />
+                  </>
+                }
               />
             )}
           </Show>
@@ -647,5 +700,62 @@ function StationPicker(props: {
         }}
       </For>
     </div>
+  );
+}
+
+const PET_NAMES: Record<string, string> = {
+  bunny: "bunnies",
+  pup: "pups",
+  kitty: "kitties",
+  hamster: "hamsters",
+  duck: "ducks",
+  turtle: "turtles",
+};
+
+/** All the pets I've ever rescued (comes back with the coin claim). */
+function PetCollection(props: {
+  claim: MiniGameClaim | "pending";
+}): JSXElement {
+  const pets = (): Record<string, number> | undefined =>
+    props.claim === "pending" ? undefined : props.claim.shipPets;
+  const total = (): number => {
+    const all = pets() ?? {};
+    let sum = 0;
+    for (const k of PET_KINDS) sum += all[k] ?? 0;
+    return sum;
+  };
+  return (
+    <Show when={pets() !== undefined && total() > 0}>
+      <div class="grid w-full gap-1">
+        <div class="text-sm font-bold text-sub">
+          🏠 Your pet collection ({total()} rescued)
+        </div>
+        <div class="flex flex-wrap justify-center gap-2">
+          <For each={PET_KINDS}>
+            {(k) => (
+              <span
+                class={cn(
+                  "flex items-center gap-1 rounded-lg bg-sub-alt px-2 py-1 text-text",
+                  (pets()?.[k] ?? 0) === 0 && "opacity-40",
+                )}
+                title={PET_NAMES[k]}
+              >
+                <img
+                  src={PET_ART[k]}
+                  alt={k}
+                  class="h-7 w-7 [image-rendering:pixelated]"
+                />
+                <b class="tabular-nums">{pets()?.[k] ?? 0}</b>
+              </span>
+            )}
+          </For>
+          <Show when={(pets()?.["golden"] ?? 0) > 0}>
+            <span class="flex items-center gap-1 rounded-lg bg-sub-alt px-2 py-1 font-bold text-text">
+              🌟 golden <span class="tabular-nums">{pets()?.["golden"]}</span>
+            </span>
+          </Show>
+        </div>
+      </div>
+    </Show>
   );
 }

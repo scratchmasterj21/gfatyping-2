@@ -8,7 +8,7 @@ export type TypingReport = {
   hardest: string[];
 };
 
-/** Collects the player's typing during one Ghost Hunter run. */
+/** Collects the player's typing during one game run (Ghost Hunter, Rescue Ship). */
 export class TypingTracker {
   private chars = 0;
   private words = 0;

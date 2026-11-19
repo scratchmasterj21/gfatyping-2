@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  boostId,
   buildCrew,
   RUN_MS,
+  shipZones,
+  stationOf,
   shipDifficultyFor,
   ShipFacts,
   ShipSetup,
@@ -56,9 +59,9 @@ describe("rescue ship", () => {
     const d = shipDifficultyFor("Medium");
     expect(shipTasks(5, d)).toEqual(shipTasks(5, d));
     const kinds = new Set(shipTasks(5, d).map((t) => t.kind));
-    expect([...kinds].sort()).toEqual(
-      ["break", "charge", "hands", "hazard", "pet"].sort(),
-    );
+    for (const k of ["boss", "break", "charge", "hands", "hazard", "pet"]) {
+      expect(kinds.has(k as never)).toBe(true);
+    }
   });
 
   it("a good crew gets home with pets", () => {
@@ -118,5 +121,100 @@ describe("rescue ship", () => {
     const late = shipView(setup, tasks, facts, RUN_MS);
     expect(late.away.has("rescuer")).toBe(false);
     expect(late.stats["me"]?.rescues ?? 0).toBeGreaterThan(5);
+  });
+
+  it("picks 3 different flying zones, then the boss and the station", () => {
+    const zones = shipZones(9);
+    expect(zones).toEqual(shipZones(9));
+    expect(new Set(zones.slice(0, 3).map((z) => z.kind)).size).toBe(3);
+    expect(zones[3]?.kind).toBe("boss");
+    expect(zones[4]?.kind).toBe("station");
+    expect(zones[4]?.end).toBe(RUN_MS);
+  });
+
+  it("a solo captain can do every job and send the boss off", () => {
+    for (const seed of [1, 5, 8]) {
+      const setup: ShipSetup = {
+        seed,
+        difficulty: shipDifficultyFor("Medium"),
+        crew: buildCrew([]),
+        captain: "me",
+      };
+      const tasks = shipTasks(seed, setup.difficulty);
+      const facts: ShipFacts = { startAt: 0, done: {}, hands: {} };
+      for (const task of tasks) {
+        if (task.kind === "hands")
+          facts.hands[task.id] = { me: task.at + 1500 };
+        else facts.done[task.id] = { by: "me", at: task.at + 1200 };
+      }
+      const v = shipView(setup, tasks, facts, RUN_MS);
+      expect(v.reason).toBe("home");
+      expect(v.boss).toBe("won");
+      expect(v.perfect).toBe(true);
+      expect(v.pets).toBeGreaterThanOrEqual(18);
+      expect(v.stats["helper"]).toBeUndefined();
+      expect(v.stats["me"]?.boss).toBe(v.bossMax);
+    }
+  });
+
+  it("idle captain: slow helpers still get some jobs done", () => {
+    const setup: ShipSetup = {
+      seed: 4,
+      difficulty: shipDifficultyFor("Easy"),
+      crew: buildCrew([]),
+      captain: "me",
+    };
+    const v = shipView(
+      setup,
+      shipTasks(4, setup.difficulty),
+      { startAt: 0, done: {}, hands: {} },
+      RUN_MS,
+    );
+    expect(v.stats["helper"]?.dodges ?? 0).toBeGreaterThan(0);
+    expect(v.perfect).toBe(false);
+  });
+
+  it("stations swap every zone when playing together", () => {
+    const setup: ShipSetup = {
+      seed: 3,
+      difficulty: shipDifficultyFor("Easy"),
+      crew: buildCrew([
+        { uid: "a", name: "A", station: "pilot" },
+        { uid: "b", name: "B", station: "shields" },
+      ]),
+      rotate: true,
+    };
+    const zones = shipZones(3);
+    expect(stationOf(setup, zones, "a", 1000)).toBe("pilot");
+    expect(stationOf(setup, zones, "a", zones[1]!.start + 1)).toBe("shields");
+    expect(stationOf(setup, zones, "b", zones[2]!.start + 1)).toBe("rescuer");
+    // a's zone-2 shield words count for a
+    const tasks = shipTasks(3, setup.difficulty);
+    const facts: ShipFacts = { startAt: 0, done: {}, hands: {} };
+    for (const task of tasks) {
+      if (
+        task.station === "shields" &&
+        task.at >= zones[1]!.start &&
+        task.at < zones[1]!.end
+      ) {
+        facts.done[task.id] = { by: "a", at: task.at + 500 };
+      }
+    }
+    const v = shipView(setup, tasks, facts, zones[2]!.start);
+    expect(v.stats["a"]?.charges ?? 0).toBeGreaterThan(10);
+  });
+
+  it("a combo boost charges the shield", () => {
+    const setup = setupFor(6);
+    const tasks = shipTasks(6, setup.difficulty);
+    const base: ShipFacts = { startAt: 0, done: {}, hands: {} };
+    const plain = shipView(setup, tasks, base, 40_000);
+    const boosted = shipView(
+      setup,
+      tasks,
+      { ...base, done: { [boostId(0, 0)]: { by: "me", at: 39_000 } } },
+      40_000,
+    );
+    expect(boosted.shield).toBeGreaterThan(plain.shield);
   });
 });
