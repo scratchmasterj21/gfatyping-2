@@ -271,7 +271,7 @@ const RGB_FINGER_CSS = buildFingerCss(RGB_SELECTOR);
 const RGB_KEYBOARD_SVGS: Record<RgbPaletteItemId, string> = Object.fromEntries(
   (Object.keys(RGB_PALETTE_HUES) as RgbPaletteItemId[]).map((id) => [
     id,
-    generateMechanicalKeyboardSvg(id),
+    generateMechanicalKeyboardSvg(id, `kb-rgb-${id}`),
   ]),
 ) as Record<RgbPaletteItemId, string>;
 

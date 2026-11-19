@@ -93,8 +93,24 @@ function escXml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Placeholder gradient id - see withGradientId. */
+const GRAD_ID = "rgb-g";
+
+/**
+ * SVG ids are global to the page. The RGB shop modal is always mounted
+ * (hidden), so its previews' gradients came first and url(#rgb-g) on the
+ * real keyboard pointed at a gradient inside display:none - no lights.
+ * Give every inline copy its own id.
+ */
+export function withGradientId(svg: string, id: string): string {
+  return svg
+    .replaceAll(`id="${GRAD_ID}"`, `id="${id}"`)
+    .replaceAll(`url(#${GRAD_ID})`, `url(#${id})`);
+}
+
 export function generateMechanicalKeyboardSvg(
   palette: RgbPaletteItemId = "rainbow",
+  gradientId = GRAD_ID,
 ): string {
   const U = 42; // one key unit in px
   const GAP = 3; // gap between keys
@@ -134,7 +150,7 @@ export function generateMechanicalKeyboardSvg(
       // Per-key RGB glow rect (bottom of key slot, picked up by gradient)
       glows.push(
         `<rect x="${px(kx)}" y="${px(ky + kh - 6)}" ` +
-          `width="${px(kw)}" height="8" fill="url(#rgb-g)"/>`,
+          `width="${px(kw)}" height="8" fill="url(#${gradientId})"/>`,
       );
 
       // Home-row bump on F and J
@@ -170,7 +186,7 @@ export function generateMechanicalKeyboardSvg(
     `@keyframes mech-rgb-wave{from{filter:hue-rotate(0deg)}to{filter:hue-rotate(360deg)}}`,
     `.mech-rgb{animation:mech-rgb-wave 3s linear infinite}`,
     `</style>`,
-    `<linearGradient id="rgb-g" x1="${PAD}" y1="0" x2="${BW - PAD}" y2="0" gradientUnits="userSpaceOnUse">`,
+    `<linearGradient id="${gradientId}" x1="${PAD}" y1="0" x2="${BW - PAD}" y2="0" gradientUnits="userSpaceOnUse">`,
     gradStops,
     `</linearGradient>`,
     `</defs>`,
@@ -179,7 +195,7 @@ export function generateMechanicalKeyboardSvg(
     `<rect x="3" y="3" width="${BW - 6}" height="${BH - 6}" rx="8" fill="#1b1b1b" stroke="#252525" stroke-width="1"/>`,
     // Underglow strip — blurred rainbow below board
     `<g class="mech-rgb-under" style="filter:blur(9px)" opacity="0.7">`,
-    `<rect x="16" y="${BH - 18}" width="${BW - 32}" height="12" rx="6" fill="url(#rgb-g)" class="mech-rgb"/>`,
+    `<rect x="16" y="${BH - 18}" width="${BW - 32}" height="12" rx="6" fill="url(#${gradientId})" class="mech-rgb"/>`,
     `</g>`,
     // Per-key glow layer
     `<g class="mech-rgb-key-glow" style="filter:blur(3px)" opacity="0.45">`,
