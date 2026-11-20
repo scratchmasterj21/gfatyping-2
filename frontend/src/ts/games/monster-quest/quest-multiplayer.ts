@@ -16,6 +16,7 @@ import {
   getRealtimeDb,
   trackRealtimeListener,
 } from "../../firebase";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 import {
   buildParty,
   HeroClass,
@@ -97,18 +98,11 @@ export function roomInputs(room: QuestRoom): {
   return { inputs, times };
 }
 
-let serverOffset = 0;
 /** Read the database clock offset so everyone's turn timers agree. */
 export async function syncQuestClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const questNow = (): number => Date.now() + serverOffset;
+export const questNow = serverClockNow;
 
 export async function createQuestRoom(input: {
   difficultyLabel: string;

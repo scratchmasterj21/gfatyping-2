@@ -1,4 +1,5 @@
 import {
+  batch,
   createEffect,
   createMemo,
   createSignal,
@@ -326,6 +327,84 @@ export function QuestBattle(props: {
     else if (hits.length > 0) sfx.oops();
   };
 
+  /** HP changes only - no popups, sounds or shakes (see skip). */
+  const applyHitsQuietly = (hits: HitResult[]): void => {
+    for (const hit of hits) {
+      const i = Number(hit.id.slice(1));
+      const sign = hit.heal === true ? 1 : -1;
+      if (hit.miss === true) continue;
+      if (hit.id.startsWith("h")) {
+        setHeroHp((hp) => {
+          const next = [...hp];
+          next[i] = Math.max(0, (next[i] ?? 0) + sign * hit.amount);
+          return next;
+        });
+      } else {
+        setMonsters((ms) =>
+          ms.map((m) =>
+            m.index === i
+              ? { ...m, hp: Math.max(0, m.hp + sign * hit.amount) }
+              : m,
+          ),
+        );
+      }
+    }
+  };
+
+  /**
+   * Fast-forward one event: keep what lasts (monsters, HP, land, level) with
+   * no animation. Used to catch up after a reload / rejoin, which used to
+   * replay the whole quest from Battle 1 at full speed while your turn timer
+   * ran out.
+   */
+  const skip = (e: QuestEvent): void => {
+    if (e.type === "battle") {
+      setMonsters(e.monsters.map((m) => ({ ...m })));
+      setBattle(e.battle);
+      setLand(e.land);
+      setWeather(e.weather);
+      setJoined(new Set<number>());
+      setVictory(false);
+      return;
+    }
+    if (e.type === "path") {
+      setLand(e.land);
+      return;
+    }
+    if (e.type === "spawn") {
+      const m = e.monster;
+      setMonsters((ms) => [...ms, { ...m }]);
+      return;
+    }
+    if (e.type === "levelup") {
+      setHeroMax(e.maxHp);
+      setHeroHp(e.hp);
+      return;
+    }
+    if (e.type === "rest") {
+      setHeroHp(e.hp);
+      return;
+    }
+    if (e.type === "end") {
+      setVictory(e.won);
+      return;
+    }
+    if (e.type === "status" || e.type === "team" || e.type === "outcome") {
+      applyHitsQuietly(e.hits);
+      return;
+    }
+    if (e.type === "action") {
+      const flags = e.flags;
+      if (flags !== undefined) {
+        const i = Number(e.actor.slice(1));
+        setMonsters((ms) =>
+          ms.map((m) => (m.index === i ? { ...m, ...flags } : m)),
+        );
+      }
+      applyHitsQuietly(e.hits);
+    }
+  };
+
   const play = (e: QuestEvent): void => {
     setActive(null);
     if (e.type === "battle") {
@@ -572,6 +651,20 @@ export function QuestBattle(props: {
     }
     if (i >= events.length || playTimer !== undefined) return;
     if (props.now < props.startAt) return;
+    // Behind by more than the latest move (reloaded, rejoined, or the tab
+    // was asleep): jump to it instead of replaying everything since Battle 1.
+    const starts = props.state.inputStart;
+    const keepFrom = Math.min(events.length, starts[starts.length - 1] ?? 0);
+    if (i < keepFrom) {
+      untrack(() => {
+        batch(() => {
+          for (let k = i; k < keepFrom; k++) skip(events[k] as QuestEvent);
+          setMessage("⏩ Caught up with the party!");
+          setShown(keepFrom);
+        });
+      });
+      return;
+    }
     const e = events[i] as QuestEvent;
     untrack(() => play(e));
     playTimer = setTimeout(() => {
@@ -1411,6 +1504,12 @@ export function QuestBattle(props: {
                 }
               >
                 <Show when={step() === "menu"}>
+                  <Show when={myHero()?.away === true}>
+                    <div class="mb-2 rounded-lg bg-game-yellow px-3 py-1 text-sm font-bold text-game-ink">
+                      👋 A helper played while you were away. Type a move now to
+                      jump back in!
+                    </div>
+                  </Show>
                   <div class="mb-2 text-sm text-game-grey">
                     Your turn, {CLASS_INFO[myClass()].name}! Type a move:
                   </div>

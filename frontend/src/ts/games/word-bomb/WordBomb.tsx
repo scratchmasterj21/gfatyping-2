@@ -98,7 +98,8 @@ export function WordBomb(props: {
   seats: Record<string, BombSeat>;
   /** what the holder has typed so far (when it isn't me) */
   holderTyped: string;
-  onPass: () => void;
+  /** resolves true once the pass went through */
+  onPass: () => Promise<boolean>;
   onTyping?: (text: string) => void;
 }): JSXElement {
   const [typed, setTyped] = createSignal("");
@@ -167,8 +168,26 @@ export function WordBomb(props: {
     props.onTyping?.(v);
     if (v === props.game.word) {
       sfx.good();
-      props.onPass();
+      void tryPass(props.game.seq, 0);
     }
+  };
+
+  // Online a pass can bounce (the room changed a split second earlier, a
+  // wifi blip). If the bomb is still mine with the same word, try again so a
+  // correctly typed word never just sits there.
+  const tryPass = async (seq: number, attempt: number): Promise<void> => {
+    const ok = await props.onPass();
+    if (ok || attempt >= 4) return;
+    setTimeout(() => {
+      if (
+        props.game.seq === seq &&
+        props.game.holder === props.myId &&
+        !props.game.over &&
+        typed() === props.game.word
+      ) {
+        void tryPass(seq, attempt + 1);
+      }
+    }, 250);
   };
 
   const shownTyped = (): string =>

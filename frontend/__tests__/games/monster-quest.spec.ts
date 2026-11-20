@@ -179,6 +179,67 @@ describe("monster quest", () => {
     expect(s.heroes[0]?.away).toBe(false);
   });
 
+  it("an away player still gets short turns and comes back by typing", () => {
+    const party = buildParty([
+      { uid: "a", name: "A", cls: "mage" },
+      { uid: "b", name: "B", cls: "knight" },
+    ]);
+    const setup = { ...solo(9), party };
+    const inputs: QuestInput[] = [];
+    const timeout: HeroInput = {
+      kind: "hero",
+      action: "attack",
+      power: 0.4,
+      timeout: true,
+    };
+    // "a" misses turns until away; everyone else answers
+    let st = runQuest(setup, inputs);
+    let guard = 0;
+    while (st.heroes[0]?.away !== true && guard++ < 50) {
+      const p = st.pending;
+      if (p === null) break;
+      inputs.push(
+        p.kind === "hero"
+          ? p.uid === "a"
+            ? timeout
+            : { kind: "hero", action: "attack", power: 1 }
+          : p.kind === "guard" || p.kind === "challenge"
+            ? { kind: "guard", guards: {} }
+            : { kind: "vote", votes: {} },
+      );
+      st = runQuest(setup, inputs);
+    }
+    expect(st.heroes[0]?.away).toBe(true);
+    // play on until it's "a"'s turn again: still asked, with a short timer
+    while (
+      guard++ < 80 &&
+      st.pending !== null &&
+      !(st.pending.kind === "hero" && st.pending.uid === "a")
+    ) {
+      const p = st.pending;
+      inputs.push(
+        p.kind === "hero"
+          ? { kind: "hero", action: "attack", power: 1 }
+          : p.kind === "guard" || p.kind === "challenge"
+            ? { kind: "guard", guards: {} }
+            : { kind: "vote", votes: {} },
+      );
+      st = runQuest(setup, inputs);
+    }
+    const p = st.pending;
+    expect(p?.kind === "hero" && p.uid === "a" && p.away === true).toBe(true);
+    const dl = pendingDeadline(
+      st,
+      0,
+      inputs.map(() => 0),
+    );
+    expect(dl).not.toBeNull();
+    // typing a move brings them back
+    inputs.push({ kind: "hero", action: "attack", power: 1 });
+    st = runQuest(setup, inputs);
+    expect(st.heroes[0]?.away).toBe(false);
+  });
+
   it("has journey stops, weather and a level up before the boss", () => {
     const s = playThrough(solo(11), (st) =>
       st.pending?.kind === "guard"

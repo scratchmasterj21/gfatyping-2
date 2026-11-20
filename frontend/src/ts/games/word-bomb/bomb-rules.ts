@@ -200,6 +200,13 @@ export function newBombMatch(
 export const bombLive = (s: BombState, now: number): boolean =>
   !s.over && now >= s.roundStartAt && now < explodeAt(s);
 
+/**
+ * Online, a pass that was typed in time can reach the database a moment
+ * late (slow wifi, iPad clocks): accept it this long after the fuse, and
+ * only report the boom after it.
+ */
+export const PASS_GRACE_MS = 600;
+
 /** The holder typed the word: pass the bomb on. */
 export function applyPass(
   s: BombState,
@@ -208,7 +215,14 @@ export function applyPass(
   now: number,
   rng: () => number,
 ): BombState | null {
-  if (by !== s.holder || !bombLive(s, now)) return null;
+  if (
+    by !== s.holder ||
+    s.over ||
+    now < s.roundStartAt ||
+    now >= explodeAt(s) + PASS_GRACE_MS
+  ) {
+    return null;
+  }
   const to = nextAlive(s, by);
   const passes = s.passes + 1;
   return {

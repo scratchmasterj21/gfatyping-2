@@ -56,6 +56,7 @@ import {
   BOOM_PAUSE_MS,
   botPassMs,
   explodeAt,
+  PASS_GRACE_MS,
   MAX_BOMB_PLAYERS,
   newBombMatch,
 } from "./bomb-rules";
@@ -305,18 +306,26 @@ export function WordBombModal(props: {
       return;
     }
     if (reportedSeq === g.seq) return;
-    if (now() >= explodeAt(g) + 150) {
+    if (now() >= explodeAt(g) + PASS_GRACE_MS + 150) {
       reportedSeq = g.seq;
       void boomBomb(r, g);
     }
   });
 
-  const passTogether = (): void => {
+  const passTogether = async (): Promise<boolean> => {
     const r = room();
     const g = r?.game;
     const me = uid();
-    if (r === null || g === undefined || me === undefined) return;
-    void passBomb(r, g, me);
+    if (r === null || g === undefined || me === undefined) return false;
+    return passBomb(r, g, me).catch(() => false);
+  };
+
+  const passNow = async (): Promise<boolean> => {
+    if (mode() === "solo") {
+      passSolo();
+      return true;
+    }
+    return passTogether();
   };
 
   const shareMyTyping = (text: string): void => {
@@ -564,7 +573,7 @@ export function WordBombModal(props: {
                 myId={myId()}
                 seats={seats()}
                 holderTyped={holderTyped()}
-                onPass={() => (mode() === "solo" ? passSolo() : passTogether())}
+                onPass={passNow}
                 onTyping={shareMyTyping}
               />
             )}

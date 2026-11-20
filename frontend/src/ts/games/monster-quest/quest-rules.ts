@@ -863,6 +863,8 @@ export type PendingHero = {
   uid: string;
   /** words for each action */
   words: Record<HeroAction, string>;
+  /** a helper has been playing for them: short timer, any move brings them back */
+  away?: boolean;
 };
 
 export type PendingGuard = {
@@ -2065,7 +2067,9 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         continue;
       }
       let input: HeroInput;
-      if (needsPlayer(hero)) {
+      if (hero.uid !== null) {
+        // players always get their turn - even after a helper took over, so
+        // a slow device or a quick break never locks them out for good
         const given = inputs[s.used];
         if (given === undefined) {
           s.pending = {
@@ -2074,6 +2078,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             slot: hero.slot,
             uid: hero.uid,
             words: heroMoveWords(setup.seed, step, d),
+            ...(hero.away ? { away: true } : {}),
           };
           s.upNext = queue;
           return s;
@@ -2084,8 +2089,15 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           given.kind === "hero"
             ? given
             : { kind: "hero", action: "attack", power: TIMEOUT_POWER };
-        hero.timeouts = input.timeout === true ? hero.timeouts + 1 : 0;
-        if (hero.timeouts >= AWAY_AFTER && playerCount > 1) hero.away = true;
+        if (input.timeout === true) {
+          hero.timeouts++;
+          if (hero.timeouts >= AWAY_AFTER && playerCount > 1) hero.away = true;
+          // away: the helper picks a proper move instead of a weak swing
+          if (hero.away) input = cpuChoice(s, hero, rng);
+        } else {
+          hero.timeouts = 0;
+          hero.away = false;
+        }
       } else {
         input = cpuChoice(s, hero, rng);
       }
@@ -2344,6 +2356,8 @@ export function eventMs(e: QuestEvent): number {
 
 /** Time to make a move (typing the move name, a target and the words), ms. */
 export const HERO_TURN_MS = 45_000;
+/** An away player's turn: a short window to jump back in before the helper moves. */
+export const AWAY_TURN_MS = 12_000;
 const GUARD_BASE_MS = 3500;
 const CHALLENGE_BASE_MS = 4000;
 export const VOTE_MS = 20_000;
@@ -2437,7 +2451,9 @@ export function pendingDeadline(
     since +
     anim +
     (p.kind === "hero"
-      ? HERO_TURN_MS
+      ? p.away === true
+        ? AWAY_TURN_MS
+        : HERO_TURN_MS
       : p.kind === "vote" || p.kind === "pick"
         ? VOTE_MS
         : p.ms)

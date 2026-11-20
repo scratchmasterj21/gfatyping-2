@@ -11,6 +11,7 @@ import {
   bombStars,
   BOOM_PAUSE_MS,
   explodeAt,
+  PASS_GRACE_MS,
   fuseFor,
   newBombMatch,
   nextAlive,
@@ -44,7 +45,9 @@ describe("word bomb", () => {
     expect(p.passes).toBe(1);
     expect(p.totalPasses.a).toBe(1);
     expect(p.lastPass).toEqual({ from: "a", to: "b" });
-    expect(applyPass(s, "a", D, explodeAt(s), rng0)).toBeNull();
+    // a pass that arrives a moment late still counts (slow wifi / clocks)
+    expect(applyPass(s, "a", D, explodeAt(s) + 100, rng0)).not.toBeNull();
+    expect(applyPass(s, "a", D, explodeAt(s) + PASS_GRACE_MS, rng0)).toBeNull();
   });
 
   it("passing goes round the circle, skipping knocked-out players", () => {

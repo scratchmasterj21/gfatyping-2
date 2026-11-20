@@ -16,8 +16,11 @@ import {
   getRealtimeDb,
   trackRealtimeListener,
 } from "../../firebase";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 import {
   applyBoom,
+  explodeAt,
+  PASS_GRACE_MS,
   applyPass,
   bombDifficultyFor,
   BombState,
@@ -72,18 +75,11 @@ function readRoom(snapshot: DataSnapshot): BombRoom | null {
   return snapshot.exists() ? (snapshot.val() as BombRoom) : null;
 }
 
-let serverOffset = 0;
 /** Read the database clock offset so everyone times the fuse the same. */
 export async function syncServerClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const serverNow = (): number => Date.now() + serverOffset;
+export const serverNow = serverClockNow;
 
 export async function createBombRoom(difficultyLabel: string): Promise<string> {
   const user = currentUser();
@@ -208,7 +204,10 @@ export async function boomBomb(
 ): Promise<boolean> {
   const d = bombDifficultyFor(room.difficultyLabel);
   return advance(room.code, game.seq, (g) =>
-    applyBoom(g, d, serverNow(), Math.random),
+    // a late pass still wins (see PASS_GRACE_MS)
+    serverNow() < explodeAt(g) + PASS_GRACE_MS
+      ? null
+      : applyBoom(g, d, serverNow(), Math.random),
   );
 }
 
