@@ -95,6 +95,8 @@ type Step = "menu" | "target" | "type";
 
 /** Hits land a little after the move name shows. */
 const HIT_DELAY_MS = 380;
+/** Skip ahead (no animations) only when this far behind the party. */
+const CATCH_UP_AFTER_MS = 8000;
 
 /**
  * The battle screen. Plays the quest's events one by one (so everyone sees
@@ -653,9 +655,16 @@ export function QuestBattle(props: {
     if (props.now < props.startAt) return;
     // Behind by more than the latest move (reloaded, rejoined, or the tab
     // was asleep): jump to it instead of replaying everything since Battle 1.
+    // Only when really behind - in normal play a quick friend's move can
+    // land while the last one is still animating, and skipping then hid
+    // things like a skeleton rattling back together.
     const starts = props.state.inputStart;
     const keepFrom = Math.min(events.length, starts[starts.length - 1] ?? 0);
-    if (i < keepFrom) {
+    let behindMs = 0;
+    for (let k = i; k < keepFrom; k++) {
+      behindMs += eventMs(events[k] as QuestEvent);
+    }
+    if (i < keepFrom && behindMs > CATCH_UP_AFTER_MS) {
       untrack(() => {
         batch(() => {
           for (let k = i; k < keepFrom; k++) skip(events[k] as QuestEvent);
@@ -774,14 +783,24 @@ export function QuestBattle(props: {
       ? 1
       : 0);
 
+  /** friends who haven't chosen yet on the open vote / super-move pick */
+  const stillChoosing = (): string[] => {
+    const p = props.state.pending;
+    if (p === null || (p.kind !== "vote" && p.kind !== "pick")) return [];
+    const votes = props.openVotes ?? {};
+    return p.voters
+      .filter((u) => u !== props.myUid && votes[u] === undefined)
+      .map((u) => party().find((h) => h.uid === u)?.name ?? "a friend");
+  };
   /** someone else is choosing */
   const waitingOn = (): string | null => {
     const p = props.state.pending;
     if (p === null || !caughtUp() || props.state.over) return null;
     if (p.kind === "vote" || p.kind === "pick") {
-      return voted() !== undefined || !p.voters.includes(props.myUid)
-        ? "friends to choose"
-        : null;
+      if (voted() === undefined && p.voters.includes(props.myUid)) return null;
+      const names = stillChoosing();
+      const left = secondsLeft();
+      return `${names.length > 0 ? names.join(", ") : "friends"} to choose${left !== null && left > 0 ? ` (${left}s)` : ""}`;
     }
     if (p.kind === "challenge") {
       return p.words[props.myUid] === undefined || submitted() === p.n
@@ -1378,6 +1397,17 @@ export function QuestBattle(props: {
               <div class="text-center text-2xl font-bold text-game-yellow">
                 {v().title}
               </div>
+              <Show when={voted() !== undefined}>
+                <div class="text-center text-lg font-bold text-game-cream">
+                  ✅ Picked! Waiting for{" "}
+                  {stillChoosing().length > 0
+                    ? stillChoosing().join(", ")
+                    : "the others"}
+                  {secondsLeft() !== null && (secondsLeft() ?? 0) > 0
+                    ? ` · ${secondsLeft()}s`
+                    : ""}
+                </div>
+              </Show>
               <div
                 class={cn(
                   "grid gap-2",

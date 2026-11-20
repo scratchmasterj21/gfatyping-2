@@ -71,6 +71,7 @@ import {
   QuestInput,
   questScore,
   QuestSetup,
+  QuestState,
   questStars,
   runQuest,
   START_PAUSE_MS,
@@ -262,13 +263,42 @@ export function MonsterQuestModal(props: {
       : openVotes(r, p.n);
   };
 
+  /** a player who left (closed the tab, lost wifi) */
+  const isOffline = (u: string): boolean =>
+    room()?.players[u]?.online === false;
+  /**
+   * Online: nobody left to wait for, so close the turn now instead of
+   * running the clock - everyone still here has voted / guarded, or the
+   * player whose move it is has left. (Choice screens used to sit for the
+   * full timer waiting on a student who'd gone, which felt like a loop.)
+   */
+  const nothingToWaitFor = (p: NonNullable<QuestState["pending"]>): boolean => {
+    const r = room();
+    if (r === null) return false;
+    if (p.kind === "hero") return isOffline(p.uid);
+    if (p.kind === "vote" || p.kind === "pick") {
+      const votes = openVotes(r, p.n) ?? {};
+      const here = p.voters.filter((u) => !isOffline(u));
+      return here.every((u) => votes[u] !== undefined);
+    }
+    const raw = (r.inputs ?? {}) as Record<
+      string,
+      { kind?: string; guards?: Record<string, boolean>; closed?: boolean }
+    >;
+    const entry = raw[String(p.n)];
+    const guards = entry?.kind === "guard" ? (entry.guards ?? {}) : {};
+    const here = Object.keys(p.words).filter((u) => !isOffline(u));
+    return here.every((u) => guards[u] === true);
+  };
+
   // turn timer ran out: answer for the slow player
   createEffect(() => {
     const st = state();
     const d = deadline();
     if (st === null || d === null || st.pending === null || st.over) return;
     const p = st.pending;
-    if (now() < d) return;
+    const early = mode() === "together" && nothingToWaitFor(p);
+    if (now() < d && !early) return;
     if (mode() === "solo") {
       untrack(() =>
         pushSolo(
@@ -287,7 +317,7 @@ export function MonsterQuestModal(props: {
       return;
     }
     // online: anyone may close it, a moment late so the player's answer wins
-    if (now() < d + CLOSE_GRACE_MS || closeTried === p.n) return;
+    if ((!early && now() < d + CLOSE_GRACE_MS) || closeTried === p.n) return;
     closeTried = p.n;
     const code = roomCode();
     if (code !== undefined) {
