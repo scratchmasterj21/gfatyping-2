@@ -6,6 +6,8 @@ export type WaveEnd = {
   misses: number;
   /** true when a lesson's wave target was cleared (not out of lives) */
   cleared?: boolean;
+  /** the result was already sent the moment the game ended */
+  reported?: boolean;
 };
 
 export const waveAccuracy = (d: WaveEnd): number =>

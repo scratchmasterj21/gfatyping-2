@@ -845,6 +845,19 @@ export function LessonsPage(): JSXElement {
   const [fruitNinjaOpen, setFruitNinjaOpen] = createSignal(false);
   const [typeTossOpen, setTypeTossOpen] = createSignal(false);
   const [rpgOpen, setRpgOpen] = createSignal(false);
+  // Which group each checkpoint game was opened for. Kept after the game
+  // closes: the games report their result a moment after the last hit, and a
+  // student who tapped "Back to lessons" in that moment lost the checkpoint
+  // (the group id was already cleared, so the result was dropped).
+  const resultGroup: Record<
+    "defender" | "balloon" | "toss" | "ghost",
+    string | null
+  > = {
+    defender: null,
+    balloon: null,
+    toss: null,
+    ghost: null,
+  };
   const [lessonDefGroupId, setLessonDefGroupId] = createSignal<string | null>(
     null,
   );
@@ -1584,8 +1597,10 @@ export function LessonsPage(): JSXElement {
       setLessonGameWords(words);
       if (gameType === "defender") {
         setLessonDefGroupId(group.id);
+        resultGroup.defender = group.id;
       } else {
         setLessonBallGroupId(group.id);
+        resultGroup.balloon = group.id;
       }
     } finally {
       setLessonGameLoading(false);
@@ -1623,12 +1638,16 @@ export function LessonsPage(): JSXElement {
       );
       if (checkpoint.gameType === "defender") {
         setLessonDefGroupId(group.id);
+        resultGroup.defender = group.id;
       } else if (checkpoint.gameType === "balloon") {
         setLessonBallGroupId(group.id);
+        resultGroup.balloon = group.id;
       } else if (checkpoint.gameType === "toss") {
         setLessonTossGroupId(group.id);
+        resultGroup.toss = group.id;
       } else {
         setLessonGhostGroupId(group.id);
+        resultGroup.ghost = group.id;
       }
     } finally {
       setLessonGameLoading(false);
@@ -2860,7 +2879,7 @@ export function LessonsPage(): JSXElement {
           }}
           lessonWords={lessonGameWords()}
           onResult={(score, wave, _label, _group, cleared) => {
-            const gid = lessonDefGroupId();
+            const gid = lessonDefGroupId() ?? resultGroup.defender;
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:word-defender`,
@@ -2881,7 +2900,7 @@ export function LessonsPage(): JSXElement {
           }}
           lessonWords={lessonGameWords()}
           onResult={(score, wave, _label, _group, cleared) => {
-            const gid = lessonBallGroupId();
+            const gid = lessonBallGroupId() ?? resultGroup.balloon;
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:balloon-pop`,
@@ -2902,7 +2921,7 @@ export function LessonsPage(): JSXElement {
           }}
           lessonWords={lessonGameWords()}
           onResult={(score, wave, _label, _group, checkpointCleared) => {
-            const gid = lessonTossGroupId();
+            const gid = lessonTossGroupId() ?? resultGroup.toss;
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:type-toss`,
@@ -2923,7 +2942,7 @@ export function LessonsPage(): JSXElement {
           }}
           lessonWords={lessonGameWords()}
           onResult={(score, wave, _label, _group, cleared) => {
-            const gid = lessonGhostGroupId();
+            const gid = lessonGhostGroupId() ?? resultGroup.ghost;
             if (gid !== null) {
               void recordGameResult(
                 `${GAME_PREFIX}${gid}:ghost-hunter`,

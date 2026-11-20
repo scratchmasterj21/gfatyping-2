@@ -157,8 +157,10 @@ export function TypeTossModal(props: Props): JSXElement {
     setPhase("playing");
   };
 
-  const onEnd = async (e: TossEnd): Promise<void> => {
-    const r = untrack(run);
+  // `played` is the run this game belongs to: the result can land just
+  // after the window closed (which clears run()), and must still count.
+  const onEnd = async (e: TossEnd, played?: Run): Promise<void> => {
+    const r = played ?? untrack(run);
     if (r === null) return;
     props.onResult?.(
       e.tickets,
@@ -631,7 +633,7 @@ export function TypeTossModal(props: Props): JSXElement {
                 seed={r.seed}
                 difficulty={r.difficulty}
                 {...(r.shared === undefined ? {} : { shared: r.shared })}
-                onEnd={(e) => void onEnd(e)}
+                onEnd={(e) => void onEnd(e, r)}
               />
             )}
           </Show>

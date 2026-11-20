@@ -1391,6 +1391,16 @@ export class GameScene extends Scene {
         );
       }
 
+      if (lastWave) {
+        // Report now, not after the banner: students tap "Back to lessons"
+        // as soon as they see "clear!", which used to destroy the game
+        // before the checkpoint was saved.
+        this.game.events.emit("game-result", {
+          score: this.score,
+          wave: this.wave,
+          cleared: true,
+        });
+      }
       this.time.delayedCall(WAVE_PAUSE_MS, () => {
         if (lastWave) {
           playGameOver();
@@ -1406,6 +1416,7 @@ export class GameScene extends Scene {
             misses: this.misses,
             report: this.tracker.report(),
             cleared: true,
+            reported: true,
           });
           return;
         }

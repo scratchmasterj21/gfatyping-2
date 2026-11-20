@@ -157,8 +157,10 @@ export function WordDefenderModal(props: Props): JSXElement {
     setPhase("playing");
   };
 
-  const onEnd = async (e: DefenderEnd): Promise<void> => {
-    const r = untrack(run);
+  // `played` is the run this game belongs to: the result can land just
+  // after the window closed (which clears run()), and must still count.
+  const onEnd = async (e: DefenderEnd, played?: Run): Promise<void> => {
+    const r = played ?? untrack(run);
     const diff = r?.opts.difficulty.label ?? "Easy";
     props.onResult?.(
       e.score,
@@ -541,7 +543,7 @@ export function WordDefenderModal(props: Props): JSXElement {
               <DefenderGame
                 opts={r.opts}
                 {...(r.coop === undefined ? {} : { coop: r.coop })}
-                onEnd={(e) => void onEnd(e)}
+                onEnd={(e) => void onEnd(e, r)}
               />
             )}
           </Show>

@@ -584,20 +584,31 @@ export async function recordGameResult(
   const uid = getAuthenticatedUser()?.uid;
   if (uid === undefined) return;
 
+  const body = { key, score, wave, cleared: options?.cleared === true };
   try {
-    const result = await callApi<{ ok: boolean; reason?: string }>(
-      "/api/save-game-result",
-      {
-        key,
-        score,
-        wave,
-        cleared: options?.cleared === true,
-      },
-    );
-    if (!result.ok) {
-      throw new Error(result.reason ?? "Failed to save game result");
+    // school wifi drops out: try a few times before giving up, so a
+    // beaten checkpoint isn't lost to one failed request
+    let refused: string | undefined;
+    let lastError: unknown = new Error("Failed to save game result");
+    for (const wait of [0, 1500, 4000]) {
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      try {
+        const result = await callApi<{ ok: boolean; reason?: string }>(
+          "/api/save-game-result",
+          body,
+        );
+        if (result.ok) {
+          void queryClient.invalidateQueries({ queryKey: ["lessonProgress"] });
+          return;
+        }
+        // the server said no (bad data): retrying won't help
+        refused = result.reason ?? "Failed to save game result";
+        break;
+      } catch (e) {
+        lastError = e;
+      }
     }
-    void queryClient.invalidateQueries({ queryKey: ["lessonProgress"] });
+    throw refused !== undefined ? new Error(refused) : lastError;
   } catch (e) {
     console.error("Failed to save game result:", e);
     showNoticeNotification(

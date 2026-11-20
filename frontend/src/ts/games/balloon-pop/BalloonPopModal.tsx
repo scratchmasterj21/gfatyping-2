@@ -166,8 +166,10 @@ export function BalloonPopModal(props: Props): JSXElement {
     setPhase("playing");
   };
 
-  const onEnd = async (e: BalloonEnd): Promise<void> => {
-    const r = untrack(run);
+  // `played` is the run this game belongs to: the result can land just
+  // after the window closed (which clears run()), and must still count.
+  const onEnd = async (e: BalloonEnd, played?: Run): Promise<void> => {
+    const r = played ?? untrack(run);
     if (r === null) return;
     const level = r.level;
     props.onResult?.(
@@ -613,7 +615,7 @@ export function BalloonPopModal(props: Props): JSXElement {
                 words={r.words}
                 seed={r.seed}
                 {...(r.versus === undefined ? {} : { versus: r.versus })}
-                onEnd={(e) => void onEnd(e)}
+                onEnd={(e) => void onEnd(e, r)}
               />
             )}
           </Show>

@@ -12,6 +12,11 @@ export class GameOverScene extends Scene {
   }
 
   create(data: WaveEnd): void {
+    if (data.reported !== true) this.reportResult(data);
+    this.game.events.emit("game-over-screen", data);
+  }
+
+  private reportResult(data: WaveEnd): void {
     this.game.events.emit("game-result", {
       score: data.score,
       wave: data.wave,
@@ -19,7 +24,6 @@ export class GameOverScene extends Scene {
       // next lesson on this, whatever the wave number)
       cleared: data.cleared === true,
     });
-    this.game.events.emit("game-over-screen", data);
   }
 
   /** Same restart as the old in-canvas "Play Again" button. */
