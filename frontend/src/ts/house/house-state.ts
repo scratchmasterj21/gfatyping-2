@@ -3,7 +3,6 @@ import {
   deleteField,
   doc,
   DocumentReference,
-  getDoc,
   setDoc,
 } from "firebase/firestore";
 import { callApi } from "../api-client";
@@ -14,6 +13,7 @@ import { invalidateCoinQueries } from "../queries/coins";
 import { DEFAULT_GARDEN_THEME_ID } from "./garden-themes";
 import { HousePlace as HouseScene } from "./house-scene";
 import { DEFAULT_HOUSE_THEME_ID } from "./house-themes";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 const SCENE_FIELDS = {
   room: {
@@ -133,7 +133,7 @@ const num = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
 
 export async function getHouseState(uid: string): Promise<HouseState> {
-  const snap = await getDoc(userRef(uid));
+  const snap = await getUserDocShared(uid);
   return houseStateFromDoc(snap.exists() ? snap.data() : undefined);
 }
 

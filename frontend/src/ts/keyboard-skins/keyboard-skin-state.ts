@@ -1,20 +1,14 @@
-import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
-
 import { callApi } from "../api-client";
-import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { KeyboardSkinItem } from "./keyboard-skin-items";
 import { claimedFromDoc } from "../utils/shop-collections";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 export type KeyboardSkinState = {
   coins: number;
   claimedCollections?: Record<string, true>;
   ownedSkins: Record<string, true>;
 };
-
-function userRef(uid: string): DocumentReference {
-  return doc(collection(getDb(), "users"), uid);
-}
 
 /**
  * Ownership only - which skin is active piggybacks on the existing free
@@ -25,7 +19,7 @@ export async function getKeyboardSkinState(
   uid: string,
 ): Promise<KeyboardSkinState> {
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (snap.exists()) {
       const data = snap.data();
       return {

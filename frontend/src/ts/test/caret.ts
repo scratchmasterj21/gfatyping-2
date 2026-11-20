@@ -1,3 +1,4 @@
+import { batch } from "solid-js";
 import { Config } from "../config/store";
 import { getCurrentInput } from "./events/data";
 import * as TestState from "../test/test-state";
@@ -51,11 +52,16 @@ export function updatePosition(noAnim = false): void {
     const word = TestWords.words.getCurrentText();
     if (word && letterIndex < word.length) {
       const char = word[letterIndex] as string;
-      setActiveFinger(fingerForChar(char) ?? null);
-      setActiveChar(char);
+      // one update for both: each signal alone rewrites the hands <style>
+      batch(() => {
+        setActiveFinger(fingerForChar(char) ?? null);
+        setActiveChar(char);
+      });
     } else {
-      setActiveFinger("thumb");
-      setActiveChar(" ");
+      batch(() => {
+        setActiveFinger("thumb");
+        setActiveChar(" ");
+      });
     }
   }
 }

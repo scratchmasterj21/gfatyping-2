@@ -39,7 +39,8 @@ export function PracticeCombo(): JSXElement {
 
   onMount(() => {
     const t = setInterval(() => {
-      if (firstAt === 0) return;
+      // nothing to show (not the kid theme, or the result is up)
+      if (firstAt === 0 || !isKidThemeActive() || getResultVisible()) return;
       const min = (Date.now() - firstAt) / 60_000;
       setWpm(min > 0.05 ? Math.round(correct / 5 / min) : 0);
     }, 500);

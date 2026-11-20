@@ -2,7 +2,11 @@ import { QueryClient } from "@tanstack/solid-query";
 import { createEffectOn } from "../hooks/effects";
 import { isAuthenticated } from "../states/core";
 
-export const queryClient = new QueryClient();
+// No refetch burst every time a student switches back to the tab (it fired
+// ~10 user-doc reads at once on Chromebooks, right as typing resumed).
+export const queryClient = new QueryClient({
+  defaultOptions: { queries: { refetchOnWindowFocus: false } },
+});
 
 createEffectOn(isAuthenticated, () => {
   //reset user related queries and collections whenever the state changes.

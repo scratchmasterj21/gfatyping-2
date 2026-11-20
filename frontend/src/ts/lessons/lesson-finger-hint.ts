@@ -8,7 +8,10 @@ export type LessonFingerHint = {
   label: string;
 };
 
-const [hint, setHint] = createSignal<LessonFingerHint | null>(null);
+// same char = same hint: skip the update so the hint isn't rebuilt every key
+const [hint, setHint] = createSignal<LessonFingerHint | null>(null, {
+  equals: (a, b) => a?.char === b?.char,
+});
 
 export function getLessonFingerHint(): LessonFingerHint | null {
   return hint();

@@ -6,6 +6,7 @@ import {
   JSXElement,
   Show,
   For,
+  untrack,
 } from "solid-js";
 
 // eslint-disable-next-line no-restricted-imports
@@ -516,6 +517,11 @@ export function AnimatedHands(): JSXElement {
   const [bursts, setBursts] = createSignal<Burst[]>([]);
   let burstCounter = 0;
   let lastBurstKeyId: string | null = null;
+  // Key centres as % of the keyboard, measured once per key per keyboard -
+  // measuring on every key forced a full layout right after the hands
+  // <style> rewrite, on every keystroke.
+  let keyCentres = new Map<string, { x: number; y: number }>();
+  let centresFor = "";
 
   const [activeLeftId, setActiveLeftId] = createSignal<string>("neutral-left");
   const [activeRightId, setActiveRightId] =
@@ -574,23 +580,34 @@ export function AnimatedHands(): JSXElement {
     if (keyId === lastBurstKeyId) return;
     lastBurstKeyId = keyId;
 
-    const keyEl = document.querySelector(
-      `#animatedKeyboard-svg svg #${CSS.escape(keyId)}`,
-    );
-    if (!keyEl || !burstContainerRef) return;
-
-    const keyRect = keyEl.getBoundingClientRect();
-    const containerRect = burstContainerRef.getBoundingClientRect();
+    const board = untrack(() => config().svgRaw);
+    if (board !== centresFor) {
+      keyCentres = new Map();
+      centresFor = board;
+    }
+    let centre = keyCentres.get(keyId);
+    if (centre === undefined) {
+      const keyEl = document.querySelector(
+        `#animatedKeyboard-svg svg #${CSS.escape(keyId)}`,
+      );
+      if (!keyEl || !burstContainerRef) return;
+      const keyRect = keyEl.getBoundingClientRect();
+      const containerRect = burstContainerRef.getBoundingClientRect();
+      if (containerRect.width === 0 || containerRect.height === 0) return;
+      centre = {
+        x:
+          ((keyRect.left - containerRect.left + keyRect.width / 2) /
+            containerRect.width) *
+          100,
+        y:
+          ((keyRect.top - containerRect.top + keyRect.height / 2) /
+            containerRect.height) *
+          100,
+      };
+      keyCentres.set(keyId, centre);
+    }
     const id = ++burstCounter;
-    setBursts((prev) => [
-      ...prev,
-      {
-        id,
-        x: keyRect.left - containerRect.left + keyRect.width / 2,
-        y: keyRect.top - containerRect.top + keyRect.height / 2,
-        effect,
-      },
-    ]);
+    setBursts((prev) => [...prev, { id, x: centre.x, y: centre.y, effect }]);
     setTimeout(() => {
       setBursts((prev) => prev.filter((b) => b.id !== id));
     }, 650);
@@ -771,8 +788,8 @@ export function AnimatedHands(): JSXElement {
               <div
                 style={{
                   position: "absolute",
-                  left: `${burst.x}px`,
-                  top: `${burst.y}px`,
+                  left: `${burst.x}%`,
+                  top: `${burst.y}%`,
                 }}
               >
                 <Show

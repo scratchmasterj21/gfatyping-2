@@ -1,10 +1,4 @@
-import {
-  collection,
-  doc,
-  DocumentReference,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, setDoc } from "firebase/firestore";
 
 import { callApi } from "../api-client";
 import { getDb } from "../firebase";
@@ -15,6 +9,7 @@ import {
   isBackdropItemId,
 } from "./backdrop-items";
 import { claimedFromDoc } from "../utils/shop-collections";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 export type BackdropState = {
   coins: number;
@@ -29,7 +24,7 @@ function userRef(uid: string): DocumentReference {
 
 export async function getBackdropState(uid: string): Promise<BackdropState> {
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (snap.exists()) {
       const data = snap.data();
       const stored = data["selectedBackdrop"] as string | undefined;

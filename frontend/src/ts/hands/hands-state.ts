@@ -1,16 +1,11 @@
-import {
-  collection,
-  doc,
-  DocumentReference,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, setDoc } from "firebase/firestore";
 
 import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { HandStyle, HandStyleId, isHandStyleId } from "./hand-styles";
 import { claimedFromDoc } from "../utils/shop-collections";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 export type HandsState = {
   coins: number;
@@ -25,7 +20,7 @@ function userRef(uid: string): DocumentReference {
 
 export async function getHandsState(uid: string): Promise<HandsState> {
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (snap.exists()) {
       const data = snap.data();
       const storedStyle = data["selectedHandStyle"] as string | undefined;

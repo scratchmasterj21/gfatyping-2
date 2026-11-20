@@ -1,11 +1,9 @@
-import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
-
 import { callApi } from "../api-client";
-import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { AvatarCategory, AvatarItem, AvatarShape } from "./avatar-items";
 import { findTitle } from "../titles/titles";
 import { EquippedAvatar, equippedFromDoc } from "./equipped-from-doc";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 export type AvatarState = {
   coins: number;
@@ -32,10 +30,6 @@ export const OUTFIT_SLOTS = ["1", "2", "3"] as const;
 
 export type { EquippedAvatar } from "./equipped-from-doc";
 
-function userRef(uid: string): DocumentReference {
-  return doc(collection(getDb(), "users"), uid);
-}
-
 /**
  * Lightweight read for display purposes only (no coins/ownership) - safe to
  * call for any uid. Always returns a value (defaults to an unequipped
@@ -45,7 +39,7 @@ function userRef(uid: string): DocumentReference {
 export async function getEquippedAvatar(uid: string): Promise<EquippedAvatar> {
   if (uid.trim().length === 0) return {};
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (!snap.exists()) return {};
     return equippedFromDoc(snap.data());
   } catch (e) {
@@ -59,7 +53,7 @@ export async function getAvatarState(uid: string): Promise<AvatarState> {
     return { coins: 0, ownedCostumes: {}, equipped: {}, shape: "round" };
   }
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (snap.exists()) {
       const data = snap.data();
       return {

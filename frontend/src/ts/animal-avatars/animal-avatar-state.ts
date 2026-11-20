@@ -1,12 +1,7 @@
-import { collection, doc, DocumentReference, getDoc } from "firebase/firestore";
 import { callApi } from "../api-client";
-import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { AnimalAvatarItem } from "./animal-avatar-items";
-
-function userRef(uid: string): DocumentReference {
-  return doc(collection(getDb(), "users"), uid);
-}
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 export type AnimalAvatarState = {
   coins: number;
@@ -19,7 +14,7 @@ export async function getAnimalAvatarState(
   uid: string,
 ): Promise<AnimalAvatarState> {
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (snap.exists()) {
       const data = snap.data();
       return {

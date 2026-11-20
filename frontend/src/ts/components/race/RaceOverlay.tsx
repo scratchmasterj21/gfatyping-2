@@ -79,8 +79,6 @@ function medal(rank: number): string {
 
 export function RaceOverlay(): JSXElement {
   const [now, setNow] = createSignal(Date.now());
-  const timer = setInterval(() => setNow(Date.now()), 200);
-  onCleanup(() => clearInterval(timer));
 
   // Attempt to reconnect if the page was reloaded mid-race.
   onMount(() => {
@@ -90,6 +88,16 @@ export function RaceOverlay(): JSXElement {
   const selfUid = (): string | undefined => getAuthenticatedUser()?.uid;
   const isParticipant = (): boolean => getRaceRole() === "participant";
   const status = (): string | undefined => getCurrentRace()?.status;
+  // tick only while a race is on (it used to wake 5x a second all the time)
+  const inRace = createMemo(
+    () => getCurrentRace() !== undefined && getCurrentRace() !== null,
+  );
+  createEffect(() => {
+    if (!inRace()) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 200);
+    onCleanup(() => clearInterval(timer));
+  });
 
   const countdownLeft = createMemo((): number => {
     const race = getCurrentRace();

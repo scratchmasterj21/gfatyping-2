@@ -3,7 +3,6 @@ import {
   deleteField,
   doc,
   DocumentReference,
-  getDoc,
   setDoc,
 } from "firebase/firestore";
 
@@ -11,6 +10,7 @@ import { callApi } from "../api-client";
 import { getDb } from "../firebase";
 import { invalidateCoinQueries } from "../queries/coins";
 import { PetItem } from "./pet-items";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 function userRef(uid: string): DocumentReference {
   return doc(collection(getDb(), "users"), uid);
@@ -29,7 +29,7 @@ export type PetState = {
  * persisting.
  */
 export async function getPetState(uid: string): Promise<PetState> {
-  const snap = await getDoc(userRef(uid));
+  const snap = await getUserDocShared(uid);
   return petStateFromDoc(snap.exists() ? snap.data() : undefined);
 }
 

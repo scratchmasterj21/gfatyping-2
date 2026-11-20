@@ -1,10 +1,4 @@
-import {
-  collection,
-  doc,
-  DocumentReference,
-  getDoc,
-  setDoc,
-} from "firebase/firestore";
+import { collection, doc, DocumentReference, setDoc } from "firebase/firestore";
 
 import { callApi } from "../api-client";
 import { getDb } from "../firebase";
@@ -15,6 +9,7 @@ import {
   RgbPaletteItemId,
 } from "./rgb-palette-items";
 import { claimedFromDoc } from "../utils/shop-collections";
+import { getUserDocShared } from "../utils/shared-user-doc";
 
 export type RgbPaletteState = {
   coins: number;
@@ -31,7 +26,7 @@ export async function getRgbPaletteState(
   uid: string,
 ): Promise<RgbPaletteState> {
   try {
-    const snap = await getDoc(userRef(uid));
+    const snap = await getUserDocShared(uid);
     if (snap.exists()) {
       const data = snap.data();
       const stored = data["selectedRgbPalette"] as string | undefined;
