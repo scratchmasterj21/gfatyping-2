@@ -7,6 +7,7 @@ import {
   on,
   onCleanup,
   Show,
+  createMemo,
 } from "solid-js";
 
 import type { PongGame } from "./pong-multiplayer";
@@ -176,35 +177,35 @@ export function WordPong(props: {
     props.rally !== true && !props.game.over && !mine() && ready() === null;
   const target = (): number => props.game.target ?? WIN_POINTS;
 
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const ballSeq = createMemo(() => props.game.seq);
   // a new ball: clear the box, show what just happened
   createEffect(
-    on(
-      () => props.game.seq,
-      (_, prevSeq) => {
-        setTyped("");
-        setWrong(false);
-        ballMisses = 0;
-        if (prevSeq === undefined) return;
-        const g = props.game;
-        if (g.hits > 0) {
-          // somebody hit it back
-          const hitter = otherSide(g.toSide);
-          setSwing(hitter);
-          later(220, () => setSwing(null));
-          if (g.smash === true) {
-            showPopup("💥 SMASH!");
-            setShake(true);
-            later(400, () => setShake(false));
-          } else if (g.ball !== undefined && g.ball !== "normal") {
-            const info = SHOT_INFO[g.ball];
-            showPopup(`${info.emoji} ${info.name} - ${info.tip}`);
-          }
-        } else if (g.lastPoint !== undefined) {
-          setFlyOff({ id: g.seq, side: otherSide(g.lastPoint) });
-          later(900, () => setFlyOff((f) => (f?.id === g.seq ? null : f)));
+    on(ballSeq, (_, prevSeq) => {
+      setTyped("");
+      setWrong(false);
+      ballMisses = 0;
+      if (prevSeq === undefined) return;
+      const g = props.game;
+      if (g.hits > 0) {
+        // somebody hit it back
+        const hitter = otherSide(g.toSide);
+        setSwing(hitter);
+        later(220, () => setSwing(null));
+        if (g.smash === true) {
+          showPopup("💥 SMASH!");
+          setShake(true);
+          later(400, () => setShake(false));
+        } else if (g.ball !== undefined && g.ball !== "normal") {
+          const info = SHOT_INFO[g.ball];
+          showPopup(`${info.emoji} ${info.name} - ${info.tip}`);
         }
-      },
-    ),
+      } else if (g.lastPoint !== undefined) {
+        setFlyOff({ id: g.seq, side: otherSide(g.lastPoint) });
+        later(900, () => setFlyOff((f) => (f?.id === g.seq ? null : f)));
+      }
+    }),
   );
 
   /** time used, 0-1 */

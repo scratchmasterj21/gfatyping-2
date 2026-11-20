@@ -6,6 +6,7 @@ import {
   JSXElement,
   on,
   Show,
+  createMemo,
 } from "solid-js";
 
 import { Mascot } from "../../components/common/Mascot";
@@ -279,10 +280,13 @@ export function GemDig(props: {
     props.shaft.slice(props.me.depth, props.me.depth + VISIBLE);
   const treasureInView = (): boolean => props.me.depth + VISIBLE >= DIG_DEPTH;
 
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const myDepth = createMemo(() => props.me.depth);
   // a new block on top: reset, start the lava clock
   createEffect(
     on(
-      () => props.me.depth,
+      myDepth,
       () => {
         setTyped("");
         setWrong(false);

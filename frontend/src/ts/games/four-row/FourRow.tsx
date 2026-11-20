@@ -5,6 +5,7 @@ import {
   JSXElement,
   on,
   Show,
+  createMemo,
 } from "solid-js";
 
 import { Mascot } from "../../components/common/Mascot";
@@ -133,23 +134,23 @@ export function FourRow(props: {
           (props.game.roundStartAt + props.game.roundMs - props.now) / 1000,
         );
 
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const roundKey = createMemo(
+    () => props.game.round + props.game.boardNo * 100,
+  );
+  const wordsKey = createMemo(() => props.game.words.join(","));
   // new round, or a column's word changed under my typing: clear the box
   createEffect(
-    on(
-      () => props.game.round + props.game.boardNo * 100,
-      () => {
-        setTyped("");
-        setWrong(false);
-      },
-    ),
+    on(roundKey, () => {
+      setTyped("");
+      setWrong(false);
+    }),
   );
   createEffect(
-    on(
-      () => props.game.words.join(","),
-      () => {
-        if (typed() !== "" && target() < 0) setTyped("");
-      },
-    ),
+    on(wordsKey, () => {
+      if (typed() !== "" && target() < 0) setTyped("");
+    }),
   );
 
   const onInput = (value: string): void => {

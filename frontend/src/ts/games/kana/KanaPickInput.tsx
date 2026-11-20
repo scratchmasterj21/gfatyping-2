@@ -1,4 +1,10 @@
-import { createEffect, createSignal, JSXElement, on } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  JSXElement,
+  on,
+  createMemo,
+} from "solid-js";
 
 import { kanaPrefixMatch } from "../../lessons/kana-romaji";
 import { sfx } from "../mini/mini-sounds";
@@ -27,16 +33,16 @@ export function KanaPickInput(props: {
     props.onTyped?.(t);
   };
 
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const candidateKey = createMemo(() => props.candidates.join("|"));
   // words changed (taken by someone, new round): drop typing that no longer fits
   createEffect(
-    on(
-      () => props.candidates.join("|"),
-      () => {
-        const t = typed();
-        if (t === "") return;
-        if (!props.candidates.some((w) => kanaPrefixMatch(w, t).ok)) setT("");
-      },
-    ),
+    on(candidateKey, () => {
+      const t = typed();
+      if (t === "") return;
+      if (!props.candidates.some((w) => kanaPrefixMatch(w, t).ok)) setT("");
+    }),
   );
   createEffect(
     on(

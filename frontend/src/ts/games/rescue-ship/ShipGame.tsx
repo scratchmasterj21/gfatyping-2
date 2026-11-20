@@ -461,14 +461,14 @@ export function ShipGame(props: {
         break;
     }
   };
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const eventCount = createMemo(() => props.view.events.length);
   createEffect(
-    on(
-      () => props.view.events.length,
-      (n, prev) => {
-        if (prev === undefined || n <= prev) return;
-        for (const e of props.view.events.slice(prev)) onEvent(e);
-      },
-    ),
+    on(eventCount, (n, prev) => {
+      if (prev === undefined || n <= prev) return;
+      for (const e of props.view.events.slice(prev)) onEvent(e);
+    }),
   );
 
   // a new zone (and maybe a new job): tell everyone

@@ -1,4 +1,12 @@
-import { createEffect, For, Index, JSXElement, on, Show } from "solid-js";
+import {
+  createEffect,
+  For,
+  Index,
+  JSXElement,
+  on,
+  Show,
+  createMemo,
+} from "solid-js";
 
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { cn } from "../../utils/cn";
@@ -193,22 +201,22 @@ export function RaceTrack(props: {
 
 function Car(props: { car: LaneCar; top: number; small: boolean }): JSXElement {
   let body: HTMLDivElement | undefined;
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const spinning = createMemo(() => props.car.spinning === true);
   createEffect(
-    on(
-      () => props.car.spinning === true,
-      (spin) => {
-        if (spin && body !== undefined) {
-          body.animate(
-            [
-              { transform: "rotate(0deg)" },
-              { transform: "rotate(-200deg)" },
-              { transform: "rotate(-360deg)" },
-            ],
-            { duration: 600, easing: "ease-out" },
-          );
-        }
-      },
-    ),
+    on(spinning, (spin) => {
+      if (spin && body !== undefined) {
+        body.animate(
+          [
+            { transform: "rotate(0deg)" },
+            { transform: "rotate(-200deg)" },
+            { transform: "rotate(-360deg)" },
+          ],
+          { duration: 600, easing: "ease-out" },
+        );
+      }
+    }),
   );
   return (
     <div

@@ -5,6 +5,7 @@ import {
   JSXElement,
   on,
   Show,
+  createMemo,
 } from "solid-js";
 
 import { Mascot } from "../../components/common/Mascot";
@@ -126,15 +127,15 @@ export function WordBomb(props: {
   const bombPos = (): { x: number; y: number } =>
     pos(props.game.holder, n() === 2 ? 20 : 17);
 
+  // memo: online, the game object is new on every room update and on()
+  // re-runs on each one (it doesn't compare values) - only react to a real change
+  const bombSeq = createMemo(() => props.game.seq);
   // a new holder or round: clear the box
   createEffect(
-    on(
-      () => props.game.seq,
-      () => {
-        setTyped("");
-        setWrong(false);
-      },
-    ),
+    on(bombSeq, () => {
+      setTyped("");
+      setWrong(false);
+    }),
   );
 
   // tick-tock: once a second, fast near the end
