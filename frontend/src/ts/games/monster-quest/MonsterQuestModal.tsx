@@ -167,25 +167,39 @@ export function MonsterQuestModal(props: {
   });
 
   // ---------------------------------------------------------- the quest
-  const setup = createMemo((): QuestSetup | null => {
-    if (mode() === "solo") return solo()?.setup ?? null;
-    const r = room();
-    if (r === null || r.party === undefined) return null;
-    if (r.weekly !== undefined) {
-      const plan = weeklyPlan(r.weekly);
+  // same quest = same object (each room update used to build a new one)
+  const setup = createMemo(
+    (): QuestSetup | null => {
+      if (mode() === "solo") return solo()?.setup ?? null;
+      const r = room();
+      if (r === null || r.party === undefined) return null;
+      if (r.weekly !== undefined) {
+        const plan = weeklyPlan(r.weekly);
+        return {
+          seed: plan.seed,
+          difficulty: questDifficultyFor(WEEKLY_DIFFICULTY),
+          party: roomParty(r),
+          weekly: plan,
+        };
+      }
       return {
-        seed: plan.seed,
-        difficulty: questDifficultyFor(WEEKLY_DIFFICULTY),
+        seed: r.seed,
+        difficulty: questDifficultyFor(r.difficultyLabel),
         party: roomParty(r),
-        weekly: plan,
       };
-    }
-    return {
-      seed: r.seed,
-      difficulty: questDifficultyFor(r.difficultyLabel),
-      party: roomParty(r),
-    };
-  });
+    },
+    null,
+    {
+      equals: (a, b) =>
+        a === b ||
+        (a !== null &&
+          b !== null &&
+          a.seed === b.seed &&
+          a.difficulty.label === b.difficulty.label &&
+          a.party.map((h) => `${h.slot}:${h.uid}:${h.cls}`).join() ===
+            b.party.map((h) => `${h.slot}:${h.uid}:${h.cls}`).join()),
+    },
+  );
   const startAt = (): number =>
     mode() === "solo" ? (solo()?.startAt ?? 0) : (room()?.startAt ?? 0);
   const log = createMemo((): { inputs: QuestInput[]; times: number[] } => {

@@ -193,12 +193,11 @@ export function QuestBattle(props: {
     setWeather("clear");
     setHeroMax(props.setup.party.map((h) => CLASS_INFO[h.cls].maxHp));
   };
-  createEffect(
-    on(
-      () => props.setup.seed,
-      () => resetPlayback(),
-    ),
-  );
+  // Only a NEW quest (new seed) restarts playback. on() alone re-runs on
+  // every change of props.setup - and online that's a fresh object on each
+  // room update, so every move replayed the battle from the very start.
+  const seed = createMemo(() => props.setup.seed);
+  createEffect(on(seed, () => resetPlayback()));
 
   const party = (): QuestSetup["party"] => props.setup.party;
   const heroName = (slot: number): string => {
