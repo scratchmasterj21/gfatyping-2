@@ -17,7 +17,16 @@ import {
   pauseUntilText,
   resolvePolicy,
 } from "../../src/ts/games/game-access";
-import { games, gradeRange } from "../../src/ts/games/games-data";
+import {
+  games,
+  gradeRange,
+  LEVEL_GAME_IDS,
+} from "../../src/ts/games/games-data";
+import {
+  ALL_KEYS_GROUPS,
+  allKeysGroupsDone,
+} from "../../src/ts/lessons/achievements";
+import { lessonGroups } from "../../src/ts/lessons/lessons-data";
 
 const today = "2026-11-05";
 const access = parseGameAccess({
@@ -170,5 +179,78 @@ describe("teacher pauses", () => {
       );
       expect(fit.length).toBeGreaterThanOrEqual(5);
     }
+  });
+});
+
+describe("easy/medium/hard games need All Keys", () => {
+  const keys = parseGameAccess({
+    classes: { G2A: { needAllKeys: true } },
+    students: { early: { needAllKeys: false }, strict: { needAllKeys: true } },
+  });
+  const day = { lessonsPassed: 0, gameSec: 0 };
+  const notYet = { levelGame: true, allKeysDone: false };
+
+  it("only the level-word games are in the gate", () => {
+    expect([...LEVEL_GAME_IDS].sort()).toEqual(
+      [
+        "echo-keys",
+        "four-row",
+        "monster-raid",
+        "rescue-ship",
+        "typing-rpg",
+        "word-bomb",
+      ].sort(),
+    );
+    expect(LEVEL_GAME_IDS.has("type-racer")).toBe(false);
+    expect(LEVEL_GAME_IDS.has("word-defender")).toBe(false);
+  });
+
+  it("classes are open until the teacher switches it on", () => {
+    const p = resolvePolicy(keys, "G3A", "x", today);
+    expect(p.needAllKeys).toBe(false);
+    expect(checkGameAccess("four-row", p, day, notYet).allowed).toBe(true);
+  });
+
+  it("locks level games until All Keys is done; lesson games stay open", () => {
+    const p = resolvePolicy(keys, "G2A", "x", today);
+    const locked = checkGameAccess("four-row", p, day, notYet);
+    expect(locked).toEqual({ allowed: false, reason: "keys" });
+    expect(gameLockMessage(locked)).toContain("All Keys");
+    expect(
+      checkGameAccess("four-row", p, day, {
+        levelGame: true,
+        allKeysDone: true,
+      }).allowed,
+    ).toBe(true);
+    expect(
+      checkGameAccess("word-pong", p, day, {
+        levelGame: false,
+        allKeysDone: false,
+      }).allowed,
+    ).toBe(true);
+  });
+
+  it("a student override wins either way", () => {
+    const early = resolvePolicy(keys, "G2A", "early", today);
+    expect(early.ownNeedAllKeys).toBe(false);
+    expect(checkGameAccess("four-row", early, day, notYet).allowed).toBe(true);
+    const strict = resolvePolicy(keys, "G3A", "strict", today);
+    expect(checkGameAccess("four-row", strict, day, notYet).allowed).toBe(
+      false,
+    );
+  });
+
+  it("counts finished key groups", () => {
+    const done = (ids: string[]) =>
+      new Map(ids.map((id) => [id, { completed: true, stars: 2 }]));
+    expect(allKeysGroupsDone(new Map())).toBe(0);
+    const homeRow =
+      lessonGroups.find((g) => g.id === "home-row")?.lessons.map((l) => l.id) ??
+      [];
+    expect(allKeysGroupsDone(done(homeRow))).toBe(1);
+    const every = lessonGroups
+      .filter((g) => (ALL_KEYS_GROUPS as readonly string[]).includes(g.id))
+      .flatMap((g) => g.lessons.map((l) => l.id));
+    expect(allKeysGroupsDone(done(every))).toBe(ALL_KEYS_GROUPS.length);
   });
 });

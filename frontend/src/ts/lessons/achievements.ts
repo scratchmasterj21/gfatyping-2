@@ -27,6 +27,19 @@ function allDone(groupId: string, p: Map<string, ProgressLike>): boolean {
   );
 }
 
+/** Lesson groups that make up "All Keys" (every letter learned). */
+export const ALL_KEYS_GROUPS = [
+  "home-row",
+  "top-row",
+  "bottom-row",
+  "all-keys",
+] as const;
+
+/** How many of the All Keys groups are fully completed (out of 4). */
+export function allKeysGroupsDone(p: Map<string, ProgressLike>): number {
+  return ALL_KEYS_GROUPS.filter((g) => allDone(g, p)).length;
+}
+
 function allStars(
   groupId: string,
   p: Map<string, ProgressLike>,
@@ -82,11 +95,7 @@ const DEFS: Def[] = [
     name: "All Keys",
     description: "Complete all alphabet lessons",
     icon: "fa-keyboard",
-    check: (p) =>
-      allDone("home-row", p) &&
-      allDone("top-row", p) &&
-      allDone("bottom-row", p) &&
-      allDone("all-keys", p),
+    check: (p) => allKeysGroupsDone(p) === ALL_KEYS_GROUPS.length,
   },
   {
     id: "speed-20",

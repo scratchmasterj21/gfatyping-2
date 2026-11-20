@@ -27,6 +27,12 @@ export type GamePolicy = {
   earnTypingMin?: number;
   /** game ids that stay locked */
   blocked?: string[];
+  /**
+   * Easy/medium/hard games (real words, every letter) need the All Keys
+   * lessons finished first. Student value overrides the class (false = let
+   * this student play early).
+   */
+  needAllKeys?: boolean;
 };
 
 /** Why a teacher paused a student's games. */
@@ -85,6 +91,9 @@ function parsePolicy(raw: unknown): StudentPolicy {
     out.blocked = (r["blocked"] as unknown[]).filter(
       (x): x is string => typeof x === "string",
     );
+  }
+  if (typeof r["needAllKeys"] === "boolean") {
+    out.needAllKeys = r["needAllKeys"];
   }
   if (typeof r["bonusDate"] === "string") out.bonusDate = r["bonusDate"];
   if (
@@ -202,6 +211,10 @@ export type EffectivePolicy = {
   /** minutes of free typing (Practice) today also needed (0 = none) */
   earnTypingMin: number;
   blocked: string[];
+  /** easy/medium/hard games need All Keys finished */
+  needAllKeys: boolean;
+  /** the student's own needAllKeys override (undefined = class setting) */
+  ownNeedAllKeys?: boolean;
   /** bonus minutes valid today (0 = none) */
   bonusMinutes: number;
   /** true when any setting comes from the student's own override */
@@ -227,12 +240,17 @@ export function resolvePolicy(
     earnLessons: stu.earnLessons ?? cls.earnLessons ?? EARN_LESSONS_DEFAULT,
     earnTypingMin: stu.earnTypingMin ?? cls.earnTypingMin ?? 0,
     blocked: stu.blocked ?? cls.blocked ?? [],
+    needAllKeys: stu.needAllKeys ?? cls.needAllKeys ?? false,
+    ...(stu.needAllKeys !== undefined
+      ? { ownNeedAllKeys: stu.needAllKeys }
+      : {}),
     bonusMinutes: stu.bonusDate === today ? (stu.bonusMinutes ?? 0) : 0,
     personal:
       stu.mode !== undefined ||
       stu.earnLessons !== undefined ||
       stu.earnTypingMin !== undefined ||
-      stu.blocked !== undefined,
+      stu.blocked !== undefined ||
+      stu.needAllKeys !== undefined,
     ...(stu.pauseUntil !== undefined && stu.pauseUntil >= today
       ? { pause: { until: stu.pauseUntil, reason: stu.pauseReason ?? "other" } }
       : {}),
@@ -243,7 +261,7 @@ export type GameAccess =
   | { allowed: true; bonusLeftMin?: number }
   | {
       allowed: false;
-      reason: "blocked" | "off" | "earn" | "paused";
+      reason: "blocked" | "off" | "earn" | "paused" | "keys";
       /** "earn": lessons still to pass today */
       lessonsLeft?: number;
       /** "earn": minutes of free typing still to do today */
@@ -252,11 +270,15 @@ export type GameAccess =
       pause?: { until: string; reason: PauseReason };
     };
 
-/** Whether a free-play game can be opened right now. */
+/**
+ * Whether a free-play game can be opened right now. `skills.levelGame`: the
+ * game uses easy/medium/hard words (see games-data `words: "levels"`).
+ */
 export function checkGameAccess(
   gameId: string | undefined,
   policy: EffectivePolicy,
   today: { lessonsPassed: number; gameSec: number; practiceSec?: number },
+  skills?: { levelGame: boolean; allKeysDone: boolean },
 ): GameAccess {
   const typingMinLeft = Math.max(
     0,
@@ -268,6 +290,14 @@ export function checkGameAccess(
   }
   if (gameId !== undefined && policy.blocked.includes(gameId)) {
     return { allowed: false, reason: "blocked" };
+  }
+  if (
+    skills !== undefined &&
+    skills.levelGame &&
+    policy.needAllKeys &&
+    !skills.allKeysDone
+  ) {
+    return { allowed: false, reason: "keys" };
   }
   if (policy.mode === "on") return { allowed: true };
   if (
@@ -319,6 +349,9 @@ export function pauseMessage(pause: {
   return `⏸️ Your teacher paused your games${end}. Keep practicing your lessons!`;
 }
 
+export const KEYS_LOCK_TEXT =
+  "Finish the All Keys lessons to play this game - it uses every letter!";
+
 /** "Get ⭐⭐ on 1 more lesson and type 3 more minutes" */
 export function earnTodo(lessonsLeft: number, typingMinLeft: number): string {
   const parts: string[] = [];
@@ -344,6 +377,9 @@ export function gameLockMessage(access: GameAccess): string {
   }
   if (access.reason === "blocked") {
     return "🔒 Your teacher turned this game off";
+  }
+  if (access.reason === "keys") {
+    return `🔒 ${KEYS_LOCK_TEXT}`;
   }
   if (access.reason === "off") {
     return "🔒 Your teacher turned games off for now";

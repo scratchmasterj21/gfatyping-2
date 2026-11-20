@@ -71,6 +71,7 @@ import {
   GAME_WORD_SOURCE_GROUPS,
   gradeRange,
   games,
+  LEVEL_GAME_IDS,
 } from "../../../games/games-data";
 import { GemDigModal } from "../../../games/gem-dig/GemDigModal";
 import { GhostHunterModal } from "../../../games/ghost-hunter/GhostHunterModal";
@@ -87,6 +88,10 @@ import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
 import { WordBombModal } from "../../../games/word-bomb/WordBombModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
 import { WordPongModal } from "../../../games/word-pong/WordPongModal";
+import {
+  ALL_KEYS_GROUPS,
+  allKeysGroupsDone,
+} from "../../../lessons/achievements";
 import {
   checkpointLockMessage,
   checkpointProgressKey,
@@ -1035,6 +1040,8 @@ export function LessonsPage(): JSXElement {
   };
   const rpgUnlocked = (): boolean =>
     isCurrentUserStaff() ||
+    // teacher let this student play the level games early
+    gamePolicy().ownNeedAllKeys === false ||
     (progress.data !== undefined && !isLessonLocked("all-keys-1"));
 
   // The first not-yet-completed lesson OR checkpoint game in curriculum
@@ -1320,11 +1327,33 @@ export function LessonsPage(): JSXElement {
   const gamePolicy = createMemo(() =>
     resolvePolicy(gameAccessQuery.data, classId(), getAuthenticatedUser()?.uid),
   );
+  /** All Keys lesson groups finished (0-4) - gates easy/medium/hard games. */
+  const keyGroupsDone = (): number =>
+    progress.data === undefined ? 0 : allKeysGroupsDone(progress.data);
   /** Free-play access; no game id = the games section as a whole. */
   const gameAccess = (gameId?: string): GameAccess =>
     isCurrentUserStaff()
       ? { allowed: true }
-      : checkGameAccess(gameId, gamePolicy(), myToday());
+      : checkGameAccess(
+          gameId,
+          gamePolicy(),
+          myToday(),
+          gameId === undefined
+            ? undefined
+            : {
+                levelGame: LEVEL_GAME_IDS.has(gameId),
+                allKeysDone: keyGroupsDone() === ALL_KEYS_GROUPS.length,
+              },
+        );
+  const isKeysLocked = (gameId: string): boolean => {
+    const a = gameAccess(gameId);
+    return !a.allowed && a.reason === "keys";
+  };
+  /** Lock message, with All Keys progress when that's the reason. */
+  const lockText = (access: GameAccess): string =>
+    !access.allowed && access.reason === "keys"
+      ? `${gameLockMessage(access)} (${keyGroupsDone()} of ${ALL_KEYS_GROUPS.length} key groups done)`
+      : gameLockMessage(access);
 
   const classGoal = createMemo(() => {
     const id = classId();
@@ -1635,7 +1664,7 @@ export function LessonsPage(): JSXElement {
   const openBuiltinGame = (gameId: string, recommended = false): void => {
     const access = gameAccess(gameId);
     if (!access.allowed) {
-      showNoticeNotification(gameLockMessage(access));
+      showNoticeNotification(lockText(access));
       return;
     }
     if (gameId === "typing-rpg" && !rpgUnlocked()) {
@@ -1780,7 +1809,8 @@ export function LessonsPage(): JSXElement {
       const builtinGames = games.filter(
         (game) =>
           game.type === "builtin" &&
-          (game.id !== "typing-rpg" || rpgUnlocked()),
+          (game.id !== "typing-rpg" || rpgUnlocked()) &&
+          !isKeysLocked(game.id),
       );
       const day = Number(localDateString().replaceAll("-", ""));
       const game = builtinGames[day % builtinGames.length];
@@ -2245,7 +2275,7 @@ export function LessonsPage(): JSXElement {
                           lockedMessage={
                             gameAccess(game.id).allowed
                               ? undefined
-                              : gameLockMessage(gameAccess(game.id))
+                              : lockText(gameAccess(game.id))
                           }
                           onClick={() => launchGame(game.id)}
                         />
@@ -2304,7 +2334,7 @@ export function LessonsPage(): JSXElement {
                             lockedMessage={
                               gameAccess(game.id).allowed
                                 ? "🔒 Complete the required typing lessons to play together"
-                                : gameLockMessage(gameAccess(game.id))
+                                : lockText(gameAccess(game.id))
                             }
                             onClick={() => {
                               if (!locked()) launchGame(game.id, "together");
@@ -2432,7 +2462,7 @@ export function LessonsPage(): JSXElement {
                         description={game.description}
                         icon={game.icon}
                         locked={!gameAccess(game.id).allowed}
-                        lockedMessage={gameLockMessage(gameAccess(game.id))}
+                        lockedMessage={lockText(gameAccess(game.id))}
                         onClick={() => {
                           if (gameAccess(game.id).allowed) {
                             launchGame(game.id, "solo");

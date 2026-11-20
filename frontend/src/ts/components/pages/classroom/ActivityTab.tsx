@@ -38,7 +38,12 @@ import {
   unpauseStudentGames,
   updateStudentGamePolicy,
 } from "../../../games/game-access";
-import { BuiltinGame, games, gradeRange } from "../../../games/games-data";
+import {
+  BuiltinGame,
+  games,
+  gradeRange,
+  LEVEL_GAME_IDS,
+} from "../../../games/games-data";
 import {
   classThemePolicy,
   getLessonSettings,
@@ -63,6 +68,9 @@ import { cn } from "../../../utils/cn";
 import { Fa } from "../../common/Fa";
 
 const FREE_PLAY = games.filter((g): g is BuiltinGame => g.type === "builtin");
+const LEVEL_GAME_NAMES = FREE_PLAY.filter((g) => LEVEL_GAME_IDS.has(g.id))
+  .map((g) => g.name)
+  .join(", ");
 
 /** How long a pause lasts: days after today (0 = today only). */
 const PAUSE_LENGTHS: { label: string; days: number | "forever" }[] = [
@@ -165,6 +173,7 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     if (merged.blocked !== undefined && merged.blocked.length > 0) {
       next.blocked = merged.blocked;
     }
+    if (merged.needAllKeys === true) next.needAllKeys = true;
     const classId = props.classId;
     void save(async () =>
       setClassGamePolicy(classId, Object.keys(next).length === 0 ? null : next),
@@ -361,6 +370,29 @@ export function ActivityTab(props: { classId: string }): JSXElement {
             onChange={(n) => setClassPolicy({ earnTypingMin: n })}
           />
         </Show>
+        <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+          <span title={LEVEL_GAME_NAMES}>⌨️ Easy / medium / hard games:</span>
+          <button
+            type="button"
+            class={chip(classPolicy().needAllKeys !== true)}
+            disabled={saving() || accessQuery.isPending}
+            onClick={() => setClassPolicy({ needAllKeys: false })}
+          >
+            Open to everyone
+          </button>
+          <button
+            type="button"
+            class={chip(classPolicy().needAllKeys === true)}
+            disabled={saving() || accessQuery.isPending}
+            onClick={() => setClassPolicy({ needAllKeys: true })}
+          >
+            🔒 Finish All Keys first
+          </button>
+          <span class="text-xs">
+            They use every letter, so they&apos;re only fun once all keys are
+            learned. ({LEVEL_GAME_NAMES})
+          </span>
+        </div>
         <div>
           <div class="mb-2 flex flex-wrap items-center gap-2 text-sm text-sub">
             Turn off single games for the whole class (tap to block):
@@ -938,6 +970,39 @@ function StudentRow(props: {
               </option>
               <option value="on">On</option>
               <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="flex flex-wrap items-center gap-2 text-sm text-sub">
+            ⌨️ Easy / medium / hard games for {props.student.name}:
+            <select
+              class="min-h-9 rounded bg-sub-alt px-2 text-text"
+              value={
+                own().needAllKeys === undefined
+                  ? "class"
+                  : own().needAllKeys === true
+                    ? "need"
+                    : "early"
+              }
+              disabled={props.saving}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                const id = uid();
+                void props.save(async () =>
+                  updateStudentGamePolicy(id, {
+                    needAllKeys: v === "class" ? null : v === "need",
+                  }),
+                );
+              }}
+            >
+              <option value="class">
+                Class setting (
+                {props.access?.classes[props.classId]?.needAllKeys === true
+                  ? "finish All Keys first"
+                  : "open"}
+                )
+              </option>
+              <option value="early">Let play now</option>
+              <option value="need">Finish All Keys first</option>
             </select>
           </label>
           <Show when={own().mode === "earn"}>

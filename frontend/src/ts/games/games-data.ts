@@ -352,3 +352,10 @@ export const games: Game[] = [
     icon: "fa-water",
   },
 ];
+
+/** Games that use easy/medium/hard words (every letter) - see needAllKeys. */
+export const LEVEL_GAME_IDS: ReadonlySet<string> = new Set(
+  games.flatMap((g) =>
+    g.type === "builtin" && g.words === "levels" ? [g.id] : [],
+  ),
+);
