@@ -50,7 +50,8 @@ export type DefenderEnd = {
 
 /** Co-op: what the room tells this game, and what it sends back. */
 export type DefenderCoop = {
-  isHost: boolean;
+  /** am I the one marking hits right now (host, or next if they left) */
+  isHost: () => boolean;
   myUid: string;
   /** server-clock start */
   startAt: number;
@@ -199,10 +200,10 @@ export function DefenderGame(props: {
             say("🛡️ Your shield blocked a ship!", 1200);
           } else {
             sfx.bad();
-            if (coop?.isHost === true && !e.id.startsWith("boss")) {
+            if (coop?.isHost() === true && !e.id.startsWith("boss")) {
               coop.markHit(e.id);
             }
-            if (coop?.isHost === true && e.id === "boss") {
+            if (coop?.isHost() === true && e.id === "boss") {
               coop.markHit(`boss${sim.wave}a`);
               coop.markHit(`boss${sim.wave}b`);
             }
@@ -314,9 +315,7 @@ export function DefenderGame(props: {
         );
       }
     }
-    if (!coop.isHost) {
-      handle(sim.setLives(START_LIVES - Object.keys(coop.hits()).length));
-    }
+    handle(sim.setLives(START_LIVES - Object.keys(coop.hits()).length));
   });
 
   onMount(() => {

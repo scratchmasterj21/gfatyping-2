@@ -32,6 +32,7 @@ import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { dailyDay } from "../ghost-hunter/daily-haunting";
+import { actingHostUid } from "../shared/acting-host";
 import {
   arcadeNow,
   ArcadeRoom,
@@ -334,7 +335,8 @@ export function BalloonPopModal(props: Props): JSXElement {
 
   createEffect(() => {
     const r = room();
-    if (r?.status !== "playing" || r.hostUid !== myUid()) return;
+    // the host - or the next player if the host has dropped out
+    if (r?.status !== "playing" || actingHostUid(r) !== myUid()) return;
     const on = Object.values(r.players ?? {}).filter((p) => p.online);
     if (on.length > 0 && on.every((p) => p.done)) {
       void finishArcadeRoom(KIND, r.code).catch(() => undefined);

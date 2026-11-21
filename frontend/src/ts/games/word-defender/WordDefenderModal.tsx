@@ -33,6 +33,7 @@ import { InviteClassmates } from "../components/InviteClassmates";
 import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
+import { actingHostUid } from "../shared/acting-host";
 import {
   arcadeNow,
   ArcadeRoom,
@@ -211,7 +212,11 @@ export function WordDefenderModal(props: Props): JSXElement {
   const isHost = (): boolean => room()?.hostUid === myUid();
 
   const coopFor = (r: ArcadeRoom): DefenderCoop => ({
-    isHost: r.hostUid === myUid(),
+    // checked live: if the host drops out, the next player takes over
+    isHost: () => {
+      const cur = room();
+      return cur !== undefined && actingHostUid(cur) === myUid();
+    },
     myUid: myUid() ?? "",
     startAt: r.startAt ?? arcadeNow(),
     now: arcadeNow,
@@ -263,7 +268,9 @@ export function WordDefenderModal(props: Props): JSXElement {
             maxWave: 0,
             bosses: true,
             upgrades: false,
-            authority: next.hostUid === myUid(),
+            // lives come from the shared hit list on every screen (see
+            // DefenderGame), so no single tab has to stay awake
+            authority: false,
           },
         });
         setPhase("playing");
@@ -278,7 +285,8 @@ export function WordDefenderModal(props: Props): JSXElement {
   // host: everyone's out of lives -> results
   createEffect(() => {
     const r = room();
-    if (r?.status !== "playing" || r.hostUid !== myUid()) return;
+    // the host - or the next player if the host has dropped out
+    if (r?.status !== "playing" || actingHostUid(r) !== myUid()) return;
     const on = Object.values(r.players ?? {}).filter((p) => p.online);
     if (on.length > 0 && on.every((p) => p.done)) {
       void finishArcadeRoom(KIND, r.code).catch(() => undefined);

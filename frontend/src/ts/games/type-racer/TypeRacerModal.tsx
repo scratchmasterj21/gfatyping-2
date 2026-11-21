@@ -35,6 +35,7 @@ import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { sfx } from "../mini/mini-sounds";
+import { actingHostUid } from "../shared/acting-host";
 import { submitDailyBest } from "../shared/daily-board";
 import { serverClockNow } from "../shared/server-clock";
 import {
@@ -548,7 +549,8 @@ export function TypeRacerModal(props: Props): JSXElement {
   createEffect(() => {
     const r = room();
     if (r?.status !== "countdown" && r?.status !== "playing") return;
-    if (r.hostUid !== myUid() || finishSent === (r.round ?? 1)) return;
+    // the host - or the next player if the host has dropped out
+    if (actingHostUid(r) !== myUid() || finishSent === (r.round ?? 1)) return;
     const online = Object.values(r.players ?? {}).filter((p) => p.online);
     if (online.length > 0 && online.every((p) => p.finished)) {
       finishSent = r.round ?? 1;

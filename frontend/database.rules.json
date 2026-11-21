@@ -418,7 +418,11 @@
             ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 1 && newData.child('wpm').isNumber() && newData.child('wpm').val() >= 0 && newData.child('accuracy').isNumber() && newData.child('accuracy').val() >= 0 && newData.child('accuracy').val() <= 100 && newData.child('finished').isBoolean() && newData.child('online').isBoolean())"
           }
         },
+        "series": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('racerRooms').child($code).child('players').child(auth.uid).exists() && root.child('racerRooms').child($code).child('players').child(root.child('racerRooms').child($code).child('hostUid').val()).child('online').val() == false && (root.child('racerRooms').child($code).child('status').val() == 'playing' || root.child('racerRooms').child($code).child('status').val() == 'countdown')"
+        },
         "status": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('racerRooms').child($code).child('players').child(auth.uid).exists() && root.child('racerRooms').child($code).child('players').child(root.child('racerRooms').child($code).child('hostUid').val()).child('online').val() == false && (data.val() == 'playing' || data.val() == 'countdown') && newData.val() == 'finished'",
           ".validate": "newData.val() == 'lobby' || newData.val() == 'countdown' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
         "durationSec": {
@@ -583,7 +587,14 @@
             }
           }
         },
+        "hits": {
+          "$id": {
+            ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('defenderRooms').child($code).child('players').child(auth.uid).exists() && root.child('defenderRooms').child($code).child('players').child(root.child('defenderRooms').child($code).child('hostUid').val()).child('online').val() == false && root.child('defenderRooms').child($code).child('status').val() == 'playing'",
+            ".validate": "newData.isBoolean() && $id.length <= 24"
+          }
+        },
         "status": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('defenderRooms').child($code).child('players').child(auth.uid).exists() && root.child('defenderRooms').child($code).child('players').child(root.child('defenderRooms').child($code).child('hostUid').val()).child('online').val() == false && data.val() == 'playing' && newData.val() == 'finished'",
           ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
         "hostUid": {
@@ -630,6 +641,7 @@
           }
         },
         "status": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('balloonRooms').child($code).child('players').child(auth.uid).exists() && root.child('balloonRooms').child($code).child('players').child(root.child('balloonRooms').child($code).child('hostUid').val()).child('online').val() == false && data.val() == 'playing' && newData.val() == 'finished'",
           ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
         "hostUid": {
@@ -676,6 +688,7 @@
           }
         },
         "status": {
+          ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && root.child('tossArena').child($code).child('players').child(auth.uid).exists() && root.child('tossArena').child($code).child('players').child(root.child('tossArena').child($code).child('hostUid').val()).child('online').val() == false && data.val() == 'playing' && newData.val() == 'finished'",
           ".validate": "newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
         "hostUid": {
