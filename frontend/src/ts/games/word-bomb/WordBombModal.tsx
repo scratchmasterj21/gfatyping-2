@@ -137,6 +137,10 @@ export function WordBombModal(props: {
     const score = bombScore(g, me);
     const place = bombPlace(g, me);
     if (place === 1) sfx.finish();
+    // score and coins now: a Back tap during the pause used to cancel them
+    props.onResult?.(score);
+    setClaim("pending");
+    void claimMiniGameReward("word-bomb", score).then(setClaim);
     resultTimer = setTimeout(() => {
       resultTimer = undefined;
       setResult({
@@ -149,9 +153,6 @@ export function WordBombModal(props: {
         ],
       });
       setPhase("result");
-      props.onResult?.(score);
-      setClaim("pending");
-      void claimMiniGameReward("word-bomb", score).then(setClaim);
     }, BOOM_PAUSE_MS);
   };
 

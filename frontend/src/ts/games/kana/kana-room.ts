@@ -16,6 +16,7 @@ import {
   getRealtimeDb,
   trackRealtimeListener,
 } from "../../firebase";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 
 /**
  * Student-hosted rooms for the romaji games (RTDB {root}/{code}), same
@@ -43,18 +44,11 @@ export type KanaRoom<G> = {
   caught?: Record<string, string>;
 };
 
-let serverOffset = 0;
 /** Read the database clock offset so everyone agrees on time. */
 export async function syncServerClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const serverNow = (): number => Date.now() + serverOffset;
+export const serverNow = serverClockNow;
 
 function currentUser(): { uid: string; name: string } {
   const user = getAuthenticatedUser();

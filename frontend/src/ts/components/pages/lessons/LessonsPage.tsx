@@ -1636,6 +1636,9 @@ export function LessonsPage(): JSXElement {
       setRecommendedGameId(
         recommended ? HOME_ROW_GAME_IDS[checkpoint.gameType] : undefined,
       );
+      openedAsRecommended = recommended
+        ? HOME_ROW_GAME_IDS[checkpoint.gameType]
+        : undefined;
       if (checkpoint.gameType === "defender") {
         setLessonDefGroupId(group.id);
         resultGroup.defender = group.id;
@@ -1693,6 +1696,7 @@ export function LessonsPage(): JSXElement {
       return;
     }
     setRecommendedGameId(recommended ? gameId : undefined);
+    openedAsRecommended = recommended ? gameId : undefined;
     if (gameId === "word-defender") setDefenderOpen(true);
     else if (gameId === "balloon-pop") setBalloonOpen(true);
     else if (gameId === "type-racer") setRacerOpen(true);
@@ -1865,13 +1869,20 @@ export function LessonsPage(): JSXElement {
       ] as boolean[]
     ).filter(Boolean).length;
 
+  // The game last opened as "recommended". Kept after its window closes:
+  // results can land just after a quick Back tap (which clears
+  // recommendedGameId) and the coins must still count.
+  let openedAsRecommended: string | undefined;
   const claimRecommendedGame = (
     gameId: string,
     score: number,
     wave: number,
   ): void => {
-    if (recommendedGameId() !== gameId) return;
+    if (recommendedGameId() !== gameId && openedAsRecommended !== gameId) {
+      return;
+    }
     setRecommendedGameId(undefined);
+    openedAsRecommended = undefined;
     void claimRecommendedGameReward(gameId, score, wave).then((coins) => {
       if (coins > 0) {
         showSuccessNotification(`Recommended game complete · +${coins} coins`);

@@ -16,6 +16,7 @@ import {
   getRealtimeDb,
   trackRealtimeListener,
 } from "../../firebase";
+import { serverClockNow, watchServerClock } from "./server-clock";
 
 /**
  * Real-time rooms for Word Defender (co-op: defenderRooms), Balloon Pop
@@ -91,19 +92,11 @@ function newPlayer(lives: number): ArcadePlayer {
   };
 }
 
-let serverOffset = 0;
 /** Read the database clock offset so everyone's game runs in step. */
 export async function syncArcadeClock(): Promise<void> {
-  try {
-    const v = (
-      await get(ref(getRealtimeDb(), ".info/serverTimeOffset"))
-    ).val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // local clock it is
-  }
+  watchServerClock();
 }
-export const arcadeNow = (): number => Date.now() + serverOffset;
+export const arcadeNow = serverClockNow;
 
 export async function createArcadeRoom(
   kind: ArcadeKind,

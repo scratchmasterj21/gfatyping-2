@@ -117,6 +117,10 @@ export function FourRowModal(props: {
     const score = fourScore(g, myDisc);
     const won = g.matchWinner === myDisc;
     if (won) sfx.finish();
+    // score and coins now: a Back tap during the pause used to cancel them
+    props.onResult?.(score);
+    setClaim("pending");
+    void claimMiniGameReward("four-row", score).then(setClaim);
     resultTimer = setTimeout(() => {
       resultTimer = undefined;
       setResult({
@@ -133,9 +137,6 @@ export function FourRowModal(props: {
         ],
       });
       setPhase("result");
-      props.onResult?.(score);
-      setClaim("pending");
-      void claimMiniGameReward("four-row", score).then(setClaim);
     }, RESULT_DELAY_MS);
   };
 

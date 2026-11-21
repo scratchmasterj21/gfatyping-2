@@ -16,6 +16,7 @@ import {
   getRealtimeDb,
   trackRealtimeListener,
 } from "../../firebase";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 
 export type RacerPlayer = {
   uid: string;
@@ -122,6 +123,7 @@ export async function createRacerRoom(input: {
   wordListLabel: string;
   words: string[];
 }): Promise<string> {
+  watchServerClock();
   const player = newPlayer();
   const words = input.words
     .filter((word) => word.length > 0 && word.length <= 60)
@@ -155,6 +157,7 @@ export async function createRacerRoom(input: {
 }
 
 export async function joinRacerRoom(rawCode: string): Promise<string> {
+  watchServerClock();
   const code = rawCode.trim();
   const player = newPlayer();
   const room = readRoom(await get(roomRef(code)));
@@ -193,7 +196,7 @@ export async function startRacerRoom(
   }
   await update(roomRef(code), {
     status: "countdown",
-    startAt: Date.now() + 3000,
+    startAt: serverClockNow() + 3000,
     round: 1,
     bots: Math.max(0, FILL_TO - onlineCount),
     seed: Math.floor(Math.random() * 2 ** 31),
@@ -221,7 +224,7 @@ export async function rematchRacerRoom(room: RacerRoom): Promise<void> {
   await update(roomRef(room.code), {
     players,
     status: "countdown",
-    startAt: Date.now() + 3000,
+    startAt: serverClockNow() + 3000,
     round: (room.round ?? 1) + 1,
     bots: Math.max(0, FILL_TO - n),
     seed: Math.floor(Math.random() * 2 ** 31),
@@ -268,7 +271,7 @@ export async function updateRacerPlayer(
     wpm: Math.max(0, stats.wpm),
     accuracy: Math.max(0, Math.min(100, stats.accuracy)),
     finished: stats.finished,
-    finishedAt: stats.finished ? Date.now() : 0,
+    finishedAt: stats.finished ? serverClockNow() : 0,
     completed: stats.completed === true,
     raceMs: Math.max(0, Math.round(stats.raceMs ?? 0)),
     online: true,

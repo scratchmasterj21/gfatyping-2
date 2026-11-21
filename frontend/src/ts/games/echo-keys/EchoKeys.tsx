@@ -72,7 +72,13 @@ export function EchoKeys(p: MiniGamePlayProps<EchoDifficulty>): JSXElement {
   let inputEl: HTMLInputElement | undefined;
   let finished = false;
 
-  onCleanup(() => timers.forEach(clearTimeout));
+  // a game that already ended but is still showing its last moment:
+  // closing now must still report it (coins), not drop it with the timer
+  let endingWith: boolean | null = null;
+  onCleanup(() => {
+    timers.forEach(clearTimeout);
+    if (endingWith !== null && !finished) end(endingWith);
+  });
 
   const light = (key: string, good: boolean): void => {
     setLitGood(good);
@@ -149,6 +155,7 @@ export function EchoKeys(p: MiniGamePlayProps<EchoDifficulty>): JSXElement {
         setSweep((n) => n + 1);
         timers.push(setTimeout(() => sfx.great(), 200));
         if (won.longest >= MAX_LENGTH) {
+          endingWith = true;
           timers.push(setTimeout(() => end(true), 700));
         } else {
           timers.push(setTimeout(() => playRound(won.length), 900));
@@ -167,6 +174,7 @@ export function EchoKeys(p: MiniGamePlayProps<EchoDifficulty>): JSXElement {
     setPhase("pause");
     if (echoIsOver(after)) {
       setMessage("Out of lives!");
+      endingWith = false;
       timers.push(setTimeout(() => end(false), 900));
       return;
     }

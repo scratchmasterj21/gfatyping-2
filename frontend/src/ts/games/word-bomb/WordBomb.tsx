@@ -138,19 +138,19 @@ export function WordBomb(props: {
     }),
   );
 
-  // tick-tock: once a second, fast near the end
+  // tick-tock: once a second, fast near the end (memo: `now` changes every
+  // 50ms, and on() alone would tick on each change)
+  const tickBucket = createMemo(() =>
+    live()
+      ? `${props.game.roundNo}-${Math.floor(
+          (props.now - props.game.roundStartAt) / (danger() ? 250 : 1000),
+        )}`
+      : "",
+  );
   createEffect(
-    on(
-      () =>
-        live()
-          ? `${props.game.roundNo}-${Math.floor(
-              (props.now - props.game.roundStartAt) / (danger() ? 250 : 1000),
-            )}`
-          : "",
-      (bucket) => {
-        if (bucket !== "") sfx.tick();
-      },
-    ),
+    on(tickBucket, (bucket) => {
+      if (bucket !== "") sfx.tick();
+    }),
   );
 
   const onInput = (value: string): void => {

@@ -25,6 +25,7 @@ import {
   Station,
   STATIONS,
 } from "./ship-rules";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 
 /**
  * Rescue Ship rooms (RTDB shipRooms/{code}). Each player writes only the
@@ -83,17 +84,10 @@ export function roomCrew(room: ShipRoom): CrewMember[] {
   );
 }
 
-let serverOffset = 0;
 export async function syncShipClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const shipNow = (): number => Date.now() + serverOffset;
+export const shipNow = serverClockNow;
 
 export async function createShipRoom(input: {
   difficultyLabel: string;

@@ -10,6 +10,7 @@ import {
 } from "solid-js";
 
 import { sfx } from "../mini/mini-sounds";
+import { serverClockNow } from "../shared/server-clock";
 import { TypingReport, TypingTracker } from "../shared/typing-report";
 import {
   CarLook,
@@ -127,7 +128,11 @@ export function RaceGame(props: {
     keepOrder: s.keepOrder,
   });
   const tracker = new TypingTracker();
-  const [now, setNow] = createSignal(Date.now());
+  // online races share the database clock (the start time comes from the
+  // host); a Chromebook with a wrong clock got a wrong countdown/time limit
+  const clock = (): number =>
+    s.others === undefined ? Date.now() : serverClockNow();
+  const [now, setNow] = createSignal(clock());
   const [version, setVersion] = createSignal(0);
   const [value, setValue] = createSignal("");
   const [banner, setBanner] = createSignal<string>();
@@ -139,7 +144,7 @@ export function RaceGame(props: {
   let ended = false;
   let finalShown = false;
   let bannerTimer: ReturnType<typeof setTimeout> | undefined;
-  let lastTick = Date.now();
+  let lastTick = clock();
   let lastLive = 0;
   let popupId = 0;
 
@@ -216,7 +221,7 @@ export function RaceGame(props: {
       setValue("");
       return;
     }
-    const t = Date.now();
+    const t = clock();
     const missesBefore = run.misses;
     const events = run.input(raw, t, otherDistances());
     for (let i = missesBefore; i < run.misses; i++) {
@@ -272,7 +277,7 @@ export function RaceGame(props: {
   const end = (): void => {
     if (ended) return;
     ended = true;
-    const t = Date.now();
+    const t = clock();
     const elapsedMs = Math.max(1, (run.finishedAt ?? t) - s.startAt);
     const finished = run.finishedAt !== undefined;
     const standings =
@@ -315,7 +320,7 @@ export function RaceGame(props: {
     let raf = 0;
     let endTimer: ReturnType<typeof setTimeout> | undefined;
     const frame = (): void => {
-      const t = Date.now();
+      const t = clock();
       setNow(t);
       if (t >= s.startAt && !ended) {
         tracker.tick(Math.min(250, t - lastTick));
@@ -368,6 +373,9 @@ export function RaceGame(props: {
     onCleanup(() => {
       cancelAnimationFrame(raf);
       clearTimeout(endTimer);
+      // closed during the finish banner: still report the race (score,
+      // coins, daily board, garage) instead of dropping it with the timer
+      if (endTimer !== undefined) end();
       clearTimeout(bannerTimer);
     });
   });

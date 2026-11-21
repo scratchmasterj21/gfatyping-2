@@ -22,6 +22,7 @@ import {
   DigDifficulty,
   WorldId,
 } from "./dig-rules";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 
 /**
  * Gem Dig rooms (RTDB digRooms/{code}). Each player only writes their own
@@ -90,17 +91,10 @@ export function digDifficultyFor(label: string): DigDifficulty {
   );
 }
 
-let serverOffset = 0;
 export async function syncDigClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const digServerNow = (): number => Date.now() + serverOffset;
+export const digServerNow = serverClockNow;
 
 /** When the match ends: time limit, or a short grace after the first finish. */
 export function digEndsAt(room: DigRoom): number | undefined {

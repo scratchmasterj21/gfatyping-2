@@ -250,6 +250,9 @@ export function RescueShipModal(props: {
       void finishShipRoom(r.code).catch(() => undefined);
     }
     const awards = mode() === "together" ? shipAwards(s.crew, v.stats) : [];
+    // coins and pets now: a Back tap during the pause used to cancel them
+    setClaim("pending");
+    void claimMiniGameReward(GAME_ID, score, { pets }).then(setClaim);
     resultTimer = setTimeout(() => {
       resultTimer = undefined;
       setResult({
@@ -289,8 +292,6 @@ export function RescueShipModal(props: {
       });
       setReport(typing);
       setPhase("result");
-      setClaim("pending");
-      void claimMiniGameReward(GAME_ID, score, { pets }).then(setClaim);
     }, RESULT_PAUSE_MS);
   });
 

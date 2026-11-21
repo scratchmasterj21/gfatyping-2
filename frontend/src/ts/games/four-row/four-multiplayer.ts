@@ -24,6 +24,7 @@ import {
   FourState,
   newMatch,
 } from "./four-rules";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 
 /**
  * Four in a Row rooms (RTDB fourRooms/{code}). Only written when a piece
@@ -71,18 +72,11 @@ function readRoom(snapshot: DataSnapshot): FourRoom | null {
   return snapshot.exists() ? (snapshot.val() as FourRoom) : null;
 }
 
-let serverOffset = 0;
 /** Read the database clock offset so both players time rounds the same. */
 export async function syncServerClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const serverNow = (): number => Date.now() + serverOffset;
+export const serverNow = serverClockNow;
 
 export async function createFourRoom(difficultyLabel: string): Promise<string> {
   const user = currentUser();

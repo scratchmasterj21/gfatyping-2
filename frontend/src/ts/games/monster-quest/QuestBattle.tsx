@@ -826,33 +826,31 @@ export function QuestBattle(props: {
     if (inputEl !== undefined) inputEl.value = "";
   };
 
+  // memos: on() re-runs whenever its source is touched (every room update,
+  // every 100ms clock tick) - only react when the prompt really changes
+  const pendingN = createMemo(() => {
+    const p = props.state.pending;
+    return p === null ? -1 : p.n;
+  });
+  const guardN = createMemo(() => myGuard()?.n);
   // new prompt: back to the menu
   createEffect(
-    on(
-      () => {
-        const p = props.state.pending;
-        return p === null ? -1 : p.n;
-      },
-      () => {
-        setStep("menu");
-        setTarget(undefined);
-        clearInput();
-        errors = 0;
-        typeStart = performance.now();
-      },
-    ),
+    on(pendingN, () => {
+      setStep("menu");
+      setTarget(undefined);
+      clearInput();
+      errors = 0;
+      typeStart = performance.now();
+    }),
   );
   // a guard prompt starts timing right away
   createEffect(
-    on(
-      () => myGuard()?.n,
-      (n) => {
-        if (n === undefined) return;
-        errors = 0;
-        typeStart = performance.now();
-        sfx.tick();
-      },
-    ),
+    on(guardN, (n) => {
+      if (n === undefined) return;
+      errors = 0;
+      typeStart = performance.now();
+      sfx.tick();
+    }),
   );
 
   const me = (): QuestState["heroes"][number] | undefined => {

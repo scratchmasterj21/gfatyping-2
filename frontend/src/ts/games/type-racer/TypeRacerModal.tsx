@@ -36,6 +36,7 @@ import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { sfx } from "../mini/mini-sounds";
 import { submitDailyBest } from "../shared/daily-board";
+import { serverClockNow } from "../shared/server-clock";
 import {
   getWordListOptions,
   WordListOption,
@@ -390,7 +391,7 @@ export function TypeRacerModal(props: Props): JSXElement {
   const startOnlineRace = (r: RacerRoom): void => {
     const uid = myUid();
     const bots = onlineBots(r);
-    const fallbackStart = Date.now() + COUNTDOWN_MS;
+    const fallbackStart = serverClockNow() + COUNTDOWN_MS;
     setResult(null);
     setSetup({
       words: raceWords(r),

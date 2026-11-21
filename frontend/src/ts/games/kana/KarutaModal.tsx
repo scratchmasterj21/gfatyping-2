@@ -277,6 +277,10 @@ export function KarutaModal(props: {
     const score = karutaScore(g, me);
     const stars = karutaStars(g, me);
     if (stars === 3) sfx.finish();
+    // score and coins now: a Back tap during the pause used to cancel them
+    props.onResult?.(score);
+    setClaim("pending");
+    void claimMiniGameReward("karuta", score).then(setClaim);
     resultTimer = setTimeout(() => {
       resultTimer = undefined;
       setResult({
@@ -292,9 +296,6 @@ export function KarutaModal(props: {
         ],
       });
       setPhase("result");
-      props.onResult?.(score);
-      setClaim("pending");
-      void claimMiniGameReward("karuta", score).then(setClaim);
     }, 1800);
   };
 

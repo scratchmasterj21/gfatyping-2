@@ -29,6 +29,7 @@ import {
   PONG_DIFFICULTIES,
   PongDifficulty,
 } from "./pong-rules";
+import { serverClockNow, watchServerClock } from "../shared/server-clock";
 
 /**
  * Word Ping-Pong rooms (RTDB pongRooms/{code}). Turn-based: only the player
@@ -100,18 +101,11 @@ export function difficultyFor(label: string): PongDifficulty {
   );
 }
 
-let serverOffset = 0;
 /** Read the database clock offset so both players time the ball the same. */
 export async function syncServerClock(): Promise<void> {
-  try {
-    const snap = await get(ref(getRealtimeDb(), ".info/serverTimeOffset"));
-    const v = snap.val() as unknown;
-    if (typeof v === "number") serverOffset = v;
-  } catch {
-    // fall back to the local clock
-  }
+  watchServerClock();
 }
-export const serverNow = (): number => Date.now() + serverOffset;
+export const serverNow = serverClockNow;
 
 export async function createPongRoom(input: {
   difficultyLabel: string;
