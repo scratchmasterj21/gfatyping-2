@@ -9,7 +9,11 @@ import {
   HomeRowCheckpoint,
   LESSON_GROUP_CHECKPOINTS,
 } from "../../../lessons/lesson-checkpoints";
-import { LESSON_GROUP_INTRO_VIDEOS } from "../../../lessons/lesson-intro-videos";
+import {
+  introVideoPoster,
+  isLocalIntroVideo,
+  LESSON_GROUP_INTRO_VIDEOS,
+} from "../../../lessons/lesson-intro-videos";
 import { GAME_PREFIX, LessonProgress } from "../../../lessons/lesson-progress";
 import { LessonGroup } from "../../../lessons/lessons-data";
 import { showNoticeNotification } from "../../../states/notifications";
@@ -113,8 +117,19 @@ export function LessonGroupSection(props: {
                 onClick={() => showLessonIntroVideo(videoId)}
               >
                 <div class="px-4 pt-3 text-2xl font-bold text-sub">▶</div>
-                <div class="flex items-center justify-center px-3 py-2">
-                  <Fa icon="fa-play-circle" class="text-main" size={2.8} />
+                <div class="relative flex items-center justify-center px-3 py-2">
+                  <Show when={isLocalIntroVideo(videoId)}>
+                    <img
+                      src={introVideoPoster(videoId)}
+                      alt=""
+                      class="absolute inset-x-3 inset-y-2 h-[calc(100%-1rem)] w-[calc(100%-1.5rem)] rounded-lg object-cover opacity-70"
+                    />
+                  </Show>
+                  <Fa
+                    icon="fa-play-circle"
+                    class="relative text-main drop-shadow"
+                    size={2.8}
+                  />
                 </div>
                 <div class="border-t border-bg px-3 py-2.5 text-center">
                   <div class="lesson-card-title font-medium">Intro video</div>
