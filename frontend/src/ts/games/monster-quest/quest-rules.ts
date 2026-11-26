@@ -27,12 +27,17 @@ export type HeroClass =
   | "monk"
   | "ninja"
   | "sorcerer"
-  | "bard";
+  | "bard"
+  // Wild Ones set
+  | "berserker"
+  | "druid"
+  | "hunter"
+  | "shaman";
 
 /** Everyone has these; computer helpers only ever use them. */
 export const FREE_HEROES: FreeHero[] = ["knight", "mage", "healer", "guardian"];
 
-export type HeroSetId = "legends" | "wanderers";
+export type HeroSetId = "legends" | "wanderers" | "wild";
 
 export type HeroSetInfo = {
   id: HeroSetId;
@@ -69,6 +74,16 @@ export const HERO_SETS: HeroSetInfo[] = [
     requiresName: "Top Row",
     title: "Peak Wanderer",
     combo: { name: "Wandering Storm", emoji: "🌪️" },
+  },
+  {
+    id: "wild",
+    name: "Wild Ones",
+    emoji: "🌿",
+    heroes: ["berserker", "druid", "hunter", "shaman"],
+    requires: "bottom-row",
+    requiresName: "Bottom Row",
+    title: "Wild Heart",
+    combo: { name: "Call of the Wild", emoji: "🐾" },
   },
 ];
 
@@ -236,6 +251,54 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
     skillTarget: "ally",
     blurb: "Makes a friend's next move a critical",
     tip: "Also heals a little and fills Team Spirit.",
+  },
+  berserker: {
+    name: "Berserker",
+    emoji: "🪓",
+    maxHp: 125,
+    atk: 13,
+    speed: 6,
+    skill: "Cleave",
+    skillEmoji: "🪓",
+    skillTarget: "allMonsters",
+    blurb: "Swings at every monster",
+    tip: "Hits harder the more hurt the Berserker is.",
+  },
+  druid: {
+    name: "Druid",
+    emoji: "🌿",
+    maxHp: 110,
+    atk: 10,
+    speed: 6,
+    skill: "Thorn Storm",
+    skillEmoji: "🌿",
+    skillTarget: "allMonsters",
+    blurb: "Thorny magic on every monster",
+    tip: "Magic thorns reach flying and faded monsters.",
+  },
+  hunter: {
+    name: "Hunter",
+    emoji: "🎯",
+    maxHp: 95,
+    atk: 12,
+    speed: 9,
+    skill: "Hunter's Mark",
+    skillEmoji: "🎯",
+    skillTarget: "monster",
+    blurb: "Marks a monster for the team",
+    tip: "Everyone hits a marked monster 30% harder - and it can't hide behind a disguise or thick hide.",
+  },
+  shaman: {
+    name: "Shaman",
+    emoji: "🪶",
+    maxHp: 95,
+    atk: 9,
+    speed: 7,
+    skill: "Healing Totem",
+    skillEmoji: "🪶",
+    skillTarget: "self",
+    blurb: "A totem heals the team for 3 turns",
+    tip: "The totem heals every friend a little after each of your turns.",
   },
 };
 
@@ -443,7 +506,12 @@ export type MonsterKind =
   | "lantern"
   | "toad"
   | "fox"
-  | "kite";
+  | "kite"
+  // Wildwood Jungle (Wild Ones set)
+  | "wasp"
+  | "croc"
+  | "monkey"
+  | "boar";
 
 export type MonsterInfo = {
   name: string;
@@ -643,6 +711,39 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
     trick:
       "Floats up every other turn and claps thunder on everyone every 3rd turn",
   },
+  wasp: {
+    name: "Stinger Wasp",
+    hp: 70,
+    atk: 20,
+    speed: 9,
+    boss: false,
+    trick: "Poison stings - healing cures it",
+  },
+  croc: {
+    name: "Snapjaw Log",
+    hp: 105,
+    atk: 25,
+    speed: 3,
+    boss: false,
+    trick: "Pretends to be a log - half damage until it bites (or gets marked)",
+  },
+  monkey: {
+    name: "Vine Monkey",
+    hp: 75,
+    atk: 20,
+    speed: 10,
+    boss: false,
+    trick: "Steals gold - beat it to get the gold back",
+  },
+  boar: {
+    name: "Thundertusk",
+    hp: 580,
+    atk: 42,
+    speed: 4,
+    boss: true,
+    trick:
+      "Charges up a stampede - Defend! Thick hide: mark it to hit full power",
+  },
 };
 
 /** The word to type to aim at a monster (twins add "a" / "b"). */
@@ -670,6 +771,10 @@ export const KIND_WORD: Record<MonsterKind, string> = {
   toad: "toad",
   fox: "fox",
   kite: "kite",
+  wasp: "wasp",
+  croc: "log",
+  monkey: "monkey",
+  boar: "tusk",
 };
 
 export function monsterWord(m: {
@@ -682,7 +787,13 @@ export function monsterWord(m: {
   return twin === undefined ? base : `${base} ${twin.toLowerCase()}`;
 }
 
-export type LandId = "forest" | "mountain" | "castle" | "ruins" | "peaks";
+export type LandId =
+  | "forest"
+  | "mountain"
+  | "castle"
+  | "ruins"
+  | "peaks"
+  | "jungle";
 
 export type LandInfo = {
   name: string;
@@ -722,6 +833,12 @@ export const LANDS: Record<LandId, LandInfo> = {
     minions: ["lantern", "toad", "fox"],
     bosses: ["kite", "queen"],
   },
+  jungle: {
+    name: "Wildwood Jungle",
+    emoji: "🌴",
+    minions: ["wasp", "croc", "monkey"],
+    bosses: ["boar", "treant"],
+  },
 };
 export const LAND_IDS: LandId[] = [
   "forest",
@@ -729,6 +846,7 @@ export const LAND_IDS: LandId[] = [
   "castle",
   "ruins",
   "peaks",
+  "jungle",
 ];
 /** The weekly quest only picks from these, so adding a land never changes a week already planned. */
 export const WEEKLY_LAND_IDS: LandId[] = ["forest", "mountain", "castle"];
@@ -816,7 +934,15 @@ export type UltimateId =
   | "meteor"
   | "stormcall"
   | "anthem"
-  | "lullaby";
+  | "lullaby"
+  | "rampage"
+  | "warcry"
+  | "bearform"
+  | "grove"
+  | "pindown"
+  | "packhunt"
+  | "wolves"
+  | "ancestors";
 
 export type UltimateInfo = {
   name: string;
@@ -996,6 +1122,62 @@ export const ULTIMATES: Record<UltimateId, UltimateInfo> = {
     aim: "allMonsters",
     blurb: "Every monster falls asleep and skips a turn",
   },
+  rampage: {
+    name: "Rampage",
+    emoji: "💢",
+    cls: "berserker",
+    aim: "monster",
+    blurb: "One giant swing - even bigger when you're hurt",
+  },
+  warcry: {
+    name: "War Cry",
+    emoji: "📣",
+    cls: "berserker",
+    aim: "allMonsters",
+    blurb: "Scares every monster - they hit softer for the battle",
+  },
+  bearform: {
+    name: "Bear Form",
+    emoji: "🐻",
+    cls: "druid",
+    aim: "self",
+    blurb: "Turn into a bear: heal, defend and draw attacks",
+  },
+  grove: {
+    name: "Blooming Grove",
+    emoji: "🌸",
+    cls: "druid",
+    aim: "allAllies",
+    blurb: "Flowers heal the whole team and cure poison",
+  },
+  pindown: {
+    name: "Pin Down",
+    emoji: "📌",
+    cls: "hunter",
+    aim: "monster",
+    blurb: "A huge arrow that pins a monster - it skips a turn",
+  },
+  packhunt: {
+    name: "Pack Hunt",
+    emoji: "🐺",
+    cls: "hunter",
+    aim: "allMonsters",
+    blurb: "Arrows on every monster, and marks them all",
+  },
+  wolves: {
+    name: "Spirit Wolves",
+    emoji: "🐺",
+    cls: "shaman",
+    aim: "allMonsters",
+    blurb: "Spirit wolves bite every monster",
+  },
+  ancestors: {
+    name: "Ancestors' Call",
+    emoji: "🪶",
+    cls: "shaman",
+    aim: "allAllies",
+    blurb: "Wakes up every fallen friend and heals the team",
+  },
 };
 
 export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
@@ -1011,6 +1193,10 @@ export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
   ninja: ["smokebomb", "shadowclone"],
   sorcerer: ["meteor", "stormcall"],
   bard: ["anthem", "lullaby"],
+  berserker: ["rampage", "warcry"],
+  druid: ["bearform", "grove"],
+  hunter: ["pindown", "packhunt"],
+  shaman: ["wolves", "ancestors"],
 };
 
 const BOSS_HP = 1.45;
@@ -1076,6 +1262,8 @@ export const COMBOS: Record<string, { name: string; emoji: string }> = {
 export const COMBO_BOOST = 1.3;
 /** Summoner's spirit friend attacks after this many of their turns. */
 export const SPIRIT_TURNS = 3;
+/** Shaman's totem heals after this many of their turns. */
+export const TOTEM_TURNS = 3;
 /** any other two different heroes */
 export const TEAM_COMBO = { name: "Team Combo", emoji: "🤝" };
 
@@ -1169,6 +1357,10 @@ export type HeroState = HeroSetup & {
   familiar: number;
   /** rogue vanished: monsters can't pick them until their next turn */
   hidden: boolean;
+  /** druid's bear form: own turns left drawing attacks */
+  taunt: number;
+  /** shaman's healing totem: turns left */
+  totem: number;
 };
 
 export type MonsterState = {
@@ -1200,6 +1392,8 @@ export type MonsterState = {
   asleep?: boolean;
   /** trickster fox: dodges the next single hit */
   dodge?: boolean;
+  /** hunter's mark: everyone hits it 30% harder */
+  marked?: boolean;
 };
 
 export type MonsterFlags = Pick<MonsterState, "faded" | "flying" | "charging">;
@@ -1213,7 +1407,8 @@ export type StatusKind =
   | "potionsBack"
   | "shellCracked"
   | "mimicGold"
-  | "monsterAsleep";
+  | "monsterAsleep"
+  | "goldBack";
 
 export type HitResult = {
   /** "h0".."h3" or "m0".. */
@@ -1641,6 +1836,22 @@ function cpuChoice(
       ? { kind: "hero", action: "skill", target: friend.slot, power }
       : attack;
   }
+  if (hero.cls === "berserker" || hero.cls === "druid") {
+    return monsters.length >= 2 || reachable.length === 0
+      ? { kind: "hero", action: "skill", power }
+      : attack;
+  }
+  if (hero.cls === "hunter") {
+    const prey = [...monsters]
+      .filter((m) => m.marked !== true)
+      .sort((a, b) => b.hp - a.hp)[0];
+    return prey !== undefined
+      ? { kind: "hero", action: "skill", target: prey.index, power }
+      : attack;
+  }
+  if (hero.cls === "shaman") {
+    return hero.totem === 0 ? { kind: "hero", action: "skill", power } : attack;
+  }
   if (hero.cls === "summoner") {
     return hero.familiar === 0
       ? { kind: "hero", action: "skill", power }
@@ -1767,6 +1978,7 @@ function applyHero(
   hero.defending = false;
   // vanishing lasts until the rogue's next turn
   hero.hidden = false;
+  if (hero.taunt > 0) hero.taunt--;
   // a guardian's protection lasts until its next turn
   for (const h of s.heroes) {
     if (h.protectedBy === hero.slot) h.protectedBy = undefined;
@@ -1803,6 +2015,14 @@ function applyHero(
       rng() < 0.6
     ) {
       return { id, amount: 0, miss: true };
+    }
+    // hunter's mark: everyone hits harder; disguises and hide don't help
+    if (m.marked === true) {
+      base *= 1.3;
+    } else if (m.kind === "croc" && !m.used) {
+      base *= 0.5;
+    } else if (m.kind === "boar" && !aoe) {
+      base *= 0.75;
     }
     // a trickster fox dodges the first single hit after its turn
     if (m.kind === "fox" && m.dodge === true && !aoe) {
@@ -2007,6 +2227,70 @@ function applyHero(
           x.asleep = true;
           x.charging = false;
         }
+        break;
+      case "rampage":
+        hits =
+          m === undefined ? [] : [hitMonster(m, info.atk * 2.4 * rage(hero))];
+        break;
+      case "warcry":
+        for (const x of live) x.atk = Math.round(x.atk * 0.85);
+        break;
+      case "bearform": {
+        hero.taunt = 2;
+        hero.defending = true;
+        const amount = Math.min(
+          hero.maxHp - hero.hp,
+          Math.round(hero.maxHp * 0.25 * healBoost),
+        );
+        hero.hp += amount;
+        stats.healed += amount;
+        hits = [{ id: actor, amount, heal: true }];
+        shields = [actor];
+        break;
+      }
+      case "grove":
+        hits = alive(s.heroes).map((h) => {
+          const amount = Math.min(
+            h.maxHp - h.hp,
+            scaled(25 * healBoost, input.power, rng),
+          );
+          h.hp += amount;
+          h.poison = 0;
+          h.sleep = 0;
+          stats.healed += amount;
+          return { id: heroId(h.slot), amount, heal: true };
+        });
+        break;
+      case "pindown":
+        if (m !== undefined) {
+          hits = [hitMonster(m, info.atk * 2.5, "arrow")];
+          if (m.hp > 0) {
+            m.asleep = true;
+            m.charging = false;
+          }
+        }
+        break;
+      case "packhunt":
+        hits = live.map((x) => hitMonster(x, info.atk * 0.95, "arrow", true));
+        for (const x of live) if (x.hp > 0) x.marked = true;
+        break;
+      case "wolves":
+        hits = live.map((x) => hitMonster(x, info.atk * 1.15, "magic", true));
+        break;
+      case "ancestors":
+        hits = s.heroes.map((h) => {
+          const revive = h.hp <= 0;
+          const amount = revive
+            ? Math.round(h.maxHp * 0.3)
+            : Math.min(h.maxHp - h.hp, Math.round(15 * healBoost));
+          h.hp += amount;
+          if (revive) {
+            h.poison = 0;
+            h.sleep = 0;
+          }
+          stats.healed += amount;
+          return { id: heroId(h.slot), amount, heal: true, revive };
+        });
         break;
     }
     s.events.push({
@@ -2219,6 +2503,61 @@ function applyHero(
     });
     return;
   }
+  if (hero.cls === "berserker") {
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: alive(s.monsters).map((m) =>
+        hitMonster(m, info.atk * 0.85 * rage(hero) * boost, "melee", true),
+      ),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "druid") {
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: alive(s.monsters).map((m) =>
+        hitMonster(m, info.atk * 0.95 * boost, "magic", true),
+      ),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "hunter") {
+    const m = targetMonster();
+    const hits =
+      m === undefined ? [] : [hitMonster(m, info.atk * 1.0 * boost, "arrow")];
+    if (m !== undefined && m.hp > 0) m.marked = true;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits,
+      ...(m !== undefined && m.hp > 0 ? { note: `${m.name} is marked!` } : {}),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "shaman") {
+    hero.totem = TOTEM_TURNS;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: [],
+      note: `heals the team for ${TOTEM_TURNS} turns`,
+      ...combo,
+    });
+    return;
+  }
   if (hero.cls === "summoner") {
     hero.familiar = SPIRIT_TURNS;
     s.events.push({
@@ -2299,6 +2638,35 @@ function applyHero(
       note: `protects ${target.slot === hero.slot ? "the team" : target.name}`,
     });
   }
+}
+
+/** Berserker: up to 1.8x damage as their HP drops. */
+const rage = (h: HeroState): number => 1 + 0.8 * (1 - h.hp / h.maxHp);
+
+/** The shaman's totem heals the team after the shaman's move. */
+function totemPulse(s: QuestState, hero: HeroState): void {
+  if (hero.totem <= 0 || hero.hp <= 0) return;
+  hero.totem--;
+  const healBoost = s.weather === "sun" ? 1.3 : 1;
+  const hits: HitResult[] = [];
+  for (const h of alive(s.heroes)) {
+    const amount = Math.min(h.maxHp - h.hp, Math.round(12 * healBoost));
+    if (amount <= 0) continue;
+    h.hp += amount;
+    (s.stats[hero.slot] as HeroStats).healed += amount;
+    hits.push({ id: heroId(h.slot), amount, heal: true });
+  }
+  s.events.push({
+    type: "action",
+    actor: heroId(hero.slot),
+    move: "Totem Pulse",
+    emoji: "🪶",
+    hits,
+    note:
+      hero.totem > 0
+        ? `${hero.totem} more turn${hero.totem === 1 ? "" : "s"}`
+        : "the totem fades",
+  });
 }
 
 /** The summoner's spirit friend attacks after the summoner's move. */
@@ -2406,11 +2774,23 @@ function monsterPlan(
   const visible = standing.filter((h) => !h.hidden);
   const live = visible.length > 0 ? visible : standing;
   const pickOne = (): HeroState => {
+    // a druid in bear form draws attacks
+    const bear = live.find((h) => h.taunt > 0);
+    if (bear !== undefined && rng() < 0.6) return bear;
     const guardian = live.find((h) => h.cls === "guardian");
     if (guardian !== undefined && rng() < 0.35) return guardian;
     return live[Math.floor(rng() * live.length)] as HeroState;
   };
   if (m.charging) {
+    if (m.kind === "boar") {
+      return {
+        big: true,
+        targets: live,
+        move: "Wild Stampede",
+        emoji: "🐗",
+        base: m.atk * 0.75,
+      };
+    }
     return m.kind === "toad"
       ? {
           big: true,
@@ -2479,7 +2859,7 @@ function setupTurn(m: MonsterState): [string, string] | null {
   // golem every 3rd turn; the smaller toad starts charging right away
   if (
     !m.charging &&
-    ((m.kind === "golem" && m.turns % 3 === 0) ||
+    (((m.kind === "golem" || m.kind === "boar") && m.turns % 3 === 0) ||
       (m.kind === "toad" && m.turns % 3 === 1))
   ) {
     m.charging = true;
@@ -2516,6 +2896,10 @@ const MONSTER_MOVES: Record<MonsterKind, [string, string]> = {
   toad: ["Tongue Lash", "🐸"],
   fox: ["Fox Fire", "🦊"],
   kite: ["Gust Slash", "🪁"],
+  wasp: ["Sting", "🐝"],
+  croc: ["Snap", "🐊"],
+  monkey: ["Banana Bonk", "🍌"],
+  boar: ["Tusk Bash", "🐗"],
 };
 const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   slime: ["Mega Splash", "🌊"],
@@ -2541,6 +2925,10 @@ const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   toad: ["Tongue Lash", "🐸"],
   fox: ["Fox Fire", "🦊"],
   kite: ["Storm Dive", "🌩️"],
+  wasp: ["Sting", "🐝"],
+  croc: ["Snap", "🐊"],
+  monkey: ["Banana Bonk", "🍌"],
+  boar: ["Wild Stampede", "🐗"],
 };
 
 /** Weather for a battle: often clear. */
@@ -2603,6 +2991,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       streak: 0,
       familiar: 0,
       hidden: false,
+      taunt: 0,
+      totem: 0,
     })),
     monsters: [],
     potions: START_POTIONS,
@@ -2888,6 +3278,15 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           what: "mimicGold",
           hits: [],
         });
+      } else if (m.kind === "monkey" && m.hp <= 0 && m.stolen > 0) {
+        s.gold += m.stolen;
+        m.stolen = 0;
+        s.events.push({
+          type: "status",
+          id: monsterId(m.index),
+          what: "goldBack",
+          hits: [],
+        });
       } else if (m.kind === "imp" && m.hp <= 0 && m.stolen > 0) {
         s.potions += m.stolen;
         m.stolen = 0;
@@ -2979,6 +3378,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       applyHero(s, hero, input, rng);
       shellStatus(s, shells);
       spiritPounce(s, hero, rng);
+      totemPulse(s, hero);
       reactions();
     } else {
       const m = s.monsters[Number(id.slice(1))] as MonsterState;
@@ -3064,7 +3464,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         // tricks only land on an unguarded hit
         const victim = s.heroes[Number(res[0]?.id.slice(1) ?? -1)];
         if (!guarded && victim !== undefined && victim.hp > 0) {
-          if (m.kind === "snake") {
+          if (m.kind === "snake" || m.kind === "wasp") {
             victim.poison = 2;
             notes.push("poisoned!");
           } else if (m.kind === "mushroom" && rng() < 0.28) {
@@ -3075,6 +3475,11 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             victim.sleep = 1;
             victim.sleepWhy = "frozen";
             notes.push("frozen solid!");
+          } else if (m.kind === "monkey" && s.gold > 0) {
+            const g = Math.min(5, s.gold);
+            s.gold -= g;
+            m.stolen += g;
+            notes.push("stole gold!");
           } else if (m.kind === "imp" && s.potions > 0) {
             s.potions--;
             m.stolen++;
@@ -3092,6 +3497,11 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         if (m.faded) notes.push("faded away!");
       }
       if (m.kind === "fox") m.dodge = true;
+      // the log was a croc all along
+      if (m.kind === "croc" && !m.used) {
+        m.used = true;
+        notes.push("it was a croc!");
+      }
       // the wisp and the kite float up every other turn
       if (m.kind === "wisp" || m.kind === "kite") {
         m.flying = !wasFlying;
@@ -3203,6 +3613,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           h.sleep = 0;
           h.familiar = 0;
           h.hidden = false;
+          h.taunt = 0;
+          h.totem = 0;
         }
         s.events.push({ type: "rest", hp: s.heroes.map((h) => h.hp) });
         if (s.battle === BATTLE_COUNT - 1) {

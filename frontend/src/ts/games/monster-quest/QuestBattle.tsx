@@ -103,6 +103,14 @@ const ULT_SHOW: Record<UltimateId, { motion: Motion; fx: FxKind }> = {
   stormcall: { motion: "channel", fx: "bolt" },
   anthem: { motion: "channel", fx: "hearts" },
   lullaby: { motion: "channel", fx: "frost" },
+  rampage: { motion: "leap", fx: "megaimpact" },
+  warcry: { motion: "stomp", fx: "eruption" },
+  bearform: { motion: "stomp", fx: "dome" },
+  grove: { motion: "channel", fx: "hearts" },
+  pindown: { motion: "channel", fx: "megaimpact" },
+  packhunt: { motion: "spin-dash", fx: "tornado" },
+  wolves: { motion: "channel", fx: "tornado" },
+  ancestors: { motion: "channel", fx: "pillar" },
 };
 /** cut-in first, then the effect, then the hits land */
 const CUT_IN_MS = 900;
@@ -271,7 +279,13 @@ export function QuestBattle(props: {
       setMotion({ id: e.actor, kind: ULT_SHOW[u].motion });
       const targets = e.shields ?? e.hits.map((h) => h.id);
       for (const t of targets) effect(t, ULT_SHOW[u].fx, true, 1700);
-      if (u === "mighty" || u === "slam" || u === "titan") {
+      if (
+        u === "mighty" ||
+        u === "slam" ||
+        u === "titan" ||
+        u === "rampage" ||
+        u === "warcry"
+      ) {
         setTimeout(() => {
           setBigQuake(true);
           setTimeout(() => setBigQuake(false), 650);
@@ -499,6 +513,7 @@ export function QuestBattle(props: {
         shellCracked: `🪲 CRACK! ${who}'s shell broke - hit it hard now!`,
         mimicGold: "📦 The Mimic Chest drops 10 💰 gold!",
         monsterAsleep: `😴 ${who} is fast asleep - Zzz…`,
+        goldBack: "🍌 You got your gold back from the monkey!",
       };
       setMessage(text[e.what]);
       if (e.what === "asleep") popup(e.id, "💤", "hit");
@@ -1223,7 +1238,9 @@ export function QuestBattle(props: {
                 ? "from-game-night via-game-brown-dark/70 to-game-tan/70"
                 : land() === "peaks"
                   ? "from-game-night via-game-dusk/60 to-game-sunset/60"
-                  : "from-game-night via-game-navy to-game-grass-dark",
+                  : land() === "jungle"
+                    ? "from-game-night via-game-frog/50 to-game-grass-dark"
+                    : "from-game-night via-game-navy to-game-grass-dark",
           bigQuake()
             ? "animate-quest-big-quake motion-reduce:animate-none"
             : quake() && "animate-quest-quake motion-reduce:animate-none",

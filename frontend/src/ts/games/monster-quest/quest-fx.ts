@@ -65,6 +65,7 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Howl":
       return "ice";
     case "Poison Bite":
+    case "Sting":
       return "poison";
     case "Spooky Touch":
     case "Spooky Glow":
@@ -76,11 +77,14 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Zap":
       return "laser";
     case "Vine Whip":
+    case "Thorn Storm":
       return "vine";
     case "Charge Up":
     case "Fly Up":
       return "charge";
     case "Root Quake":
+    case "Banana Bonk":
+    case "Wild Stampede":
     case "Shell Bash":
     case "Titan":
     case "Mega Smash":
@@ -102,10 +106,14 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Storm Dive":
       return "thunder";
     case "Flurry":
+    case "Cleave":
+    case "Tusk Bash":
     case "Thunder Palm":
     case "Shadow Clone":
       return "bigslash";
     case "Cheer Song":
+    case "Healing Totem":
+    case "Totem Pulse":
     case "Hero Anthem":
     case "Inner Peace":
       return "heal";
@@ -119,6 +127,7 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Summon Spirit":
       return "holy";
     case "Arrow Volley":
+    case "Hunter's Mark":
     case "Arrow Rain":
     case "Hawk Shot":
       return "slash";
@@ -147,6 +156,7 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Screech":
     case "Double Bite":
     case "Tongue Lash":
+    case "Snap":
     case "Gust Slash":
     case "Chomp":
     case "Sneaky Swipe":

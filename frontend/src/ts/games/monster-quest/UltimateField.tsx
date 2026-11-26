@@ -32,7 +32,13 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
           <div class="absolute inset-0 animate-quest-flash bg-game-cream [animation-delay:0.3s]"></div>
           <div class="absolute inset-0 animate-quest-flash bg-game-yellow/50 [animation-delay:0.5s]"></div>
         </Match>
-        <Match when={props.kind === "holy" || props.kind === "judgement"}>
+        <Match
+          when={
+            props.kind === "holy" ||
+            props.kind === "judgement" ||
+            props.kind === "ancestors"
+          }
+        >
           <div class="absolute -top-1/3 left-0 h-full w-1/2 animate-quest-flash rounded-full bg-radial from-game-gold/80 to-transparent"></div>
         </Match>
         <Match when={props.kind === "arrowrain" || props.kind === "startoss"}>
@@ -114,7 +120,13 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
         <Match when={props.kind === "mighty"}>
           <div class="absolute inset-0 animate-quest-flash bg-game-cream [animation-delay:0.4s]"></div>
         </Match>
-        <Match when={props.kind === "whirlwind"}>
+        <Match
+          when={
+            props.kind === "whirlwind" ||
+            props.kind === "wolves" ||
+            props.kind === "packhunt"
+          }
+        >
           <For each={range(12)}>
             {(i) => (
               <span
@@ -128,7 +140,7 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
             )}
           </For>
         </Match>
-        <Match when={props.kind === "groupheal"}>
+        <Match when={props.kind === "groupheal" || props.kind === "grove"}>
           <div class="absolute inset-y-0 right-0 w-1/2 animate-quest-flash bg-linear-to-t from-game-green/60 to-transparent"></div>
           <For each={range(14)}>
             {(i) => (
@@ -146,11 +158,11 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
             )}
           </For>
         </Match>
-        <Match when={props.kind === "wall"}>
+        <Match when={props.kind === "wall" || props.kind === "bearform"}>
           <div class="absolute right-[1%] bottom-0 h-[92%] w-[46%] origin-bottom animate-quest-dome rounded-t-full border-4 border-game-blue bg-game-blue/20 shadow-[0_0_40px_var(--color-game-blue)]"></div>
           <div class="absolute right-[6%] bottom-0 h-[80%] w-[36%] origin-bottom animate-quest-dome rounded-t-full border-2 border-game-cream/60 [animation-delay:0.1s]"></div>
         </Match>
-        <Match when={props.kind === "slam"}>
+        <Match when={props.kind === "slam" || props.kind === "warcry"}>
           <div class="absolute bottom-[14%] left-[3%] h-2 w-[46%] origin-right animate-quest-crack rounded-full bg-game-ink shadow-[0_0_10px_var(--color-game-orange)]"></div>
           <div class="absolute bottom-[10%] left-[8%] h-1.5 w-[36%] origin-right animate-quest-crack rounded-full bg-game-ink [animation-delay:0.12s]"></div>
           <div class="absolute inset-x-0 bottom-0 h-1/3 animate-quest-flash bg-linear-to-t from-game-tan/70 to-transparent [animation-delay:0.2s]"></div>

@@ -655,3 +655,84 @@ describe("monster quest: Wanderers heroes and Lantern Peaks", () => {
     expect(e?.type === "action" && e.hits.length).toBe(2);
   });
 });
+
+describe("monster quest: Wild Ones heroes and Wildwood Jungle", () => {
+  const as = (cls: HeroClass, seed: number): QuestSetup => ({
+    seed,
+    difficulty: questDifficultyFor("Easy"),
+    party: buildParty([{ uid: "me", name: "Ann", cls }]),
+  });
+  const skiller = (st: ReturnType<typeof runQuest>): QuestInput =>
+    st.pending?.kind === "guard"
+      ? { kind: "guard", guards: { me: true } }
+      : { kind: "hero", action: "skill", power: 1.5 };
+  const attacker = (st: ReturnType<typeof runQuest>): QuestInput =>
+    st.pending?.kind === "guard"
+      ? { kind: "guard", guards: { me: true } }
+      : { kind: "hero", action: "attack", power: 1 };
+  const count = (events: QuestEvent[], pred: (e: QuestEvent) => boolean) =>
+    events.filter(pred).length;
+
+  it("each Wild Ones hero can win a quest in Wildwood Jungle", () => {
+    landPick = "jungle";
+    for (const cls of ["berserker", "druid", "hunter", "shaman"] as const) {
+      for (const boss of [0, 1]) {
+        bossPick = boss;
+        for (const seed of [1, 2, 3]) {
+          const s = playThrough(as(cls, seed), skiller);
+          expect(s.won, `${cls} ${boss} ${seed}`).toBe(true);
+        }
+      }
+    }
+    landPick = "forest";
+    bossPick = 0;
+  });
+
+  it("jungle monsters do their tricks", () => {
+    landPick = "jungle";
+    bossPick = 0;
+    let stampede = 0;
+    let croc = 0;
+    let gold = 0;
+    let poison = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const s = playThrough(as("knight", seed), attacker);
+      stampede += count(
+        s.events,
+        (e) => e.type === "action" && e.move === "Wild Stampede",
+      );
+      croc += count(
+        s.events,
+        (e) => e.type === "action" && e.note?.includes("croc") === true,
+      );
+      gold += count(
+        s.events,
+        (e) => e.type === "action" && e.note?.includes("stole gold") === true,
+      );
+      poison += count(
+        s.events,
+        (e) => e.type === "status" && e.what === "poison",
+      );
+    }
+    expect(stampede).toBeGreaterThan(0);
+    expect(croc).toBeGreaterThan(0);
+    expect(gold).toBeGreaterThan(0);
+    expect(poison).toBeGreaterThan(0);
+    landPick = "forest";
+  });
+
+  it("the shaman's totem heals, the hunter marks", () => {
+    const sh = playThrough(as("shaman", 2), skiller);
+    expect(
+      count(sh.events, (e) => e.type === "action" && e.move === "Totem Pulse"),
+    ).toBeGreaterThan(0);
+    const hu = runQuest(as("hunter", 2), [
+      { kind: "vote", votes: { me: "forest" } },
+      { kind: "hero", action: "skill", target: 0, power: 1 },
+    ]);
+    const marked = hu.monsters.filter((m) => m.marked === true);
+    expect(
+      marked.length + hu.monsters.filter((m) => m.hp <= 0).length,
+    ).toBeGreaterThan(0);
+  });
+});
