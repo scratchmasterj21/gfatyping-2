@@ -1,11 +1,16 @@
 import { useQuery } from "@tanstack/solid-query";
-import { For, JSXElement, Show } from "solid-js";
+import { createSignal, For, JSXElement, Show } from "solid-js";
 
+import { isCurrentUserStaff } from "../../auth";
+import { getGameAccess, resolvePolicy } from "../../games/game-access";
+import { openZooVisit, setZooVisit } from "../../games/zoo/zoo-visit";
+import { ZooAnimal } from "../../games/zoo/ZooAnimal";
 import { getClassStreet, StreetHouse } from "../../house/class-street";
 import { HOUSE_THEMES } from "../../house/house-themes";
 import { summarizePractice } from "../../house/practice-state";
 import { listChampions } from "../../race/race-db";
 import { getUserId } from "../../states/core";
+import { showModal } from "../../states/modals";
 import { getSnapshot } from "../../states/snapshot";
 import { cn } from "../../utils/cn";
 import { currentSchoolYear, schoolYearOf } from "../../utils/school-year";
@@ -47,6 +52,29 @@ export function ClassStreet(props: {
       (c) => schoolYearOf(c.crownedAt) === currentSchoolYear(),
     )?.uid;
 
+  // My Zoo: the zoo park lists classmates' zoos (teacher can turn zoos off)
+  const [showZoos, setShowZoos] = createSignal(false);
+  const accessQuery = useQuery(() => ({
+    queryKey: ["gameAccess"],
+    queryFn: getGameAccess,
+    enabled: props.open && !isCurrentUserStaff(),
+    staleTime: STREET_STALE_MS,
+  }));
+  const zooOffFor = (uid: string | null): boolean =>
+    resolvePolicy(accessQuery.data, classId(), uid ?? undefined).zooOff;
+  const myZooOff = (): boolean =>
+    !isCurrentUserStaff() && zooOffFor(getUserId());
+  const zoos = (): StreetHouse[] =>
+    (streetQuery.data ?? []).filter((h) => !zooOffFor(h.uid));
+  const visitZoo = (h: StreetHouse): void => {
+    if (h.isMe) {
+      setZooVisit(undefined);
+      showModal("Zoo");
+    } else {
+      openZooVisit(h.uid, h.name);
+    }
+  };
+
   // the free "plain" wall follows the site theme (often dark) - use a
   // friendly cream outside instead
   const wall = (h: StreetHouse): string => {
@@ -64,8 +92,21 @@ export function ClassStreet(props: {
           </div>
         }
       >
-        <div class="mb-3 text-center text-lg font-bold text-game-ink">
-          🏘️ {classId()} street - tap a house to visit!
+        <div class="mb-3 flex flex-wrap items-center justify-center gap-3">
+          <div class="text-center text-lg font-bold text-game-ink">
+            {showZoos() && !myZooOff()
+              ? `🦁 ${classId()} zoo park - tap a zoo to visit!`
+              : `🏘️ ${classId()} street - tap a house to visit!`}
+          </div>
+          <Show when={!myZooOff()}>
+            <button
+              type="button"
+              class="press-3d flex min-h-11 items-center gap-2 rounded-xl bg-game-cream px-4 text-sm font-bold text-game-ink shadow-[0_4px_0_rgb(43_33_64/0.25)]"
+              onClick={() => setShowZoos((z) => !z)}
+            >
+              {showZoos() ? "🏘️ Back to the houses" : "🦁 Visit the zoo park"}
+            </button>
+          </Show>
         </div>
         <Show
           when={!streetQuery.isPending}
@@ -75,65 +116,108 @@ export function ClassStreet(props: {
             </div>
           }
         >
-          <div class="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
-            <For each={streetQuery.data ?? []}>
-              {(h) => (
-                <button
-                  type="button"
-                  class="group flex cursor-pointer flex-col items-center rounded-none bg-transparent p-0 hover:bg-transparent"
-                  aria-label={h.isMe ? "Your house" : `Visit ${h.name}'s house`}
-                  onClick={() => props.onVisit(h)}
-                >
-                  <Show when={h.uid === championUid()}>
-                    <div
-                      class="-mb-2 text-3xl drop-shadow motion-safe:animate-bounce"
-                      title="Class Champion"
+          <Show
+            when={showZoos() && !myZooOff()}
+            fallback={
+              <div class="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
+                <For each={streetQuery.data ?? []}>
+                  {(h) => (
+                    <button
+                      type="button"
+                      class="group flex cursor-pointer flex-col items-center rounded-none bg-transparent p-0 hover:bg-transparent"
+                      aria-label={
+                        h.isMe ? "Your house" : `Visit ${h.name}'s house`
+                      }
+                      onClick={() => props.onVisit(h)}
                     >
-                      👑
-                    </div>
-                  </Show>
-                  {/* roof */}
-                  <div
-                    class={cn(
-                      "h-10 w-[88%] [clip-path:polygon(50%_0,100%_100%,0_100%)]",
-                      h.isMe ? "bg-game-gold" : "bg-game-red",
-                    )}
-                  ></div>
-                  {/* walls + door */}
-                  <div
-                    class="relative flex h-24 w-[76%] items-end justify-center rounded-b-lg border-b-4 border-game-brown-dark shadow transition-transform group-hover:-translate-y-0.5"
-                    style={{ background: wall(h) }}
+                      <Show when={h.uid === championUid()}>
+                        <div
+                          class="-mb-2 text-3xl drop-shadow motion-safe:animate-bounce"
+                          title="Class Champion"
+                        >
+                          👑
+                        </div>
+                      </Show>
+                      {/* roof */}
+                      <div
+                        class={cn(
+                          "h-10 w-[88%] [clip-path:polygon(50%_0,100%_100%,0_100%)]",
+                          h.isMe ? "bg-game-gold" : "bg-game-red",
+                        )}
+                      ></div>
+                      {/* walls + door */}
+                      <div
+                        class="relative flex h-24 w-[76%] items-end justify-center rounded-b-lg border-b-4 border-game-brown-dark shadow transition-transform group-hover:-translate-y-0.5"
+                        style={{ background: wall(h) }}
+                      >
+                        <div class="absolute top-2 left-2 h-5 w-5 rounded-sm border-2 border-game-brown-dark bg-game-sky"></div>
+                        <div class="absolute top-2 right-2 h-5 w-5 rounded-sm border-2 border-game-brown-dark bg-game-sky"></div>
+                        <div class="mb-0 flex h-16 w-12 items-center justify-center rounded-t-full bg-game-brown">
+                          <Avatar
+                            color={h.equipped.color}
+                            shape={h.equipped.shape}
+                            hair={h.equipped.hair}
+                            hat={h.equipped.hat}
+                            accessory={h.equipped.accessory}
+                            face={h.equipped.face}
+                            background={h.equipped.background}
+                            animalImage={h.equipped.animalImage}
+                            size={40}
+                          />
+                        </div>
+                      </div>
+                      <div class="mt-1 flex max-w-full items-center gap-1 text-sm font-bold text-game-ink">
+                        <span class="truncate">{h.isMe ? "You" : h.name}</span>
+                      </div>
+                      <div class="text-xs text-game-ink/80">
+                        {gardenBadge(h)} 🏆
+                        {h.house.trophies.achievements.length}
+                        <Show when={Object.keys(h.pets.ownedPets).length > 0}>
+                          {" "}
+                          🐾{Object.keys(h.pets.ownedPets).length}
+                        </Show>
+                      </div>
+                    </button>
+                  )}
+                </For>
+              </div>
+            }
+          >
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <For each={zoos()}>
+                {(h) => (
+                  <button
+                    type="button"
+                    class="group flex cursor-pointer flex-col items-center overflow-hidden rounded-xl border-4 border-game-brown bg-game-grass p-0 shadow-[0_4px_0_var(--color-game-brown-dark)] transition-transform hover:-translate-y-0.5 hover:bg-game-grass"
+                    aria-label={h.isMe ? "Your zoo" : `Visit ${h.name}'s zoo`}
+                    onClick={() => visitZoo(h)}
                   >
-                    <div class="absolute top-2 left-2 h-5 w-5 rounded-sm border-2 border-game-brown-dark bg-game-sky"></div>
-                    <div class="absolute top-2 right-2 h-5 w-5 rounded-sm border-2 border-game-brown-dark bg-game-sky"></div>
-                    <div class="mb-0 flex h-16 w-12 items-center justify-center rounded-t-full bg-game-brown">
-                      <Avatar
-                        color={h.equipped.color}
-                        shape={h.equipped.shape}
-                        hair={h.equipped.hair}
-                        hat={h.equipped.hat}
-                        accessory={h.equipped.accessory}
-                        face={h.equipped.face}
-                        background={h.equipped.background}
-                        animalImage={h.equipped.animalImage}
-                        size={40}
-                      />
+                    <div class="w-full bg-game-brown py-0.5 text-center text-xs font-bold text-game-cream">
+                      {h.isMe ? "Your zoo" : `${h.name}'s zoo`}
                     </div>
-                  </div>
-                  <div class="mt-1 flex max-w-full items-center gap-1 text-sm font-bold text-game-ink">
-                    <span class="truncate">{h.isMe ? "You" : h.name}</span>
-                  </div>
-                  <div class="text-xs text-game-ink/80">
-                    {gardenBadge(h)} 🏆{h.house.trophies.achievements.length}
-                    <Show when={Object.keys(h.pets.ownedPets).length > 0}>
-                      {" "}
-                      🐾{Object.keys(h.pets.ownedPets).length}
-                    </Show>
-                  </div>
-                </button>
-              )}
-            </For>
-          </div>
+                    <div class="flex h-20 w-full items-end justify-center gap-0.5 px-1">
+                      <For each={h.zoo.animals.slice(-3)}>
+                        {(s) => (
+                          <ZooAnimal
+                            species={s}
+                            class="h-[80%] w-auto max-w-[33%]"
+                          />
+                        )}
+                      </For>
+                    </div>
+                    <div class="w-full bg-game-cream/80 py-0.5 text-center text-xs font-bold text-game-ink">
+                      🐾{h.zoo.animals.length}
+                      <Show when={h.zoo.streak > 0}> 🔥{h.zoo.streak}</Show>
+                      <Show when={h.zoo.decor.length > 0}>
+                        {" "}
+                        🌳{h.zoo.decor.length}
+                      </Show>
+                    </div>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
         </Show>
       </Show>
     </div>

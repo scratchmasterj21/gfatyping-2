@@ -4,6 +4,7 @@ import { EquippedAvatar, equippedFromDoc } from "../avatar/equipped-from-doc";
 import { getDb } from "../firebase";
 import { PetState, petStateFromDoc } from "../pet-shop/pet-state";
 import { queryClient } from "../queries";
+import { ZooState, zooStateFromDoc } from "../games/zoo/zoo-state";
 import { HouseState, houseStateFromDoc } from "./house-state";
 
 export type StreetHouse = {
@@ -13,12 +14,13 @@ export type StreetHouse = {
   equipped: EquippedAvatar;
   house: HouseState;
   pets: PetState;
+  zoo: ZooState;
 };
 
 /**
  * Every house on your class's street. One read per classmate (their user
  * doc holds the whole house), cached by the caller; also seeds the house /
- * avatar / pet caches so visiting a house costs no extra reads.
+ * avatar / pet / zoo caches so visiting costs no extra reads.
  */
 export async function getClassStreet(
   classId: string,
@@ -37,6 +39,7 @@ export async function getClassStreet(
       equipped: equippedFromDoc(data),
       house: houseStateFromDoc(data),
       pets: petStateFromDoc(data),
+      zoo: zooStateFromDoc(data),
     };
   });
   for (const h of houses) {
@@ -44,6 +47,7 @@ export async function getClassStreet(
     queryClient.setQueryData(["houseState", h.uid], h.house);
     queryClient.setQueryData(["houseEquippedAvatar", h.uid], h.equipped);
     queryClient.setQueryData(["petState", h.uid], h.pets);
+    queryClient.setQueryData(["zooState", h.uid], h.zoo);
   }
   return houses.sort(
     (a, b) => Number(b.isMe) - Number(a.isMe) || a.name.localeCompare(b.name),
