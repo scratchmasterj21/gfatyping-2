@@ -36,7 +36,8 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
           when={
             props.kind === "holy" ||
             props.kind === "judgement" ||
-            props.kind === "ancestors"
+            props.kind === "ancestors" ||
+            props.kind === "purify"
           }
         >
           <div class="absolute -top-1/3 left-0 h-full w-1/2 animate-quest-flash rounded-full bg-radial from-game-gold/80 to-transparent"></div>
@@ -80,7 +81,7 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
           <div class="absolute inset-0 animate-quest-flash bg-game-cream [animation-delay:0.3s]"></div>
           <div class="absolute inset-0 animate-quest-flash bg-game-blue/40 [animation-delay:0.5s]"></div>
         </Match>
-        <Match when={props.kind === "meteor"}>
+        <Match when={props.kind === "meteor" || props.kind === "megabomb"}>
           <span class="absolute top-0 left-[15%] animate-quest-shard text-6xl">
             ☄️
           </span>
@@ -124,7 +125,9 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
           when={
             props.kind === "whirlwind" ||
             props.kind === "wolves" ||
-            props.kind === "packhunt"
+            props.kind === "packhunt" ||
+            props.kind === "spearsweep" ||
+            props.kind === "petalstorm"
           }
         >
           <For each={range(12)}>
@@ -158,7 +161,13 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
             )}
           </For>
         </Match>
-        <Match when={props.kind === "wall" || props.kind === "bearform"}>
+        <Match
+          when={
+            props.kind === "wall" ||
+            props.kind === "bearform" ||
+            props.kind === "sanctuary"
+          }
+        >
           <div class="absolute right-[1%] bottom-0 h-[92%] w-[46%] origin-bottom animate-quest-dome rounded-t-full border-4 border-game-blue bg-game-blue/20 shadow-[0_0_40px_var(--color-game-blue)]"></div>
           <div class="absolute right-[6%] bottom-0 h-[80%] w-[36%] origin-bottom animate-quest-dome rounded-t-full border-2 border-game-cream/60 [animation-delay:0.1s]"></div>
         </Match>

@@ -111,6 +111,14 @@ const ULT_SHOW: Record<UltimateId, { motion: Motion; fx: FxKind }> = {
   packhunt: { motion: "spin-dash", fx: "tornado" },
   wolves: { motion: "channel", fx: "tornado" },
   ancestors: { motion: "channel", fx: "pillar" },
+  cometdive: { motion: "leap", fx: "megaimpact" },
+  spearsweep: { motion: "spin-dash", fx: "tornado" },
+  petalstorm: { motion: "spin-dash", fx: "tornado" },
+  moonslash: { motion: "leap", fx: "megaimpact" },
+  turret: { motion: "channel", fx: "charge" },
+  megabomb: { motion: "channel", fx: "eruption" },
+  sanctuary: { motion: "channel", fx: "dome" },
+  purify: { motion: "channel", fx: "pillar" },
 };
 /** cut-in first, then the effect, then the hits land */
 const CUT_IN_MS = 900;
@@ -496,7 +504,9 @@ export function QuestBattle(props: {
           ? "💧 The slime splits in two!"
           : m.kind === "beetle"
             ? `🪲 ${m.name} crawls in to help the king!`
-            : `🤖 ${m.name} joins the fight!`,
+            : m.kind === "tumbleweed"
+              ? "🌾 Another tumbleweed rolls in!"
+              : `🤖 ${m.name} joins the fight!`,
       );
       sfx.pop();
       return;
@@ -1240,7 +1250,9 @@ export function QuestBattle(props: {
                   ? "from-game-night via-game-dusk/60 to-game-sunset/60"
                   : land() === "jungle"
                     ? "from-game-night via-game-frog/50 to-game-grass-dark"
-                    : "from-game-night via-game-navy to-game-grass-dark",
+                    : land() === "canyon"
+                      ? "from-game-sky-top via-game-sunset/60 to-game-tan"
+                      : "from-game-night via-game-navy to-game-grass-dark",
           bigQuake()
             ? "animate-quest-big-quake motion-reduce:animate-none"
             : quake() && "animate-quest-quake motion-reduce:animate-none",
@@ -1282,14 +1294,22 @@ export function QuestBattle(props: {
                 style={{ "animation-delay": entering() ? `${i * 0.12}s` : "" }}
               >
                 <Show
-                  when={m().hp > 0 && (m().faded || m().flying || m().charging)}
+                  when={
+                    m().hp > 0 &&
+                    (m().faded ||
+                      m().flying ||
+                      m().charging ||
+                      m().burrowed === true)
+                  }
                 >
                   <span class="absolute -top-3 z-10 rounded-full bg-game-ink/80 px-2 text-xs font-bold whitespace-nowrap text-game-cream">
-                    {m().charging
-                      ? "⚡ charging - Defend!"
-                      : m().flying
-                        ? "🪽 flying - spells or arrows!"
-                        : "👻 faded - use spells!"}
+                    {m().burrowed === true
+                      ? "⛏️ underground - hit everyone or jump!"
+                      : m().charging
+                        ? "⚡ charging - Defend!"
+                        : m().flying
+                          ? "🪽 flying - spells or arrows!"
+                          : "👻 faded - use spells!"}
                   </span>
                 </Show>
                 <span

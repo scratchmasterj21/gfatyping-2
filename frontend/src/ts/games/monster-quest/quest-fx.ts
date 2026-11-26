@@ -50,6 +50,7 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
   switch (move) {
     case "Fire Storm":
     case "Wisp Flame":
+    case "Grenade":
     case "Fox Fire":
     case "Meteor":
     case "Phoenix":
@@ -83,6 +84,9 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Fly Up":
       return "charge";
     case "Root Quake":
+    case "Drill Bash":
+    case "Canyon Quake":
+    case "Roll Over":
     case "Banana Bonk":
     case "Wild Stampede":
     case "Shell Bash":
@@ -106,24 +110,29 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Storm Dive":
       return "thunder";
     case "Flurry":
+    case "Sky Jump":
+    case "Iaido Slash":
     case "Cleave":
     case "Tusk Bash":
     case "Thunder Palm":
     case "Shadow Clone":
       return "bigslash";
     case "Cheer Song":
+    case "Bless":
     case "Healing Totem":
     case "Totem Pulse":
     case "Hero Anthem":
     case "Inner Peace":
       return "heal";
     case "Smoke Bomb":
+    case "Dust Swirl":
     case "Lullaby":
       return "charge";
     case "Holy Light":
     case "Smite":
     case "Judgement":
     case "Spirit Pounce":
+    case "Turret Shot":
     case "Summon Spirit":
       return "holy";
     case "Arrow Volley":
@@ -156,6 +165,8 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Screech":
     case "Double Bite":
     case "Tongue Lash":
+    case "Pinch":
+    case "Angry Sting":
     case "Snap":
     case "Gust Slash":
     case "Chomp":

@@ -32,12 +32,17 @@ export type HeroClass =
   | "berserker"
   | "druid"
   | "hunter"
-  | "shaman";
+  | "shaman"
+  // Frontier set
+  | "lancer"
+  | "samurai"
+  | "engineer"
+  | "cleric";
 
 /** Everyone has these; computer helpers only ever use them. */
 export const FREE_HEROES: FreeHero[] = ["knight", "mage", "healer", "guardian"];
 
-export type HeroSetId = "legends" | "wanderers" | "wild";
+export type HeroSetId = "legends" | "wanderers" | "wild" | "frontier";
 
 export type HeroSetInfo = {
   id: HeroSetId;
@@ -84,6 +89,16 @@ export const HERO_SETS: HeroSetInfo[] = [
     requiresName: "Bottom Row",
     title: "Wild Heart",
     combo: { name: "Call of the Wild", emoji: "🐾" },
+  },
+  {
+    id: "frontier",
+    name: "Frontier",
+    emoji: "⚙️",
+    heroes: ["lancer", "samurai", "engineer", "cleric"],
+    requires: "all-keys",
+    requiresName: "All Keys",
+    title: "Frontier Captain",
+    combo: { name: "Frontier Blitz", emoji: "🚀" },
   },
 ];
 
@@ -300,6 +315,54 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
     blurb: "A totem heals the team for 3 turns",
     tip: "The totem heals every friend a little after each of your turns.",
   },
+  lancer: {
+    name: "Lancer",
+    emoji: "🔱",
+    maxHp: 115,
+    atk: 13,
+    speed: 7,
+    skill: "Sky Jump",
+    skillEmoji: "🔱",
+    skillTarget: "monster",
+    blurb: "Leaps up, crashes down",
+    tip: "Out of reach until your next turn. Hits flying and underground monsters.",
+  },
+  samurai: {
+    name: "Samurai",
+    emoji: "⚔️",
+    maxHp: 110,
+    atk: 14,
+    speed: 8,
+    skill: "Iaido Slash",
+    skillEmoji: "⚔️",
+    skillTarget: "monster",
+    blurb: "Fast typing = huge slash",
+    tip: "Even stronger on a critical, and strikes back at the next monster that hits you.",
+  },
+  engineer: {
+    name: "Engineer",
+    emoji: "🔧",
+    maxHp: 95,
+    atk: 10,
+    speed: 6,
+    skill: "Grenade",
+    skillEmoji: "💣",
+    skillTarget: "allMonsters",
+    blurb: "Boom! Hits every monster",
+    tip: "Fire damage on every monster, even underground ones.",
+  },
+  cleric: {
+    name: "Cleric",
+    emoji: "🔔",
+    maxHp: 100,
+    atk: 9,
+    speed: 7,
+    skill: "Bless",
+    skillEmoji: "🔔",
+    skillTarget: "ally",
+    blurb: "A glowing shield on a friend",
+    tip: "The shield soaks up the next 30 damage.",
+  },
 };
 
 export type HeroSetup = {
@@ -511,7 +574,12 @@ export type MonsterKind =
   | "wasp"
   | "croc"
   | "monkey"
-  | "boar";
+  | "boar"
+  // Dustbowl Canyon (Frontier set)
+  | "scorpion"
+  | "tumbleweed"
+  | "dustdevil"
+  | "rumbler";
 
 export type MonsterInfo = {
   name: string;
@@ -744,6 +812,40 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
     trick:
       "Charges up a stampede - Defend! Thick hide: mark it to hit full power",
   },
+  scorpion: {
+    name: "Sand Scorpion",
+    hp: 90,
+    atk: 22,
+    speed: 6,
+    boss: false,
+    trick:
+      "Gets angry when hit up close - its next sting is stronger. Use arrows, magic or hit-everyone moves",
+  },
+  tumbleweed: {
+    name: "Tumbleweed",
+    hp: 60,
+    atk: 18,
+    speed: 7,
+    boss: false,
+    trick: "Rolls in a little friend - hit everyone to clear them fast",
+  },
+  dustdevil: {
+    name: "Dust Devil",
+    hp: 75,
+    atk: 21,
+    speed: 9,
+    boss: false,
+    trick: "Blows away your potions - guard well!",
+  },
+  rumbler: {
+    name: "The Great Rumbler",
+    hp: 570,
+    atk: 42,
+    speed: 5,
+    boss: true,
+    trick:
+      "Digs underground every other turn - only hit-everyone moves and jumps reach it",
+  },
 };
 
 /** The word to type to aim at a monster (twins add "a" / "b"). */
@@ -775,6 +877,10 @@ export const KIND_WORD: Record<MonsterKind, string> = {
   croc: "log",
   monkey: "monkey",
   boar: "tusk",
+  scorpion: "scorpion",
+  tumbleweed: "tumbleweed",
+  dustdevil: "devil",
+  rumbler: "rumbler",
 };
 
 export function monsterWord(m: {
@@ -783,7 +889,8 @@ export function monsterWord(m: {
   mini?: boolean;
 }): string {
   const twin = /\s([A-E])$/.exec(m.name)?.[1];
-  const base = m.mini === true ? "mini slime" : KIND_WORD[m.kind];
+  const base =
+    m.mini === true ? `mini ${KIND_WORD[m.kind]}` : KIND_WORD[m.kind];
   return twin === undefined ? base : `${base} ${twin.toLowerCase()}`;
 }
 
@@ -793,7 +900,8 @@ export type LandId =
   | "castle"
   | "ruins"
   | "peaks"
-  | "jungle";
+  | "jungle"
+  | "canyon";
 
 export type LandInfo = {
   name: string;
@@ -839,6 +947,12 @@ export const LANDS: Record<LandId, LandInfo> = {
     minions: ["wasp", "croc", "monkey"],
     bosses: ["boar", "treant"],
   },
+  canyon: {
+    name: "Dustbowl Canyon",
+    emoji: "🌵",
+    minions: ["scorpion", "tumbleweed", "dustdevil"],
+    bosses: ["rumbler", "robot"],
+  },
 };
 export const LAND_IDS: LandId[] = [
   "forest",
@@ -847,6 +961,7 @@ export const LAND_IDS: LandId[] = [
   "ruins",
   "peaks",
   "jungle",
+  "canyon",
 ];
 /** The weekly quest only picks from these, so adding a land never changes a week already planned. */
 export const WEEKLY_LAND_IDS: LandId[] = ["forest", "mountain", "castle"];
@@ -942,7 +1057,15 @@ export type UltimateId =
   | "pindown"
   | "packhunt"
   | "wolves"
-  | "ancestors";
+  | "ancestors"
+  | "cometdive"
+  | "spearsweep"
+  | "petalstorm"
+  | "moonslash"
+  | "turret"
+  | "megabomb"
+  | "sanctuary"
+  | "purify";
 
 export type UltimateInfo = {
   name: string;
@@ -1178,6 +1301,62 @@ export const ULTIMATES: Record<UltimateId, UltimateInfo> = {
     aim: "allAllies",
     blurb: "Wakes up every fallen friend and heals the team",
   },
+  cometdive: {
+    name: "Comet Dive",
+    emoji: "☄️",
+    cls: "lancer",
+    aim: "monster",
+    blurb: "A giant dive from the sky - reaches anything",
+  },
+  spearsweep: {
+    name: "Spear Sweep",
+    emoji: "🔱",
+    cls: "lancer",
+    aim: "allMonsters",
+    blurb: "One wide sweep hits every monster",
+  },
+  petalstorm: {
+    name: "Petal Storm",
+    emoji: "🌸",
+    cls: "samurai",
+    aim: "allMonsters",
+    blurb: "A storm of slashes on every monster",
+  },
+  moonslash: {
+    name: "Moon Slash",
+    emoji: "🌙",
+    cls: "samurai",
+    aim: "monster",
+    blurb: "One perfect slash - huge damage",
+  },
+  turret: {
+    name: "Build Turret",
+    emoji: "⚙️",
+    cls: "engineer",
+    aim: "self",
+    blurb: "A turret shoots a monster after each of your turns (3 turns)",
+  },
+  megabomb: {
+    name: "Mega Bomb",
+    emoji: "💥",
+    cls: "engineer",
+    aim: "allMonsters",
+    blurb: "A huge boom on every monster",
+  },
+  sanctuary: {
+    name: "Sanctuary",
+    emoji: "🛡️",
+    cls: "cleric",
+    aim: "allAllies",
+    blurb: "A glowing shield on the whole team",
+  },
+  purify: {
+    name: "Purify",
+    emoji: "✨",
+    cls: "cleric",
+    aim: "allAllies",
+    blurb: "Heals everyone and pulls every monster out of hiding",
+  },
 };
 
 export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
@@ -1197,6 +1376,10 @@ export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
   druid: ["bearform", "grove"],
   hunter: ["pindown", "packhunt"],
   shaman: ["wolves", "ancestors"],
+  lancer: ["cometdive", "spearsweep"],
+  samurai: ["petalstorm", "moonslash"],
+  engineer: ["turret", "megabomb"],
+  cleric: ["sanctuary", "purify"],
 };
 
 const BOSS_HP = 1.45;
@@ -1264,6 +1447,8 @@ export const COMBO_BOOST = 1.3;
 export const SPIRIT_TURNS = 3;
 /** Shaman's totem heals after this many of their turns. */
 export const TOTEM_TURNS = 3;
+/** Cleric's Bless soaks up this much damage. */
+export const WARD = 30;
 /** any other two different heroes */
 export const TEAM_COMBO = { name: "Team Combo", emoji: "🤝" };
 
@@ -1361,6 +1546,10 @@ export type HeroState = HeroSetup & {
   taunt: number;
   /** shaman's healing totem: turns left */
   totem: number;
+  /** cleric's Bless: damage the glowing shield still soaks up */
+  ward: number;
+  /** samurai: strikes back at the next monster that hits them */
+  counter: boolean;
 };
 
 export type MonsterState = {
@@ -1394,9 +1583,16 @@ export type MonsterState = {
   dodge?: boolean;
   /** hunter's mark: everyone hits it 30% harder */
   marked?: boolean;
+  /** great rumbler: underground (only hit-everyone moves and jumps reach) */
+  burrowed?: boolean;
+  /** sand scorpion: hit up close since its last turn */
+  stung?: boolean;
 };
 
-export type MonsterFlags = Pick<MonsterState, "faded" | "flying" | "charging">;
+export type MonsterFlags = Pick<
+  MonsterState,
+  "faded" | "flying" | "charging" | "burrowed"
+>;
 
 export type StatusKind =
   | "poison"
@@ -1658,6 +1854,7 @@ const flagsOf = (m: MonsterState): MonsterFlags => ({
   faded: m.faded,
   flying: m.flying,
   charging: m.charging,
+  burrowed: m.burrowed === true,
 });
 
 /** Holy moves hit these extra hard. */
@@ -1669,7 +1866,8 @@ const UNDEAD: ReadonlySet<MonsterKind> = new Set<MonsterKind>([
 ]);
 
 /** Swords can't reach a faded ghost or a flying dragon. */
-export const untouchable = (m: MonsterState): boolean => m.faded || m.flying;
+export const untouchable = (m: MonsterState): boolean =>
+  m.faded || m.flying || m.burrowed === true;
 
 const POISON_DMG = 5;
 /** gold a beaten Mimic Chest drops */
@@ -1852,6 +2050,26 @@ function cpuChoice(
   if (hero.cls === "shaman") {
     return hero.totem === 0 ? { kind: "hero", action: "skill", power } : attack;
   }
+  if (hero.cls === "lancer") {
+    const high = monsters.find((m) => m.flying || m.burrowed === true);
+    return high !== undefined
+      ? { kind: "hero", action: "skill", target: high.index, power }
+      : rng() < 0.5
+        ? { ...attack, action: "skill" }
+        : attack;
+  }
+  if (hero.cls === "samurai") return { ...attack, action: "skill" };
+  if (hero.cls === "engineer") {
+    return monsters.length >= 2 || reachable.length === 0
+      ? { kind: "hero", action: "skill", power }
+      : attack;
+  }
+  if (hero.cls === "cleric") {
+    const hurt = lowest(alive(s.heroes).filter((h) => h.ward === 0));
+    return hurt !== undefined && hurt.hp / hurt.maxHp < 0.7
+      ? { kind: "hero", action: "skill", target: hurt.slot, power }
+      : attack;
+  }
   if (hero.cls === "summoner") {
     return hero.familiar === 0
       ? { kind: "hero", action: "skill", power }
@@ -1979,6 +2197,7 @@ function applyHero(
   // vanishing lasts until the rogue's next turn
   hero.hidden = false;
   if (hero.taunt > 0) hero.taunt--;
+  hero.counter = false;
   // a guardian's protection lasts until its next turn
   for (const h of s.heroes) {
     if (h.protectedBy === hero.slot) h.protectedBy = undefined;
@@ -1993,7 +2212,7 @@ function applyHero(
   const hitMonster = (
     m: MonsterState,
     base: number,
-    style: "melee" | "fire" | "magic" | "arrow" = "melee",
+    style: "melee" | "fire" | "magic" | "arrow" | "leap" = "melee",
     aoe = false,
   ): HitResult => {
     const id = monsterId(m.index);
@@ -2002,12 +2221,16 @@ function applyHero(
       base *= s.weather === "rain" ? 0.7 : s.weather === "sun" ? 1.2 : 1;
       if (s.twist === "fire") base *= 2;
     }
-    if (style === "melee" && untouchable(m)) {
+    // underground: only hit-everyone moves and jumps reach it
+    if (m.burrowed === true) {
+      if (!aoe && style !== "leap") return { id, amount: 0, miss: true };
+    } else if (style === "melee" && untouchable(m)) {
       return { id, amount: 0, miss: true };
     }
-    if (style === "arrow" && m.faded) {
+    if ((style === "arrow" || style === "leap") && m.faded) {
       return { id, amount: 0, miss: true };
     }
+    if (style === "melee" && m.kind === "scorpion") m.stung = true;
     if (
       style === "melee" &&
       m.kind === "bat" &&
@@ -2292,6 +2515,47 @@ function applyHero(
           return { id: heroId(h.slot), amount, heal: true, revive };
         });
         break;
+      case "cometdive":
+        hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.7, "leap")];
+        break;
+      case "spearsweep":
+        hits = live.map((x) => hitMonster(x, info.atk * 0.95, "melee", true));
+        break;
+      case "petalstorm":
+        hits = live.map((x) => hitMonster(x, info.atk * 1.0, "melee", true));
+        break;
+      case "moonslash":
+        hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.8)];
+        break;
+      case "turret":
+        hero.familiar = SPIRIT_TURNS;
+        shields = [actor];
+        break;
+      case "megabomb":
+        hits = live.map((x) => hitMonster(x, info.atk * 1.3, "fire", true));
+        break;
+      case "sanctuary":
+        shields = alive(s.heroes).map((h) => {
+          h.ward = 25;
+          return heroId(h.slot);
+        });
+        break;
+      case "purify":
+        hits = alive(s.heroes).map((h) => {
+          const amount = Math.min(h.maxHp - h.hp, Math.round(20 * healBoost));
+          h.hp += amount;
+          h.poison = 0;
+          h.sleep = 0;
+          stats.healed += amount;
+          return { id: heroId(h.slot), amount, heal: true };
+        });
+        for (const x of live) {
+          x.faded = false;
+          x.flying = false;
+          x.burrowed = false;
+          x.charging = false;
+        }
+        break;
     }
     s.events.push({
       type: "action",
@@ -2558,6 +2822,66 @@ function applyHero(
     });
     return;
   }
+  if (hero.cls === "lancer") {
+    const m = targetMonster();
+    hero.hidden = true;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits:
+        m === undefined ? [] : [hitMonster(m, info.atk * 1.4 * boost, "leap")],
+      note: "leaps out of reach!",
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "samurai") {
+    const m = targetMonster();
+    hero.counter = true;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits:
+        m === undefined
+          ? []
+          : [hitMonster(m, info.atk * 1.2 * (crit ? 1.6 : 1) * boost)],
+      note: crit ? "lightning fast!" : "ready to strike back",
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "engineer") {
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: alive(s.monsters).map((m) =>
+        hitMonster(m, info.atk * 0.95 * boost, "fire", true),
+      ),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "cleric") {
+    const target = targetHero();
+    if (target.hp > 0) target.ward = Math.round(WARD * boost);
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: [],
+      shield: heroId(target.hp > 0 ? target.slot : hero.slot),
+      note: `a glowing shield on ${target.slot === hero.slot ? "yourself" : target.name}`,
+      ...combo,
+    });
+    return;
+  }
   if (hero.cls === "summoner") {
     hero.familiar = SPIRIT_TURNS;
     s.events.push({
@@ -2676,6 +3000,7 @@ function spiritPounce(s: QuestState, hero: HeroState, rng: () => number): void {
   const m = lowest(live);
   if (m === undefined) return;
   hero.familiar--;
+  const turret = hero.cls === "engineer";
   const base =
     CLASS_INFO[hero.cls].atk *
     0.9 *
@@ -2687,13 +3012,15 @@ function spiritPounce(s: QuestState, hero: HeroState, rng: () => number): void {
   s.events.push({
     type: "action",
     actor: heroId(hero.slot),
-    move: "Spirit Pounce",
-    emoji: "🌟",
+    move: turret ? "Turret Shot" : "Spirit Pounce",
+    emoji: turret ? "⚙️" : "🌟",
     hits: [{ id: monsterId(m.index), amount, ko: m.hp <= 0 }],
     note:
       hero.familiar > 0
         ? `${hero.familiar} more turn${hero.familiar === 1 ? "" : "s"}`
-        : "the spirit says goodbye",
+        : turret
+          ? "the turret runs out"
+          : "the spirit says goodbye",
   });
 }
 
@@ -2736,6 +3063,12 @@ function damageHero(
       : s.heroes.find((h) => h.slot === target.protectedBy && h.hp > 0);
   const victim = guardian ?? target;
   if (guardian !== undefined) amount = Math.max(1, Math.round(amount * 0.5));
+  // cleric's glowing shield soaks it up first
+  if (victim.ward > 0) {
+    const soaked = Math.min(victim.ward, amount);
+    victim.ward -= soaked;
+    amount -= soaked;
+  }
   amount = Math.min(victim.hp, amount);
   victim.hp -= amount;
   if (guarded) (s.stats[target.slot] as HeroStats).guards++;
@@ -2806,6 +3139,15 @@ function monsterPlan(
           emoji: "🪨",
           base: m.atk * 0.75,
         };
+  }
+  if (m.kind === "scorpion" && m.stung === true) {
+    return {
+      big: false,
+      targets: [pickOne()],
+      move: "Angry Sting",
+      emoji: "🦂",
+      base: m.atk * 1.5,
+    };
   }
   if (m.kind === "kite" && m.turns % 3 === 0) {
     return {
@@ -2900,6 +3242,10 @@ const MONSTER_MOVES: Record<MonsterKind, [string, string]> = {
   croc: ["Snap", "🐊"],
   monkey: ["Banana Bonk", "🍌"],
   boar: ["Tusk Bash", "🐗"],
+  scorpion: ["Pinch", "🦂"],
+  tumbleweed: ["Roll Over", "🌾"],
+  dustdevil: ["Dust Swirl", "🌪️"],
+  rumbler: ["Drill Bash", "⛏️"],
 };
 const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   slime: ["Mega Splash", "🌊"],
@@ -2929,6 +3275,10 @@ const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   croc: ["Snap", "🐊"],
   monkey: ["Banana Bonk", "🍌"],
   boar: ["Wild Stampede", "🐗"],
+  scorpion: ["Pinch", "🦂"],
+  tumbleweed: ["Roll Over", "🌾"],
+  dustdevil: ["Dust Swirl", "🌪️"],
+  rumbler: ["Canyon Quake", "🌋"],
 };
 
 /** Weather for a battle: often clear. */
@@ -2993,6 +3343,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       hidden: false,
       taunt: 0,
       totem: 0,
+      ward: 0,
+      counter: false,
     })),
     monsters: [],
     potions: START_POTIONS,
@@ -3396,6 +3748,14 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         continue;
       }
       m.turns++;
+      if (m.kind === "tumbleweed" && !m.used && alive(s.monsters).length < 4) {
+        m.used = true;
+        spawnMonster(s, "tumbleweed", d, {
+          name: "Mini Tumbleweed",
+          share: 0.5,
+          mini: true,
+        });
+      }
       if (m.kind === "treant" && s.angry && m.hp < m.maxHp) {
         const amount = Math.min(m.maxHp - m.hp, Math.round(m.maxHp * 0.025));
         m.hp += amount;
@@ -3475,6 +3835,9 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
             victim.sleep = 1;
             victim.sleepWhy = "frozen";
             notes.push("frozen solid!");
+          } else if (m.kind === "dustdevil" && s.potions > 0) {
+            s.potions--;
+            notes.push("blew away a potion!");
           } else if (m.kind === "monkey" && s.gold > 0) {
             const g = Math.min(5, s.gold);
             s.gold -= g;
@@ -3488,6 +3851,23 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         }
         return res;
       });
+      // a samurai who just used Iaido Slash strikes back
+      for (const t of plan.targets) {
+        if (!t.counter || t.hp <= 0 || m.hp <= 0) continue;
+        t.counter = false;
+        const amount = Math.min(
+          m.hp,
+          scaled(
+            CLASS_INFO[t.cls].atk * 0.9 * (t.level > 1 ? LEVEL_BOOST : 1),
+            1,
+            rng,
+          ),
+        );
+        m.hp -= amount;
+        (s.stats[t.slot] as HeroStats).damage += amount;
+        hits.push({ id, amount, ko: m.hp <= 0 });
+        notes.push("counter strike!");
+      }
       const wasFlying = m.flying;
       m.charging = false;
       m.flying = false;
@@ -3503,6 +3883,12 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         notes.push("it was a croc!");
       }
       // the wisp and the kite float up every other turn
+      m.stung = false;
+      // the rumbler digs down every other turn
+      if (m.kind === "rumbler") {
+        m.burrowed = m.burrowed !== true;
+        if (m.burrowed) notes.push("digs underground!");
+      }
       if (m.kind === "wisp" || m.kind === "kite") {
         m.flying = !wasFlying;
         if (m.flying) notes.push("floats up high!");
@@ -3615,6 +4001,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           h.hidden = false;
           h.taunt = 0;
           h.totem = 0;
+          h.ward = 0;
+          h.counter = false;
         }
         s.events.push({ type: "rest", hp: s.heroes.map((h) => h.hp) });
         if (s.battle === BATTLE_COUNT - 1) {

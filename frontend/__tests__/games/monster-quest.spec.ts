@@ -736,3 +736,88 @@ describe("monster quest: Wild Ones heroes and Wildwood Jungle", () => {
     ).toBeGreaterThan(0);
   });
 });
+
+describe("monster quest: Frontier heroes and Dustbowl Canyon", () => {
+  const as = (cls: HeroClass, seed: number): QuestSetup => ({
+    seed,
+    difficulty: questDifficultyFor("Easy"),
+    party: buildParty([{ uid: "me", name: "Ann", cls }]),
+  });
+  const skiller = (st: ReturnType<typeof runQuest>): QuestInput =>
+    st.pending?.kind === "guard"
+      ? { kind: "guard", guards: { me: true } }
+      : { kind: "hero", action: "skill", power: 1.5 };
+  const attacker = (st: ReturnType<typeof runQuest>): QuestInput =>
+    st.pending?.kind === "guard"
+      ? { kind: "guard", guards: { me: true } }
+      : { kind: "hero", action: "attack", power: 1 };
+  const count = (events: QuestEvent[], pred: (e: QuestEvent) => boolean) =>
+    events.filter(pred).length;
+  const noted = (events: QuestEvent[], text: string) =>
+    count(
+      events,
+      (e) => e.type === "action" && e.note?.includes(text) === true,
+    );
+
+  it("each Frontier hero can win a quest in Dustbowl Canyon", () => {
+    landPick = "canyon";
+    for (const cls of ["lancer", "samurai", "engineer", "cleric"] as const) {
+      for (const boss of [0, 1]) {
+        bossPick = boss;
+        for (const seed of [1, 2, 3]) {
+          const s = playThrough(as(cls, seed), skiller);
+          expect(s.won, `${cls} ${boss} ${seed}`).toBe(true);
+        }
+      }
+    }
+    landPick = "forest";
+    bossPick = 0;
+  });
+
+  it("canyon monsters do their tricks", () => {
+    landPick = "canyon";
+    bossPick = 0;
+    let angry = 0;
+    let rolled = 0;
+    let blown = 0;
+    let dug = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const s = playThrough(as("knight", seed), attacker);
+      angry += count(
+        s.events,
+        (e) => e.type === "action" && e.move === "Angry Sting",
+      );
+      rolled += count(
+        s.events,
+        (e) => e.type === "spawn" && e.monster.kind === "tumbleweed",
+      );
+      blown += noted(s.events, "blew away a potion");
+      dug += noted(s.events, "digs underground");
+    }
+    expect(angry).toBeGreaterThan(0);
+    expect(rolled).toBeGreaterThan(0);
+    expect(blown).toBeGreaterThan(0);
+    expect(dug).toBeGreaterThan(0);
+    landPick = "forest";
+  });
+
+  it("samurai strikes back, cleric shields soak damage", () => {
+    landPick = "forest";
+    let counters = 0;
+    for (const seed of [1, 2, 3]) {
+      counters += noted(
+        playThrough(as("samurai", seed), skiller).events,
+        "counter strike",
+      );
+    }
+    expect(counters).toBeGreaterThan(0);
+    const c = runQuest(as("cleric", 2), [
+      { kind: "vote", votes: { me: "forest" } },
+      { kind: "hero", action: "skill", target: 0, power: 1 },
+    ]);
+    const bless = c.events.find(
+      (e) => e.type === "action" && e.move === "Bless",
+    );
+    expect(bless).toBeDefined();
+  });
+});
