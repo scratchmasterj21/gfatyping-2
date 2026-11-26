@@ -15,7 +15,6 @@ import { getAuthenticatedUser } from "../../firebase";
 import { queryClient } from "../../queries";
 import { showErrorNotification } from "../../states/notifications";
 import { getSnapshot } from "../../states/snapshot";
-import { cn } from "../../utils/cn";
 import { DifficultySegmented } from "../components/DifficultySegmented";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
@@ -37,6 +36,7 @@ import {
 } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
 import { HERO_ART } from "./hero-art";
+import { HeroPicker, useQuestHeroes } from "./HeroPicker";
 import {
   closeTimedOut,
   createQuestRoom,
@@ -59,7 +59,6 @@ import {
 import {
   buildParty,
   CLASS_INFO,
-  HERO_CLASSES,
   HeroClass,
   HeroInput,
   PARTY_SIZE,
@@ -132,6 +131,11 @@ export function MonsterQuestModal(props: {
     };
   };
   const [weeklyNote, setWeeklyNote] = createSignal<string>();
+  const heroes = useQuestHeroes(() => props.open);
+  // a bought hero switched off (or not owned on this account): back to knight
+  createEffect(() => {
+    if (!heroes.canPlay(cls())) setCls("knight");
+  });
 
   // solo
   const [solo, setSolo] = createSignal<{
@@ -639,7 +643,7 @@ export function MonsterQuestModal(props: {
               </ul>
             </GameSetupSection>
             <GameSetupSection title="Pick your hero">
-              <ClassPicker selected={cls()} onSelect={setCls} />
+              <HeroPicker heroes={heroes} selected={cls()} onSelect={setCls} />
             </GameSetupSection>
             <GameSetupSection title="Who do you want to play with?">
               <SoloTogetherToggle
@@ -753,7 +757,8 @@ export function MonsterQuestModal(props: {
               </For>
               <div>
                 <div class="mb-2 text-sm font-bold text-sub">Your hero</div>
-                <ClassPicker
+                <HeroPicker
+                  heroes={heroes}
                   selected={myLobbyClass() ?? cls()}
                   taken={takenByOthers()}
                   onSelect={(c) => {
@@ -817,47 +822,5 @@ export function MonsterQuestModal(props: {
         </Show>
       </GameModalFrame>
     </Show>
-  );
-}
-
-function ClassPicker(props: {
-  selected: HeroClass;
-  taken?: Set<HeroClass | undefined>;
-  onSelect: (cls: HeroClass) => void;
-}): JSXElement {
-  return (
-    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <For each={HERO_CLASSES}>
-        {(c) => {
-          const taken = (): boolean => props.taken?.has(c) === true;
-          return (
-            <button
-              type="button"
-              disabled={taken()}
-              class={cn(
-                "press-3d grid cursor-pointer justify-items-center gap-1 rounded-xl p-3 text-center font-kid",
-                props.selected === c
-                  ? "bg-main text-bg"
-                  : "bg-sub-alt text-text hover:bg-text hover:text-bg",
-                taken() && "cursor-not-allowed opacity-40",
-              )}
-              onClick={() => props.onSelect(c)}
-            >
-              <img
-                src={HERO_ART[c]}
-                alt=""
-                class="h-16 w-auto [image-rendering:pixelated]"
-              />
-              <span class="text-lg font-bold">
-                {CLASS_INFO[c].emoji} {CLASS_INFO[c].name}
-              </span>
-              <span class="text-xs leading-tight opacity-80">
-                {taken() ? "taken" : CLASS_INFO[c].blurb}
-              </span>
-            </button>
-          );
-        }}
-      </For>
-    </div>
   );
 }

@@ -54,6 +54,8 @@ service cloud.firestore {
         // My Zoo: animals are bought and care is paid via the API
         'ownedZooAnimals', 'zooCareDates', 'zooCareDone', 'ownedZooDecor',
         'zooStreak',
+        // Monster Quest heroes are bought via the API
+        'ownedQuestHeroes',
         'championWins', 'lastChampionAt',
         // "teacher" accounts skip the student rules - admin sets it
         'role'

@@ -19,6 +19,7 @@ import {
 import { serverClockNow, watchServerClock } from "../shared/server-clock";
 import {
   buildParty,
+  FREE_HEROES,
   HeroClass,
   HeroInput,
   HeroSetup,
@@ -169,9 +170,8 @@ export async function joinQuestRoom(
       .filter((p) => p.uid !== user.uid)
       .map((p) => p.cls),
   );
-  const free = (["knight", "mage", "healer", "guardian"] as HeroClass[]).find(
-    (c) => !taken.has(c),
-  );
+  // a free hero, so it's one this player can always use
+  const free = (FREE_HEROES as HeroClass[]).find((c) => !taken.has(c));
   await set(path(code, `/players/${user.uid}`), {
     uid: user.uid,
     name: user.name,

@@ -38,6 +38,11 @@ export type GamePolicy = {
    * (false = this student keeps the zoo while the class has it off).
    */
   zooOff?: boolean;
+  /**
+   * Monster Quest heroes bought with coins turned off (default on): hidden
+   * in the picker and can't be bought. Student value overrides the class.
+   */
+  questHeroesOff?: boolean;
 };
 
 /** Why a teacher paused a student's games. */
@@ -101,6 +106,9 @@ function parsePolicy(raw: unknown): StudentPolicy {
     out.needAllKeys = r["needAllKeys"];
   }
   if (typeof r["zooOff"] === "boolean") out.zooOff = r["zooOff"];
+  if (typeof r["questHeroesOff"] === "boolean") {
+    out.questHeroesOff = r["questHeroesOff"];
+  }
   if (typeof r["bonusDate"] === "string") out.bonusDate = r["bonusDate"];
   if (
     typeof r["pauseUntil"] === "string" &&
@@ -223,6 +231,8 @@ export type EffectivePolicy = {
   ownNeedAllKeys?: boolean;
   /** My Zoo turned off by the teacher */
   zooOff: boolean;
+  /** bought Monster Quest heroes turned off by the teacher */
+  questHeroesOff: boolean;
   /** bonus minutes valid today (0 = none) */
   bonusMinutes: number;
   /** true when any setting comes from the student's own override */
@@ -253,6 +263,7 @@ export function resolvePolicy(
       ? { ownNeedAllKeys: stu.needAllKeys }
       : {}),
     zooOff: stu.zooOff ?? cls.zooOff ?? false,
+    questHeroesOff: stu.questHeroesOff ?? cls.questHeroesOff ?? false,
     bonusMinutes: stu.bonusDate === today ? (stu.bonusMinutes ?? 0) : 0,
     personal:
       stu.mode !== undefined ||

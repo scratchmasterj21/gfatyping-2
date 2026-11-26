@@ -177,6 +177,7 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     }
     if (merged.needAllKeys === true) next.needAllKeys = true;
     if (merged.zooOff === true) next.zooOff = true;
+    if (merged.questHeroesOff === true) next.questHeroesOff = true;
     const classId = props.classId;
     void save(async () =>
       setClassGamePolicy(classId, Object.keys(next).length === 0 ? null : next),
@@ -417,6 +418,29 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           <span class="text-xs">
             Students buy zoo animals with coins and look after them each day.
             See or reset one student&apos;s zoo under their name &gt; More.
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+          <span>⚔️ Monster Quest heroes:</span>
+          <button
+            type="button"
+            class={chip(classPolicy().questHeroesOff !== true)}
+            disabled={saving() || accessQuery.isPending}
+            onClick={() => setClassPolicy({ questHeroesOff: false })}
+          >
+            On
+          </button>
+          <button
+            type="button"
+            class={chip(classPolicy().questHeroesOff === true)}
+            disabled={saving() || accessQuery.isPending}
+            onClick={() => setClassPolicy({ questHeroesOff: true })}
+          >
+            Off
+          </button>
+          <span class="text-xs">
+            Extra heroes students buy with coins (after the lessons they need).
+            Off hides them; the 4 free heroes always stay.
           </span>
         </div>
         <div>
@@ -1117,6 +1141,39 @@ function StudentRow(props: {
               <option value="class">
                 Class setting (
                 {props.access?.classes[props.classId]?.zooOff === true
+                  ? "off"
+                  : "on"}
+                )
+              </option>
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="flex flex-wrap items-center gap-2 text-sm text-sub">
+            ⚔️ Monster Quest heroes for {props.student.name}:
+            <select
+              class="min-h-9 rounded bg-sub-alt px-2 text-text"
+              value={
+                own().questHeroesOff === undefined
+                  ? "class"
+                  : own().questHeroesOff === true
+                    ? "off"
+                    : "on"
+              }
+              disabled={props.saving}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                const id = uid();
+                void props.save(async () =>
+                  updateStudentGamePolicy(id, {
+                    questHeroesOff: v === "class" ? null : v === "off",
+                  }),
+                );
+              }}
+            >
+              <option value="class">
+                Class setting (
+                {props.access?.classes[props.classId]?.questHeroesOff === true
                   ? "off"
                   : "on"}
                 )

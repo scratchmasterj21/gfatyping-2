@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildParty,
+  CLASS_INFO,
+  comboFor,
+  FREE_HEROES,
+  HERO_CLASSES,
+  HERO_SETS,
+  HeroClass,
   HeroInput,
+  LANDS,
+  QuestEvent,
+  SPIRIT_TURNS,
   pendingDeadline,
   QuestInput,
   questDifficultyFor,
@@ -123,7 +132,7 @@ describe("monster quest", () => {
   });
 
   it("a good player beats every land and boss", () => {
-    for (const land of ["forest", "mountain", "castle"]) {
+    for (const land of ["forest", "mountain", "castle", "ruins"]) {
       for (const boss of [0, 1]) {
         landPick = land;
         bossPick = boss;
@@ -391,5 +400,136 @@ describe("monster quest", () => {
       expect(hard.words.attack.split(" ")).toHaveLength(3);
       expect(hard.words.skill.split(" ")).toHaveLength(3);
     }
+  });
+});
+
+describe("monster quest: Legends heroes and the Ruins", () => {
+  const as = (cls: HeroClass, seed: number): QuestSetup => ({
+    seed,
+    difficulty: questDifficultyFor("Easy"),
+    party: buildParty([{ uid: "me", name: "Ann", cls }]),
+  });
+  /** perfect typing, always the skill, on the first monster / weakest friend */
+  const skiller = (st: ReturnType<typeof runQuest>): QuestInput =>
+    st.pending?.kind === "guard"
+      ? { kind: "guard", guards: { me: true } }
+      : { kind: "hero", action: "skill", power: 1.5 };
+  const actions = (events: QuestEvent[], move: string): number =>
+    events.filter((e) => e.type === "action" && e.move === move).length;
+  const statuses = (events: QuestEvent[], what: string): number =>
+    events.filter((e) => e.type === "status" && e.what === what).length;
+
+  it("helpers only use the free heroes", () => {
+    const party = buildParty([{ uid: "a", name: "A", cls: "rogue" }]);
+    expect(party.map((h) => h.cls)).toEqual([
+      "rogue",
+      "knight",
+      "mage",
+      "healer",
+    ]);
+    for (const h of party.slice(1)) {
+      expect(FREE_HEROES as HeroClass[]).toContain(h.cls);
+    }
+  });
+
+  it("every hero is in exactly one set or free", () => {
+    const sets = HERO_SETS.flatMap((s) => s.heroes);
+    expect(new Set([...FREE_HEROES, ...sets]).size).toBe(HERO_CLASSES.length);
+    // sets of 4, each with a hit-everyone skill
+    for (const set of HERO_SETS) {
+      expect(set.heroes).toHaveLength(4);
+      expect(
+        set.heroes.some((h) => CLASS_INFO[h].skillTarget === "allMonsters"),
+      ).toBe(true);
+    }
+  });
+
+  it("each Legends hero can win a quest in the Ruins", () => {
+    landPick = "ruins";
+    for (const cls of ["paladin", "rogue", "ranger", "summoner"] as const) {
+      for (const boss of [0, 1]) {
+        bossPick = boss;
+        for (const seed of [1, 2, 3]) {
+          const s = playThrough(as(cls, seed), skiller);
+          expect(s.won, `${cls} ${boss} ${seed}`).toBe(true);
+        }
+      }
+    }
+    landPick = "forest";
+    bossPick = 0;
+  });
+
+  it("is the same on every screen with the new heroes", () => {
+    landPick = "ruins";
+    const a = playThrough(as("summoner", 5), skiller);
+    const b = playThrough(as("summoner", 5), skiller);
+    expect(JSON.stringify(a.events)).toBe(JSON.stringify(b.events));
+    landPick = "forest";
+  });
+
+  it("the Ruins have their own monsters and boss", () => {
+    expect(LANDS.ruins.minions).toEqual(["beetle", "mimic", "wisp"]);
+    expect(LANDS.ruins.bosses).toContain("hollowking");
+  });
+
+  it("the weekly quest never picks a new land", () => {
+    for (let week = 0; week < 60; week++) {
+      expect(weeklyPlan(week * 7 * 86_400_000).land).not.toBe("ruins");
+    }
+  });
+
+  it("the summoner's spirit pounces 3 times per summon", () => {
+    landPick = "forest";
+    const s = playThrough(as("summoner", 3), skiller);
+    const summons = actions(s.events, "Summon Spirit");
+    const pounces = actions(s.events, "Spirit Pounce");
+    expect(summons).toBeGreaterThan(0);
+    expect(pounces).toBeGreaterThanOrEqual(summons);
+    expect(pounces).toBeLessThanOrEqual(summons * SPIRIT_TURNS);
+  });
+
+  it("the ranger's volley cracks shells and mimics drop gold", () => {
+    landPick = "ruins";
+    let cracked = 0;
+    let gold = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const s = playThrough(as("ranger", seed), skiller);
+      cracked += statuses(s.events, "shellCracked");
+      gold += statuses(s.events, "mimicGold");
+    }
+    expect(cracked).toBeGreaterThan(0);
+    expect(gold).toBeGreaterThan(0);
+    landPick = "forest";
+  });
+
+  it("the Hollow King calls beetles when angry", () => {
+    landPick = "ruins";
+    bossPick = 0;
+    const s = playThrough(as("paladin", 2), skiller);
+    const spawns = s.events.filter(
+      (e) => e.type === "spawn" && e.monster.kind === "beetle",
+    );
+    expect(spawns).toHaveLength(2);
+    landPick = "forest";
+  });
+
+  it("paladin's Smite heals a friend, rogue's skill finds gold", () => {
+    const p = playThrough(as("paladin", 4), skiller);
+    expect(p.stats[0]?.healed).toBeGreaterThan(0);
+    const r = runQuest(as("rogue", 4), [
+      { kind: "vote", votes: { me: "forest" } },
+      { kind: "hero", action: "skill", power: 1 },
+    ]);
+    const sneak = r.events.find(
+      (e) => e.type === "action" && e.move === "Sneak Attack",
+    );
+    expect(sneak).toBeDefined();
+  });
+
+  it("any two different heroes combo; same set gets the set combo", () => {
+    expect(comboFor("knight", "mage")?.name).toBe("Flame Blade");
+    expect(comboFor("paladin", "ranger")?.name).toBe("Legendary Strike");
+    expect(comboFor("paladin", "mage")?.name).toBe("Team Combo");
+    expect(comboFor("rogue", "rogue")).toBeUndefined();
   });
 });

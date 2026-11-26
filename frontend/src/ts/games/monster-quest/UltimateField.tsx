@@ -1,5 +1,6 @@
 import { For, JSXElement, Match, Switch } from "solid-js";
 
+import { cn } from "../../utils/cn";
 import { UltimateId } from "./quest-rules";
 
 const range = (n: number): number[] => Array.from({ length: n }, (_, i) => i);
@@ -31,8 +32,44 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
           <div class="absolute inset-0 animate-quest-flash bg-game-cream [animation-delay:0.3s]"></div>
           <div class="absolute inset-0 animate-quest-flash bg-game-yellow/50 [animation-delay:0.5s]"></div>
         </Match>
-        <Match when={props.kind === "holy"}>
+        <Match when={props.kind === "holy" || props.kind === "judgement"}>
           <div class="absolute -top-1/3 left-0 h-full w-1/2 animate-quest-flash rounded-full bg-radial from-game-gold/80 to-transparent"></div>
+        </Match>
+        <Match when={props.kind === "arrowrain" || props.kind === "startoss"}>
+          <For each={range(30)}>
+            {(i) => (
+              <span
+                class={cn(
+                  "absolute top-0 animate-quest-shard",
+                  props.kind === "arrowrain"
+                    ? "h-12 w-1 rounded-full bg-linear-to-b from-game-cream to-game-brown"
+                    : "text-xl",
+                )}
+                style={{
+                  left: `${(i * 31) % 52}%`,
+                  "animation-delay": `${((i * 7) % 14) * 0.05}s`,
+                }}
+              >
+                {props.kind === "startoss" ? "✴️" : ""}
+              </span>
+            )}
+          </For>
+        </Match>
+        <Match when={props.kind === "phoenix"}>
+          <div class="absolute inset-y-0 left-0 w-1/2 animate-quest-flash bg-linear-to-t from-game-orange/70 via-game-red/40 to-transparent"></div>
+          <span class="absolute top-1/4 left-1/4 animate-quest-rise text-6xl [--fx-x:0px]">
+            🔥
+          </span>
+        </Match>
+        <Match when={props.kind === "aura"}>
+          <div class="absolute right-[1%] bottom-0 h-[92%] w-[46%] origin-bottom animate-quest-dome rounded-t-full border-4 border-game-gold bg-game-gold/20 shadow-[0_0_40px_var(--color-game-gold)]"></div>
+        </Match>
+        <Match when={props.kind === "titan"}>
+          <div class="absolute bottom-[14%] left-[3%] h-2 w-[46%] origin-right animate-quest-crack rounded-full bg-game-ink shadow-[0_0_10px_var(--color-game-grey)]"></div>
+          <div class="absolute inset-x-0 bottom-0 h-1/3 animate-quest-flash bg-linear-to-t from-game-grey/70 to-transparent [animation-delay:0.2s]"></div>
+        </Match>
+        <Match when={props.kind === "vanish"}>
+          <div class="absolute inset-y-0 right-0 w-1/2 animate-quest-flash bg-game-ink/60"></div>
         </Match>
         <Match when={props.kind === "mighty"}>
           <div class="absolute inset-0 animate-quest-flash bg-game-cream [animation-delay:0.4s]"></div>

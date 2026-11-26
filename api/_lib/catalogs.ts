@@ -35,7 +35,8 @@ export type ShopId =
   | "animalAvatar"
   | "garden"
   | "zoo"
-  | "zooDecor";
+  | "zooDecor"
+  | "questHero";
 
 /** users/{uid} field each shop's ownership map is stored under. */
 export const OWNED_FIELD: Record<ShopId, string> = {
@@ -52,6 +53,7 @@ export const OWNED_FIELD: Record<ShopId, string> = {
   garden: "ownedGardenItems",
   zoo: "ownedZooAnimals",
   zooDecor: "ownedZooDecor",
+  questHero: "ownedQuestHeroes",
 };
 
 /** users/{uid} field for the "currently equipped/selected" id, if the shop has one. */
@@ -98,6 +100,14 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     penguin: { price: 170, requiresLessonGroup: "all-keys" },
     lion: { price: 200, requiresLessonGroup: "all-keys" },
     panda: { price: 220, requiresLessonGroup: "all-keys" },
+  },
+  // Monster Quest heroes. Mirrors frontend games/monster-quest/quest-heroes.ts
+  // (and HERO_SETS in quest-rules.ts). Whole sets: QUEST_HERO_SETS below.
+  questHero: {
+    paladin: { price: 90, requiresLessonGroup: "home-row" },
+    rogue: { price: 90, requiresLessonGroup: "home-row" },
+    ranger: { price: 90, requiresLessonGroup: "home-row" },
+    summoner: { price: 90, requiresLessonGroup: "home-row" },
   },
   // My Zoo decorations. Mirrors frontend games/zoo/zoo-decor.ts.
   zooDecor: {
@@ -506,3 +516,23 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     "square-zebra": { price: 200 },
   },
 };
+
+/**
+ * Monster Quest hero sets: buying "set:<id>" gets every hero in it that you
+ * don't own yet, for QUEST_HERO_PRICE each, never more than QUEST_SET_PRICE.
+ */
+export const QUEST_HERO_SETS: Readonly<
+  Record<string, { heroes: readonly string[]; requiresLessonGroup: string }>
+> = {
+  legends: {
+    heroes: ["paladin", "rogue", "ranger", "summoner"],
+    requiresLessonGroup: "home-row",
+  },
+};
+export const QUEST_HERO_PRICE = 90;
+export const QUEST_SET_PRICE = 300;
+
+/** Coins for the heroes of a set you don't have yet. */
+export function questSetPrice(missing: number): number {
+  return Math.min(QUEST_SET_PRICE, missing * QUEST_HERO_PRICE);
+}

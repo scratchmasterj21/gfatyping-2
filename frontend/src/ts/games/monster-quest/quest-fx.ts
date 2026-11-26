@@ -49,6 +49,8 @@ const BASE =
 export function fxForMove(move: string, heroActor: boolean): FxKind {
   switch (move) {
     case "Fire Storm":
+    case "Wisp Flame":
+    case "Phoenix":
     case "Fire Breath":
     case "Inferno":
     case "Sky Dive":
@@ -74,10 +76,15 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Fly Up":
       return "charge";
     case "Root Quake":
+    case "Shell Bash":
+    case "Titan":
     case "Mega Smash":
     case "Bone Toss":
       return "rock";
     case "Power Strike":
+    case "Sneak Attack":
+    case "Star Toss":
+    case "Rusty Sword":
     case "Whirlwind":
     case "Mighty Blow":
       return "bigslash";
@@ -86,7 +93,20 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Thunder":
       return "thunder";
     case "Holy Light":
+    case "Smite":
+    case "Judgement":
+    case "Spirit Pounce":
+    case "Summon Spirit":
       return "holy";
+    case "Arrow Volley":
+    case "Arrow Rain":
+    case "Hawk Shot":
+      return "slash";
+    case "Holy Aura":
+    case "Vanish":
+      return "charge";
+    case "Royal Roar":
+      return "spooky";
     case "Group Heal":
       return "heal";
     case "Shield Wall":
@@ -106,6 +126,7 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Wing Flap":
     case "Screech":
     case "Double Bite":
+    case "Chomp":
     case "Sneaky Swipe":
       return "claw";
     case "Spore Puff":

@@ -23,6 +23,7 @@ const COIN_QUERY_KEYS: string[] = [
   "backdropState",
   "sideImagesShop",
   "zooState",
+  "questHeroState",
 ];
 
 export function invalidateCoinQueries(): void {

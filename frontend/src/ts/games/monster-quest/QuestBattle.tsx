@@ -87,6 +87,14 @@ const ULT_SHOW: Record<UltimateId, { motion: Motion; fx: FxKind }> = {
   holy: { motion: "channel", fx: "pillar" },
   wall: { motion: "channel", fx: "dome" },
   slam: { motion: "stomp", fx: "eruption" },
+  judgement: { motion: "leap", fx: "pillar" },
+  aura: { motion: "channel", fx: "dome" },
+  vanish: { motion: "spin-dash", fx: "charge" },
+  startoss: { motion: "spin-dash", fx: "slash" },
+  hawk: { motion: "channel", fx: "megaimpact" },
+  arrowrain: { motion: "channel", fx: "slash" },
+  phoenix: { motion: "channel", fx: "fire" },
+  titan: { motion: "stomp", fx: "eruption" },
 };
 /** cut-in first, then the effect, then the hits land */
 const CUT_IN_MS = 900;
@@ -255,7 +263,7 @@ export function QuestBattle(props: {
       setMotion({ id: e.actor, kind: ULT_SHOW[u].motion });
       const targets = e.shields ?? e.hits.map((h) => h.id);
       for (const t of targets) effect(t, ULT_SHOW[u].fx, true, 1700);
-      if (u === "mighty" || u === "slam") {
+      if (u === "mighty" || u === "slam" || u === "titan") {
         setTimeout(() => {
           setBigQuake(true);
           setTimeout(() => setBigQuake(false), 650);
@@ -464,7 +472,9 @@ export function QuestBattle(props: {
       setMessage(
         m.kind === "slime"
           ? "💧 The slime splits in two!"
-          : `🤖 ${m.name} joins the fight!`,
+          : m.kind === "beetle"
+            ? `🪲 ${m.name} crawls in to help the king!`
+            : `🤖 ${m.name} joins the fight!`,
       );
       sfx.pop();
       return;
@@ -478,6 +488,8 @@ export function QuestBattle(props: {
         regrow: `🌿 ${who} regrows some leaves!`,
         rebuild: `💀 ${who} rattles back together!`,
         potionsBack: "🧪 You got your potions back!",
+        shellCracked: `🪲 CRACK! ${who}'s shell broke - hit it hard now!`,
+        mimicGold: "📦 The Mimic Chest drops 10 💰 gold!",
       };
       setMessage(text[e.what]);
       if (e.what === "asleep") popup(e.id, "💤", "hit");
@@ -485,6 +497,8 @@ export function QuestBattle(props: {
       if (e.what === "poison") effect(e.id, "poison", false);
       if (e.what === "regrow") effect(e.id, "heal", false);
       if (e.what === "rebuild") effect(e.id, "spooky", false);
+      if (e.what === "shellCracked") effect(e.id, "rock", false);
+      if (e.what === "mimicGold") effect(e.id, "charge", false);
       applyHits(e.hits);
       return;
     }
@@ -1195,7 +1209,9 @@ export function QuestBattle(props: {
             ? "from-game-night via-game-blue/60 to-game-mint"
             : land() === "castle"
               ? "from-game-ink via-game-purple/60 to-game-grey"
-              : "from-game-night via-game-navy to-game-grass-dark",
+              : land() === "ruins"
+                ? "from-game-night via-game-brown-dark/70 to-game-tan/70"
+                : "from-game-night via-game-navy to-game-grass-dark",
           bigQuake()
             ? "animate-quest-big-quake motion-reduce:animate-none"
             : quake() && "animate-quest-quake motion-reduce:animate-none",
@@ -1243,7 +1259,7 @@ export function QuestBattle(props: {
                     {m().charging
                       ? "⚡ charging - Defend!"
                       : m().flying
-                        ? "🪽 flying - use spells!"
+                        ? "🪽 flying - spells or arrows!"
                         : "👻 faded - use spells!"}
                   </span>
                 </Show>

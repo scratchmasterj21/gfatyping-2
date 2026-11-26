@@ -15,12 +15,54 @@ import { EASY_WORDS, HARD_WORDS, MEDIUM_WORDS } from "../shared/kid-words";
 
 // ---------------------------------------------------------------- setup
 
-export type HeroClass = "knight" | "mage" | "healer" | "guardian";
+export type FreeHero = "knight" | "mage" | "healer" | "guardian";
+export type HeroClass =
+  | FreeHero
+  // Legends set (bought with coins, see quest-heroes.ts)
+  | "paladin"
+  | "rogue"
+  | "ranger"
+  | "summoner";
+
+/** Everyone has these; computer helpers only ever use them. */
+export const FREE_HEROES: FreeHero[] = ["knight", "mage", "healer", "guardian"];
+
+export type HeroSetId = "legends";
+
+export type HeroSetInfo = {
+  id: HeroSetId;
+  name: string;
+  emoji: string;
+  heroes: HeroClass[];
+  /** lesson group to finish before the set can be bought */
+  requires: "home-row" | "top-row" | "bottom-row" | "all-keys";
+  requiresName: string;
+  /** full-set bonus: a title to show off */
+  title: string;
+  /** full-set bonus: two of the set's heroes chaining skills */
+  combo: { name: string; emoji: string };
+};
+
+/** Hero sets students can buy, released one at a time. */
+export const HERO_SETS: HeroSetInfo[] = [
+  {
+    id: "legends",
+    name: "Legends",
+    emoji: "🛡️",
+    heroes: ["paladin", "rogue", "ranger", "summoner"],
+    requires: "home-row",
+    requiresName: "Home Row",
+    title: "Legend Keeper",
+    combo: { name: "Legendary Strike", emoji: "🏆" },
+  },
+];
+
+export const setOfHero = (cls: HeroClass): HeroSetInfo | undefined =>
+  HERO_SETS.find((s) => s.heroes.includes(cls));
+
 export const HERO_CLASSES: HeroClass[] = [
-  "knight",
-  "mage",
-  "healer",
-  "guardian",
+  ...FREE_HEROES,
+  ...HERO_SETS.flatMap((s) => s.heroes),
 ];
 export const PARTY_SIZE = 4;
 
@@ -33,8 +75,10 @@ export type ClassInfo = {
   skill: string;
   skillEmoji: string;
   /** what the skill aims at */
-  skillTarget: "monster" | "allMonsters" | "ally";
+  skillTarget: "monster" | "allMonsters" | "ally" | "self";
   blurb: string;
+  /** longer tip for the hero picker */
+  tip?: string;
 };
 
 export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
@@ -82,6 +126,54 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
     skillTarget: "ally",
     blurb: "Shields a friend and draws attacks",
   },
+  paladin: {
+    name: "Paladin",
+    emoji: "⚜️",
+    maxHp: 130,
+    atk: 12,
+    speed: 5,
+    skill: "Smite",
+    skillEmoji: "✨",
+    skillTarget: "monster",
+    blurb: "Hits a monster and heals a friend",
+    tip: "Smite heals the weakest friend for half the damage.",
+  },
+  rogue: {
+    name: "Rogue",
+    emoji: "🥷",
+    maxHp: 85,
+    atk: 13,
+    speed: 10,
+    skill: "Sneak Attack",
+    skillEmoji: "💨",
+    skillTarget: "monster",
+    blurb: "Sneaky hits and grabs gold",
+    tip: "Double damage on a monster that just attacked someone else. +3 gold.",
+  },
+  ranger: {
+    name: "Ranger",
+    emoji: "🏹",
+    maxHp: 90,
+    atk: 11,
+    speed: 8,
+    skill: "Arrow Volley",
+    skillEmoji: "🏹",
+    skillTarget: "allMonsters",
+    blurb: "Arrows on every monster",
+    tip: "Arrows reach flying monsters, and bats can't dodge them.",
+  },
+  summoner: {
+    name: "Summoner",
+    emoji: "🪄",
+    maxHp: 85,
+    atk: 10,
+    speed: 7,
+    skill: "Summon Spirit",
+    skillEmoji: "🌟",
+    skillTarget: "self",
+    blurb: "A spirit friend attacks for 3 turns",
+    tip: "The spirit's magic hits flying and faded monsters too.",
+  },
 };
 
 export type HeroSetup = {
@@ -92,7 +184,10 @@ export type HeroSetup = {
   name: string;
 };
 
-/** Players keep their picks; computer helpers take the classes left over. */
+/**
+ * Players keep their picks; computer helpers take the free classes left over
+ * (bought heroes are only ever played by their owners).
+ */
 export function buildParty(
   players: { uid: string; name: string; cls?: HeroClass }[],
 ): HeroSetup[] {
@@ -102,11 +197,11 @@ export function buildParty(
     const cls =
       p.cls !== undefined && !taken.has(p.cls)
         ? p.cls
-        : (HERO_CLASSES.find((c) => !taken.has(c)) as HeroClass);
+        : (FREE_HEROES.find((c) => !taken.has(c)) as HeroClass);
     taken.add(cls);
     party.push({ slot: party.length, cls, uid: p.uid, name: p.name });
   }
-  for (const cls of HERO_CLASSES) {
+  for (const cls of FREE_HEROES) {
     if (party.length >= PARTY_SIZE) break;
     if (taken.has(cls)) continue;
     taken.add(cls);
@@ -246,7 +341,9 @@ export type WeeklySetup = {
 export function weeklyPlan(week: number): WeeklySetup & { seed: number } {
   const seed = hashString(`monster-quest-week-${week}`);
   const rng = seededRandom(seed);
-  const land = LAND_IDS[Math.floor(rng() * LAND_IDS.length)] as LandId;
+  const land = WEEKLY_LAND_IDS[
+    Math.floor(rng() * WEEKLY_LAND_IDS.length)
+  ] as LandId;
   const bosses = LANDS[land].bosses;
   const boss = bosses[Math.floor(rng() * bosses.length)] as MonsterKind;
   const twist = TWIST_IDS[Math.floor(rng() * TWIST_IDS.length)] as TwistId;
@@ -273,7 +370,12 @@ export type MonsterKind =
   | "bolt"
   | "treant"
   | "queen"
-  | "robot";
+  | "robot"
+  // Ruins of Eldmoor (Legends set)
+  | "beetle"
+  | "mimic"
+  | "wisp"
+  | "hollowking";
 
 export type MonsterInfo = {
   name: string;
@@ -406,6 +508,39 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
     boss: true,
     trick: "Calls in Bolt Bots when angry",
   },
+  beetle: {
+    name: "Shellback Beetle",
+    hp: 100,
+    atk: 22,
+    speed: 3,
+    boss: false,
+    trick:
+      "Hard shell - single hits do half damage until a hit-everyone move cracks it",
+  },
+  mimic: {
+    name: "Mimic Chest",
+    hp: 85,
+    atk: 27,
+    speed: 6,
+    boss: false,
+    trick: "A chest that bites! Beat it for 10 gold",
+  },
+  wisp: {
+    name: "Will-o'-Wisp",
+    hp: 65,
+    atk: 21,
+    speed: 9,
+    boss: false,
+    trick: "Floats up high every other turn - use spells or arrows",
+  },
+  hollowking: {
+    name: "The Hollow King",
+    hp: 540,
+    atk: 40,
+    speed: 5,
+    boss: true,
+    trick: "Calls Shellback Beetles when angry - holy moves hit it extra hard",
+  },
 };
 
 /** The word to type to aim at a monster (twins add "a" / "b"). */
@@ -425,6 +560,10 @@ export const KIND_WORD: Record<MonsterKind, string> = {
   treant: "thornroot",
   queen: "queen",
   robot: "clank",
+  beetle: "beetle",
+  mimic: "mimic",
+  wisp: "wisp",
+  hollowking: "king",
 };
 
 export function monsterWord(m: {
@@ -437,7 +576,7 @@ export function monsterWord(m: {
   return twin === undefined ? base : `${base} ${twin.toLowerCase()}`;
 }
 
-export type LandId = "forest" | "mountain" | "castle";
+export type LandId = "forest" | "mountain" | "castle" | "ruins";
 
 export type LandInfo = {
   name: string;
@@ -465,8 +604,16 @@ export const LANDS: Record<LandId, LandInfo> = {
     minions: ["ghost", "skeleton", "imp"],
     bosses: ["robot", "dragon"],
   },
+  ruins: {
+    name: "Ruins of Eldmoor",
+    emoji: "🏛️",
+    minions: ["beetle", "mimic", "wisp"],
+    bosses: ["hollowking", "golem"],
+  },
 };
-export const LAND_IDS: LandId[] = ["forest", "mountain", "castle"];
+export const LAND_IDS: LandId[] = ["forest", "mountain", "castle", "ruins"];
+/** The weekly quest only picks from these, so adding a land never changes a week already planned. */
+export const WEEKLY_LAND_IDS: LandId[] = ["forest", "mountain", "castle"];
 export const BATTLE_COUNT = 3;
 
 /** Monsters for battle 0 (2 of them) and battle 1 (3) in a land. */
@@ -535,13 +682,21 @@ export type UltimateId =
   | "groupheal"
   | "holy"
   | "wall"
-  | "slam";
+  | "slam"
+  | "judgement"
+  | "aura"
+  | "vanish"
+  | "startoss"
+  | "hawk"
+  | "arrowrain"
+  | "phoenix"
+  | "titan";
 
 export type UltimateInfo = {
   name: string;
   emoji: string;
   cls: HeroClass;
-  aim: "monster" | "allMonsters" | "allAllies";
+  aim: "monster" | "allMonsters" | "allAllies" | "self";
   blurb: string;
 };
 
@@ -603,6 +758,62 @@ export const ULTIMATES: Record<UltimateId, UltimateInfo> = {
     aim: "allMonsters",
     blurb: "Shake every monster",
   },
+  judgement: {
+    name: "Judgement",
+    emoji: "⚖️",
+    cls: "paladin",
+    aim: "monster",
+    blurb: "Huge holy hit - double on ghosts, bones and the Hollow King",
+  },
+  aura: {
+    name: "Holy Aura",
+    emoji: "🌟",
+    cls: "paladin",
+    aim: "allAllies",
+    blurb: "Heals everyone a bit and the whole team defends",
+  },
+  vanish: {
+    name: "Vanish",
+    emoji: "💨",
+    cls: "rogue",
+    aim: "self",
+    blurb: "Disappear: monsters can't hit you, next move is a critical",
+  },
+  startoss: {
+    name: "Star Toss",
+    emoji: "✴️",
+    cls: "rogue",
+    aim: "allMonsters",
+    blurb: "Throwing stars hit every monster, even flying ones",
+  },
+  hawk: {
+    name: "Hawk Shot",
+    emoji: "🦅",
+    cls: "ranger",
+    aim: "monster",
+    blurb: "One giant arrow - triple on flying monsters",
+  },
+  arrowrain: {
+    name: "Arrow Rain",
+    emoji: "🌧️",
+    cls: "ranger",
+    aim: "allMonsters",
+    blurb: "A big rain of arrows on every monster",
+  },
+  phoenix: {
+    name: "Phoenix",
+    emoji: "🔥",
+    cls: "summoner",
+    aim: "allMonsters",
+    blurb: "Fire bird hits every monster and wakes up a friend",
+  },
+  titan: {
+    name: "Titan",
+    emoji: "🗿",
+    cls: "summoner",
+    aim: "monster",
+    blurb: "A stone giant stomps one monster - never misses",
+  },
 };
 
 export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
@@ -610,6 +821,10 @@ export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
   mage: ["icestorm", "thunder"],
   healer: ["groupheal", "holy"],
   guardian: ["wall", "slam"],
+  paladin: ["judgement", "aura"],
+  rogue: ["vanish", "startoss"],
+  ranger: ["hawk", "arrowrain"],
+  summoner: ["phoenix", "titan"],
 };
 
 const BOSS_HP = 1.45;
@@ -673,12 +888,21 @@ export const COMBOS: Record<string, { name: string; emoji: string }> = {
   "guardian+healer": { name: "Safe Haven", emoji: "💠" },
 };
 export const COMBO_BOOST = 1.3;
+/** Summoner's spirit friend attacks after this many of their turns. */
+export const SPIRIT_TURNS = 3;
+/** any other two different heroes */
+export const TEAM_COMBO = { name: "Team Combo", emoji: "🤝" };
 
 export function comboFor(
   a: HeroClass,
   b: HeroClass,
 ): { name: string; emoji: string } | undefined {
-  return COMBOS[[a, b].sort().join("+")];
+  if (a === b) return undefined;
+  const named = COMBOS[[a, b].sort().join("+")];
+  if (named !== undefined) return named;
+  const set = setOfHero(a);
+  if (set !== undefined && set === setOfHero(b)) return set.combo;
+  return TEAM_COMBO;
 }
 
 /** Team Spirit needed for a Team Attack. */
@@ -755,6 +979,10 @@ export type HeroState = HeroSetup & {
   blessed: boolean;
   /** clean moves in a row (players): a growing damage bonus */
   streak: number;
+  /** summoner: turns the spirit friend keeps attacking */
+  familiar: number;
+  /** rogue vanished: monsters can't pick them until their next turn */
+  hidden: boolean;
 };
 
 export type MonsterState = {
@@ -780,6 +1008,8 @@ export type MonsterState = {
   stolen: number;
   /** small spawned monster (mini slime) */
   mini?: boolean;
+  /** hero slots it hit on its last move (rogue's Sneak Attack) */
+  lastTargets?: number[];
 };
 
 export type MonsterFlags = Pick<MonsterState, "faded" | "flying" | "charging">;
@@ -790,7 +1020,9 @@ export type StatusKind =
   | "frozen"
   | "regrow"
   | "rebuild"
-  | "potionsBack";
+  | "potionsBack"
+  | "shellCracked"
+  | "mimicGold";
 
 export type HitResult = {
   /** "h0".."h3" or "m0".. */
@@ -1023,7 +1255,8 @@ function spawnMonster(
     faded: false,
     flying: false,
     charging: false,
-    used: true,
+    // spawned shellbacks still have their shell
+    used: kind !== "beetle",
     stolen: 0,
     ...(opts.mini === true ? { mini: true } : {}),
   };
@@ -1038,10 +1271,19 @@ const flagsOf = (m: MonsterState): MonsterFlags => ({
   charging: m.charging,
 });
 
+/** Holy moves hit these extra hard. */
+const UNDEAD: ReadonlySet<MonsterKind> = new Set<MonsterKind>([
+  "ghost",
+  "skeleton",
+  "hollowking",
+]);
+
 /** Swords can't reach a faded ghost or a flying dragon. */
 export const untouchable = (m: MonsterState): boolean => m.faded || m.flying;
 
 const POISON_DMG = 5;
+/** gold a beaten Mimic Chest drops */
+export const MIMIC_GOLD = 10;
 
 function landOptions(): VoteOption[] {
   return LAND_IDS.map((id) => {
@@ -1175,6 +1417,30 @@ function cpuChoice(
       ? { kind: "hero", action: "skill", power }
       : attack;
   }
+  if (hero.cls === "ranger") {
+    return monsters.length >= 2 || monsters.some((m) => m.flying)
+      ? { kind: "hero", action: "skill", power }
+      : attack;
+  }
+  if (hero.cls === "summoner") {
+    return hero.familiar === 0
+      ? { kind: "hero", action: "skill", power }
+      : attack;
+  }
+  if (hero.cls === "paladin") {
+    const hurt = lowest(alive(s.heroes));
+    return hurt !== undefined && hurt.hp / hurt.maxHp < 0.6
+      ? { ...attack, action: "skill" }
+      : attack;
+  }
+  if (hero.cls === "rogue") {
+    const sneaky = reachable.find(
+      (m) => m.lastTargets !== undefined && !m.lastTargets.includes(hero.slot),
+    );
+    return sneaky !== undefined
+      ? { ...attack, action: "skill", target: sneaky.index }
+      : attack;
+  }
   // knight
   return rng() < 0.45 ? { ...attack, action: "skill" } : attack;
 }
@@ -1280,15 +1546,24 @@ function applyHero(
       ? {}
       : { combo: `${comboInfo.emoji} ${comboInfo.name}` };
   hero.defending = false;
+  // vanishing lasts until the rogue's next turn
+  hero.hidden = false;
   // a guardian's protection lasts until its next turn
   for (const h of s.heroes) {
     if (h.protectedBy === hero.slot) h.protectedBy = undefined;
   }
+  /** beetles whose shell broke this move */
+  const cracked: MonsterState[] = [];
 
+  /**
+   * melee: swords (miss flying / faded); arrow: reaches flying, bats can't
+   * dodge; magic / fire: always reach. `aoe` = a hit-everyone move.
+   */
   const hitMonster = (
     m: MonsterState,
     base: number,
-    style: "melee" | "fire" | "magic" = "melee",
+    style: "melee" | "fire" | "magic" | "arrow" = "melee",
+    aoe = false,
   ): HitResult => {
     const id = monsterId(m.index);
     base *= (hero.level > 1 ? LEVEL_BOOST : 1) * s.strength * streakBoost;
@@ -1299,6 +1574,9 @@ function applyHero(
     if (style === "melee" && untouchable(m)) {
       return { id, amount: 0, miss: true };
     }
+    if (style === "arrow" && m.faded) {
+      return { id, amount: 0, miss: true };
+    }
     if (
       style === "melee" &&
       m.kind === "bat" &&
@@ -1306,6 +1584,15 @@ function applyHero(
       rng() < 0.6
     ) {
       return { id, amount: 0, miss: true };
+    }
+    // a shellback's shell halves single hits until a hit-everyone move
+    if (m.kind === "beetle" && !m.used) {
+      if (aoe) {
+        m.used = true;
+        cracked.push(m);
+      } else {
+        base *= 0.5;
+      }
     }
     const weak =
       style === "fire" && (m.kind === "snowman" || m.kind === "treant");
@@ -1346,13 +1633,13 @@ function applyHero(
     let shields: string[] | undefined;
     switch (hero.ultimate) {
       case "whirlwind":
-        hits = live.map((x) => hitMonster(x, info.atk * 0.95));
+        hits = live.map((x) => hitMonster(x, info.atk * 0.95, "melee", true));
         break;
       case "mighty":
         hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.6)];
         break;
       case "icestorm":
-        hits = live.map((x) => hitMonster(x, info.atk * 1.1, "magic"));
+        hits = live.map((x) => hitMonster(x, info.atk * 1.1, "magic", true));
         break;
       case "thunder":
         hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.6, "magic")];
@@ -1361,17 +1648,10 @@ function applyHero(
         hits =
           m === undefined
             ? []
-            : [
-                hitMonster(
-                  m,
-                  info.atk *
-                    (m.kind === "ghost" || m.kind === "skeleton" ? 4 : 2),
-                  "magic",
-                ),
-              ];
+            : [hitMonster(m, info.atk * (UNDEAD.has(m.kind) ? 4 : 2), "magic")];
         break;
       case "slam":
-        hits = live.map((x) => hitMonster(x, info.atk * 0.9));
+        hits = live.map((x) => hitMonster(x, info.atk * 0.9, "melee", true));
         break;
       case "groupheal":
         hits = alive(s.heroes).map((h) => {
@@ -1391,6 +1671,69 @@ function applyHero(
           h.defending = true;
           return heroId(h.slot);
         });
+        break;
+      case "judgement":
+        hits =
+          m === undefined
+            ? []
+            : [
+                hitMonster(
+                  m,
+                  info.atk * (UNDEAD.has(m.kind) ? 4.4 : 2.4),
+                  "magic",
+                ),
+              ];
+        break;
+      case "aura":
+        hits = alive(s.heroes).map((h) => {
+          h.defending = true;
+          const amount = Math.min(
+            h.maxHp - h.hp,
+            scaled(18 * healBoost, input.power, rng),
+          );
+          h.hp += amount;
+          stats.healed += amount;
+          return { id: heroId(h.slot), amount, heal: true };
+        });
+        shields = alive(s.heroes).map((h) => heroId(h.slot));
+        break;
+      case "vanish":
+        hero.hidden = true;
+        hero.blessed = true;
+        shields = [actor];
+        break;
+      case "startoss":
+        hits = live.map((x) => hitMonster(x, info.atk * 0.95, "arrow", true));
+        break;
+      case "hawk":
+        hits =
+          m === undefined
+            ? []
+            : [hitMonster(m, info.atk * (m.flying ? 3.4 : 2.5), "arrow")];
+        break;
+      case "arrowrain":
+        hits = live.map((x) => hitMonster(x, info.atk * 1.2, "arrow", true));
+        break;
+      case "phoenix": {
+        hits = live.map((x) => hitMonster(x, info.atk * 1.05, "fire", true));
+        const down = s.heroes.find((h) => h.hp <= 0);
+        if (down !== undefined) {
+          const amount = Math.round(down.maxHp * 0.3);
+          down.hp = amount;
+          down.poison = 0;
+          down.sleep = 0;
+          stats.healed += amount;
+          hits.push({
+            id: heroId(down.slot),
+            amount,
+            heal: true,
+            revive: true,
+          });
+        }
+        break;
+      }
+      case "titan":
+        hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.7, "magic")];
         break;
     }
     s.events.push({
@@ -1461,6 +1804,79 @@ function applyHero(
     return;
   }
   // skills
+  if (hero.cls === "paladin") {
+    const m = targetMonster();
+    const hits = m === undefined ? [] : [hitMonster(m, info.atk * 1.5 * boost)];
+    // half the damage heals the weakest friend still standing
+    const dealt = hits[0]?.amount ?? 0;
+    const friend = lowest(alive(s.heroes));
+    if (friend !== undefined && dealt > 0) {
+      const amount = Math.min(
+        friend.maxHp - friend.hp,
+        Math.round(dealt * 0.5 * healBoost),
+      );
+      if (amount > 0) {
+        friend.hp += amount;
+        stats.healed += amount;
+        hits.push({ id: heroId(friend.slot), amount, heal: true });
+      }
+    }
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits,
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "rogue") {
+    const m = targetMonster();
+    // it just went for someone else: double damage
+    const sneaky =
+      m?.lastTargets !== undefined && !m.lastTargets.includes(hero.slot);
+    s.gold += 3;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits:
+        m === undefined
+          ? []
+          : [hitMonster(m, info.atk * (sneaky ? 2.2 : 1.1) * boost)],
+      note: sneaky ? "sneaky! +3 gold" : "+3 gold",
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "ranger") {
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: alive(s.monsters).map((m) =>
+        hitMonster(m, info.atk * 0.95 * boost, "arrow", true),
+      ),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "summoner") {
+    hero.familiar = SPIRIT_TURNS;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: [],
+      note: `a spirit friend joins for ${SPIRIT_TURNS} turns`,
+      ...combo,
+    });
+    return;
+  }
   if (hero.cls === "knight") {
     const m = targetMonster();
     s.events.push({
@@ -1478,7 +1894,7 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: alive(s.monsters).map((m) =>
-        hitMonster(m, info.atk * 1.05 * boost, "fire"),
+        hitMonster(m, info.atk * 1.05 * boost, "fire", true),
       ),
       ...combo,
     });
@@ -1529,6 +1945,55 @@ function applyHero(
     });
   }
 }
+
+/** The summoner's spirit friend attacks after the summoner's move. */
+function spiritPounce(s: QuestState, hero: HeroState, rng: () => number): void {
+  if (hero.familiar <= 0) return;
+  const live = alive(s.monsters);
+  const m = lowest(live);
+  if (m === undefined) return;
+  hero.familiar--;
+  const base =
+    CLASS_INFO[hero.cls].atk *
+    0.9 *
+    (hero.level > 1 ? LEVEL_BOOST : 1) *
+    s.strength;
+  const amount = Math.min(m.hp, scaled(base, 1, rng));
+  m.hp -= amount;
+  (s.stats[hero.slot] as HeroStats).damage += amount;
+  s.events.push({
+    type: "action",
+    actor: heroId(hero.slot),
+    move: "Spirit Pounce",
+    emoji: "🌟",
+    hits: [{ id: monsterId(m.index), amount, ko: m.hp <= 0 }],
+    note:
+      hero.familiar > 0
+        ? `${hero.familiar} more turn${hero.familiar === 1 ? "" : "s"}`
+        : "the spirit says goodbye",
+  });
+}
+
+/** Shellbacks whose shell just cracked (from a hit-everyone move). */
+function shellStatus(s: QuestState, before: Set<number>): void {
+  for (const m of s.monsters) {
+    if (m.kind === "beetle" && m.used && before.has(m.index)) {
+      s.events.push({
+        type: "status",
+        id: monsterId(m.index),
+        what: "shellCracked",
+        hits: [],
+      });
+    }
+  }
+}
+
+const intactShells = (s: QuestState): Set<number> =>
+  new Set(
+    s.monsters
+      .filter((m) => m.kind === "beetle" && !m.used)
+      .map((m) => m.index),
+  );
 
 function damageHero(
   s: QuestState,
@@ -1581,7 +2046,10 @@ function monsterPlan(
   m: MonsterState,
   rng: () => number,
 ): MonsterPlan {
-  const live = alive(s.heroes);
+  // a vanished rogue can't be picked (unless nobody else is left)
+  const standing = alive(s.heroes);
+  const visible = standing.filter((h) => !h.hidden);
+  const live = visible.length > 0 ? visible : standing;
   const pickOne = (): HeroState => {
     const guardian = live.find((h) => h.cls === "guardian");
     if (guardian !== undefined && rng() < 0.35) return guardian;
@@ -1596,7 +2064,7 @@ function monsterPlan(
       base: m.atk * 0.75,
     };
   }
-  if (m.flying) {
+  if (m.flying && m.kind === "dragon") {
     return {
       big: false,
       targets: [pickOne()],
@@ -1663,6 +2131,10 @@ const MONSTER_MOVES: Record<MonsterKind, [string, string]> = {
   treant: ["Vine Whip", "🌿"],
   queen: ["Ice Shard", "❄️"],
   robot: ["Laser Beam", "🔴"],
+  beetle: ["Shell Bash", "🪲"],
+  mimic: ["Chomp", "📦"],
+  wisp: ["Wisp Flame", "🔥"],
+  hollowking: ["Rusty Sword", "⚔️"],
 };
 const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   slime: ["Mega Splash", "🌊"],
@@ -1680,6 +2152,10 @@ const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   treant: ["Root Quake", "🌳"],
   queen: ["Blizzard", "🌨️"],
   robot: ["Mega Laser", "💥"],
+  beetle: ["Shell Bash", "🪲"],
+  mimic: ["Chomp", "📦"],
+  wisp: ["Wisp Flame", "🔥"],
+  hollowking: ["Royal Roar", "👑"],
 };
 
 /** Weather for a battle: often clear. */
@@ -1739,6 +2215,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       ultimateCooldown: 0,
       blessed: false,
       streak: 0,
+      familiar: 0,
+      hidden: false,
     })),
     monsters: [],
     potions: START_POTIONS,
@@ -2014,6 +2492,15 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           share: 0.35,
           mini: true,
         });
+      } else if (m.kind === "mimic" && m.hp <= 0 && !m.used) {
+        m.used = true;
+        s.gold += MIMIC_GOLD;
+        s.events.push({
+          type: "status",
+          id: monsterId(m.index),
+          what: "mimicGold",
+          hits: [],
+        });
       } else if (m.kind === "imp" && m.hp <= 0 && m.stolen > 0) {
         s.potions += m.stolen;
         m.stolen = 0;
@@ -2101,7 +2588,10 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       } else {
         input = cpuChoice(s, hero, rng);
       }
+      const shells = intactShells(s);
       applyHero(s, hero, input, rng);
+      shellStatus(s, shells);
+      spiritPounce(s, hero, rng);
       reactions();
     } else {
       const m = s.monsters[Number(id.slice(1))] as MonsterState;
@@ -2191,11 +2681,18 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         }
         return res;
       });
+      const wasFlying = m.flying;
       m.charging = false;
       m.flying = false;
+      m.lastTargets = plan.targets.map((t) => t.slot);
       if (m.kind === "ghost") {
         m.faded = !m.faded;
         if (m.faded) notes.push("faded away!");
+      }
+      // the wisp floats up every other turn
+      if (m.kind === "wisp") {
+        m.flying = !wasFlying;
+        if (m.flying) notes.push("floats up high!");
       }
       s.events.push({
         type: "action",
@@ -2229,7 +2726,9 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           power += 10;
         }
       }
+      const shells = intactShells(s);
       const hits = alive(s.monsters).map((m) => {
+        if (m.kind === "beetle") m.used = true;
         const amount = Math.min(
           m.hp,
           Math.round(power * (0.9 + rngT() * 0.2) * s.strength),
@@ -2253,6 +2752,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       s.spirit = 0;
       s.lastSkill = undefined;
       s.events.push({ type: "team", hits, ids: typed });
+      shellStatus(s, shells);
       reactions();
     }
 
@@ -2265,6 +2765,10 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       if (boss.kind === "robot") {
         spawnMonster(s, "bolt", d, { name: "Bolt Bot A", share: 0.8 });
         spawnMonster(s, "bolt", d, { name: "Bolt Bot B", share: 0.8 });
+      }
+      if (boss.kind === "hollowking") {
+        spawnMonster(s, "beetle", d, { name: "Shellback A", share: 0.6 });
+        spawnMonster(s, "beetle", d, { name: "Shellback B", share: 0.6 });
       }
     }
 
@@ -2294,6 +2798,8 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
           h.protectedBy = undefined;
           h.poison = 0;
           h.sleep = 0;
+          h.familiar = 0;
+          h.hidden = false;
         }
         s.events.push({ type: "rest", hp: s.heroes.map((h) => h.hp) });
         if (s.battle === BATTLE_COUNT - 1) {

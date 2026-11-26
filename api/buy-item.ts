@@ -11,6 +11,8 @@ import { lessonGroupDone } from "./_lib/zoo.js";
 import {
   CATALOGS,
   OWNED_FIELD,
+  QUEST_HERO_SETS,
+  questSetPrice,
   SELECTED_FIELD,
   ShopId,
 } from "./_lib/catalogs.js";
@@ -29,6 +31,7 @@ const SHOP_IDS: Set<ShopId> = new Set([
   "garden",
   "zoo",
   "zooDecor",
+  "questHero",
 ]);
 
 type SideImageSet = { id?: string; price?: number };
@@ -41,6 +44,66 @@ function parseSideImageSets(data: unknown): SideImageSet[] {
 }
 
 class BuyError extends Error {}
+
+/**
+ * Teacher switch for bought Monster Quest heroes (schoolConfig/gameAccess,
+ * student override wins over the class). Two small reads, only when buying
+ * a hero.
+ */
+async function questHeroesOff(
+  db: admin.firestore.Firestore,
+  uid: string,
+): Promise<boolean> {
+  const [userSnap, accessSnap] = await Promise.all([
+    db.collection("users").doc(uid).get(),
+    db.collection("schoolConfig").doc("gameAccess").get(),
+  ]);
+  const classId: unknown = userSnap.data()?.["classId"];
+  const access = (accessSnap.data() ?? {}) as {
+    classes?: Record<string, { questHeroesOff?: unknown }>;
+    students?: Record<string, { questHeroesOff?: unknown }>;
+  };
+  const own = access.students?.[uid]?.questHeroesOff;
+  if (typeof own === "boolean") return own;
+  const cls =
+    typeof classId === "string"
+      ? access.classes?.[classId]?.questHeroesOff
+      : undefined;
+  return cls === true;
+}
+
+/** "set:<id>": every hero of the set you don't own yet, capped price. */
+async function buyQuestSet(
+  db: admin.firestore.Firestore,
+  userRef: admin.firestore.DocumentReference,
+  setId: string,
+): Promise<number> {
+  const set = QUEST_HERO_SETS[setId];
+  if (set === undefined) throw new BuyError("Unknown item");
+  if (!(await lessonGroupDone(userRef, set.requiresLessonGroup))) {
+    throw new BuyError("Finish those lessons first");
+  }
+  return db.runTransaction(async (tx: admin.firestore.Transaction) => {
+    const snap = await tx.get(userRef);
+    const data = snap.exists ? snap.data() : {};
+    const owned =
+      (data?.["ownedQuestHeroes"] as Record<string, true> | undefined) ?? {};
+    const missing = set.heroes.filter((h) => owned[h] !== true);
+    if (missing.length === 0) throw new BuyError("Already owned");
+    const price = questSetPrice(missing.length);
+    const coins = (data?.["coins"] as number | undefined) ?? 0;
+    if (coins < price) throw new BuyError("Not enough coins");
+    tx.set(
+      userRef,
+      {
+        ownedQuestHeroes: Object.fromEntries(missing.map((h) => [h, true])),
+        coins: admin.firestore.FieldValue.increment(-price),
+      },
+      { merge: true },
+    );
+    return price;
+  });
+}
 
 export default async function handler(
   req: VercelRequest,
@@ -126,6 +189,28 @@ export default async function handler(
     return;
   }
   const shopId = shop as ShopId;
+
+  if (shopId === "questHero") {
+    try {
+      if (await questHeroesOff(db, auth.uid)) {
+        throw new BuyError("Your teacher has turned bought heroes off");
+      }
+      if (itemId.startsWith("set:")) {
+        const price = await buyQuestSet(db, userRef, itemId.slice(4));
+        res.status(200).json({ ok: true, price });
+        return;
+      }
+    } catch (e) {
+      if (e instanceof BuyError) {
+        res.status(200).json({ ok: false, reason: e.message });
+        return;
+      }
+      console.error("buy-item (questHero) failed:", e);
+      res.status(500).json({ ok: false, reason: "Something went wrong" });
+      return;
+    }
+  }
+
   const item = CATALOGS[shopId][itemId];
   if (item === undefined) {
     res.status(400).json({ ok: false, reason: "Unknown item" });
