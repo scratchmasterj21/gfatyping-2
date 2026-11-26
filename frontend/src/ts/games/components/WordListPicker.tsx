@@ -1,5 +1,6 @@
 import { createMemo, createSignal, For, JSXElement, Show } from "solid-js";
 
+import { Fa } from "../../components/common/Fa";
 import { cn } from "../../utils/cn";
 import { WordListOption } from "../word-defender/systems/vocab-pool";
 import { WordListGroup } from "./groupWordListOptions";
@@ -10,6 +11,8 @@ export function WordListPicker(props: {
   onSelect: (option: WordListOption) => void;
   filterable?: boolean;
   listClass?: string;
+  /** why a list can't be picked (see useGameLevel().listLock) */
+  lockedReason?: (option: WordListOption) => string | undefined;
 }): JSXElement {
   const [filter, setFilter] = createSignal("");
   const filteredGroups = createMemo((): WordListGroup[] => {
@@ -51,20 +54,34 @@ export function WordListPicker(props: {
                 {g.group}
               </div>
               <For each={g.items}>
-                {(opt) => (
-                  <button
-                    type="button"
-                    class={cn(
-                      "w-full border-l-2 px-4 py-2 text-left text-em-sm transition-colors",
-                      props.selectedId === opt.id
-                        ? "border-main bg-bg text-text ring-1 ring-main/30"
-                        : "border-transparent text-sub hover:bg-bg/60 hover:text-text",
-                    )}
-                    onClick={() => props.onSelect(opt)}
-                  >
-                    {opt.label}
-                  </button>
-                )}
+                {(opt) => {
+                  const locked = (): string | undefined =>
+                    props.lockedReason?.(opt);
+                  return (
+                    <button
+                      type="button"
+                      disabled={locked() !== undefined}
+                      title={locked()}
+                      class={cn(
+                        "flex w-full items-center gap-2 border-l-2 px-4 py-2 text-left text-em-sm transition-colors",
+                        locked() !== undefined
+                          ? "cursor-not-allowed border-transparent text-sub opacity-50"
+                          : props.selectedId === opt.id
+                            ? "border-main bg-bg text-text ring-1 ring-main/30"
+                            : "border-transparent text-sub hover:bg-bg/60 hover:text-text",
+                      )}
+                      onClick={() => props.onSelect(opt)}
+                    >
+                      <Show when={locked() !== undefined}>
+                        <Fa icon="fa-lock" />
+                      </Show>
+                      <span class="flex-1">{opt.label}</span>
+                      <Show when={locked()}>
+                        {(why) => <span class="text-em-xs">{why()}</span>}
+                      </Show>
+                    </button>
+                  );
+                }}
               </For>
             </div>
           )}

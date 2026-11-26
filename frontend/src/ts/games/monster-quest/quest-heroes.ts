@@ -1,7 +1,6 @@
 import { callApi } from "../../api-client";
 import { invalidateCoinQueries } from "../../queries/coins";
 import { getUserDocShared } from "../../utils/shared-user-doc";
-import type { QuestLevel } from "../game-access";
 import {
   FREE_HEROES,
   HERO_SETS,
@@ -98,42 +97,9 @@ export async function buyQuestHero(
   }
 }
 
-/**
- * Quest words follow lesson progress, not a student's pick (kids always pick
- * the easiest). Each step needs its lesson group finished.
- */
-export const QUEST_LEVEL_STEPS: {
-  level: QuestLevel;
-  requires: string;
-  requiresName: string;
-}[] = [
-  { level: "Medium", requires: "top-row", requiresName: "Top Row" },
-  { level: "Hard", requires: "all-keys", requiresName: "All Keys" },
-];
-
-/** The teacher's fixed level wins; otherwise the highest step finished. */
-export function questLevelFor(
-  groupDone: (groupId: string) => boolean,
-  teacher?: QuestLevel,
-): QuestLevel {
-  if (teacher !== undefined) return teacher;
-  let level: QuestLevel = "Easy";
-  for (const step of QUEST_LEVEL_STEPS) {
-    if (groupDone(step.requires)) level = step.level;
-  }
-  return level;
-}
-
-/** Why a level isn't yours (undefined = it is). */
-export function questLevelLock(
-  option: QuestLevel,
-  mine: QuestLevel,
-  byTeacher: boolean,
-): string | undefined {
-  if (option === mine) return undefined;
-  if (byTeacher) return "set by your teacher";
-  const order: QuestLevel[] = ["Easy", "Medium", "Hard"];
-  if (order.indexOf(option) < order.indexOf(mine)) return "you're past this!";
-  const step = QUEST_LEVEL_STEPS.find((s) => s.level === option);
-  return `finish ${step?.requiresName ?? "more"} lessons`;
-}
+/** Quest words follow lesson progress (shared with every game). */
+export {
+  LEVEL_STEPS as QUEST_LEVEL_STEPS,
+  levelLock as questLevelLock,
+  wordLevelFor as questLevelFor,
+} from "../game-level";

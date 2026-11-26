@@ -46,6 +46,7 @@ import {
   syncArcadeClock,
   updateArcadePlayer,
 } from "../shared/arcade-room";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -112,6 +113,14 @@ export function BalloonPopModal(props: Props): JSXElement {
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
   const [speed, setSpeed] = createSignal(
     VERSUS_SPEEDS[1] as (typeof VERSUS_SPEEDS)[number],
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    speed,
+    (d) => setSpeed(() => d),
+    lv.speedLock,
+    () => VERSUS_SPEEDS,
   );
   const [stars, setStars] = createSignal<StarMap>(loadLocalStars());
   const [levelId, setLevelId] = createSignal(1);
@@ -473,6 +482,7 @@ export function BalloonPopModal(props: Props): JSXElement {
                   <GameSetupSection title="Balloon speed">
                     <DifficultySegmented
                       options={VERSUS_SPEEDS}
+                      lockedReason={lv.speedLock}
                       selectedLabel={speed().label}
                       onSelect={(d) => setSpeed(d)}
                     />
@@ -539,6 +549,7 @@ export function BalloonPopModal(props: Props): JSXElement {
               </GameSetupSection>
               <GameSetupSection title="Choose a word list">
                 <WordListPicker
+                  lockedReason={lv.listLock}
                   groups={GROUPS}
                   selectedId={selected().id}
                   onSelect={setSelected}

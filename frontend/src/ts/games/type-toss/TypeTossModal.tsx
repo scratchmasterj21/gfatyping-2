@@ -49,6 +49,7 @@ import {
   updateArcadePlayer,
 } from "../shared/arcade-room";
 import { submitDailyBest } from "../shared/daily-board";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -103,6 +104,14 @@ export function TypeTossModal(props: Props): JSXElement {
     OPTIONS[0] as WordListOption,
   );
   const [difficulty, setDifficulty] = createSignal<TossDifficulty>(MEDIUM);
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.speedLock,
+    () => TOSS_DIFFICULTIES,
+  );
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
   const [stall, setStall] = createSignal<Stall | "daily">("ducks");
   const [phase, setPhase] = createSignal<
@@ -497,6 +506,7 @@ export function TypeTossModal(props: Props): JSXElement {
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
                   options={TOSS_DIFFICULTIES}
+                  lockedReason={lv.speedLock}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(d)}
                 />
@@ -529,6 +539,7 @@ export function TypeTossModal(props: Props): JSXElement {
               </GameSetupSection>
               <GameSetupSection title="Choose a word list">
                 <WordListPicker
+                  lockedReason={lv.listLock}
                   groups={GROUPS}
                   selectedId={selected().id}
                   onSelect={setSelected}

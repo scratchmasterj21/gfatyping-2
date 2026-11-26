@@ -51,6 +51,7 @@ import {
 } from "../shared/arcade-room";
 import { submitDailyBest } from "../shared/daily-board";
 import { waveAccuracy } from "../shared/wave-result";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   dailyDay,
   getMissionWords,
@@ -99,6 +100,14 @@ export function WordDefenderModal(props: Props): JSXElement {
   );
   const [difficulty, setDifficulty] = createSignal<DefenderDifficulty>(
     DEFENDER_DIFFICULTIES[0] as DefenderDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.speedLock,
+    () => DEFENDER_DIFFICULTIES,
   );
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
   const [daily, setDaily] = createSignal(false);
@@ -455,6 +464,7 @@ export function WordDefenderModal(props: Props): JSXElement {
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
                   options={DEFENDER_DIFFICULTIES}
+                  lockedReason={lv.speedLock}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(d)}
                 />
@@ -474,6 +484,7 @@ export function WordDefenderModal(props: Props): JSXElement {
               <Show when={mode() === "together" || !daily()}>
                 <GameSetupSection title="Choose a word list">
                   <WordListPicker
+                    lockedReason={lv.listLock}
                     groups={GROUPS}
                     selectedId={selected().id}
                     onSelect={setSelected}

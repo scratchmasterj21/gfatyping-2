@@ -38,6 +38,7 @@ import { sfx } from "../mini/mini-sounds";
 import { actingHostUid } from "../shared/acting-host";
 import { submitDailyBest } from "../shared/daily-board";
 import { serverClockNow } from "../shared/server-clock";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -145,6 +146,14 @@ export function TypeRacerModal(props: Props): JSXElement {
   );
   const [difficulty, setDifficulty] = createSignal<RaceDifficulty>(
     RACE_DIFFICULTIES[0] as RaceDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.speedLock,
+    () => RACE_DIFFICULTIES,
   );
   const [durationSec, setDurationSec] = createSignal<30 | 60>(60);
   const [kind, setKind] = createSignal<Kind>("race");
@@ -763,6 +772,7 @@ export function TypeRacerModal(props: Props): JSXElement {
                 <GameSetupSection title="Choose difficulty">
                   <DifficultySegmented
                     options={RACE_DIFFICULTIES}
+                    lockedReason={lv.speedLock}
                     selectedLabel={difficulty().label}
                     onSelect={(d) => setDifficulty(d)}
                   />
@@ -831,6 +841,7 @@ export function TypeRacerModal(props: Props): JSXElement {
               <Show when={mode() === "together" || kind() !== "daily"}>
                 <GameSetupSection title="Choose a word list">
                   <WordListPicker
+                    lockedReason={lv.listLock}
                     groups={GROUPS}
                     selectedId={selected().id}
                     onSelect={setSelected}

@@ -447,7 +447,7 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           </span>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
-          <span>📚 Monster Quest words:</span>
+          <span>📚 Game words:</span>
           <For each={QUEST_LEVEL_CHOICES}>
             {(c) => (
               <button
@@ -461,8 +461,11 @@ export function ActivityTab(props: { classId: string }): JSXElement {
             )}
           </For>
           <span class="text-xs">
-            Students can&apos;t pick. By lessons: Easy, then Medium after Top
-            Row, Hard after All Keys.
+            Students can&apos;t pick easier words. By lessons: Easy, Medium
+            after Top Row, Hard after All Keys; word lists = current lesson
+            group + the end of the one before; game speed can&apos;t go below
+            their level. Easy/Medium/Hard here fixes it (lists: home, top row,
+            all keys).
           </span>
         </div>
         <div>
@@ -1205,7 +1208,7 @@ function StudentRow(props: {
             </select>
           </label>
           <label class="flex flex-wrap items-center gap-2 text-sm text-sub">
-            📚 Monster Quest words for {props.student.name}:
+            📚 Game words for {props.student.name}:
             <select
               class="min-h-9 rounded bg-sub-alt px-2 text-text"
               value={own().questLevel ?? "class"}

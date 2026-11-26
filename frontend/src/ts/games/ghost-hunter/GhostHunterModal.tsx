@@ -39,6 +39,7 @@ import { PracticeWords } from "../components/PracticeWords";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { WordListPicker } from "../components/WordListPicker";
 import { waveAccuracy, WaveEnd, waveStars } from "../shared/wave-result";
+import { pickAllowed, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -165,6 +166,18 @@ export function GhostHunterModal(props: Props): JSXElement {
       ? GHOST_DIFFICULTIES.filter((item) => item.label !== "Easy")
       : GHOST_DIFFICULTIES,
   );
+  const lv = useGameLevel(() => props.open);
+  createEffect(() => {
+    const list = pickAllowed(
+      selected(),
+      lv.listLock,
+      mode() === "together" ? MULTIPLAYER_OPTIONS : OPTIONS,
+    );
+    if (list !== undefined) setSelected(list);
+    const d = pickAllowed(difficulty(), lv.speedLock, availableDifficulties());
+    if (d !== undefined) setDifficulty(d);
+  });
+
   const multiplayerPlayers = createMemo(() =>
     Object.values(room()?.players ?? {}).sort(
       (a, b) => a.joinedAt - b.joinedAt,
@@ -579,6 +592,7 @@ export function GhostHunterModal(props: Props): JSXElement {
               <GameSetupSection title="Choose difficulty">
                 <DifficultySegmented
                   options={availableDifficulties()}
+                  lockedReason={lv.speedLock}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(d)}
                   compact
@@ -620,6 +634,7 @@ export function GhostHunterModal(props: Props): JSXElement {
               <Show when={mode() === "together" || !daily()}>
                 <GameSetupSection title="Choose a word list">
                   <WordListPicker
+                    lockedReason={lv.listLock}
                     groups={groups()}
                     selectedId={selected().id}
                     onSelect={setSelected}

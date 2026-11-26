@@ -31,6 +31,7 @@ import { ScoreRaceResults } from "../components/score-race/ScoreRaceResults";
 import { useScoreRace } from "../components/score-race/use-score-race";
 import { WordListPicker } from "../components/WordListPicker";
 import { ScoreRaceGameId } from "../shared/score-race";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -93,12 +94,25 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   onResult?: (score: number, wave: number) => void;
   /** Why a difficulty can't be picked yet (shown on the locked button). */
   difficultyLock?: (difficulty: D) => string | undefined;
+  /** difficulty = word level (Easy/Medium/Hard words), not game speed */
+  levelWords?: boolean;
 }): JSXElement {
   const [selected, setSelected] = createSignal<WordListOption>(
     OPTIONS[0] as WordListOption,
   );
   const [difficulty, setDifficulty] = createSignal<D>(
     untrack(() => props.difficulties[0] as D),
+  );
+  const lv = useGameLevel(() => props.open);
+  const lockDifficulty = (d: D): string | undefined =>
+    props.difficultyLock?.(d) ??
+    (props.levelWords === true ? lv.wordsLock(d) : lv.speedLock(d));
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lockDifficulty,
+    () => props.difficulties,
   );
   const [phase, setPhase] = createSignal<
     "pick" | "loading" | "playing" | "result"
@@ -228,6 +242,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                   fallback={
                     <GameSetupPrimaryAction
                       text="Start game"
+                      disabled={!lv.ready()}
                       onClick={() => void start()}
                     />
                   }
@@ -256,7 +271,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                   options={props.difficulties}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(() => d)}
-                  lockedReason={props.difficultyLock}
+                  lockedReason={lockDifficulty}
                 />
               </GameSetupSection>
               <p class="mb-4 flex items-center gap-2 text-sm text-sub">
@@ -268,6 +283,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                 <GameSetupMore>
                   <GameSetupSection title="Choose a word list">
                     <WordListPicker
+                      lockedReason={lv.listLock}
                       groups={GROUPS}
                       selectedId={selected().id}
                       onSelect={setSelected}

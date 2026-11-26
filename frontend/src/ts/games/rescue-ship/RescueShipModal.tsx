@@ -31,6 +31,7 @@ import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
 import { TypingReport, TypingTracker } from "../shared/typing-report";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import { PET_ART } from "./ship-art";
 import {
   createShipRoom,
@@ -99,6 +100,13 @@ export function RescueShipModal(props: {
   const [station, setStation] = createSignal<Station>("pilot");
   const [difficulty, setDifficulty] = createSignal<ShipDifficulty>(
     SHIP_DIFFICULTIES[0] as ShipDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.wordsLock,
+    () => SHIP_DIFFICULTIES,
   );
   const [now, setNow] = createSignal(Date.now());
   const [result, setResult] = createSignal<GameResultView | null>(null);
@@ -518,6 +526,7 @@ export function RescueShipModal(props: {
             <GameSetupSection title="Words">
               <DifficultySegmented
                 options={SHIP_DIFFICULTIES}
+                lockedReason={lv.wordsLock}
                 selectedLabel={difficulty().label}
                 onSelect={(d) => setDifficulty(() => d)}
               />

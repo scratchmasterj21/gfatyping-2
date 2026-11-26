@@ -19,7 +19,7 @@ import { getSnapshot } from "../states/snapshot";
 
 export type GameMode = "on" | "off" | "earn";
 
-/** Monster Quest word level a teacher can fix (unset = from lessons). */
+/** Game word level a teacher can fix (unset = from lessons). */
 export type QuestLevel = "Easy" | "Medium" | "Hard";
 const QUEST_LEVELS: readonly string[] = ["Easy", "Medium", "Hard"];
 /** Teacher chips (undefined = follow lesson progress). */
@@ -55,8 +55,9 @@ export type GamePolicy = {
    */
   questHeroesOff?: boolean;
   /**
-   * Monster Quest words fixed by the teacher (unset = set by the student's
-   * lesson progress). Student value overrides the class.
+   * Game word level fixed by the teacher, for every game (unset = set by the
+   * student's lesson progress; see game-level.ts). Field name kept from when
+   * it was Monster Quest only. Student value overrides the class.
    */
   questLevel?: QuestLevel;
 };

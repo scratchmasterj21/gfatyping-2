@@ -28,6 +28,7 @@ import { InviteClassmates } from "../components/InviteClassmates";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   createFourRoom,
   dropFourPiece,
@@ -83,6 +84,13 @@ export function FourRowModal(props: {
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
   const [difficulty, setDifficulty] = createSignal<FourDifficulty>(
     FOUR_DIFFICULTIES[0] as FourDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.wordsLock,
+    () => FOUR_DIFFICULTIES,
   );
   const [now, setNow] = createSignal(Date.now());
   const [result, setResult] = createSignal<GameResultView | null>(null);
@@ -418,6 +426,7 @@ export function FourRowModal(props: {
             <GameSetupSection title="Words">
               <DifficultySegmented
                 options={FOUR_DIFFICULTIES}
+                lockedReason={lv.wordsLock}
                 selectedLabel={difficulty().label}
                 onSelect={(d) => setDifficulty(() => d)}
               />

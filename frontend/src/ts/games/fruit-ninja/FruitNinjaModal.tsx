@@ -35,6 +35,7 @@ import { useScoreRace } from "../components/score-race/use-score-race";
 import { WordListPicker } from "../components/WordListPicker";
 import { ScoreRaceRoom } from "../shared/score-race";
 import { waveAccuracy, WaveEnd, waveStars } from "../shared/wave-result";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -87,6 +88,14 @@ export function FruitNinjaModal(props: Props): JSXElement {
   );
   const [difficulty, setDifficulty] = createSignal<GameDifficulty>(
     FRUIT_NINJA_DIFFICULTIES[0] as GameDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.speedLock,
+    () => FRUIT_NINJA_DIFFICULTIES,
   );
   const [phase, setPhase] = createSignal<"pick" | "loading" | "playing">(
     "pick",
@@ -287,6 +296,7 @@ export function FruitNinjaModal(props: Props): JSXElement {
             <GameSetupSection title="Choose difficulty">
               <DifficultySegmented
                 options={FRUIT_NINJA_DIFFICULTIES}
+                lockedReason={lv.speedLock}
                 selectedLabel={difficulty().label}
                 onSelect={(d) => setDifficulty(d)}
               />
@@ -301,6 +311,7 @@ export function FruitNinjaModal(props: Props): JSXElement {
             <GameSetupMore>
               <GameSetupSection title="Choose a word list">
                 <WordListPicker
+                  lockedReason={lv.listLock}
                   groups={GROUPS}
                   selectedId={selected().id}
                   onSelect={setSelected}

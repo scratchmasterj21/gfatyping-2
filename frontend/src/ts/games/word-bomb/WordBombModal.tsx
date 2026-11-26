@@ -28,6 +28,7 @@ import { InviteClassmates } from "../components/InviteClassmates";
 import { SoloTogetherToggle } from "../components/SoloTogetherToggle";
 import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   boomBomb,
   BombRoom,
@@ -93,6 +94,13 @@ export function WordBombModal(props: {
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
   const [difficulty, setDifficulty] = createSignal<BombDifficulty>(
     BOMB_DIFFICULTIES[0] as BombDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.wordsLock,
+    () => BOMB_DIFFICULTIES,
   );
   const [botCount, setBotCount] = createSignal(
     BOT_COUNTS[1] as (typeof BOT_COUNTS)[number],
@@ -487,6 +495,7 @@ export function WordBombModal(props: {
             <GameSetupSection title="Words">
               <DifficultySegmented
                 options={BOMB_DIFFICULTIES}
+                lockedReason={lv.wordsLock}
                 selectedLabel={difficulty().label}
                 onSelect={(d) => setDifficulty(() => d)}
               />

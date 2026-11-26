@@ -35,6 +35,7 @@ import { claimMiniGameReward, MiniGameClaim } from "../mini/mini-game-reward";
 import { sfx } from "../mini/mini-sounds";
 import { submitDailyBest } from "../shared/daily-board";
 import { TypingReport, TypingTracker } from "../shared/typing-report";
+import { createPickGuard, useGameLevel } from "../use-game-level";
 import {
   getWordListOptions,
   WordListOption,
@@ -126,6 +127,14 @@ export function WordPongModal(props: {
   );
   const [difficulty, setDifficulty] = createSignal<PongDifficulty>(
     PONG_DIFFICULTIES[0] as PongDifficulty,
+  );
+  const lv = useGameLevel(() => props.open);
+  createPickGuard(selected, setSelected, lv.listLock, () => OPTIONS);
+  createPickGuard(
+    difficulty,
+    (d) => setDifficulty(() => d),
+    lv.speedLock,
+    () => PONG_DIFFICULTIES,
   );
   const [now, setNow] = createSignal(Date.now());
   const [result, setResult] = createSignal<GameResultView | null>(null);
@@ -838,6 +847,7 @@ export function WordPongModal(props: {
               <GameSetupSection title="Ball speed">
                 <DifficultySegmented
                   options={PONG_DIFFICULTIES}
+                  lockedReason={lv.speedLock}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(() => d)}
                 />
@@ -847,6 +857,7 @@ export function WordPongModal(props: {
               <GameSetupMore>
                 <GameSetupSection title="Choose a word list">
                   <WordListPicker
+                    lockedReason={lv.listLock}
                     groups={GROUPS}
                     selectedId={selected().id}
                     onSelect={setSelected}

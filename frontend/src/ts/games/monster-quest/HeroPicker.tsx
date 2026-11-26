@@ -5,8 +5,6 @@ import { isCurrentUserStaff } from "../../auth";
 import { BuyButton } from "../../components/common/BuyButton";
 import { Fa } from "../../components/common/Fa";
 import { useBuyGuard } from "../../hooks/useBuyGuard";
-import { getAllProgress } from "../../lessons/lesson-progress";
-import { lessonGroups } from "../../lessons/lessons-data";
 import { queryClient } from "../../queries";
 import { getUserId, isAuthenticated } from "../../states/core";
 import {
@@ -21,6 +19,7 @@ import {
   QuestLevel,
   resolvePolicy,
 } from "../game-access";
+import { useGameLevel } from "../use-game-level";
 import { HERO_ART } from "./hero-art";
 import {
   buyQuestHero,
@@ -30,7 +29,6 @@ import {
   ownsFullSet,
   QUEST_HERO_PRICE,
   QUEST_HEROES_KEY,
-  questLevelFor,
   questSetPrice,
 } from "./quest-heroes";
 import {
@@ -77,12 +75,6 @@ export function useQuestHeroes(enabled: () => boolean): QuestHeroes {
     enabled: enabled() && isAuthenticated() && !staff(),
     staleTime: 5 * 60 * 1000,
   }));
-  const progressQuery = useQuery(() => ({
-    queryKey: ["lessonProgress"],
-    queryFn: getAllProgress,
-    enabled: enabled() && isAuthenticated() && !staff(),
-    staleTime: 5 * 60 * 1000,
-  }));
   const { pendingId, guardedBuy } = useBuyGuard();
 
   const owned = (): HeroClass[] => heroQuery.data?.owned ?? [];
@@ -93,17 +85,8 @@ export function useQuestHeroes(enabled: () => boolean): QuestHeroes {
       getUserId() ?? undefined,
     );
   const heroesOff = (): boolean => !staff() && policy().questHeroesOff;
-  const groupDone = (groupId: string): boolean => {
-    const group = lessonGroups.find((g) => g.id === groupId);
-    const p = progressQuery.data;
-    return (
-      group !== undefined &&
-      p !== undefined &&
-      group.lessons.every((l) => p.get(l.id)?.completed === true)
-    );
-  };
-  const setOpen = (set: HeroSetInfo): boolean =>
-    staff() || groupDone(set.requires);
+  const lv = useGameLevel(enabled);
+  const setOpen = (set: HeroSetInfo): boolean => lv.groupDone(set.requires);
 
   return {
     coins: () => heroQuery.data?.coins ?? 0,
@@ -113,12 +96,9 @@ export function useQuestHeroes(enabled: () => boolean): QuestHeroes {
     // staff can try every hero without buying
     canPlay: (cls) => staff() || canPlayHero(cls, owned(), heroesOff()),
     pendingId,
-    level: () => questLevelFor(groupDone, policy().questLevel),
-    levelByTeacher: () => policy().questLevel !== undefined,
-    levelReady: () =>
-      staff() ||
-      !isAuthenticated() ||
-      (progressQuery.data !== undefined && !accessQuery.isPending),
+    level: lv.level,
+    levelByTeacher: lv.byTeacher,
+    levelReady: lv.ready,
     buy: (itemId, label) => {
       void guardedBuy(itemId, async () => {
         const r = await buyQuestHero(itemId);
