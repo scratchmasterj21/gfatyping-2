@@ -32,7 +32,8 @@ export type BuiltinGame = {
     | "goldfish"
     | "shiritori"
     | "monster-raid"
-    | "rescue-ship";
+    | "rescue-ship"
+    | "zoo-keeper";
   name: string;
   description: string;
   icon: FaSolidIcon;
@@ -182,6 +183,16 @@ export const games: Game[] = [
     icon: "fa-cookie-bite",
     words: "lessons",
     grades: grades(3, 5),
+  },
+  {
+    type: "builtin",
+    id: "zoo-keeper",
+    name: "Zoo Keeper",
+    description:
+      "Feed, wash and play with the zoo animals by typing what they need!",
+    icon: "fa-paw",
+    words: "lessons",
+    grades: grades(1, 4),
   },
   {
     type: "builtin",

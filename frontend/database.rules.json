@@ -271,7 +271,7 @@
           ".validate": "newData.val() == 'lobby' || newData.val() == 'countdown' || newData.val() == 'playing' || newData.val() == 'finished'"
         },
         "gameId": {
-          ".validate": "(newData.val() == 'balloon-pop' || newData.val() == 'fruit-ninja' || newData.val() == 'word-defender' || newData.val() == 'tower-climb' || newData.val() == 'snack-shop' || newData.val() == 'echo-keys') && (!data.exists() || newData.val() == data.val())"
+          ".validate": "(newData.val() == 'balloon-pop' || newData.val() == 'fruit-ninja' || newData.val() == 'word-defender' || newData.val() == 'tower-climb' || newData.val() == 'snack-shop' || newData.val() == 'echo-keys' || newData.val() == 'zoo-keeper') && (!data.exists() || newData.val() == data.val())"
         },
         "durationSec": {
           ".validate": "newData.isNumber() && newData.val() >= 30 && newData.val() <= 300 && (!data.exists() || newData.val() == data.val())"

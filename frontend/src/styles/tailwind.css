@@ -355,6 +355,128 @@
     }
   }
 
+  /* Zoo animals (ZooAnimal.tsx) */
+  --animate-zoo-breathe: zoo-breathe 2.4s ease-in-out infinite;
+  --animate-zoo-blink: zoo-blink 4.2s linear infinite;
+  --animate-zoo-wag: zoo-wag 0.9s ease-in-out infinite;
+  --animate-zoo-step: zoo-step 0.5s ease-in-out infinite alternate;
+  --animate-zoo-step-alt: zoo-step 0.5s ease-in-out -0.5s infinite alternate;
+  --animate-zoo-pace: zoo-pace 10s linear infinite;
+  --animate-zoo-nibble: zoo-nibble 0.32s ease-in-out infinite alternate;
+  --animate-zoo-flap: zoo-flap 0.45s ease-in-out infinite alternate;
+  --animate-zoo-zzz: zoo-zzz 2.1s ease-out infinite;
+  --animate-zoo-buzz: zoo-buzz 1.3s linear infinite;
+  --animate-zoo-cheer: game-hop 0.42s ease-out 3;
+  --animate-zoo-shimmy: zoo-shimmy 0.3s ease-in-out infinite alternate;
+
+  @keyframes zoo-breathe {
+    0%,
+    100% {
+      transform: scaleY(1);
+    }
+    50% {
+      transform: scaleY(1.035);
+    }
+  }
+  @keyframes zoo-blink {
+    0%,
+    93%,
+    100% {
+      transform: scaleY(1);
+    }
+    95% {
+      transform: scaleY(0.1);
+    }
+  }
+  @keyframes zoo-wag {
+    0%,
+    100% {
+      transform: rotate(-14deg);
+    }
+    50% {
+      transform: rotate(14deg);
+    }
+  }
+  @keyframes zoo-step {
+    from {
+      transform: rotate(-11deg);
+    }
+    to {
+      transform: rotate(11deg);
+    }
+  }
+  @keyframes zoo-pace {
+    0% {
+      transform: translateX(-18%) scaleX(1);
+    }
+    46% {
+      transform: translateX(18%) scaleX(1);
+    }
+    50% {
+      transform: translateX(18%) scaleX(-1);
+    }
+    96% {
+      transform: translateX(-18%) scaleX(-1);
+    }
+    100% {
+      transform: translateX(-18%) scaleX(1);
+    }
+  }
+  @keyframes zoo-nibble {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(9deg) translateY(4px);
+    }
+  }
+  @keyframes zoo-flap {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(-28deg);
+    }
+  }
+  @keyframes zoo-zzz {
+    0% {
+      transform: translate(0, 0) scale(0.6);
+      opacity: 0;
+    }
+    25% {
+      opacity: 1;
+    }
+    100% {
+      transform: translate(14px, -30px) scale(1.15);
+      opacity: 0;
+    }
+  }
+  @keyframes zoo-buzz {
+    0% {
+      transform: translate(0, 0);
+    }
+    25% {
+      transform: translate(10px, -6px);
+    }
+    50% {
+      transform: translate(0, -11px);
+    }
+    75% {
+      transform: translate(-10px, -5px);
+    }
+    100% {
+      transform: translate(0, 0);
+    }
+  }
+  @keyframes zoo-shimmy {
+    from {
+      transform: rotate(-3deg);
+    }
+    to {
+      transform: rotate(3deg);
+    }
+  }
+
   /* Monster Quest battle */
   --animate-quest-idle: quest-idle 1.8s ease-in-out infinite;
   --animate-quest-lunge-left: quest-lunge-left 0.62s ease-in-out;

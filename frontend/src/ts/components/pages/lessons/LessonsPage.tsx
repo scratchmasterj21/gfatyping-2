@@ -88,6 +88,7 @@ import { TypingRpgModal } from "../../../games/typing-rpg/TypingRpgModal";
 import { WordBombModal } from "../../../games/word-bomb/WordBombModal";
 import { WordDefenderModal } from "../../../games/word-defender/WordDefenderModal";
 import { WordPongModal } from "../../../games/word-pong/WordPongModal";
+import { ZooShiftModal } from "../../../games/zoo/ZooShiftModal";
 import {
   ALL_KEYS_GROUPS,
   allKeysGroupsDone,
@@ -202,6 +203,7 @@ const TOGETHER_GAME_IDS: string[] = [
   "word-defender",
   "tower-climb",
   "snack-shop",
+  "zoo-keeper",
   "echo-keys",
 ];
 
@@ -830,6 +832,7 @@ export function LessonsPage(): JSXElement {
   const [balloonOpen, setBalloonOpen] = createSignal(false);
   const [towerOpen, setTowerOpen] = createSignal(false);
   const [snackOpen, setSnackOpen] = createSignal(false);
+  const [zooOpen, setZooOpen] = createSignal(false);
   const [echoOpen, setEchoOpen] = createSignal(false);
   const [pongOpen, setPongOpen] = createSignal(false);
   const [digOpen, setDigOpen] = createSignal(false);
@@ -1358,6 +1361,17 @@ export function LessonsPage(): JSXElement {
                 allKeysDone: keyGroupsDone() === ALL_KEYS_GROUPS.length,
               },
         );
+  /** Zoo Keeper: Easy is open, Medium/Hard follow the All Keys setting. */
+  const zooHardLock = (): string | undefined => {
+    if (isCurrentUserStaff()) return undefined;
+    const a = checkGameAccess("zoo-keeper", gamePolicy(), myToday(), {
+      levelGame: true,
+      allKeysDone: keyGroupsDone() === ALL_KEYS_GROUPS.length,
+    });
+    return !a.allowed && a.reason === "keys"
+      ? `finish All Keys (${keyGroupsDone()}/${ALL_KEYS_GROUPS.length})`
+      : undefined;
+  };
   const isKeysLocked = (gameId: string): boolean => {
     const a = gameAccess(gameId);
     return !a.allowed && a.reason === "keys";
@@ -1706,6 +1720,7 @@ export function LessonsPage(): JSXElement {
     else if (gameId === "typing-rpg") setRpgOpen(true);
     else if (gameId === "tower-climb") setTowerOpen(true);
     else if (gameId === "snack-shop") setSnackOpen(true);
+    else if (gameId === "zoo-keeper") setZooOpen(true);
     else if (gameId === "echo-keys") setEchoOpen(true);
     else if (gameId === "word-pong") setPongOpen(true);
     else if (gameId === "gem-dig") setDigOpen(true);
@@ -1730,6 +1745,7 @@ export function LessonsPage(): JSXElement {
     if (rpgOpen()) return "typing-rpg";
     if (towerOpen()) return "tower-climb";
     if (snackOpen()) return "snack-shop";
+    if (zooOpen()) return "zoo-keeper";
     if (echoOpen()) return "echo-keys";
     if (pongOpen()) return "word-pong";
     if (digOpen()) return "gem-dig";
@@ -2347,6 +2363,7 @@ export function LessonsPage(): JSXElement {
                             "word-defender",
                             "tower-climb",
                             "snack-shop",
+                            "zoo-keeper",
                             "echo-keys",
                           ].includes(game.id) &&
                           !isCurrentUserStaff() &&
@@ -2674,6 +2691,19 @@ export function LessonsPage(): JSXElement {
           onResult={(score, wave) => {
             void recordGameScore("snack-shop", score);
             claimRecommendedGame("snack-shop", score, wave);
+          }}
+        />
+        <ZooShiftModal
+          open={zooOpen()}
+          initialMode={gameLaunchMode()}
+          hardLock={zooHardLock()}
+          onClose={() => {
+            setZooOpen(false);
+            setRecommendedGameId(undefined);
+          }}
+          onResult={(score, wave) => {
+            void recordGameScore("zoo-keeper", score);
+            claimRecommendedGame("zoo-keeper", score, wave);
           }}
         />
         <EchoKeysModal

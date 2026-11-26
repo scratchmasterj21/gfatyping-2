@@ -243,6 +243,7 @@ export function Sidebar(props: {
             { id: "type-toss", text: "type toss", icon: "fa-basketball-ball" },
             { id: "tower-climb", text: "tower climb", icon: "fa-building" },
             { id: "snack-shop", text: "snack shop", icon: "fa-cookie-bite" },
+            { id: "zoo-keeper", text: "zoo keeper", icon: "fa-paw" },
             { id: "echo-keys", text: "echo keys", icon: "fa-lightbulb" },
             { id: "word-pong", text: "ping-pong", icon: "fa-table-tennis" },
             { id: "gem-dig", text: "gem dig", icon: "fa-gem" },

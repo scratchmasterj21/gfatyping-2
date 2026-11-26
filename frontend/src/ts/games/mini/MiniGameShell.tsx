@@ -91,6 +91,8 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   usesWordList?: boolean;
   play: (p: MiniGamePlayProps<D>) => JSXElement;
   onResult?: (score: number, wave: number) => void;
+  /** Why a difficulty can't be picked yet (shown on the locked button). */
+  difficultyLock?: (difficulty: D) => string | undefined;
 }): JSXElement {
   const [selected, setSelected] = createSignal<WordListOption>(
     OPTIONS[0] as WordListOption,
@@ -254,6 +256,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                   options={props.difficulties}
                   selectedLabel={difficulty().label}
                   onSelect={(d) => setDifficulty(() => d)}
+                  lockedReason={props.difficultyLock}
                 />
               </GameSetupSection>
               <p class="mb-4 flex items-center gap-2 text-sm text-sub">

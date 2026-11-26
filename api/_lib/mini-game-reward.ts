@@ -17,6 +17,7 @@ export const MINI_GAME_IDS = [
   "shiritori",
   "monster-raid",
   "rescue-ship",
+  "zoo-keeper",
 ] as const;
 export type MiniGameId = (typeof MINI_GAME_IDS)[number];
 
@@ -43,6 +44,8 @@ export const MINI_GAME_SCORE_PER_COIN: Record<MiniGameId, number> = {
   "monster-raid": 15,
   // pets x6 + health x2 + 30 for getting home + jobs: a good run caps at 8
   "rescue-ship": 20,
+  // ~16 points an animal, x2 on a streak: a good 90 s shift (~350) caps at 8
+  "zoo-keeper": 45,
 };
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;

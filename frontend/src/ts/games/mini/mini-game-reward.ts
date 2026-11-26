@@ -15,7 +15,8 @@ export type MiniGameId =
   | "goldfish"
   | "shiritori"
   | "monster-raid"
-  | "rescue-ship";
+  | "rescue-ship"
+  | "zoo-keeper";
 export const MINI_GAME_MAX_COINS_PER_RUN = 8;
 export const MINI_GAME_PAID_RUNS_PER_DAY = 3;
 /** Mirrors api/_lib/mini-game-reward.ts: Monster Quest pays 5 quests a day. */

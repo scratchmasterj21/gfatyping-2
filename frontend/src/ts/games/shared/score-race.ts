@@ -31,6 +31,7 @@ export const SCORE_RACE_GAMES = [
   "tower-climb",
   "snack-shop",
   "echo-keys",
+  "zoo-keeper",
 ] as const;
 export type ScoreRaceGameId = (typeof SCORE_RACE_GAMES)[number];
 

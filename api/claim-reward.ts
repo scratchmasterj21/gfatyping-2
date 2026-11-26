@@ -43,6 +43,7 @@ const RECOMMENDED_GAME_IDS = new Set([
   "karuta",
   "goldfish",
   "shiritori",
+  "zoo-keeper",
 ]);
 
 /** Mirrors frontend COLLECTION_CATEGORIES / COLLECTION_REWARD in avatar-items.ts. */
