@@ -31,6 +31,7 @@ import { SideImagesModal } from "./SideImagesModal";
 import { SimpleModal } from "./SimpleModal";
 import { SupportModal } from "./SupportModal";
 import { VersionHistoryModal } from "./VersionHistoryModal";
+import { ZooModal } from "./ZooModal";
 
 export function Modals(): JSXElement {
   return (
@@ -57,6 +58,7 @@ export function Modals(): JSXElement {
       <AvatarModal />
       <SideImagesModal />
       <HouseModal />
+      <ZooModal />
       <HouseShopModal />
       <PetShopModal />
       <HandsShopModal />

@@ -51,6 +51,8 @@ service cloud.firestore {
         // the game unlock rules rely on them, so students can't edit them
         'activityDays', 'lastStarLessonDate',
         'houseChoreDate', 'houseChoresDone', 'houseRoomThemes',
+        // My Zoo: animals are bought and care is paid via the API
+        'ownedZooAnimals', 'zooCareDates', 'zooCareDone',
         'championWins', 'lastChampionAt',
         // "teacher" accounts skip the student rules - admin sets it
         'role'

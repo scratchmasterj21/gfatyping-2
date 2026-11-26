@@ -6,6 +6,7 @@ export type ModalId =
   | "SideImagesShop"
   | "HouseShop"
   | "House"
+  | "Zoo"
   | "PetShop"
   | "HandsShop"
   | "RgbPaletteShop"

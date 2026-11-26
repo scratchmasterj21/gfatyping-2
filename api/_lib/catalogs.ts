@@ -18,6 +18,8 @@ export type CatalogItem = {
   category?: string;
   /** Only sold some months, so it doesn't count toward collections. */
   seasonal?: true;
+  /** My Zoo: lesson group that must be finished first (see _lib/zoo.ts). */
+  requiresLessonGroup?: string;
 };
 
 export type ShopId =
@@ -31,7 +33,8 @@ export type ShopId =
   | "caretEffect"
   | "backdrop"
   | "animalAvatar"
-  | "garden";
+  | "garden"
+  | "zoo";
 
 /** users/{uid} field each shop's ownership map is stored under. */
 export const OWNED_FIELD: Record<ShopId, string> = {
@@ -46,6 +49,7 @@ export const OWNED_FIELD: Record<ShopId, string> = {
   backdrop: "ownedBackdrops",
   animalAvatar: "ownedAnimalAvatars",
   garden: "ownedGardenItems",
+  zoo: "ownedZooAnimals",
 };
 
 /** users/{uid} field for the "currently equipped/selected" id, if the shop has one. */
@@ -77,6 +81,22 @@ export const TITLE_ACHIEVEMENTS: Readonly<Record<string, string>> = {
 };
 
 export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
+  // My Zoo animals (each comes with its pen). Mirrors frontend
+  // games/zoo/zoo-areas.ts ZOO_PRICES / ZOO_AREAS. The rabbit is free.
+  zoo: {
+    chick: { price: 40 },
+    goat: { price: 60, requiresLessonGroup: "home-row" },
+    duck: { price: 60, requiresLessonGroup: "home-row" },
+    pig: { price: 70, requiresLessonGroup: "home-row" },
+    monkey: { price: 100, requiresLessonGroup: "top-row" },
+    parrot: { price: 110, requiresLessonGroup: "top-row" },
+    zebra: { price: 130, requiresLessonGroup: "bottom-row" },
+    giraffe: { price: 150, requiresLessonGroup: "bottom-row" },
+    elephant: { price: 180, requiresLessonGroup: "bottom-row" },
+    penguin: { price: 170, requiresLessonGroup: "all-keys" },
+    lion: { price: 200, requiresLessonGroup: "all-keys" },
+    panda: { price: 220, requiresLessonGroup: "all-keys" },
+  },
   house: {
     rug: { price: 20 },
     couch: { price: 40 },

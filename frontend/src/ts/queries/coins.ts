@@ -22,6 +22,7 @@ const COIN_QUERY_KEYS: string[] = [
   "caretEffectState",
   "backdropState",
   "sideImagesShop",
+  "zooState",
 ];
 
 export function invalidateCoinQueries(): void {

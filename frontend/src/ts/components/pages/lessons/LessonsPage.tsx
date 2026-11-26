@@ -686,6 +686,7 @@ const SHOP_ITEMS: {
     label: "caret effects",
   },
   { tab: "home", modal: "House", icon: "fa-home", label: "my house" },
+  { tab: "home", modal: "Zoo", icon: "fa-paw", label: "my zoo" },
   {
     tab: "home",
     modal: "SideImagesShop",

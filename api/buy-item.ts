@@ -7,6 +7,7 @@ import {
   qualifiesForAchievement,
 } from "./_lib/achievements.js";
 import { verifyStudent } from "./_lib/auth.js";
+import { lessonGroupDone } from "./_lib/zoo.js";
 import {
   CATALOGS,
   OWNED_FIELD,
@@ -26,6 +27,7 @@ const SHOP_IDS: Set<ShopId> = new Set([
   "backdrop",
   "animalAvatar",
   "garden",
+  "zoo",
 ]);
 
 type SideImageSet = { id?: string; price?: number };
@@ -138,6 +140,13 @@ export default async function handler(
     const lessonsCompleted = item.requiresAchievement?.startsWith("lessons-")
       ? await countBuiltInLessonsCompleted(userRef)
       : undefined;
+    // My Zoo areas open lesson group by group (a few doc reads, zoo only)
+    if (
+      item.requiresLessonGroup !== undefined &&
+      !(await lessonGroupDone(userRef, item.requiresLessonGroup))
+    ) {
+      throw new BuyError("Finish those lessons first");
+    }
     await db.runTransaction(async (tx: admin.firestore.Transaction) => {
       const snap = await tx.get(userRef);
       const data = snap.exists ? snap.data() : {};

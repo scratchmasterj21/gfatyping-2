@@ -143,6 +143,52 @@ async function claimHouseChore(
   }
 }
 
+/** My Zoo daily care jobs. Mirrors frontend games/zoo/zoo-areas.ts. */
+const ZOO_CARE_JOBS = new Set(["feed", "clean", "vet"]);
+const ZOO_CARE_COINS = 4;
+
+/**
+ * My Zoo care job: pays once per Japan day per job. Like the house chore the
+ * typing itself isn't checked; zooCareDates is an economy field.
+ */
+async function claimZooCare(
+  uid: string,
+  rawJob: unknown,
+  res: VercelResponse,
+): Promise<void> {
+  if (typeof rawJob !== "string" || !ZOO_CARE_JOBS.has(rawJob)) {
+    res.status(400).json({ claimed: false, coins: 0 });
+    return;
+  }
+  const job = rawJob;
+  const db = getAdminApp().firestore();
+  const userRef = db.collection("users").doc(uid);
+  const today = tokyoDateString();
+  try {
+    const claimed = await db.runTransaction(
+      async (tx: admin.firestore.Transaction) => {
+        const data = (await tx.get(userRef)).data() ?? {};
+        const dates = (data["zooCareDates"] ?? {}) as Record<string, unknown>;
+        if (dates[job] === today) return false;
+        tx.set(
+          userRef,
+          {
+            zooCareDates: { [job]: today },
+            zooCareDone: admin.firestore.FieldValue.increment(1),
+            coins: admin.firestore.FieldValue.increment(ZOO_CARE_COINS),
+          },
+          { merge: true },
+        );
+        return true;
+      },
+    );
+    res.status(200).json({ claimed, coins: claimed ? ZOO_CARE_COINS : 0 });
+  } catch (e) {
+    console.error("claim-reward (zooCare) failed:", e);
+    res.status(500).json({ claimed: false, coins: 0 });
+  }
+}
+
 /** Type Toss prize booth: plushies and their ticket prices. */
 const TOSS_PRIZES: Record<string, number> = {
   teddy: 100,
@@ -480,6 +526,7 @@ export default async function handler(
     category?: unknown;
     pets?: unknown;
     gems?: unknown;
+    job?: unknown;
   };
   if (body.type === "avatarCollection") {
     const category = body.category;
@@ -512,6 +559,10 @@ export default async function handler(
   }
   if (body.type === "houseChore") {
     await claimHouseChore(auth.uid, res);
+    return;
+  }
+  if (body.type === "zooCare") {
+    await claimZooCare(auth.uid, body.job, res);
     return;
   }
   if (body.type === "miniGame") {
