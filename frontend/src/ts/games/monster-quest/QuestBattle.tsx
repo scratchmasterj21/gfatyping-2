@@ -730,6 +730,72 @@ export function QuestBattle(props: {
     }, eventMs(e));
   });
 
+  /**
+   * Lasting effects (shields, marks, sleep...) as small badges. Read from
+   * the latest state, so only shown once playback has caught up.
+   */
+  const heroBadges = (slot: number): Badge[] => {
+    const h = props.state.heroes[slot];
+    if (h === undefined || h.hp <= 0 || !caughtUp()) return [];
+    const out: Badge[] = [];
+    if (h.ward > 0) {
+      out.push({
+        icon: "🛡️",
+        text: String(h.ward),
+        tip: `shield soaks ${h.ward} damage`,
+      });
+    }
+    if (h.hidden) {
+      out.push({ icon: "💨", tip: "out of reach until their turn" });
+    }
+    if (h.taunt > 0) {
+      out.push({ icon: "🐻", tip: "bear form - monsters go for them" });
+    }
+    if (h.familiar > 0) {
+      const turret = h.cls === "engineer";
+      out.push({
+        icon: turret ? "⚙️" : "🌟",
+        text: String(h.familiar),
+        tip: `${turret ? "turret" : "spirit"}: ${h.familiar} more turns`,
+      });
+    }
+    if (h.totem > 0) {
+      out.push({
+        icon: "🪶",
+        text: String(h.totem),
+        tip: `totem heals: ${h.totem} more turns`,
+      });
+    }
+    if (h.counter) out.push({ icon: "⚔️", tip: "will strike back" });
+    if (h.blessed) out.push({ icon: "⭐", tip: "next move is a critical" });
+    if (h.poison > 0) out.push({ icon: "🤢", tip: "poisoned" });
+    return out;
+  };
+  const monsterBadges = (index: number): Badge[] => {
+    const m = props.state.monsters[index];
+    if (m === undefined || m.hp <= 0 || !caughtUp()) return [];
+    const out: Badge[] = [];
+    if (m.marked === true) {
+      out.push({ icon: "🎯", tip: "marked - everyone hits it harder" });
+    }
+    if (m.asleep === true) {
+      out.push({ icon: "💤", tip: "asleep - skips its turn" });
+    }
+    if (m.kind === "beetle" && !m.used) {
+      out.push({ icon: "🪲", tip: "hard shell - hit everyone to crack it" });
+    }
+    if (m.kind === "croc" && !m.used) {
+      out.push({ icon: "🪵", tip: "disguised - half damage" });
+    }
+    if (m.kind === "fox" && m.dodge === true) {
+      out.push({ icon: "🦊", tip: "will dodge the next single hit" });
+    }
+    if (m.kind === "scorpion" && m.stung === true) {
+      out.push({ icon: "😡", tip: "angry - next sting is stronger" });
+    }
+    return out;
+  };
+
   const caughtUp = (): boolean =>
     shown() >= props.state.events.length && props.now >= props.startAt;
 
@@ -1354,6 +1420,7 @@ export function QuestBattle(props: {
                     style={{ width: `${(m().hp / m().maxHp) * 100}%` }}
                   ></div>
                 </div>
+                <BadgeRow badges={monsterBadges(m().index)} />
                 <FxLayer effects={effects()} target={`m${m().index}`} />
                 <BurstLayer bursts={bursts()} target={`m${m().index}`} />
                 <PopupLayer popups={popups()} target={`m${m().index}`} />
@@ -1397,6 +1464,7 @@ export function QuestBattle(props: {
                       )}
                     />
                   </span>
+                  <BadgeRow badges={heroBadges(h.slot)} side />
                   <FxLayer effects={effects()} target={`h${h.slot}`} />
                   <BurstLayer bursts={bursts()} target={`h${h.slot}`} />
                   <PopupLayer popups={popups()} target={`h${h.slot}`} />
@@ -1778,6 +1846,12 @@ export function QuestBattle(props: {
               );
             }}
           </For>
+          <Show when={props.state.smoke > 0 && caughtUp()}>
+            <div class="rounded-lg bg-game-grey/30 px-2 py-0.5 text-center text-xs font-bold text-game-cream">
+              🌫️ Smoke: the next {props.state.smoke} monster attack
+              {props.state.smoke === 1 ? "" : "s"} will miss
+            </div>
+          </Show>
           <div class="grid gap-0.5 border-t border-game-ink pt-1">
             <div class="flex items-center justify-between text-xs font-bold text-game-yellow">
               <span>🌟 Team Spirit</span>
@@ -1860,6 +1934,39 @@ function TypedWord(props: { word: string; typed: string }): JSXElement {
       <span class="text-game-green">{props.word.slice(0, done())}</span>
       <span class="text-game-cream">{props.word.slice(done())}</span>
     </div>
+  );
+}
+
+type Badge = { icon: string; text?: string; tip: string };
+
+/** Small chips for lasting effects (shield, mark, sleep...). */
+function BadgeRow(props: { badges: Badge[]; side?: boolean }): JSXElement {
+  return (
+    <Show when={props.badges.length > 0}>
+      <div
+        class={cn(
+          "pointer-events-none absolute z-10 flex gap-0.5",
+          props.side === true
+            ? "top-1/2 -left-1 -translate-x-full -translate-y-1/2 flex-col items-end"
+            : "-bottom-7 left-1/2 -translate-x-1/2",
+        )}
+      >
+        <For each={props.badges}>
+          {(b) => (
+            <span
+              title={b.tip}
+              aria-label={b.tip}
+              class="flex items-center rounded-full bg-game-ink/85 px-1.5 py-px text-sm leading-tight font-bold whitespace-nowrap text-game-cream"
+            >
+              {b.icon}
+              <Show when={b.text}>
+                {(t) => <span class="ml-0.5">{t()}</span>}
+              </Show>
+            </span>
+          )}
+        </For>
+      </div>
+    </Show>
   );
 }
 

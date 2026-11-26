@@ -174,19 +174,19 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   paladin: {
     name: "Paladin",
     emoji: "⚜️",
-    maxHp: 130,
+    maxHp: 120,
     atk: 12,
     speed: 5,
     skill: "Smite",
     skillEmoji: "✨",
     skillTarget: "monster",
     blurb: "Hits a monster and heals a friend",
-    tip: "Smite heals the weakest friend for half the damage.",
+    tip: "Smite also heals the weakest friend a little.",
   },
   rogue: {
     name: "Rogue",
     emoji: "🥷",
-    maxHp: 85,
+    maxHp: 105,
     atk: 13,
     speed: 10,
     skill: "Sneak Attack",
@@ -198,7 +198,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   ranger: {
     name: "Ranger",
     emoji: "🏹",
-    maxHp: 90,
+    maxHp: 115,
     atk: 11,
     speed: 8,
     skill: "Arrow Volley",
@@ -210,7 +210,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   summoner: {
     name: "Summoner",
     emoji: "🪄",
-    maxHp: 85,
+    maxHp: 105,
     atk: 10,
     speed: 7,
     skill: "Summon Spirit",
@@ -246,7 +246,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   sorcerer: {
     name: "Sorcerer",
     emoji: "⚡",
-    maxHp: 80,
+    maxHp: 105,
     atk: 10,
     speed: 7,
     skill: "Chain Lightning",
@@ -258,7 +258,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   bard: {
     name: "Bard",
     emoji: "🎵",
-    maxHp: 95,
+    maxHp: 85,
     atk: 8,
     speed: 8,
     skill: "Cheer Song",
@@ -270,7 +270,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   berserker: {
     name: "Berserker",
     emoji: "🪓",
-    maxHp: 125,
+    maxHp: 100,
     atk: 13,
     speed: 6,
     skill: "Cleave",
@@ -301,12 +301,12 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
     skillEmoji: "🎯",
     skillTarget: "monster",
     blurb: "Marks a monster for the team",
-    tip: "Everyone hits a marked monster 30% harder - and it can't hide behind a disguise or thick hide.",
+    tip: "Everyone hits a marked monster 25% harder - and it can't hide behind a disguise or thick hide.",
   },
   shaman: {
     name: "Shaman",
     emoji: "🪶",
-    maxHp: 95,
+    maxHp: 85,
     atk: 9,
     speed: 7,
     skill: "Healing Totem",
@@ -342,7 +342,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
   engineer: {
     name: "Engineer",
     emoji: "🔧",
-    maxHp: 95,
+    maxHp: 115,
     atk: 10,
     speed: 6,
     skill: "Grenade",
@@ -361,7 +361,7 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
     skillEmoji: "🔔",
     skillTarget: "ally",
     blurb: "A glowing shield on a friend",
-    tip: "The shield soaks up the next 30 damage.",
+    tip: "The shield soaks up the next 18 damage.",
   },
 };
 
@@ -1447,8 +1447,12 @@ export const COMBO_BOOST = 1.3;
 export const SPIRIT_TURNS = 3;
 /** Shaman's totem heals after this many of their turns. */
 export const TOTEM_TURNS = 3;
+/** Hunter's Mark: everyone hits a marked monster this much harder. */
+export const MARK_BOOST = 1.25;
+/** New heroes' hit-everyone skills on a lone monster. */
+export const FOCUS_BOOST = 1.4;
 /** Cleric's Bless soaks up this much damage. */
-export const WARD = 30;
+export const WARD = 18;
 /** any other two different heroes */
 export const TEAM_COMBO = { name: "Team Combo", emoji: "🤝" };
 
@@ -1581,7 +1585,7 @@ export type MonsterState = {
   asleep?: boolean;
   /** trickster fox: dodges the next single hit */
   dodge?: boolean;
-  /** hunter's mark: everyone hits it 30% harder */
+  /** hunter's mark: everyone hits it MARK_BOOST harder */
   marked?: boolean;
   /** great rumbler: underground (only hit-everyone moves and jumps reach) */
   burrowed?: boolean;
@@ -2241,7 +2245,7 @@ function applyHero(
     }
     // hunter's mark: everyone hits harder; disguises and hide don't help
     if (m.marked === true) {
-      base *= 1.3;
+      base *= MARK_BOOST;
     } else if (m.kind === "croc" && !m.used) {
       base *= 0.5;
     } else if (m.kind === "boar" && !aoe) {
@@ -2285,6 +2289,8 @@ function applyHero(
     s.heroes.find((h) => h.slot === input.target) ?? hero;
   /** sunshine makes heals stronger */
   const healBoost = s.weather === "sun" ? 1.3 : 1;
+  /** a hit-everyone skill on the last monster standing hits harder */
+  const focus = alive(s.monsters).length === 1 ? FOCUS_BOOST : 1;
 
   if (
     input.action === "ultimate" &&
@@ -2536,7 +2542,7 @@ function applyHero(
         break;
       case "sanctuary":
         shields = alive(s.heroes).map((h) => {
-          h.ward = 25;
+          h.ward = 15;
           return heroId(h.slot);
         });
         break;
@@ -2628,13 +2634,13 @@ function applyHero(
   if (hero.cls === "paladin") {
     const m = targetMonster();
     const hits = m === undefined ? [] : [hitMonster(m, info.atk * 1.5 * boost)];
-    // half the damage heals the weakest friend still standing
+    // some of the damage heals the weakest friend still standing
     const dealt = hits[0]?.amount ?? 0;
     const friend = lowest(alive(s.heroes));
     if (friend !== undefined && dealt > 0) {
       const amount = Math.min(
         friend.maxHp - friend.hp,
-        Math.round(dealt * 0.5 * healBoost),
+        Math.round(dealt * 0.35 * healBoost),
       );
       if (amount > 0) {
         friend.hp += amount;
@@ -2666,7 +2672,7 @@ function applyHero(
       hits:
         m === undefined
           ? []
-          : [hitMonster(m, info.atk * (sneaky ? 2.2 : 1.1) * boost)],
+          : [hitMonster(m, info.atk * (sneaky ? 2.5 : 1.4) * boost)],
       note: sneaky ? "sneaky! +3 gold" : "+3 gold",
       ...combo,
     });
@@ -2679,7 +2685,7 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: alive(s.monsters).map((m) =>
-        hitMonster(m, info.atk * 0.95 * boost, "arrow", true),
+        hitMonster(m, info.atk * 1.15 * focus * boost, "arrow", true),
       ),
       ...combo,
     });
@@ -2734,7 +2740,12 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: order.map((m, i) =>
-        hitMonster(m, info.atk * 1.25 * 0.8 ** i * boost, "magic", true),
+        hitMonster(
+          m,
+          info.atk * 1.35 * 0.8 ** i * focus * boost,
+          "magic",
+          true,
+        ),
       ),
       ...combo,
     });
@@ -2747,7 +2758,7 @@ function applyHero(
       target.blessed = true;
       const amount = Math.min(
         target.maxHp - target.hp,
-        Math.round(15 * healBoost * boost),
+        Math.round(8 * healBoost * boost),
       );
       target.hp += amount;
       stats.healed += amount;
@@ -2755,7 +2766,7 @@ function applyHero(
         hits.push({ id: heroId(target.slot), amount, heal: true });
       }
     }
-    s.spirit += 3;
+    s.spirit += 2;
     s.events.push({
       type: "action",
       actor: heroId(hero.slot),
@@ -2774,7 +2785,12 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: alive(s.monsters).map((m) =>
-        hitMonster(m, info.atk * 0.85 * rage(hero) * boost, "melee", true),
+        hitMonster(
+          m,
+          info.atk * 0.7 * rage(hero) * focus * boost,
+          "melee",
+          true,
+        ),
       ),
       ...combo,
     });
@@ -2787,7 +2803,7 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: alive(s.monsters).map((m) =>
-        hitMonster(m, info.atk * 0.95 * boost, "magic", true),
+        hitMonster(m, info.atk * 0.95 * focus * boost, "magic", true),
       ),
       ...combo,
     });
@@ -2861,7 +2877,7 @@ function applyHero(
       move: info.skill,
       emoji: info.skillEmoji,
       hits: alive(s.monsters).map((m) =>
-        hitMonster(m, info.atk * 0.95 * boost, "fire", true),
+        hitMonster(m, info.atk * 1.15 * focus * boost, "fire", true),
       ),
       ...combo,
     });
@@ -2964,8 +2980,8 @@ function applyHero(
   }
 }
 
-/** Berserker: up to 1.8x damage as their HP drops. */
-const rage = (h: HeroState): number => 1 + 0.8 * (1 - h.hp / h.maxHp);
+/** Berserker: up to 1.6x damage as their HP drops. */
+const rage = (h: HeroState): number => 1 + 0.6 * (1 - h.hp / h.maxHp);
 
 /** The shaman's totem heals the team after the shaman's move. */
 function totemPulse(s: QuestState, hero: HeroState): void {
@@ -2974,7 +2990,7 @@ function totemPulse(s: QuestState, hero: HeroState): void {
   const healBoost = s.weather === "sun" ? 1.3 : 1;
   const hits: HitResult[] = [];
   for (const h of alive(s.heroes)) {
-    const amount = Math.min(h.maxHp - h.hp, Math.round(12 * healBoost));
+    const amount = Math.min(h.maxHp - h.hp, Math.round(6 * healBoost));
     if (amount <= 0) continue;
     h.hp += amount;
     (s.stats[hero.slot] as HeroStats).healed += amount;
@@ -3003,7 +3019,7 @@ function spiritPounce(s: QuestState, hero: HeroState, rng: () => number): void {
   const turret = hero.cls === "engineer";
   const base =
     CLASS_INFO[hero.cls].atk *
-    0.9 *
+    1.1 *
     (hero.level > 1 ? LEVEL_BOOST : 1) *
     s.strength;
   const amount = Math.min(m.hp, scaled(base, 1, rng));

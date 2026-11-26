@@ -635,6 +635,16 @@ export function MonsterQuestModal(props: {
                   typing fills 🌟 Team Spirit - then everyone types together for
                   a TEAM ATTACK!
                 </li>
+                <li>
+                  🏷️ Little badges show what&apos;s going on: 🛡️ shields, 🎯
+                  marked monsters, 💤 sleeping monsters, 🌟 spirit friends and
+                  more.
+                </li>
+                <li>
+                  🦸 Finish lesson groups to unlock new hero sets (and new
+                  lands!) - buy them with coins below, if your teacher has them
+                  on.
+                </li>
                 <li>👑 Win 2 battles, then beat the boss!</li>
                 <li>
                   🪙 Earn coins for up to {MONSTER_QUEST_PAID_RUNS_PER_DAY}{" "}
