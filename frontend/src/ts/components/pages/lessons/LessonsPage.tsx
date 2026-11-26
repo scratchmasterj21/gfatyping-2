@@ -888,9 +888,13 @@ export function LessonsPage(): JSXElement {
     window.location.hash.replace(/^#/, "") || undefined,
   );
   const [shopTab, setShopTab] = createSignal<ShopTab>("me");
-  const shopItems = createMemo(() =>
-    SHOP_ITEMS.filter((item) => item.tab === shopTab()),
-  );
+  // plain function: gamePolicy (teacher's My Zoo switch) is defined below
+  const shopItems = (): typeof SHOP_ITEMS =>
+    SHOP_ITEMS.filter(
+      (item) =>
+        item.tab === shopTab() &&
+        !(item.modal === "Zoo" && !isCurrentUserStaff() && gamePolicy().zooOff),
+    );
   /** students see the games for their grade first (toggle: all games) */
   const [gradeOnly, setGradeOnly] = createSignal(true);
   const [gamesTab, setGamesTab] = createSignal<

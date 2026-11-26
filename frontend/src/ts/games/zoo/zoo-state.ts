@@ -1,4 +1,4 @@
-import { collection, doc, setDoc } from "firebase/firestore";
+import { collection, deleteField, doc, setDoc } from "firebase/firestore";
 
 import { callApi } from "../../api-client";
 import { tokyoDate } from "../../classroom/activity";
@@ -130,4 +130,23 @@ export async function claimZooCare(job: ZooCareJob): Promise<ZooCareClaim> {
   });
   invalidateCoinQueries();
   return result;
+}
+
+/**
+ * Teacher (admin) only: wipe a student's zoo back to the starter rabbit.
+ * Coins spent are not given back. Firestore rules let only the admin write
+ * these fields on someone else's doc.
+ */
+export async function resetZoo(uid: string): Promise<void> {
+  await setDoc(
+    doc(collection(getDb(), "users"), uid),
+    {
+      ownedZooAnimals: deleteField(),
+      ownedZooDecor: deleteField(),
+      zooLayout: deleteField(),
+      zooCareDates: deleteField(),
+      zooStreak: deleteField(),
+    },
+    { merge: true },
+  );
 }

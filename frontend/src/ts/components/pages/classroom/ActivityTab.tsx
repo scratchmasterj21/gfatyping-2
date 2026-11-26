@@ -44,6 +44,8 @@ import {
   gradeRange,
   LEVEL_GAME_IDS,
 } from "../../../games/games-data";
+import { resetZoo } from "../../../games/zoo/zoo-state";
+import { openZooVisit } from "../../../games/zoo/zoo-visit";
 import {
   classThemePolicy,
   getLessonSettings,
@@ -174,6 +176,7 @@ export function ActivityTab(props: { classId: string }): JSXElement {
       next.blocked = merged.blocked;
     }
     if (merged.needAllKeys === true) next.needAllKeys = true;
+    if (merged.zooOff === true) next.zooOff = true;
     const classId = props.classId;
     void save(async () =>
       setClassGamePolicy(classId, Object.keys(next).length === 0 ? null : next),
@@ -391,6 +394,29 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           <span class="text-xs">
             They use every letter, so they&apos;re only fun once all keys are
             learned. ({LEVEL_GAME_NAMES})
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+          <span>🦁 My Zoo:</span>
+          <button
+            type="button"
+            class={chip(classPolicy().zooOff !== true)}
+            disabled={saving() || accessQuery.isPending}
+            onClick={() => setClassPolicy({ zooOff: false })}
+          >
+            On
+          </button>
+          <button
+            type="button"
+            class={chip(classPolicy().zooOff === true)}
+            disabled={saving() || accessQuery.isPending}
+            onClick={() => setClassPolicy({ zooOff: true })}
+          >
+            Off
+          </button>
+          <span class="text-xs">
+            Students buy zoo animals with coins and look after them each day.
+            See or reset one student&apos;s zoo under their name &gt; More.
           </span>
         </div>
         <div>
@@ -656,6 +682,67 @@ function GameChips(props: {
           );
         }}
       </For>
+    </div>
+  );
+}
+
+/** Teacher: open a student's zoo (view only) or reset it (no coins back). */
+function StudentZooTools(props: {
+  uid: string;
+  name: string;
+  saving: boolean;
+  save: (work: () => Promise<void>, done?: string) => Promise<void>;
+}): JSXElement {
+  const [confirming, setConfirming] = createSignal(false);
+  return (
+    <div class="grid gap-2 text-sm text-sub">
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          class={chip(false)}
+          onClick={() => openZooVisit(props.uid, props.name)}
+        >
+          <Fa icon="fa-paw" /> See {props.name}&apos;s zoo
+        </button>
+        <button
+          type="button"
+          class={chip(confirming())}
+          disabled={props.saving}
+          onClick={() => setConfirming((c) => !c)}
+        >
+          <Fa icon="fa-undo" /> Reset zoo
+        </button>
+      </div>
+      <Show when={confirming()}>
+        <div class="flex flex-wrap items-center gap-2 rounded bg-sub-alt p-3">
+          <span class="text-text">
+            Remove all of {props.name}&apos;s zoo animals, decorations and care
+            streak? They keep the rabbit. Coins spent are not given back.
+          </span>
+          <button
+            type="button"
+            class="min-h-9 rounded bg-error px-3 font-semibold text-bg"
+            disabled={props.saving}
+            onClick={() => {
+              const uid = props.uid;
+              setConfirming(false);
+              void props.save(async () => {
+                await resetZoo(uid);
+                void queryClient.invalidateQueries({ queryKey: ["zooState"] });
+              }, `${props.name}'s zoo was reset`);
+            }}
+          >
+            Yes, reset
+          </button>
+          <button
+            type="button"
+            class={chip(false)}
+            onClick={() => setConfirming(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }
@@ -1005,6 +1092,45 @@ function StudentRow(props: {
               <option value="need">Finish All Keys first</option>
             </select>
           </label>
+          <label class="flex flex-wrap items-center gap-2 text-sm text-sub">
+            🦁 My Zoo for {props.student.name}:
+            <select
+              class="min-h-9 rounded bg-sub-alt px-2 text-text"
+              value={
+                own().zooOff === undefined
+                  ? "class"
+                  : own().zooOff === true
+                    ? "off"
+                    : "on"
+              }
+              disabled={props.saving}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                const id = uid();
+                void props.save(async () =>
+                  updateStudentGamePolicy(id, {
+                    zooOff: v === "class" ? null : v === "off",
+                  }),
+                );
+              }}
+            >
+              <option value="class">
+                Class setting (
+                {props.access?.classes[props.classId]?.zooOff === true
+                  ? "off"
+                  : "on"}
+                )
+              </option>
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </label>
+          <StudentZooTools
+            uid={uid()}
+            name={props.student.name}
+            saving={props.saving}
+            save={props.save}
+          />
           <Show when={own().mode === "earn"}>
             <EarnStepper
               value={own().earnLessons ?? policy().earnLessons}

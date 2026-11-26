@@ -33,6 +33,11 @@ export type GamePolicy = {
    * this student play early).
    */
   needAllKeys?: boolean;
+  /**
+   * My Zoo turned off (default on). Student value overrides the class
+   * (false = this student keeps the zoo while the class has it off).
+   */
+  zooOff?: boolean;
 };
 
 /** Why a teacher paused a student's games. */
@@ -95,6 +100,7 @@ function parsePolicy(raw: unknown): StudentPolicy {
   if (typeof r["needAllKeys"] === "boolean") {
     out.needAllKeys = r["needAllKeys"];
   }
+  if (typeof r["zooOff"] === "boolean") out.zooOff = r["zooOff"];
   if (typeof r["bonusDate"] === "string") out.bonusDate = r["bonusDate"];
   if (
     typeof r["pauseUntil"] === "string" &&
@@ -215,6 +221,8 @@ export type EffectivePolicy = {
   needAllKeys: boolean;
   /** the student's own needAllKeys override (undefined = class setting) */
   ownNeedAllKeys?: boolean;
+  /** My Zoo turned off by the teacher */
+  zooOff: boolean;
   /** bonus minutes valid today (0 = none) */
   bonusMinutes: number;
   /** true when any setting comes from the student's own override */
@@ -244,6 +252,7 @@ export function resolvePolicy(
     ...(stu.needAllKeys !== undefined
       ? { ownNeedAllKeys: stu.needAllKeys }
       : {}),
+    zooOff: stu.zooOff ?? cls.zooOff ?? false,
     bonusMinutes: stu.bonusDate === today ? (stu.bonusMinutes ?? 0) : 0,
     personal:
       stu.mode !== undefined ||

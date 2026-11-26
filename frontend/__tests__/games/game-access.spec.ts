@@ -254,3 +254,17 @@ describe("easy/medium/hard games need All Keys", () => {
     expect(allKeysGroupsDone(done(every))).toBe(ALL_KEYS_GROUPS.length);
   });
 });
+
+describe("my zoo switch", () => {
+  it("is on by default, class can turn it off, student overrides", () => {
+    expect(resolvePolicy(undefined, "G1A", "u1").zooOff).toBe(false);
+    const access = parseGameAccess({
+      classes: { G1A: { zooOff: true } },
+      students: { u2: { zooOff: false }, u3: { zooOff: "yes" } },
+    });
+    expect(resolvePolicy(access, "G1A", "u1").zooOff).toBe(true);
+    expect(resolvePolicy(access, "G1A", "u2").zooOff).toBe(false);
+    expect(resolvePolicy(access, "G1A", "u3").zooOff).toBe(true);
+    expect(resolvePolicy(access, "G2B", "u1").zooOff).toBe(false);
+  });
+});
