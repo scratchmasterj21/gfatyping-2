@@ -161,7 +161,7 @@ function getPlugins({
           ) => ({
             manifest: entries.filter(
               (entry) =>
-                !/phaser|jspdf|howler|Scene\.|progress-pdf|html2canvas/i.test(
+                !/phaser|three|ZooScene3D|jspdf|howler|Scene\.|progress-pdf|html2canvas/i.test(
                   entry.url,
                 ),
             ),
@@ -282,14 +282,15 @@ function getBuildOptions(): BuildEnvironmentOptions {
             // load. Excluding them instead lets rolldown split them into
             // async chunks fetched on first use - phaser alone is ~1.3mb of
             // js that every page load was parsing for games most users never
-            // open, and jspdf another ~430kb for a teacher-only report.
+            // open, jspdf another ~430kb for a teacher-only report, and three.js
+            // (~600kb) only the 3D My Zoo uses.
             {
               name: "vendor",
               // Anchored negative lookahead over the whole id, not just the
               // first `node_modules/` - under pnpm the real package name sits
               // in the second segment (node_modules/.pnpm/phaser@x/node_modules/phaser/...),
               // so a lookahead pinned to the first one never sees it.
-              test: /^(?!.*node_modules[/\\](phaser|jspdf|jspdf-autotable|modern-screenshot|howler)[/\\]).*node_modules[/\\]/,
+              test: /^(?!.*node_modules[/\\](phaser|three|jspdf|jspdf-autotable|modern-screenshot|howler)[/\\]).*node_modules[/\\]/,
             },
           ],
         },

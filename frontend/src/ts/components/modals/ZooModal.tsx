@@ -38,7 +38,8 @@ import {
 import { setZooVisit, zooVisit } from "../../games/zoo/zoo-visit";
 import { ZooAction } from "../../games/zoo/ZooAnimal";
 import { CareReward, ZooCarePanel } from "../../games/zoo/ZooCarePanel";
-import { ZooAnimalLook, ZooMap } from "../../games/zoo/ZooMap";
+import { ZooAnimalLook } from "../../games/zoo/ZooMap";
+import { ZooMap3D } from "../../games/zoo/ZooMap3D";
 import { ZooShopPanel } from "../../games/zoo/ZooShopPanel";
 import { useBuyGuard } from "../../hooks/useBuyGuard";
 import { getAllProgress } from "../../lessons/lesson-progress";
@@ -260,7 +261,8 @@ export function ZooModal(): JSXElement {
                   Last care: {lastCare() ?? "not yet"}
                 </span>
               </div>
-              <ZooMap
+              <ZooMap3D
+                active={isOpen()}
                 animals={zoo().animals}
                 decor={zoo().decor}
                 goldenBowls={zoo().streak >= GOLDEN_BOWL_STREAK}
@@ -426,7 +428,8 @@ export function ZooModal(): JSXElement {
                   </p>
                 </Show>
 
-                <ZooMap
+                <ZooMap3D
+                  active={isOpen()}
                   animals={zoo().animals}
                   decor={zoo().decor}
                   goldenBowls={zoo().streak >= GOLDEN_BOWL_STREAK}
