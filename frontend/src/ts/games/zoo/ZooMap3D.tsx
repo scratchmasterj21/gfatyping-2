@@ -9,7 +9,7 @@ import { ZooAnimalLook, ZooMap } from "./ZooMap";
 const ZooScene3D = lazy(async () => import("./three/ZooScene3D"));
 
 let webgl: boolean | undefined;
-function hasWebGL(): boolean {
+export function hasWebGL(): boolean {
   if (webgl !== undefined) return webgl;
   try {
     const c = document.createElement("canvas");

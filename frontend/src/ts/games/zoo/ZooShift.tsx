@@ -4,12 +4,16 @@ import {
   For,
   Index,
   JSXElement,
+  lazy,
   Match,
   onCleanup,
   Show,
+  Suspense,
   Switch,
   untrack,
 } from "solid-js";
+
+import type { StageView } from "./three/ZooStage3D";
 
 import { Fa } from "../../components/common/Fa";
 import { FaSolidIcon } from "../../types/font-awesome";
@@ -36,6 +40,10 @@ import {
   zooStars,
 } from "./zoo-shift-rules";
 import { ZooAction, ZooAnimal, ZooMood } from "./ZooAnimal";
+import { hasWebGL } from "./ZooMap3D";
+
+// three.js loads with the game, in its own chunk (2D animals until then)
+const ZooStage3D = lazy(async () => import("./three/ZooStage3D"));
 
 type Request = { id: number; need: ZooNeed; word: string; startedAt: number };
 
@@ -111,6 +119,26 @@ export function ZooShift(p: MiniGamePlayProps<ZooDifficulty>): JSXElement {
     { id: number; pen: number; text: string }[]
   >([]);
   const timers: ReturnType<typeof setTimeout>[] = [];
+  // 3D animals: one canvas behind the pens draws into each pen's box
+  const [stageReady, setStageReady] = createSignal(false);
+  const penEls: HTMLElement[] = [];
+  const stageViews = (): (StageView | undefined)[] =>
+    pens().map((pen, i) => {
+      const el = penEls[i];
+      if (el === undefined) return undefined;
+      return {
+        el,
+        species: pen.species,
+        look: () => {
+          const p = pens()[i] ?? pen;
+          return {
+            mood: moodOf(p),
+            action: p.action,
+            dirty: p.request?.need === "bath",
+          };
+        },
+      };
+    });
   let nextId = 0;
   let nextSpawnAt = start + 1200;
   let finished = false;
@@ -323,6 +351,11 @@ export function ZooShift(p: MiniGamePlayProps<ZooDifficulty>): JSXElement {
         class="absolute inset-x-0 bottom-0 h-28 bg-game-tan/70"
         aria-hidden="true"
       ></div>
+      <Show when={hasWebGL()}>
+        <Suspense>
+          <ZooStage3D views={stageViews} onReady={() => setStageReady(true)} />
+        </Suspense>
+      </Show>
 
       {/* HUD */}
       <div class="relative z-[1] grid gap-2">
@@ -391,6 +424,10 @@ export function ZooShift(p: MiniGamePlayProps<ZooDifficulty>): JSXElement {
               wrong={wrong()}
               patience={patienceOf(pen())}
               pops={pops().filter((x) => x.pen === i)}
+              three={stageReady()}
+              onEl={(el) => {
+                penEls[i] = el;
+              }}
             />
           )}
         </Index>
@@ -418,6 +455,9 @@ function PenView(props: {
   wrong: boolean;
   patience: number;
   pops: { id: number; text: string }[];
+  /** 3D stage is drawing this pen (the HTML pen goes see-through) */
+  three: boolean;
+  onEl: (el: HTMLElement) => void;
 }): JSXElement {
   const info = (): (typeof ZOO_INFO)[ZooSpecies] => ZOO_INFO[props.pen.species];
   const r = (): Request | undefined => props.pen.request;
@@ -428,15 +468,21 @@ function PenView(props: {
 
   return (
     <div
+      ref={(el) => props.onEl(el)}
       class={cn(
-        "relative flex min-h-0 flex-col overflow-hidden rounded-2xl border-4 border-game-brown shadow-[0_5px_0_var(--color-game-brown-dark)] transition-transform",
-        GROUND[info().habitat],
-        props.targeted && "scale-[1.03] border-game-yellow",
+        "relative flex min-h-0 flex-col overflow-hidden rounded-2xl transition-transform",
+        props.three
+          ? cn("ring-game-yellow", props.targeted && "scale-[1.03] ring-4")
+          : cn(
+              "border-4 border-game-brown shadow-[0_5px_0_var(--color-game-brown-dark)]",
+              GROUND[info().habitat],
+              props.targeted && "scale-[1.03] border-game-yellow",
+            ),
       )}
     >
       {/* fence */}
       <div
-        class="h-3 shrink-0"
+        class={cn("h-3 shrink-0", props.three && "invisible")}
         style={{
           background:
             "repeating-linear-gradient(90deg, var(--color-game-brown) 0 6px, transparent 6px 22px)",
@@ -491,23 +537,25 @@ function PenView(props: {
 
       {/* animal */}
       <div class="relative flex min-h-0 flex-1 items-end justify-center px-2 pb-1">
-        <PenScenery habitat={info().habitat} />
-        <div
-          class={cn(
-            "relative flex h-full max-h-64 w-full max-w-72 items-end justify-center",
-            walking() && "animate-zoo-pace motion-reduce:animate-none",
-          )}
-          style={{ "animation-delay": `${-props.index * 2.3}s` }}
-        >
-          <ZooAnimal
-            species={props.pen.species}
-            mood={props.mood}
-            action={props.pen.action}
-            dirty={r()?.need === "bath"}
-            walking={walking()}
-            class="h-full max-h-full w-auto max-w-full"
-          />
-        </div>
+        <Show when={!props.three}>
+          <PenScenery habitat={info().habitat} />
+          <div
+            class={cn(
+              "relative flex h-full max-h-64 w-full max-w-72 items-end justify-center",
+              walking() && "animate-zoo-pace motion-reduce:animate-none",
+            )}
+            style={{ "animation-delay": `${-props.index * 2.3}s` }}
+          >
+            <ZooAnimal
+              species={props.pen.species}
+              mood={props.mood}
+              action={props.pen.action}
+              dirty={r()?.need === "bath"}
+              walking={walking()}
+              class="h-full max-h-full w-auto max-w-full"
+            />
+          </div>
+        </Show>
         <For each={props.pops}>
           {(x) => (
             <span

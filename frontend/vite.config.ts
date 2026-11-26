@@ -161,7 +161,7 @@ function getPlugins({
           ) => ({
             manifest: entries.filter(
               (entry) =>
-                !/phaser|three|ZooScene3D|jspdf|howler|Scene\.|progress-pdf|html2canvas/i.test(
+                !/phaser|three|ZooScene3D|ZooStage3D|actor3d|jspdf|howler|Scene\.|progress-pdf|html2canvas/i.test(
                   entry.url,
                 ),
             ),
