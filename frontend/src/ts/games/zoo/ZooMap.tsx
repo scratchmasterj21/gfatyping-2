@@ -1,7 +1,16 @@
-import { createSignal, For, JSX, JSXElement, Show } from "solid-js";
+import {
+  createSignal,
+  For,
+  JSX,
+  JSXElement,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 
 import { Fa } from "../../components/common/Fa";
 import { cn } from "../../utils/cn";
+import { sfx } from "../mini/mini-sounds";
 import { game } from "../snack-shop/snack-art";
 import { ZooHabitat, ZOO_INFO, ZooSpecies } from "./zoo-animals";
 import { ZOO_DECOR, ZooDecorId } from "./zoo-decor";
@@ -169,10 +178,6 @@ export function ZooMap(props: {
           {(s, i) => {
             const look = (): ZooAnimalLook => props.look(s);
             const pos = (): ZooPenPosition => spot(s, defaultPenSpot(i()));
-            const walking = (): boolean =>
-              !props.editing &&
-              look().action === undefined &&
-              look().mood === "happy";
             return (
               <div
                 class={cn(
@@ -215,23 +220,12 @@ export function ZooMap(props: {
                       ></path>
                     </svg>
                   </Show>
-                  <div
-                    class={cn(
-                      "flex h-full w-full items-end justify-center",
-                      walking() &&
-                        "animate-zoo-pace motion-reduce:animate-none",
-                    )}
-                    style={{ "animation-delay": `${-i() * 2.3}s` }}
-                  >
-                    <ZooAnimal
-                      species={s}
-                      mood={look().mood}
-                      action={look().action}
-                      dirty={look().dirty}
-                      walking={walking()}
-                      class="h-[88%] w-auto max-w-full"
-                    />
-                  </div>
+                  <RoamingAnimal
+                    species={s}
+                    look={look()}
+                    still={props.editing}
+                    seed={i()}
+                  />
                   <Show when={look().bubble} keyed>
                     {(icon) => (
                       <span class="absolute top-1 right-1 grid h-6 w-6 animate-game-bob place-items-center rounded-full bg-game-cloud text-xs text-game-ink shadow motion-reduce:animate-none">
@@ -273,7 +267,197 @@ export function ZooMap(props: {
             );
           }}
         </For>
+        {/* a little life: cloud shadows drifting over, butterflies */}
+        <div
+          class="pointer-events-none absolute inset-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <For each={[0, -14, -27]}>
+            {(delay, i) => (
+              <div
+                class="absolute h-[30%] w-[40%] animate-game-drift rounded-full motion-reduce:hidden"
+                style={{
+                  top: `${10 + i() * 28}%`,
+                  background:
+                    "radial-gradient(ellipse at center, rgb(43 33 64 / 0.1), transparent 70%)",
+                  "animation-duration": "42s",
+                  "animation-delay": `${delay}s`,
+                }}
+              ></div>
+            )}
+          </For>
+          <For each={[0, -13]}>
+            {(delay, i) => (
+              <div
+                class="absolute inset-0 animate-zoo-flutter motion-reduce:hidden"
+                style={{ "animation-delay": `${delay}s` }}
+              >
+                <Butterfly color={i() === 0 ? "pink" : "yellow"} />
+              </div>
+            )}
+          </For>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function Butterfly(props: { color: "pink" | "yellow" }): JSXElement {
+  return (
+    <svg viewBox="0 0 24 20" class="w-[2.2%] min-w-4">
+      <g
+        class="animate-zoo-wing"
+        style={{ "transform-box": "fill-box", "transform-origin": "center" }}
+      >
+        <ellipse cx="7" cy="7" rx="6" ry="5" fill={game(props.color)}></ellipse>
+        <ellipse
+          cx="17"
+          cy="7"
+          rx="6"
+          ry="5"
+          fill={game(props.color)}
+        ></ellipse>
+        <ellipse
+          cx="8"
+          cy="14"
+          rx="4"
+          ry="3.5"
+          fill={game(props.color)}
+        ></ellipse>
+        <ellipse
+          cx="16"
+          cy="14"
+          rx="4"
+          ry="3.5"
+          fill={game(props.color)}
+        ></ellipse>
+      </g>
+      <rect x="11" y="4" width="2" height="13" rx="1" fill={game("ink")}></rect>
+    </svg>
+  );
+}
+
+/**
+ * One animal living in its pen: wanders to new spots with a trot, hops,
+ * turns to look around, and does a happy hop (with hearts) when tapped.
+ * It stands still while it needs care, is doing a care job, or pens are
+ * being moved.
+ */
+function RoamingAnimal(props: {
+  species: ZooSpecies;
+  look: ZooAnimalLook;
+  still: boolean;
+  seed: number;
+}): JSXElement {
+  const [x, setX] = createSignal(0);
+  const [facing, setFacing] = createSignal(1);
+  const [moveMs, setMoveMs] = createSignal(0);
+  const [moving, setMoving] = createSignal(false);
+  const [trick, setTrick] = createSignal<ZooAction | undefined>();
+  const [hearts, setHearts] = createSignal<number[]>([]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const extra: ReturnType<typeof setTimeout>[] = [];
+  let heartId = 0;
+
+  const free = (): boolean =>
+    !props.still &&
+    props.look.action === undefined &&
+    props.look.mood === "happy";
+  const later = (ms: number): void => {
+    clearTimeout(timer);
+    timer = setTimeout(step, ms);
+  };
+  const rest = (): number => 900 + Math.random() * 2600;
+
+  const step = (): void => {
+    if (!free() || trick() !== undefined) {
+      setMoving(false);
+      later(1200);
+      return;
+    }
+    const r = Math.random();
+    if (r < 0.55) {
+      // wander somewhere new in the pen
+      const to = Math.random() * 60 - 30;
+      const ms = Math.max(700, Math.abs(to - x()) * 85);
+      setFacing(to >= x() ? 1 : -1);
+      setMoveMs(ms);
+      setMoving(true);
+      setX(to);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setMoving(false);
+        later(rest());
+      }, ms);
+    } else if (r < 0.72) {
+      setTrick("cheer");
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setTrick(undefined);
+        later(rest());
+      }, 1300);
+    } else if (r < 0.88) {
+      setFacing((f) => -f); // look the other way
+      later(rest());
+    } else {
+      later(rest() + 1500);
+    }
+  };
+
+  onMount(() => later(300 + ((props.seed * 733) % 2200)));
+  onCleanup(() => {
+    clearTimeout(timer);
+    extra.forEach(clearTimeout);
+  });
+
+  const tap = (): void => {
+    if (props.still) return;
+    sfx.pop();
+    setTrick("cheer");
+    const id = heartId++;
+    setHearts((h) => [...h, id]);
+    extra.push(
+      setTimeout(() => setHearts((h) => h.filter((x) => x !== id)), 1000),
+      setTimeout(() => setTrick(undefined), 1300),
+    );
+  };
+
+  return (
+    <div
+      class="relative flex h-full w-full cursor-pointer items-end justify-center"
+      onClick={tap}
+    >
+      <div
+        class="flex h-full w-full items-end justify-center"
+        style={{
+          transform: `translateX(${free() ? x() : 0}%)`,
+          transition: `transform ${moving() ? moveMs() : 400}ms ${moving() ? "linear" : "ease-out"}`,
+        }}
+      >
+        <div
+          class="flex h-full w-full items-end justify-center transition-transform duration-200"
+          style={{ transform: `scaleX(${free() ? facing() : 1})` }}
+        >
+          <ZooAnimal
+            species={props.species}
+            mood={props.look.mood}
+            action={props.look.action ?? trick()}
+            dirty={props.look.dirty}
+            walking={moving() && free()}
+            class="h-[88%] w-auto max-w-full"
+          />
+        </div>
+      </div>
+      <For each={hearts()}>
+        {() => (
+          <span
+            class="pointer-events-none absolute top-0 left-1/2 block -translate-x-1/2 animate-game-float-up text-lg text-game-pink motion-reduce:hidden"
+            aria-hidden="true"
+          >
+            ♥
+          </span>
+        )}
+      </For>
     </div>
   );
 }

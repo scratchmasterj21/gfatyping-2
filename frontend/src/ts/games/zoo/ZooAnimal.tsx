@@ -296,6 +296,10 @@ const QUADS: Partial<Record<ZooSpecies, QuadLook>> = {
 
 function Quad(p: {
   look: QuadLook;
+  /** url() of the light/shadow gradient (see ZooAnimal defs) */
+  shade: string;
+  /** url() of the leg/wing/arm shading gradient */
+  limb: string;
   mood: ZooMood;
   action: ZooAction | undefined;
   walking: boolean;
@@ -323,6 +327,7 @@ function Quad(p: {
         fill={L().fur}
         opacity={far ? 0.82 : 1}
       ></rect>
+      <rect x={x} y="108" width="15" height="46" rx="7" fill={p.limb}></rect>
       <rect x={x} y="148" width="15" height="9" rx="3" fill={L().hoof}></rect>
     </g>
   );
@@ -380,6 +385,7 @@ function Quad(p: {
           <ellipse cx="95" cy="98" rx="52" ry="32"></ellipse>
         </clipPath>
         <ellipse cx="95" cy="98" rx="52" ry="32" fill={L().fur}></ellipse>
+        <ellipse cx="95" cy="98" rx="52" ry="32" fill={p.shade}></ellipse>
         <ellipse
           cx="95"
           cy="112"
@@ -619,6 +625,12 @@ function Quad(p: {
           r={head().r}
           fill={L().fur}
         ></circle>
+        <circle
+          cx={head().x}
+          cy={head().y}
+          r={head().r}
+          fill={p.shade}
+        ></circle>
         <Show when={L().pattern === "stripes"}>
           <path
             d={`M${head().x - 10} ${head().y - head().r + 3} l4 10 M${head().x + 10} ${head().y - head().r + 3} l-4 10`}
@@ -756,6 +768,10 @@ const BIRDS: Partial<Record<ZooSpecies, BirdLook>> = {
 
 function Bird(p: {
   look: BirdLook;
+  /** url() of the light/shadow gradient (see ZooAnimal defs) */
+  shade: string;
+  /** url() of the leg/wing/arm shading gradient */
+  limb: string;
   mood: ZooMood;
   action: ZooAction | undefined;
   walking: boolean;
@@ -800,6 +816,7 @@ function Bird(p: {
       </For>
       <g class={cn("animate-zoo-breathe", ANIM)} style={pivot("bottom")}>
         <ellipse cx="100" cy="112" rx="38" ry="40" fill={L().body}></ellipse>
+        <ellipse cx="100" cy="112" rx="38" ry="40" fill={p.shade}></ellipse>
         <ellipse cx="102" cy="120" rx="26" ry="29" fill={L().belly}></ellipse>
         {/* wings */}
         <For each={[-1, 1]}>
@@ -819,6 +836,14 @@ function Bird(p: {
                   fill={L().wing}
                   transform="rotate(14 64 114)"
                 ></ellipse>
+                <ellipse
+                  cx="64"
+                  cy="114"
+                  rx="11"
+                  ry="26"
+                  fill={p.limb}
+                  transform="rotate(14 64 114)"
+                ></ellipse>
               </g>
             </g>
           )}
@@ -835,6 +860,7 @@ function Bird(p: {
           ></path>
         </Show>
         <circle cx="100" cy="62" r="28" fill={L().body}></circle>
+        <circle cx="100" cy="62" r="28" fill={p.shade}></circle>
         <Show when={L().belly !== L().body && L().body === game("navy")}>
           <ellipse cx="100" cy="68" rx="20" ry="18" fill={L().belly}></ellipse>
         </Show>
@@ -918,6 +944,10 @@ const SITTERS: Partial<Record<ZooSpecies, SitLook>> = {
 
 function Sitter(p: {
   look: SitLook;
+  /** url() of the light/shadow gradient (see ZooAnimal defs) */
+  shade: string;
+  /** url() of the leg/wing/arm shading gradient */
+  limb: string;
   mood: ZooMood;
   action: ZooAction | undefined;
   walking: boolean;
@@ -950,6 +980,7 @@ function Sitter(p: {
       </Switch>
       <g class={cn("animate-zoo-breathe", ANIM)} style={pivot("bottom")}>
         <ellipse cx="100" cy="120" rx="38" ry="37" fill={L().fur}></ellipse>
+        <ellipse cx="100" cy="120" rx="38" ry="37" fill={p.shade}></ellipse>
         <ellipse cx="100" cy="128" rx="23" ry="25" fill={L().belly}></ellipse>
         <Show when={L().patches === true}>
           <path
@@ -959,24 +990,17 @@ function Sitter(p: {
         </Show>
       </g>
       {/* feet */}
-      <ellipse
-        cx="80"
-        cy="154"
-        rx="15"
-        ry="8"
-        fill={L().limbs}
-        class={cn(p.walking && "animate-zoo-step", ANIM)}
-        style={pivot("top")}
-      ></ellipse>
-      <ellipse
-        cx="120"
-        cy="154"
-        rx="15"
-        ry="8"
-        fill={L().limbs}
+      <g class={cn(p.walking && "animate-zoo-step", ANIM)} style={pivot("top")}>
+        <ellipse cx="80" cy="154" rx="15" ry="8" fill={L().limbs}></ellipse>
+        <ellipse cx="80" cy="154" rx="15" ry="8" fill={p.limb}></ellipse>
+      </g>
+      <g
         class={cn(p.walking && "animate-zoo-step-alt", ANIM)}
         style={pivot("top")}
-      ></ellipse>
+      >
+        <ellipse cx="120" cy="154" rx="15" ry="8" fill={L().limbs}></ellipse>
+        <ellipse cx="120" cy="154" rx="15" ry="8" fill={p.limb}></ellipse>
+      </g>
       {/* arms */}
       <ellipse
         cx="68"
@@ -984,6 +1008,14 @@ function Sitter(p: {
         rx="9"
         ry="20"
         fill={L().limbs}
+        transform="rotate(18 68 120)"
+      ></ellipse>
+      <ellipse
+        cx="68"
+        cy="120"
+        rx="9"
+        ry="20"
+        fill={p.limb}
         transform="rotate(18 68 120)"
       ></ellipse>
       <g
@@ -996,6 +1028,14 @@ function Sitter(p: {
           rx="9"
           ry="20"
           fill={L().limbs}
+          transform={wave() ? "rotate(24 142 90)" : "rotate(-18 132 120)"}
+        ></ellipse>
+        <ellipse
+          cx={wave() ? 142 : 132}
+          cy={wave() ? 90 : 120}
+          rx="9"
+          ry="20"
+          fill={p.limb}
           transform={wave() ? "rotate(24 142 90)" : "rotate(-18 132 120)"}
         ></ellipse>
       </g>
@@ -1055,6 +1095,7 @@ function Sitter(p: {
           </Match>
         </Switch>
         <circle cx="100" cy="64" r="30" fill={L().fur}></circle>
+        <circle cx="100" cy="64" r="30" fill={p.shade}></circle>
         <Show when={L().face !== undefined}>
           <ellipse cx="100" cy="70" rx="23" ry="21" fill={L().face}></ellipse>
         </Show>
@@ -1143,6 +1184,11 @@ export function ZooAnimal(props: {
     props.action === "cheer" ||
     props.action === "play" ||
     props.action === "heal";
+  // light from the top left, shadow underneath: gives the flat shapes depth
+  const shadeId = createUniqueId();
+  const shade = `url(#${shadeId})`;
+  const limbId = createUniqueId();
+  const limb = `url(#${limbId})`;
 
   return (
     <svg
@@ -1151,26 +1197,47 @@ export function ZooAnimal(props: {
       role="img"
       aria-label={`${ZOO_INFO[props.species].name}, ${mood()}`}
     >
-      {/* shadow */}
+      <defs>
+        {/* oxlint-disable react/no-unknown-property -- Solid wants kebab-case SVG attributes */}
+        <radialGradient id={shadeId} cx="0.36" cy="0.3" r="0.78">
+          <stop offset="0" stop-color={game("cloud")} stop-opacity="0.6"></stop>
+          <stop
+            offset="0.32"
+            stop-color={game("cloud")}
+            stop-opacity="0"
+          ></stop>
+          <stop offset="0.68" stop-color={INK} stop-opacity="0"></stop>
+          <stop offset="1" stop-color={INK} stop-opacity="0.32"></stop>
+        </radialGradient>
+        <linearGradient id={limbId} x1="0" y1="0" x2="1" y2="0.6">
+          <stop offset="0" stop-color={game("cloud")} stop-opacity="0.4"></stop>
+          <stop offset="0.4" stop-color={game("cloud")} stop-opacity="0"></stop>
+          <stop offset="0.6" stop-color={INK} stop-opacity="0"></stop>
+          <stop offset="1" stop-color={INK} stop-opacity="0.3"></stop>
+        </linearGradient>
+        {/* oxlint-enable react/no-unknown-property */}
+      </defs>
+      {/* ground shadow */}
       <ellipse
         cx="100"
         cy="160"
-        rx="58"
-        ry="7"
+        rx="56"
+        ry="8"
         fill={INK}
-        opacity="0.12"
+        opacity="0.22"
       ></ellipse>
       <g
-        // soft ink outline so cream and white animals stand out on grass
+        // cartoon ink outline so the animals pop off the grass
         style={{
           filter:
-            "drop-shadow(0 0 0.8px rgb(43 33 64 / 0.7)) drop-shadow(0 0 0.4px rgb(43 33 64 / 0.5))",
+            "drop-shadow(0 0 1.1px rgb(43 33 64 / 0.95)) drop-shadow(0 0 0.5px rgb(43 33 64 / 0.9))",
         }}
       >
         <g
           class={cn(
             hop() && "animate-zoo-cheer",
             props.action === "wash" && "animate-zoo-shimmy",
+            walking() && "animate-zoo-trot",
             ANIM,
           )}
           style={pivot("bottom")}
@@ -1180,6 +1247,8 @@ export function ZooAnimal(props: {
               {(l) => (
                 <Quad
                   look={l}
+                  shade={shade}
+                  limb={limb}
                   mood={mood()}
                   action={props.action}
                   walking={walking()}
@@ -1190,6 +1259,8 @@ export function ZooAnimal(props: {
               {(l) => (
                 <Bird
                   look={l}
+                  shade={shade}
+                  limb={limb}
                   mood={mood()}
                   action={props.action}
                   walking={walking()}
@@ -1200,6 +1271,8 @@ export function ZooAnimal(props: {
               {(l) => (
                 <Sitter
                   look={l}
+                  shade={shade}
+                  limb={limb}
                   mood={mood()}
                   action={props.action}
                   walking={walking()}

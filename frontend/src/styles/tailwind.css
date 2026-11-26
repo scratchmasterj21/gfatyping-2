@@ -368,6 +368,9 @@
   --animate-zoo-buzz: zoo-buzz 1.3s linear infinite;
   --animate-zoo-cheer: game-hop 0.42s ease-out 3;
   --animate-zoo-shimmy: zoo-shimmy 0.3s ease-in-out infinite alternate;
+  --animate-zoo-trot: zoo-trot 0.25s ease-in-out infinite alternate;
+  --animate-zoo-flutter: zoo-flutter 26s linear infinite;
+  --animate-zoo-wing: zoo-wing 0.18s ease-in-out infinite alternate;
 
   @keyframes zoo-breathe {
     0%,
@@ -399,10 +402,46 @@
   }
   @keyframes zoo-step {
     from {
-      transform: rotate(-11deg);
+      transform: rotate(-20deg);
     }
     to {
-      transform: rotate(11deg);
+      transform: rotate(20deg);
+    }
+  }
+  @keyframes zoo-trot {
+    from {
+      transform: translateY(0) rotate(-1.5deg);
+    }
+    to {
+      transform: translateY(-6px) rotate(1.5deg);
+    }
+  }
+  @keyframes zoo-flutter {
+    0% {
+      transform: translate(-8%, 30%) rotate(-8deg);
+    }
+    20% {
+      transform: translate(20%, 5%) rotate(8deg);
+    }
+    40% {
+      transform: translate(45%, 40%) rotate(-6deg);
+    }
+    60% {
+      transform: translate(70%, 10%) rotate(10deg);
+    }
+    80% {
+      transform: translate(90%, 45%) rotate(-8deg);
+    }
+    100% {
+      transform: translate(104%, 20%) rotate(6deg);
+    }
+  }
+  @keyframes zoo-wing {
+    from {
+      transform: scaleX(1);
+    }
+    to {
+      transform: scaleX(0.25);
     }
   }
   @keyframes zoo-pace {
