@@ -304,7 +304,7 @@
             ".write": "auth != null && auth.token.email != null && auth.token.email.matches(/.*@felice[.]ed[.]jp$/) && auth.uid == $uid && ((!data.exists() && root.child('questRooms').child($code).child('status').val() == 'lobby') || data.exists())",
             ".validate": "!newData.exists() || (newData.child('uid').val() == $uid && newData.child('name').isString() && newData.child('name').val().length <= 40 && newData.child('online').isBoolean())",
             "cls": {
-              ".validate": "newData.val() == 'knight' || newData.val() == 'mage' || newData.val() == 'healer' || newData.val() == 'guardian' || newData.val() == 'paladin' || newData.val() == 'rogue' || newData.val() == 'ranger' || newData.val() == 'summoner'"
+              ".validate": "newData.val() == 'knight' || newData.val() == 'mage' || newData.val() == 'healer' || newData.val() == 'guardian' || newData.val() == 'paladin' || newData.val() == 'rogue' || newData.val() == 'ranger' || newData.val() == 'summoner' || newData.val() == 'monk' || newData.val() == 'ninja' || newData.val() == 'sorcerer' || newData.val() == 'bard'"
             }
           }
         },

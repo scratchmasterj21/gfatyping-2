@@ -108,6 +108,10 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     rogue: { price: 90, requiresLessonGroup: "home-row" },
     ranger: { price: 90, requiresLessonGroup: "home-row" },
     summoner: { price: 90, requiresLessonGroup: "home-row" },
+    monk: { price: 90, requiresLessonGroup: "top-row" },
+    ninja: { price: 90, requiresLessonGroup: "top-row" },
+    sorcerer: { price: 90, requiresLessonGroup: "top-row" },
+    bard: { price: 90, requiresLessonGroup: "top-row" },
   },
   // My Zoo decorations. Mirrors frontend games/zoo/zoo-decor.ts.
   zooDecor: {
@@ -527,6 +531,10 @@ export const QUEST_HERO_SETS: Readonly<
   legends: {
     heroes: ["paladin", "rogue", "ranger", "summoner"],
     requiresLessonGroup: "home-row",
+  },
+  wanderers: {
+    heroes: ["monk", "ninja", "sorcerer", "bard"],
+    requiresLessonGroup: "top-row",
   },
 };
 export const QUEST_HERO_PRICE = 90;

@@ -260,13 +260,13 @@ function HeroCard(props: {
   const info = (): (typeof CLASS_INFO)[HeroClass] => CLASS_INFO[props.cls];
   const off = (): boolean => props.taken || !props.playable;
   return (
-    <div class="grid content-start justify-items-center gap-1">
+    <div class="grid grid-rows-[1fr_auto] justify-items-center gap-1">
       <button
         type="button"
         disabled={off()}
         title={info().tip ?? info().blurb}
         class={cn(
-          "press-3d grid w-full cursor-pointer justify-items-center gap-1 rounded-xl p-3 text-center font-kid",
+          "press-3d grid h-full w-full cursor-pointer content-start justify-items-center gap-1 rounded-xl p-3 text-center font-kid",
           props.selected && props.playable
             ? "bg-main text-bg"
             : "bg-sub-alt text-text hover:bg-text hover:text-bg",

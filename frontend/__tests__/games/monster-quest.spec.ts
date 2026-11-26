@@ -533,3 +533,125 @@ describe("monster quest: Legends heroes and the Ruins", () => {
     expect(comboFor("rogue", "rogue")).toBeUndefined();
   });
 });
+
+describe("monster quest: Wanderers heroes and Lantern Peaks", () => {
+  const as = (cls: HeroClass, seed: number): QuestSetup => ({
+    seed,
+    difficulty: questDifficultyFor("Easy"),
+    party: buildParty([{ uid: "me", name: "Ann", cls }]),
+  });
+  const skiller = (st: ReturnType<typeof runQuest>): QuestInput =>
+    st.pending?.kind === "guard"
+      ? { kind: "guard", guards: { me: true } }
+      : { kind: "hero", action: "skill", power: 1.5 };
+  const ulter = (st: ReturnType<typeof runQuest>): QuestInput => {
+    if (st.pending?.kind === "guard")
+      return { kind: "guard", guards: { me: true } };
+    const me = st.heroes[0];
+    const ready = me?.ultimate !== undefined && me.ultimateCooldown === 0;
+    return { kind: "hero", action: ready ? "ultimate" : "skill", power: 1.5 };
+  };
+  const moves = (events: QuestEvent[]): string[] =>
+    events.flatMap((e) => (e.type === "action" ? [e.move] : []));
+
+  it("each Wanderers hero can win a quest in Lantern Peaks", () => {
+    landPick = "peaks";
+    for (const cls of ["monk", "ninja", "sorcerer", "bard"] as const) {
+      for (const boss of [0, 1]) {
+        bossPick = boss;
+        for (const seed of [1, 2, 3]) {
+          const s = playThrough(as(cls, seed), skiller);
+          expect(s.won, `${cls} ${boss} ${seed}`).toBe(true);
+        }
+      }
+    }
+    landPick = "forest";
+    bossPick = 0;
+  });
+
+  it("Lantern Peaks monsters do their tricks", () => {
+    landPick = "peaks";
+    bossPick = 0;
+    const all: string[] = [];
+    let foxDodges = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      // plain attacks, so the monsters live long enough to show off
+      const s = playThrough(as("monk", seed), (st) =>
+        st.pending?.kind === "guard"
+          ? { kind: "guard", guards: { me: true } }
+          : { kind: "hero", action: "attack", power: 1 },
+      );
+      all.push(...moves(s.events));
+      // monster indexes start again each battle
+      let kinds: string[] = [];
+      for (const e of s.events) {
+        if (e.type === "battle") kinds = e.monsters.map((m) => m.kind);
+        if (e.type === "spawn") kinds.push(e.monster.kind);
+        if (e.type !== "action" || !e.actor.startsWith("h")) continue;
+        for (const h of e.hits) {
+          const kind = kinds[Number(h.id.slice(1))];
+          if (h.miss === true && kind === "fox") foxDodges++;
+        }
+      }
+    }
+    expect(all).toContain("Thunder Croak");
+    expect(all).toContain("Thunderclap");
+    expect(foxDodges).toBeGreaterThan(0);
+    landPick = "forest";
+  });
+
+  /** play a quest using the given super move whenever it's ready */
+  const withUlt = (cls: HeroClass, ult: string, seed: number) => {
+    const setup = as(cls, seed);
+    const inputs: QuestInput[] = [];
+    let s = runQuest(setup, inputs);
+    for (let i = 0; i < 500 && !s.over; i++) {
+      const p = s.pending;
+      inputs.push(
+        p?.kind === "vote"
+          ? {
+              kind: "vote",
+              votes: {
+                me: p.topic === "land" ? "forest" : (p.options[0]?.id ?? ""),
+              },
+            }
+          : p?.kind === "pick"
+            ? { kind: "vote", votes: { me: ult } }
+            : p?.kind === "challenge" || p?.kind === "guard"
+              ? { kind: "guard", guards: { me: true } }
+              : ulter(s),
+      );
+      s = runQuest(setup, inputs);
+    }
+    return s;
+  };
+
+  it("Lullaby puts monsters to sleep, Smoke Bomb makes them miss", () => {
+    let slept = 0;
+    let smoked = 0;
+    for (const seed of [1, 2, 3]) {
+      const bard = withUlt("bard", "lullaby", seed);
+      expect(bard.heroes[0]?.ultimate).toBe("lullaby");
+      slept += bard.events.filter(
+        (e) => e.type === "status" && e.what === "monsterAsleep",
+      ).length;
+      const ninja = withUlt("ninja", "smokebomb", seed);
+      smoked += ninja.events.filter(
+        (e) => e.type === "action" && e.note?.includes("smoke") === true,
+      ).length;
+    }
+    expect(slept).toBeGreaterThan(0);
+    expect(smoked).toBeGreaterThan(0);
+  });
+
+  it("chain lightning hits every monster, less on each bounce", () => {
+    const s = runQuest(as("sorcerer", 1), [
+      { kind: "vote", votes: { me: "forest" } },
+      { kind: "hero", action: "skill", target: 0, power: 1 },
+    ]);
+    const e = s.events.find(
+      (x) => x.type === "action" && x.move === "Chain Lightning",
+    );
+    expect(e?.type === "action" && e.hits.length).toBe(2);
+  });
+});

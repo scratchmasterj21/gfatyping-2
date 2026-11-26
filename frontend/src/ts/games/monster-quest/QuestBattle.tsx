@@ -95,6 +95,14 @@ const ULT_SHOW: Record<UltimateId, { motion: Motion; fx: FxKind }> = {
   arrowrain: { motion: "channel", fx: "slash" },
   phoenix: { motion: "channel", fx: "fire" },
   titan: { motion: "stomp", fx: "eruption" },
+  thunderpalm: { motion: "leap", fx: "bolt" },
+  innerpeace: { motion: "channel", fx: "hearts" },
+  smokebomb: { motion: "spin-dash", fx: "dome" },
+  shadowclone: { motion: "spin-dash", fx: "megaimpact" },
+  meteor: { motion: "channel", fx: "eruption" },
+  stormcall: { motion: "channel", fx: "bolt" },
+  anthem: { motion: "channel", fx: "hearts" },
+  lullaby: { motion: "channel", fx: "frost" },
 };
 /** cut-in first, then the effect, then the hits land */
 const CUT_IN_MS = 900;
@@ -490,6 +498,7 @@ export function QuestBattle(props: {
         potionsBack: "🧪 You got your potions back!",
         shellCracked: `🪲 CRACK! ${who}'s shell broke - hit it hard now!`,
         mimicGold: "📦 The Mimic Chest drops 10 💰 gold!",
+        monsterAsleep: `😴 ${who} is fast asleep - Zzz…`,
       };
       setMessage(text[e.what]);
       if (e.what === "asleep") popup(e.id, "💤", "hit");
@@ -499,6 +508,7 @@ export function QuestBattle(props: {
       if (e.what === "rebuild") effect(e.id, "spooky", false);
       if (e.what === "shellCracked") effect(e.id, "rock", false);
       if (e.what === "mimicGold") effect(e.id, "charge", false);
+      if (e.what === "monsterAsleep") popup(e.id, "💤", "hit");
       applyHits(e.hits);
       return;
     }
@@ -1211,7 +1221,9 @@ export function QuestBattle(props: {
               ? "from-game-ink via-game-purple/60 to-game-grey"
               : land() === "ruins"
                 ? "from-game-night via-game-brown-dark/70 to-game-tan/70"
-                : "from-game-night via-game-navy to-game-grass-dark",
+                : land() === "peaks"
+                  ? "from-game-night via-game-dusk/60 to-game-sunset/60"
+                  : "from-game-night via-game-navy to-game-grass-dark",
           bigQuake()
             ? "animate-quest-big-quake motion-reduce:animate-none"
             : quake() && "animate-quest-quake motion-reduce:animate-none",

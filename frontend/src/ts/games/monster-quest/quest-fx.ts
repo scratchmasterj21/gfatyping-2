@@ -50,6 +50,8 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
   switch (move) {
     case "Fire Storm":
     case "Wisp Flame":
+    case "Fox Fire":
+    case "Meteor":
     case "Phoenix":
     case "Fire Breath":
     case "Inferno":
@@ -65,7 +67,10 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Poison Bite":
       return "poison";
     case "Spooky Touch":
+    case "Spooky Glow":
+    case "Shadow Swipe":
       return "spooky";
+    case "Thunder Croak":
     case "Laser Beam":
     case "Mega Laser":
     case "Zap":
@@ -91,7 +96,22 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Ice Storm":
       return "ice";
     case "Thunder":
+    case "Chain Lightning":
+    case "Thunderclap":
+    case "Storm Call":
+    case "Storm Dive":
       return "thunder";
+    case "Flurry":
+    case "Thunder Palm":
+    case "Shadow Clone":
+      return "bigslash";
+    case "Cheer Song":
+    case "Hero Anthem":
+    case "Inner Peace":
+      return "heal";
+    case "Smoke Bomb":
+    case "Lullaby":
+      return "charge";
     case "Holy Light":
     case "Smite":
     case "Judgement":
@@ -126,6 +146,8 @@ export function fxForMove(move: string, heroActor: boolean): FxKind {
     case "Wing Flap":
     case "Screech":
     case "Double Bite":
+    case "Tongue Lash":
+    case "Gust Slash":
     case "Chomp":
     case "Sneaky Swipe":
       return "claw";

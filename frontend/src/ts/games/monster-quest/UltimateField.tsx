@@ -68,6 +68,46 @@ export function UltimateField(props: { kind: UltimateId }): JSXElement {
           <div class="absolute bottom-[14%] left-[3%] h-2 w-[46%] origin-right animate-quest-crack rounded-full bg-game-ink shadow-[0_0_10px_var(--color-game-grey)]"></div>
           <div class="absolute inset-x-0 bottom-0 h-1/3 animate-quest-flash bg-linear-to-t from-game-grey/70 to-transparent [animation-delay:0.2s]"></div>
         </Match>
+        <Match
+          when={props.kind === "stormcall" || props.kind === "thunderpalm"}
+        >
+          <div class="absolute inset-0 animate-quest-flash bg-game-cream [animation-delay:0.3s]"></div>
+          <div class="absolute inset-0 animate-quest-flash bg-game-blue/40 [animation-delay:0.5s]"></div>
+        </Match>
+        <Match when={props.kind === "meteor"}>
+          <span class="absolute top-0 left-[15%] animate-quest-shard text-6xl">
+            ☄️
+          </span>
+          <div class="absolute inset-y-0 left-0 w-1/2 animate-quest-flash bg-linear-to-t from-game-orange/70 to-transparent [animation-delay:0.4s]"></div>
+        </Match>
+        <Match when={props.kind === "smokebomb"}>
+          <div class="absolute inset-0 animate-quest-flash bg-game-grey/70"></div>
+        </Match>
+        <Match when={props.kind === "lullaby" || props.kind === "anthem"}>
+          <For each={range(12)}>
+            {(i) => (
+              <span
+                class={cn(
+                  "absolute bottom-[10%] animate-quest-rise text-2xl [--fx-x:0px]",
+                  props.kind === "lullaby" ? "left-[4%]" : "right-[4%]",
+                )}
+                style={{
+                  [props.kind === "lullaby" ? "left" : "right"]:
+                    `${4 + ((i * 29) % 44)}%`,
+                  "animation-delay": `${((i * 3) % 10) * 0.07}s`,
+                }}
+              >
+                {props.kind === "lullaby"
+                  ? i % 2 === 0
+                    ? "💤"
+                    : "🎵"
+                  : i % 2 === 0
+                    ? "🎺"
+                    : "✨"}
+              </span>
+            )}
+          </For>
+        </Match>
         <Match when={props.kind === "vanish"}>
           <div class="absolute inset-y-0 right-0 w-1/2 animate-quest-flash bg-game-ink/60"></div>
         </Match>

@@ -22,12 +22,17 @@ export type HeroClass =
   | "paladin"
   | "rogue"
   | "ranger"
-  | "summoner";
+  | "summoner"
+  // Wanderers set
+  | "monk"
+  | "ninja"
+  | "sorcerer"
+  | "bard";
 
 /** Everyone has these; computer helpers only ever use them. */
 export const FREE_HEROES: FreeHero[] = ["knight", "mage", "healer", "guardian"];
 
-export type HeroSetId = "legends";
+export type HeroSetId = "legends" | "wanderers";
 
 export type HeroSetInfo = {
   id: HeroSetId;
@@ -54,6 +59,16 @@ export const HERO_SETS: HeroSetInfo[] = [
     requiresName: "Home Row",
     title: "Legend Keeper",
     combo: { name: "Legendary Strike", emoji: "🏆" },
+  },
+  {
+    id: "wanderers",
+    name: "Wanderers",
+    emoji: "🌀",
+    heroes: ["monk", "ninja", "sorcerer", "bard"],
+    requires: "top-row",
+    requiresName: "Top Row",
+    title: "Peak Wanderer",
+    combo: { name: "Wandering Storm", emoji: "🌪️" },
   },
 ];
 
@@ -173,6 +188,54 @@ export const CLASS_INFO: Record<HeroClass, ClassInfo> = {
     skillTarget: "self",
     blurb: "A spirit friend attacks for 3 turns",
     tip: "The spirit's magic hits flying and faded monsters too.",
+  },
+  monk: {
+    name: "Monk",
+    emoji: "👊",
+    maxHp: 115,
+    atk: 12,
+    speed: 8,
+    skill: "Flurry",
+    skillEmoji: "👊",
+    skillTarget: "monster",
+    blurb: "Two fast punches",
+    tip: "Two hits in one move - great against dodgy foxes.",
+  },
+  ninja: {
+    name: "Ninja",
+    emoji: "🌀",
+    maxHp: 80,
+    atk: 12,
+    speed: 11,
+    skill: "Shadow Swipe",
+    skillEmoji: "🌀",
+    skillTarget: "monster",
+    blurb: "Magic swipes that hit ghosts",
+    tip: "Hits faded and flying monsters, and grabs back stolen potions.",
+  },
+  sorcerer: {
+    name: "Sorcerer",
+    emoji: "⚡",
+    maxHp: 80,
+    atk: 10,
+    speed: 7,
+    skill: "Chain Lightning",
+    skillEmoji: "⚡",
+    skillTarget: "allMonsters",
+    blurb: "Lightning bounces to every monster",
+    tip: "Strongest on the first monster, a bit less on each bounce.",
+  },
+  bard: {
+    name: "Bard",
+    emoji: "🎵",
+    maxHp: 95,
+    atk: 8,
+    speed: 8,
+    skill: "Cheer Song",
+    skillEmoji: "🎵",
+    skillTarget: "ally",
+    blurb: "Makes a friend's next move a critical",
+    tip: "Also heals a little and fills Team Spirit.",
   },
 };
 
@@ -375,7 +438,12 @@ export type MonsterKind =
   | "beetle"
   | "mimic"
   | "wisp"
-  | "hollowking";
+  | "hollowking"
+  // Lantern Peaks (Wanderers set)
+  | "lantern"
+  | "toad"
+  | "fox"
+  | "kite";
 
 export type MonsterInfo = {
   name: string;
@@ -541,6 +609,40 @@ export const MONSTER_INFO: Record<MonsterKind, MonsterInfo> = {
     boss: true,
     trick: "Calls Shellback Beetles when angry - holy moves hit it extra hard",
   },
+  lantern: {
+    name: "Lantern Spook",
+    hp: 80,
+    atk: 22,
+    speed: 6,
+    boss: false,
+    trick: "Fades away - only spells hit it then",
+  },
+  toad: {
+    name: "Thunder Toad",
+    hp: 100,
+    atk: 21,
+    speed: 4,
+    boss: false,
+    trick: "Charges up, then zaps everyone - Defend!",
+  },
+  fox: {
+    name: "Trickster Fox",
+    hp: 75,
+    atk: 23,
+    speed: 9,
+    boss: false,
+    trick:
+      "Dodges the first hit after each of its turns - hit twice or hit everyone",
+  },
+  kite: {
+    name: "Gale the Storm Kite",
+    hp: 550,
+    atk: 40,
+    speed: 7,
+    boss: true,
+    trick:
+      "Floats up every other turn and claps thunder on everyone every 3rd turn",
+  },
 };
 
 /** The word to type to aim at a monster (twins add "a" / "b"). */
@@ -564,6 +666,10 @@ export const KIND_WORD: Record<MonsterKind, string> = {
   mimic: "mimic",
   wisp: "wisp",
   hollowking: "king",
+  lantern: "lantern",
+  toad: "toad",
+  fox: "fox",
+  kite: "kite",
 };
 
 export function monsterWord(m: {
@@ -576,7 +682,7 @@ export function monsterWord(m: {
   return twin === undefined ? base : `${base} ${twin.toLowerCase()}`;
 }
 
-export type LandId = "forest" | "mountain" | "castle" | "ruins";
+export type LandId = "forest" | "mountain" | "castle" | "ruins" | "peaks";
 
 export type LandInfo = {
   name: string;
@@ -610,8 +716,20 @@ export const LANDS: Record<LandId, LandInfo> = {
     minions: ["beetle", "mimic", "wisp"],
     bosses: ["hollowking", "golem"],
   },
+  peaks: {
+    name: "Lantern Peaks",
+    emoji: "🏮",
+    minions: ["lantern", "toad", "fox"],
+    bosses: ["kite", "queen"],
+  },
 };
-export const LAND_IDS: LandId[] = ["forest", "mountain", "castle", "ruins"];
+export const LAND_IDS: LandId[] = [
+  "forest",
+  "mountain",
+  "castle",
+  "ruins",
+  "peaks",
+];
 /** The weekly quest only picks from these, so adding a land never changes a week already planned. */
 export const WEEKLY_LAND_IDS: LandId[] = ["forest", "mountain", "castle"];
 export const BATTLE_COUNT = 3;
@@ -690,7 +808,15 @@ export type UltimateId =
   | "hawk"
   | "arrowrain"
   | "phoenix"
-  | "titan";
+  | "titan"
+  | "thunderpalm"
+  | "innerpeace"
+  | "smokebomb"
+  | "shadowclone"
+  | "meteor"
+  | "stormcall"
+  | "anthem"
+  | "lullaby";
 
 export type UltimateInfo = {
   name: string;
@@ -814,6 +940,62 @@ export const ULTIMATES: Record<UltimateId, UltimateInfo> = {
     aim: "monster",
     blurb: "A stone giant stomps one monster - never misses",
   },
+  thunderpalm: {
+    name: "Thunder Palm",
+    emoji: "🫸",
+    cls: "monk",
+    aim: "monster",
+    blurb: "One huge palm strike that never misses",
+  },
+  innerpeace: {
+    name: "Inner Peace",
+    emoji: "🧘",
+    cls: "monk",
+    aim: "self",
+    blurb: "Heal yourself a lot, shake off poison and defend",
+  },
+  smokebomb: {
+    name: "Smoke Bomb",
+    emoji: "💨",
+    cls: "ninja",
+    aim: "allAllies",
+    blurb: "Every monster misses its next attack",
+  },
+  shadowclone: {
+    name: "Shadow Clone",
+    emoji: "👥",
+    cls: "ninja",
+    aim: "monster",
+    blurb: "You and your clone both strike - magic, never misses",
+  },
+  meteor: {
+    name: "Meteor",
+    emoji: "☄️",
+    cls: "sorcerer",
+    aim: "allMonsters",
+    blurb: "A fiery rock falls on every monster",
+  },
+  stormcall: {
+    name: "Storm Call",
+    emoji: "🌩️",
+    cls: "sorcerer",
+    aim: "monster",
+    blurb: "A giant lightning storm on one monster",
+  },
+  anthem: {
+    name: "Hero Anthem",
+    emoji: "🎺",
+    cls: "bard",
+    aim: "allAllies",
+    blurb: "Everyone's next move is a critical, +Team Spirit",
+  },
+  lullaby: {
+    name: "Lullaby",
+    emoji: "😴",
+    cls: "bard",
+    aim: "allMonsters",
+    blurb: "Every monster falls asleep and skips a turn",
+  },
 };
 
 export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
@@ -825,6 +1007,10 @@ export const ULTIMATE_CHOICES: Record<HeroClass, UltimateId[]> = {
   rogue: ["vanish", "startoss"],
   ranger: ["hawk", "arrowrain"],
   summoner: ["phoenix", "titan"],
+  monk: ["thunderpalm", "innerpeace"],
+  ninja: ["smokebomb", "shadowclone"],
+  sorcerer: ["meteor", "stormcall"],
+  bard: ["anthem", "lullaby"],
 };
 
 const BOSS_HP = 1.45;
@@ -1010,6 +1196,10 @@ export type MonsterState = {
   mini?: boolean;
   /** hero slots it hit on its last move (rogue's Sneak Attack) */
   lastTargets?: number[];
+  /** bard's Lullaby: skips its next turn */
+  asleep?: boolean;
+  /** trickster fox: dodges the next single hit */
+  dodge?: boolean;
 };
 
 export type MonsterFlags = Pick<MonsterState, "faded" | "flying" | "charging">;
@@ -1022,7 +1212,8 @@ export type StatusKind =
   | "rebuild"
   | "potionsBack"
   | "shellCracked"
-  | "mimicGold";
+  | "mimicGold"
+  | "monsterAsleep";
 
 export type HitResult = {
   /** "h0".."h3" or "m0".. */
@@ -1168,6 +1359,8 @@ export type QuestState = {
   twist?: TwistId;
   /** slot of the hero whose skill came just before (for combos) */
   lastSkill?: number;
+  /** ninja's Smoke Bomb: monster attacks left that miss */
+  smoke: number;
   heroes: HeroState[];
   monsters: MonsterState[];
   potions: number;
@@ -1228,6 +1421,7 @@ function makeMonsters(
       charging: false,
       used: false,
       stolen: 0,
+      ...(kind === "fox" ? { dodge: true } : {}),
     };
   });
 }
@@ -1276,6 +1470,7 @@ const UNDEAD: ReadonlySet<MonsterKind> = new Set<MonsterKind>([
   "ghost",
   "skeleton",
   "hollowking",
+  "lantern",
 ]);
 
 /** Swords can't reach a faded ghost or a flying dragon. */
@@ -1420,6 +1615,30 @@ function cpuChoice(
   if (hero.cls === "ranger") {
     return monsters.length >= 2 || monsters.some((m) => m.flying)
       ? { kind: "hero", action: "skill", power }
+      : attack;
+  }
+  if (hero.cls === "sorcerer") {
+    return monsters.length >= 2 || reachable.length === 0
+      ? { kind: "hero", action: "skill", power }
+      : attack;
+  }
+  if (hero.cls === "monk") return { ...attack, action: "skill" };
+  if (hero.cls === "ninja") {
+    const ghost = monsters.find(
+      (m) => untouchable(m) || (m.kind === "imp" && m.stolen > 0),
+    );
+    return ghost !== undefined
+      ? { kind: "hero", action: "skill", target: ghost.index, power }
+      : rng() < 0.5
+        ? { ...attack, action: "skill" }
+        : attack;
+  }
+  if (hero.cls === "bard") {
+    const friend = alive(s.heroes).find(
+      (h) => h.slot !== hero.slot && !h.blessed,
+    );
+    return friend !== undefined
+      ? { kind: "hero", action: "skill", target: friend.slot, power }
       : attack;
   }
   if (hero.cls === "summoner") {
@@ -1585,6 +1804,11 @@ function applyHero(
     ) {
       return { id, amount: 0, miss: true };
     }
+    // a trickster fox dodges the first single hit after its turn
+    if (m.kind === "fox" && m.dodge === true && !aoe) {
+      m.dodge = false;
+      return { id, amount: 0, miss: true };
+    }
     // a shellback's shell halves single hits until a hit-everyone move
     if (m.kind === "beetle" && !m.used) {
       if (aoe) {
@@ -1735,6 +1959,55 @@ function applyHero(
       case "titan":
         hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.7, "magic")];
         break;
+      case "thunderpalm":
+        hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.6, "magic")];
+        break;
+      case "innerpeace": {
+        const amount = Math.min(
+          hero.maxHp - hero.hp,
+          Math.round(hero.maxHp * 0.4 * healBoost),
+        );
+        hero.hp += amount;
+        hero.poison = 0;
+        hero.sleep = 0;
+        hero.defending = true;
+        stats.healed += amount;
+        hits = [{ id: actor, amount, heal: true }];
+        shields = [actor];
+        break;
+      }
+      case "smokebomb":
+        s.smoke = live.length;
+        shields = alive(s.heroes).map((h) => heroId(h.slot));
+        break;
+      case "shadowclone":
+        if (m !== undefined) {
+          hits = [hitMonster(m, info.atk * 1.4, "magic")];
+          if (m.hp > 0) hits.push(hitMonster(m, info.atk * 1.4, "magic"));
+        }
+        break;
+      case "meteor":
+        hits = live.map((x) => hitMonster(x, info.atk * 1.25, "fire", true));
+        break;
+      case "stormcall":
+        hits = m === undefined ? [] : [hitMonster(m, info.atk * 2.8, "magic")];
+        break;
+      case "anthem":
+        hits = alive(s.heroes).map((h) => {
+          h.blessed = true;
+          const amount = Math.min(h.maxHp - h.hp, Math.round(10 * healBoost));
+          h.hp += amount;
+          stats.healed += amount;
+          return { id: heroId(h.slot), amount, heal: true };
+        });
+        s.spirit += 4;
+        break;
+      case "lullaby":
+        for (const x of live) {
+          x.asleep = true;
+          x.charging = false;
+        }
+        break;
     }
     s.events.push({
       type: "action",
@@ -1860,6 +2133,88 @@ function applyHero(
       hits: alive(s.monsters).map((m) =>
         hitMonster(m, info.atk * 0.95 * boost, "arrow", true),
       ),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "monk") {
+    const m = targetMonster();
+    const hits: HitResult[] = [];
+    if (m !== undefined) {
+      hits.push(hitMonster(m, info.atk * 0.85 * boost));
+      if (m.hp > 0) hits.push(hitMonster(m, info.atk * 0.85 * boost));
+    }
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits,
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "ninja") {
+    const m = targetMonster();
+    let note: string | undefined;
+    if (m !== undefined && m.kind === "imp" && m.stolen > 0) {
+      s.potions += m.stolen;
+      m.stolen = 0;
+      note = "grabbed the potions back!";
+    }
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits:
+        m === undefined ? [] : [hitMonster(m, info.atk * 1.3 * boost, "magic")],
+      ...(note === undefined ? {} : { note }),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "sorcerer") {
+    // starts on the chosen monster, a bit weaker on each bounce
+    const first = targetMonster();
+    const order = alive(s.monsters).sort(
+      (a, b) => Number(b === first) - Number(a === first),
+    );
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits: order.map((m, i) =>
+        hitMonster(m, info.atk * 1.25 * 0.8 ** i * boost, "magic", true),
+      ),
+      ...combo,
+    });
+    return;
+  }
+  if (hero.cls === "bard") {
+    const target = targetHero();
+    const hits: HitResult[] = [];
+    if (target.hp > 0) {
+      target.blessed = true;
+      const amount = Math.min(
+        target.maxHp - target.hp,
+        Math.round(15 * healBoost * boost),
+      );
+      target.hp += amount;
+      stats.healed += amount;
+      if (amount > 0) {
+        hits.push({ id: heroId(target.slot), amount, heal: true });
+      }
+    }
+    s.spirit += 3;
+    s.events.push({
+      type: "action",
+      actor: heroId(hero.slot),
+      move: info.skill,
+      emoji: info.skillEmoji,
+      hits,
+      note: `${target.slot === hero.slot ? "your" : `${target.name}'s`} next move is a critical!`,
       ...combo,
     });
     return;
@@ -2056,12 +2411,29 @@ function monsterPlan(
     return live[Math.floor(rng() * live.length)] as HeroState;
   };
   if (m.charging) {
+    return m.kind === "toad"
+      ? {
+          big: true,
+          targets: live,
+          move: "Thunder Croak",
+          emoji: "⚡",
+          base: m.atk * 0.6,
+        }
+      : {
+          big: true,
+          targets: live,
+          move: "Mega Smash",
+          emoji: "🪨",
+          base: m.atk * 0.75,
+        };
+  }
+  if (m.kind === "kite" && m.turns % 3 === 0) {
     return {
       big: true,
       targets: live,
-      move: "Mega Smash",
-      emoji: "🪨",
-      base: m.atk * 0.75,
+      move: "Thunderclap",
+      emoji: "🌩️",
+      base: m.atk * 0.6,
     };
   }
   if (m.flying && m.kind === "dragon") {
@@ -2104,7 +2476,12 @@ function monsterPlan(
 
 /** Golem / dragon spend a turn getting ready. */
 function setupTurn(m: MonsterState): [string, string] | null {
-  if (m.kind === "golem" && !m.charging && m.turns % 3 === 0) {
+  // golem every 3rd turn; the smaller toad starts charging right away
+  if (
+    !m.charging &&
+    ((m.kind === "golem" && m.turns % 3 === 0) ||
+      (m.kind === "toad" && m.turns % 3 === 1))
+  ) {
     m.charging = true;
     return ["Charge Up", "⚡"];
   }
@@ -2135,6 +2512,10 @@ const MONSTER_MOVES: Record<MonsterKind, [string, string]> = {
   mimic: ["Chomp", "📦"],
   wisp: ["Wisp Flame", "🔥"],
   hollowking: ["Rusty Sword", "⚔️"],
+  lantern: ["Spooky Glow", "🏮"],
+  toad: ["Tongue Lash", "🐸"],
+  fox: ["Fox Fire", "🦊"],
+  kite: ["Gust Slash", "🪁"],
 };
 const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   slime: ["Mega Splash", "🌊"],
@@ -2156,6 +2537,10 @@ const BIG_MOVES: Record<MonsterKind, [string, string]> = {
   mimic: ["Chomp", "📦"],
   wisp: ["Wisp Flame", "🔥"],
   hollowking: ["Royal Roar", "👑"],
+  lantern: ["Spooky Glow", "🏮"],
+  toad: ["Tongue Lash", "🐸"],
+  fox: ["Fox Fire", "🦊"],
+  kite: ["Storm Dive", "🌩️"],
 };
 
 /** Weather for a battle: often clear. */
@@ -2202,6 +2587,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
     gold: 0,
     strength: 1,
     spirit: 0,
+    smoke: 0,
     heroes: setup.party.map((h) => ({
       ...h,
       hp: CLASS_INFO[h.cls].maxHp,
@@ -2273,6 +2659,7 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       }
     }
     s.weather = twist === "rain" ? "rain" : battleWeather(setup.seed, s.battle);
+    s.smoke = 0;
     for (const h of s.heroes) h.ultimateCooldown = 0;
     s.events.push({
       type: "battle",
@@ -2599,8 +2986,16 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         queue.shift();
         continue;
       }
-      m.turns++;
       s.lastSkill = undefined;
+      // bard's Lullaby: sleeps through this turn
+      if (m.asleep === true) {
+        m.asleep = false;
+        s.events.push({ type: "status", id, what: "monsterAsleep", hits: [] });
+        queue.shift();
+        step++;
+        continue;
+      }
+      m.turns++;
       if (m.kind === "treant" && s.angry && m.hp < m.maxHp) {
         const amount = Math.min(m.maxHp - m.hp, Math.round(m.maxHp * 0.025));
         m.hp += amount;
@@ -2651,7 +3046,14 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
         s.spirit += Object.values(guards).filter((g) => g).length;
       }
       const notes: string[] = [];
+      // ninja's Smoke Bomb: this attack is lost in the smoke
+      const smoky = s.smoke > 0;
+      if (smoky) {
+        s.smoke--;
+        notes.push("lost in the smoke!");
+      }
       const hits = plan.targets.flatMap((t) => {
+        if (smoky) return [{ id: heroId(t.slot), amount: 0, miss: true }];
         const guarded = needsPlayer(t)
           ? guards[t.uid] === true
           : rng() < CPU_GUARD_CHANCE;
@@ -2685,12 +3087,13 @@ export function runQuest(setup: QuestSetup, inputs: QuestInput[]): QuestState {
       m.charging = false;
       m.flying = false;
       m.lastTargets = plan.targets.map((t) => t.slot);
-      if (m.kind === "ghost") {
+      if (m.kind === "ghost" || m.kind === "lantern") {
         m.faded = !m.faded;
         if (m.faded) notes.push("faded away!");
       }
-      // the wisp floats up every other turn
-      if (m.kind === "wisp") {
+      if (m.kind === "fox") m.dodge = true;
+      // the wisp and the kite float up every other turn
+      if (m.kind === "wisp" || m.kind === "kite") {
         m.flying = !wasFlying;
         if (m.flying) notes.push("floats up high!");
       }
