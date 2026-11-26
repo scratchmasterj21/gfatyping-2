@@ -23,6 +23,7 @@ export function ZooShiftModal(props: {
       title="Zoo Keeper"
       difficulties={ZOO_DIFFICULTIES}
       usesWordList={false}
+      levelWords
       difficultyLock={(d) => (d.level === 0 ? undefined : props.hardLock)}
       howToPlay={
         <>
