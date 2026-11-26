@@ -12,6 +12,7 @@ import {
   type MiniGameId,
   type MiniGameRewardState,
 } from "./_lib/mini-game-reward.js";
+import { nextZooStreak, ZooStreak, zooStreakBonus } from "./_lib/zoo.js";
 import { tokyoDateString } from "./_lib/time.js";
 import {
   typingQuestDepthPayout,
@@ -143,6 +144,13 @@ async function claimHouseChore(
   }
 }
 
+function parseZooStreak(raw: unknown): ZooStreak | undefined {
+  const s = raw as Partial<ZooStreak> | undefined;
+  return typeof s?.count === "number" && typeof s.lastDate === "string"
+    ? { count: s.count, lastDate: s.lastDate }
+    : undefined;
+}
+
 /** My Zoo daily care jobs. Mirrors frontend games/zoo/zoo-areas.ts. */
 const ZOO_CARE_JOBS = new Set(["feed", "clean", "vet"]);
 const ZOO_CARE_COINS = 4;
@@ -164,25 +172,47 @@ async function claimZooCare(
   const db = getAdminApp().firestore();
   const userRef = db.collection("users").doc(uid);
   const today = tokyoDateString();
+  const yesterday = tokyoDateString(Date.now() - 24 * 60 * 60 * 1000);
   try {
-    const claimed = await db.runTransaction(
+    const result = await db.runTransaction(
       async (tx: admin.firestore.Transaction) => {
         const data = (await tx.get(userRef)).data() ?? {};
         const dates = (data["zooCareDates"] ?? {}) as Record<string, unknown>;
-        if (dates[job] === today) return false;
+        if (dates[job] === today) return null;
+        const prevStreak = parseZooStreak(data["zooStreak"]);
+        // the last job of the day finishes a care day: streak + bonus
+        const dayDone = [...ZOO_CARE_JOBS].every(
+          (j) => j === job || dates[j] === today,
+        );
+        const streak = dayDone
+          ? nextZooStreak(prevStreak, today, yesterday)
+          : prevStreak;
+        const bonus =
+          dayDone && streak !== undefined ? zooStreakBonus(streak.count) : 0;
         tx.set(
           userRef,
           {
             zooCareDates: { [job]: today },
             zooCareDone: admin.firestore.FieldValue.increment(1),
-            coins: admin.firestore.FieldValue.increment(ZOO_CARE_COINS),
+            coins: admin.firestore.FieldValue.increment(ZOO_CARE_COINS + bonus),
+            ...(dayDone && streak !== undefined ? { zooStreak: streak } : {}),
           },
           { merge: true },
         );
-        return true;
+        return { bonus, streak: streak?.count ?? 0, dayDone };
       },
     );
-    res.status(200).json({ claimed, coins: claimed ? ZOO_CARE_COINS : 0 });
+    res.status(200).json(
+      result === null
+        ? { claimed: false, coins: 0 }
+        : {
+            claimed: true,
+            coins: ZOO_CARE_COINS + result.bonus,
+            bonus: result.bonus,
+            streak: result.streak,
+            dayDone: result.dayDone,
+          },
+    );
   } catch (e) {
     console.error("claim-reward (zooCare) failed:", e);
     res.status(500).json({ claimed: false, coins: 0 });

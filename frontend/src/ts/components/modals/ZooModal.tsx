@@ -12,14 +12,20 @@ import {
   ZooCareJob,
 } from "../../games/zoo/zoo-areas";
 import {
-  buyZooAnimal,
+  GOLDEN_BOWL_STREAK,
+  nextBonusDay,
+  ZOO_DECOR,
+  ZooDecorId,
+} from "../../games/zoo/zoo-decor";
+import {
+  buyZooItem,
   claimZooCare,
   getZooState,
-  setZooPenPosition,
+  setZooPosition,
   ZooState,
 } from "../../games/zoo/zoo-state";
 import { ZooAction } from "../../games/zoo/ZooAnimal";
-import { ZooCarePanel } from "../../games/zoo/ZooCarePanel";
+import { CareReward, ZooCarePanel } from "../../games/zoo/ZooCarePanel";
 import { ZooAnimalLook, ZooMap } from "../../games/zoo/ZooMap";
 import { ZooShopPanel } from "../../games/zoo/ZooShopPanel";
 import { useBuyGuard } from "../../hooks/useBuyGuard";
@@ -45,8 +51,10 @@ const CARE_ACTION: Record<ZooCareJob, ZooAction> = {
 const EMPTY: ZooState = {
   coins: 0,
   animals: ["rabbit"],
+  decor: [],
   layout: {},
   careDates: {},
+  streak: 0,
 };
 
 export function ZooModal(): JSXElement {
@@ -120,14 +128,16 @@ export function ZooModal(): JSXElement {
     };
   };
 
-  const claim = async (j: ZooCareJob): Promise<number | null> => {
+  const claim = async (j: ZooCareJob): Promise<CareReward | null> => {
     zoo().animals.forEach((s, i) =>
       timers.push(setTimeout(() => act(s, "cheer", 1400), i * 120)),
     );
     try {
       const r = await claimZooCare(j);
       refresh();
-      return r.claimed ? r.coins : null;
+      return r.claimed
+        ? { coins: r.coins, bonus: r.bonus ?? 0, streak: r.streak ?? 0 }
+        : null;
     } catch (error) {
       showErrorNotification("Couldn't add coins - check your connection", {
         error,
@@ -138,7 +148,7 @@ export function ZooModal(): JSXElement {
 
   const buy = (s: ZooSpecies): void => {
     void guardedBuy(s, async () => {
-      const r = await buyZooAnimal(s);
+      const r = await buyZooItem("zoo", s);
       if (!r.ok) {
         showErrorNotification(r.reason ?? "Couldn't buy that");
         return;
@@ -150,10 +160,26 @@ export function ZooModal(): JSXElement {
     });
   };
 
-  const move = (s: ZooSpecies, pos: { xPct: number; yPct: number }): void => {
+  const buyDecor = (id: ZooDecorId): void => {
+    void guardedBuy(id, async () => {
+      const r = await buyZooItem("zooDecor", id);
+      if (!r.ok) {
+        showErrorNotification(r.reason ?? "Couldn't buy that");
+        return;
+      }
+      const name = ZOO_DECOR.find((d) => d.id === id)?.name ?? "It";
+      showSuccessNotification(`${name} added - tap Move to place it!`);
+      refresh();
+    });
+  };
+
+  const move = (
+    id: ZooSpecies | ZooDecorId,
+    pos: { xPct: number; yPct: number },
+  ): void => {
     const uid = getUserId();
     if (uid === null) return;
-    setZooPenPosition(uid, s, pos)
+    setZooPosition(uid, id, pos)
       .then(refresh)
       .catch((error: unknown) =>
         showErrorNotification("Couldn't move that pen", { error }),
@@ -177,7 +203,7 @@ export function ZooModal(): JSXElement {
               each={
                 [
                   { id: "zoo", label: "My zoo", icon: "fa-paw" },
-                  { id: "shop", label: "Animal shop", icon: "fa-store" },
+                  { id: "shop", label: "Zoo shop", icon: "fa-store" },
                 ] as const
               }
             >
@@ -214,6 +240,8 @@ export function ZooModal(): JSXElement {
                 areaOpen={areaOpen}
                 pendingId={pendingId()}
                 onBuy={buy}
+                decorOwned={new Set(zoo().decor)}
+                onBuyDecor={buyDecor}
               />
             }
           >
@@ -252,6 +280,20 @@ export function ZooModal(): JSXElement {
                   </button>
                 )}
               </For>
+              <span
+                class={cn(
+                  "flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-sm font-bold",
+                  zoo().streak > 0
+                    ? "bg-game-orange text-game-cream"
+                    : "bg-sub-alt text-sub",
+                )}
+                title={`Do all 3 jobs every day. Bonus coins on day ${nextBonusDay(zoo().streak)}!`}
+              >
+                <Fa icon="fa-fire" />
+                {zoo().streak > 0
+                  ? `${zoo().streak}-day streak`
+                  : "Start a streak!"}
+              </span>
               <div class="flex-1"></div>
               <button
                 type="button"
@@ -269,6 +311,11 @@ export function ZooModal(): JSXElement {
                 {editing() ? "Done moving" : "Move pens"}
               </button>
             </div>
+
+            <p class="-mt-1 text-xs text-sub">
+              Do all 3 jobs every day for a care streak: bonus coins on day 3,
+              5, 7 and 10, and golden food bowls from day {GOLDEN_BOWL_STREAK}!
+            </p>
 
             <Show when={job()} keyed>
               {(j) => (
@@ -289,12 +336,14 @@ export function ZooModal(): JSXElement {
 
             <Show when={editing()}>
               <p class="text-center text-sm text-sub">
-                Drag the pens to where you want them.
+                Drag the pens and decorations to where you want them.
               </p>
             </Show>
 
             <ZooMap
               animals={zoo().animals}
+              decor={zoo().decor}
+              goldenBowls={zoo().streak >= GOLDEN_BOWL_STREAK}
               layout={zoo().layout}
               look={look}
               editing={editing()}
@@ -303,7 +352,7 @@ export function ZooModal(): JSXElement {
 
             <Show when={zoo().animals.length === 1}>
               <p class="text-center text-sm text-sub">
-                Look after your rabbit every day, then visit the Animal shop to
+                Look after your rabbit every day, then visit the Zoo shop to
                 grow your zoo!
               </p>
             </Show>

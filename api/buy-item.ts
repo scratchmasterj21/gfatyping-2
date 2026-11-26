@@ -28,6 +28,7 @@ const SHOP_IDS: Set<ShopId> = new Set([
   "animalAvatar",
   "garden",
   "zoo",
+  "zooDecor",
 ]);
 
 type SideImageSet = { id?: string; price?: number };

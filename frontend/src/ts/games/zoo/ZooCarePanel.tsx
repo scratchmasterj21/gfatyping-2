@@ -8,6 +8,8 @@ import { sfx } from "../mini/mini-sounds";
 import { MiniTypingInput } from "../mini/MiniTypingInput";
 import { CARE_JOB_INFO, ZooCareJob } from "./zoo-areas";
 
+export type CareReward = { coins: number; bonus: number; streak: number };
+
 /**
  * One daily care job: type its words one by one. `onWord` lets the zoo play
  * a care animation; `onDone` claims the coins (null = already paid today).
@@ -17,14 +19,14 @@ export function ZooCarePanel(props: {
   words: string[];
   paidToday: boolean;
   onWord: (index: number) => void;
-  onDone: (job: ZooCareJob) => Promise<number | null>;
+  onDone: (job: ZooCareJob) => Promise<CareReward | null>;
   onClose: () => void;
 }): JSXElement {
   const [index, setIndex] = createSignal(0);
   const [typed, setTyped] = createSignal("");
   const [wrong, setWrong] = createSignal(false);
   const [result, setResult] = createSignal<
-    "pending" | "claiming" | number | null
+    "pending" | "claiming" | CareReward | null
   >("pending");
 
   const word = (): string => props.words[index()] ?? "";
@@ -102,15 +104,21 @@ export function ZooCarePanel(props: {
               <Match
                 when={(() => {
                   const r = result();
-                  return typeof r === "number" && r > 0 ? r : false;
+                  return typeof r === "object" && r !== null ? r : false;
                 })()}
               >
-                {(coins) => (
+                {(r) => (
                   <div class="grid justify-items-center gap-1">
                     <span class="text-text">
                       All done - the animals love you!
                     </span>
-                    <CoinCountUp coins={coins()} />
+                    <CoinCountUp coins={r().coins} />
+                    <Show when={r().bonus > 0}>
+                      <span class="rounded-full bg-game-orange px-3 py-1 text-sm font-bold text-game-cream">
+                        <Fa icon="fa-fire" class="mr-1.5" />
+                        {r().streak}-day care streak! +{r().bonus} bonus coins
+                      </span>
+                    </Show>
                   </div>
                 )}
               </Match>

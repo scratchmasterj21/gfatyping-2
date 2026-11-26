@@ -52,7 +52,8 @@ service cloud.firestore {
         'activityDays', 'lastStarLessonDate',
         'houseChoreDate', 'houseChoresDone', 'houseRoomThemes',
         // My Zoo: animals are bought and care is paid via the API
-        'ownedZooAnimals', 'zooCareDates', 'zooCareDone',
+        'ownedZooAnimals', 'zooCareDates', 'zooCareDone', 'ownedZooDecor',
+        'zooStreak',
         'championWins', 'lastChampionAt',
         // "teacher" accounts skip the student rules - admin sets it
         'role'

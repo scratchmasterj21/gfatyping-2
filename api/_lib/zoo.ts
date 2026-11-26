@@ -53,3 +53,31 @@ export async function lessonGroupDone(
   );
   return snaps.every((s) => s.data()?.["completed"] === true);
 }
+
+/** Days in a row with all 3 care jobs done. */
+export type ZooStreak = { count: number; lastDate: string };
+
+/**
+ * After a care day is finished on `today`: continue the streak if the last
+ * finished day was `yesterday`, else start again at 1. Same day: unchanged.
+ */
+export function nextZooStreak(
+  prev: ZooStreak | undefined,
+  today: string,
+  yesterday: string,
+): ZooStreak {
+  if (prev?.lastDate === today) return prev;
+  return {
+    count: prev?.lastDate === yesterday ? prev.count + 1 : 1,
+    lastDate: today,
+  };
+}
+
+/** Bonus coins for reaching a streak day (3, 5, 7, 10, then every 10). */
+export function zooStreakBonus(count: number): number {
+  if (count === 3) return 5;
+  if (count === 5) return 10;
+  if (count === 7) return 15;
+  if (count >= 10 && count % 10 === 0) return 20;
+  return 0;
+}

@@ -5,7 +5,9 @@ import { Fa } from "../../components/common/Fa";
 import { cn } from "../../utils/cn";
 import { ZOO_INFO, ZooSpecies } from "./zoo-animals";
 import { STARTER_ANIMAL, ZOO_AREAS, ZooArea, ZOO_PRICES } from "./zoo-areas";
+import { ZOO_DECOR, ZooDecorId } from "./zoo-decor";
 import { ZooAnimal } from "./ZooAnimal";
+import { ZooDecor } from "./ZooDecor";
 
 /** Animals for sale, area by area; locked areas say which lessons open them. */
 export function ZooShopPanel(props: {
@@ -14,6 +16,8 @@ export function ZooShopPanel(props: {
   areaOpen: (area: ZooArea) => boolean;
   pendingId: string | null;
   onBuy: (species: ZooSpecies) => void;
+  decorOwned: ReadonlySet<ZooDecorId>;
+  onBuyDecor: (id: ZooDecorId) => void;
 }): JSXElement {
   return (
     <div class="grid gap-4 font-kid">
@@ -89,6 +93,46 @@ export function ZooShopPanel(props: {
           );
         }}
       </For>
+      <section class="grid gap-2">
+        <h3 class="text-lg font-bold text-text">Decorations</h3>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+          <For each={ZOO_DECOR}>
+            {(d) => {
+              const owned = (): boolean => props.decorOwned.has(d.id);
+              return (
+                <div
+                  class={cn(
+                    "flex flex-col items-center gap-1 rounded-double p-3",
+                    owned() ? "bg-main/15" : "bg-sub-alt",
+                  )}
+                >
+                  <ZooDecor id={d.id} class="h-16 w-16" />
+                  <span class="text-center text-sm font-semibold text-text">
+                    {d.name}
+                  </span>
+                  <Show
+                    when={!owned()}
+                    fallback={
+                      <span class="flex min-h-9 items-center gap-1 text-sm font-semibold text-main">
+                        <Fa icon="fa-check-circle" />
+                        in your zoo
+                      </span>
+                    }
+                  >
+                    <BuyButton
+                      price={d.price}
+                      coins={props.coins}
+                      busy={props.pendingId === d.id}
+                      locked={props.pendingId !== null}
+                      onBuy={() => props.onBuyDecor(d.id)}
+                    />
+                  </Show>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </section>
     </div>
   );
 }

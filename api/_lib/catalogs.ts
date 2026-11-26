@@ -34,7 +34,8 @@ export type ShopId =
   | "backdrop"
   | "animalAvatar"
   | "garden"
-  | "zoo";
+  | "zoo"
+  | "zooDecor";
 
 /** users/{uid} field each shop's ownership map is stored under. */
 export const OWNED_FIELD: Record<ShopId, string> = {
@@ -50,6 +51,7 @@ export const OWNED_FIELD: Record<ShopId, string> = {
   animalAvatar: "ownedAnimalAvatars",
   garden: "ownedGardenItems",
   zoo: "ownedZooAnimals",
+  zooDecor: "ownedZooDecor",
 };
 
 /** users/{uid} field for the "currently equipped/selected" id, if the shop has one. */
@@ -96,6 +98,19 @@ export const CATALOGS: Record<ShopId, Record<string, CatalogItem>> = {
     penguin: { price: 170, requiresLessonGroup: "all-keys" },
     lion: { price: 200, requiresLessonGroup: "all-keys" },
     panda: { price: 220, requiresLessonGroup: "all-keys" },
+  },
+  // My Zoo decorations. Mirrors frontend games/zoo/zoo-decor.ts.
+  zooDecor: {
+    signpost: { price: 10 },
+    rock: { price: 10 },
+    bush: { price: 15 },
+    flowers: { price: 15 },
+    tree: { price: 20 },
+    bench: { price: 25 },
+    balloons: { price: 35 },
+    pond: { price: 40 },
+    "ice-cream": { price: 50 },
+    fountain: { price: 60 },
   },
   house: {
     rug: { price: 20 },
