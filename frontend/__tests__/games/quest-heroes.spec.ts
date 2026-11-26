@@ -8,13 +8,15 @@ import {
   questSetPrice as serverSetPrice,
 } from "../../../api/_lib/catalogs";
 import { ZOO_LESSON_GROUPS } from "../../../api/_lib/zoo";
-import { resolvePolicy } from "../../src/ts/games/game-access";
+import { parseGameAccess, resolvePolicy } from "../../src/ts/games/game-access";
 import {
   canPlayHero,
   ownsFullSet,
   QUEST_HERO_PRICE,
   QUEST_SET_PRICE,
   questHeroStateFromDoc,
+  questLevelFor,
+  questLevelLock,
   questSetPrice,
   setTitles,
 } from "../../src/ts/games/monster-quest/quest-heroes";
@@ -75,5 +77,42 @@ describe("monster quest hero shop", () => {
     expect(resolvePolicy(access, "c1", "s1").questHeroesOff).toBe(true);
     expect(resolvePolicy(access, "c1", "s2").questHeroesOff).toBe(false);
     expect(resolvePolicy(access, "c2", "s1").questHeroesOff).toBe(false);
+  });
+});
+
+describe("monster quest word level", () => {
+  const done =
+    (...ids: string[]) =>
+    (id: string): boolean =>
+      ids.includes(id);
+
+  it("follows lesson progress, not a pick", () => {
+    expect(questLevelFor(done())).toBe("Easy");
+    expect(questLevelFor(done("home-row"))).toBe("Easy");
+    expect(questLevelFor(done("home-row", "top-row"))).toBe("Medium");
+    expect(questLevelFor(done("top-row", "bottom-row", "all-keys"))).toBe(
+      "Hard",
+    );
+  });
+
+  it("teacher's level wins, student over class", () => {
+    expect(questLevelFor(done("all-keys"), "Easy")).toBe("Easy");
+    expect(questLevelFor(done(), "Hard")).toBe("Hard");
+    const access = parseGameAccess({
+      classes: { c1: { questLevel: "Medium" } },
+      students: { s1: { questLevel: "Hard" }, s2: { questLevel: "bogus" } },
+    });
+    expect(resolvePolicy(access, "c1", "s1").questLevel).toBe("Hard");
+    expect(resolvePolicy(access, "c1", "s2").questLevel).toBe("Medium");
+    expect(resolvePolicy(access, "c2", "s3").questLevel).toBeUndefined();
+  });
+
+  it("locks every other level", () => {
+    expect(questLevelLock("Medium", "Medium", false)).toBeUndefined();
+    expect(questLevelLock("Easy", "Medium", false)).toBe("you're past this!");
+    expect(questLevelLock("Hard", "Medium", false)).toBe(
+      "finish All Keys lessons",
+    );
+    expect(questLevelLock("Easy", "Hard", true)).toBe("set by your teacher");
   });
 });

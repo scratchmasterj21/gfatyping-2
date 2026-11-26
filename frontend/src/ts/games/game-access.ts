@@ -19,6 +19,17 @@ import { getSnapshot } from "../states/snapshot";
 
 export type GameMode = "on" | "off" | "earn";
 
+/** Monster Quest word level a teacher can fix (unset = from lessons). */
+export type QuestLevel = "Easy" | "Medium" | "Hard";
+const QUEST_LEVELS: readonly string[] = ["Easy", "Medium", "Hard"];
+/** Teacher chips (undefined = follow lesson progress). */
+export const QUEST_LEVEL_CHOICES: { level?: QuestLevel; label: string }[] = [
+  { label: "By lessons" },
+  { level: "Easy", label: "Easy" },
+  { level: "Medium", label: "Medium" },
+  { level: "Hard", label: "Hard" },
+];
+
 export type GamePolicy = {
   mode?: GameMode;
   /** "earn": distinct lessons to pass with 2+ stars today to unlock games */
@@ -43,6 +54,11 @@ export type GamePolicy = {
    * in the picker and can't be bought. Student value overrides the class.
    */
   questHeroesOff?: boolean;
+  /**
+   * Monster Quest words fixed by the teacher (unset = set by the student's
+   * lesson progress). Student value overrides the class.
+   */
+  questLevel?: QuestLevel;
 };
 
 /** Why a teacher paused a student's games. */
@@ -108,6 +124,12 @@ function parsePolicy(raw: unknown): StudentPolicy {
   if (typeof r["zooOff"] === "boolean") out.zooOff = r["zooOff"];
   if (typeof r["questHeroesOff"] === "boolean") {
     out.questHeroesOff = r["questHeroesOff"];
+  }
+  if (
+    typeof r["questLevel"] === "string" &&
+    QUEST_LEVELS.includes(r["questLevel"])
+  ) {
+    out.questLevel = r["questLevel"] as QuestLevel;
   }
   if (typeof r["bonusDate"] === "string") out.bonusDate = r["bonusDate"];
   if (
@@ -233,6 +255,8 @@ export type EffectivePolicy = {
   zooOff: boolean;
   /** bought Monster Quest heroes turned off by the teacher */
   questHeroesOff: boolean;
+  /** Monster Quest words fixed by the teacher (undefined = from lessons) */
+  questLevel?: QuestLevel;
   /** bonus minutes valid today (0 = none) */
   bonusMinutes: number;
   /** true when any setting comes from the student's own override */
@@ -264,6 +288,9 @@ export function resolvePolicy(
       : {}),
     zooOff: stu.zooOff ?? cls.zooOff ?? false,
     questHeroesOff: stu.questHeroesOff ?? cls.questHeroesOff ?? false,
+    ...((stu.questLevel ?? cls.questLevel) !== undefined
+      ? { questLevel: stu.questLevel ?? cls.questLevel }
+      : {}),
     bonusMinutes: stu.bonusDate === today ? (stu.bonusMinutes ?? 0) : 0,
     personal:
       stu.mode !== undefined ||

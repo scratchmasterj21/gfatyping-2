@@ -10,6 +10,9 @@ import {
   untrack,
 } from "solid-js";
 
+import type { QuestLevel } from "../game-access";
+
+import { isCurrentUserStaff } from "../../auth";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { queryClient } from "../../queries";
@@ -37,6 +40,7 @@ import {
 import { sfx } from "../mini/mini-sounds";
 import { HERO_ART } from "./hero-art";
 import { HeroPicker, useQuestHeroes } from "./HeroPicker";
+import { questLevelLock } from "./quest-heroes";
 import {
   closeTimedOut,
   createQuestRoom,
@@ -114,7 +118,8 @@ export function MonsterQuestModal(props: {
   const [phase, setPhase] = createSignal<Phase>("pick");
   const [mode, setMode] = createSignal<"solo" | "together">("solo");
   const [cls, setCls] = createSignal<HeroClass>("knight");
-  const [difficulty, setDifficulty] = createSignal<QuestDifficulty>(
+  /** staff pick freely; students get the level their lessons (or teacher) set */
+  const [picked, setPicked] = createSignal<QuestDifficulty>(
     QUEST_DIFFICULTIES[0] as QuestDifficulty,
   );
   const [now, setNow] = createSignal(Date.now());
@@ -132,6 +137,9 @@ export function MonsterQuestModal(props: {
   };
   const [weeklyNote, setWeeklyNote] = createSignal<string>();
   const heroes = useQuestHeroes(() => props.open);
+  const staff = (): boolean => isCurrentUserStaff();
+  const difficulty = (): QuestDifficulty =>
+    staff() ? picked() : questDifficultyFor(heroes.level());
   // a bought hero switched off (or not owned on this account): back to knight
   createEffect(() => {
     if (!heroes.canPlay(cls())) setCls("knight");
@@ -593,13 +601,14 @@ export function MonsterQuestModal(props: {
                 fallback={
                   <GameSetupPrimaryAction
                     text="Start the quest!"
+                    disabled={!weekly() && !heroes.levelReady()}
                     onClick={startSolo}
                   />
                 }
               >
                 <GameMultiplayerRoomFooter
                   gameId={GAME_ID}
-                  roomBusy={roomBusy()}
+                  roomBusy={roomBusy() || (!weekly() && !heroes.levelReady())}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
                   onCreateRoom={() => void createRoom()}
@@ -645,6 +654,10 @@ export function MonsterQuestModal(props: {
                   lands!) - buy them with coins below, if your teacher has them
                   on.
                 </li>
+                <li>
+                  📚 Your words get harder as you finish lessons: Medium after
+                  Top Row, Hard after All Keys.
+                </li>
                 <li>👑 Win 2 battles, then beat the boss!</li>
                 <li>
                   🪙 Earn coins for up to {MONSTER_QUEST_PAID_RUNS_PER_DAY}{" "}
@@ -677,7 +690,16 @@ export function MonsterQuestModal(props: {
                 <DifficultySegmented
                   options={QUEST_DIFFICULTIES}
                   selectedLabel={difficulty().label}
-                  onSelect={(d) => setDifficulty(() => d)}
+                  onSelect={(d) => setPicked(() => d)}
+                  lockedReason={(d) =>
+                    staff()
+                      ? undefined
+                      : questLevelLock(
+                          d.label as QuestLevel,
+                          heroes.level(),
+                          heroes.levelByTeacher(),
+                        )
+                  }
                 />
               </GameSetupSection>
             </Show>
@@ -735,8 +757,8 @@ export function MonsterQuestModal(props: {
                 <div class="mt-2 text-sm text-sub">
                   {room()?.weekly !== undefined ? "🗓️ Weekly quest · " : ""}
                   {questDifficultyFor(room()?.difficultyLabel ?? "").label}{" "}
-                  words · {lobbyPlayers().length}/{PARTY_SIZE} heroes · helpers
-                  fill empty spots
+                  words (the host&apos;s level) · {lobbyPlayers().length}/
+                  {PARTY_SIZE} heroes · helpers fill empty spots
                 </div>
               </div>
               <For each={lobbyPlayers()}>

@@ -32,6 +32,8 @@ import {
   pauseStudentGames,
   PauseReason,
   pauseUntilText,
+  QUEST_LEVEL_CHOICES,
+  QuestLevel,
   resolvePolicy,
   setClassGamePolicy,
   StudentPolicy,
@@ -178,6 +180,7 @@ export function ActivityTab(props: { classId: string }): JSXElement {
     if (merged.needAllKeys === true) next.needAllKeys = true;
     if (merged.zooOff === true) next.zooOff = true;
     if (merged.questHeroesOff === true) next.questHeroesOff = true;
+    if (merged.questLevel !== undefined) next.questLevel = merged.questLevel;
     const classId = props.classId;
     void save(async () =>
       setClassGamePolicy(classId, Object.keys(next).length === 0 ? null : next),
@@ -441,6 +444,25 @@ export function ActivityTab(props: { classId: string }): JSXElement {
           <span class="text-xs">
             Extra heroes students buy with coins (after the lessons they need).
             Off hides them; the 4 free heroes always stay.
+          </span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-sm text-sub">
+          <span>📚 Monster Quest words:</span>
+          <For each={QUEST_LEVEL_CHOICES}>
+            {(c) => (
+              <button
+                type="button"
+                class={chip(classPolicy().questLevel === c.level)}
+                disabled={saving() || accessQuery.isPending}
+                onClick={() => setClassPolicy({ questLevel: c.level })}
+              >
+                {c.label}
+              </button>
+            )}
+          </For>
+          <span class="text-xs">
+            Students can&apos;t pick. By lessons: Easy, then Medium after Top
+            Row, Hard after All Keys.
           </span>
         </div>
         <div>
@@ -1180,6 +1202,33 @@ function StudentRow(props: {
               </option>
               <option value="on">On</option>
               <option value="off">Off</option>
+            </select>
+          </label>
+          <label class="flex flex-wrap items-center gap-2 text-sm text-sub">
+            📚 Monster Quest words for {props.student.name}:
+            <select
+              class="min-h-9 rounded bg-sub-alt px-2 text-text"
+              value={own().questLevel ?? "class"}
+              disabled={props.saving}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                const id = uid();
+                void props.save(async () =>
+                  updateStudentGamePolicy(id, {
+                    questLevel: v === "class" ? null : (v as QuestLevel),
+                  }),
+                );
+              }}
+            >
+              <option value="class">
+                Class setting (
+                {props.access?.classes[props.classId]?.questLevel ??
+                  "by lessons"}
+                )
+              </option>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
             </select>
           </label>
           <StudentZooTools
