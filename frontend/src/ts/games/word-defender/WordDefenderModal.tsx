@@ -390,6 +390,7 @@ export function WordDefenderModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text={daily() ? "Start today's mission" : "Start game"}
                     onClick={() => void start()}
                   />
@@ -401,6 +402,7 @@ export function WordDefenderModal(props: Props): JSXElement {
                   joinCode={joinCode()}
                   createLabel="Host a co-op battle"
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                 />

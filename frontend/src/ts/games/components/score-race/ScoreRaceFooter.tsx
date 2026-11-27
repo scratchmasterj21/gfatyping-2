@@ -7,6 +7,7 @@ import { ScoreRace } from "./use-score-race";
 export function ScoreRaceFooter(props: {
   race: ScoreRace;
   onCreate: () => void;
+  createDisabled?: boolean;
 }): JSXElement {
   return (
     <GameMultiplayerRoomFooter
@@ -14,6 +15,7 @@ export function ScoreRaceFooter(props: {
       roomBusy={props.race.busy()}
       joinCode={props.race.joinCode()}
       onJoinCodeChange={props.race.setJoinCode}
+      createDisabled={props.createDisabled}
       onCreateRoom={() => props.onCreate()}
       onJoinRoom={() => void props.race.join()}
     />

@@ -729,6 +729,7 @@ export function WordPongModal(props: {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text={
                       soloKind() === "tournament"
                         ? "Start the tournament"
@@ -748,6 +749,7 @@ export function WordPongModal(props: {
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                   createLabel="Create a room for a friend"

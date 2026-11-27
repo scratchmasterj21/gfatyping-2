@@ -385,6 +385,7 @@ export function FourRowModal(props: {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text="Play Tappy"
                     onClick={startSolo}
                   />
@@ -395,6 +396,7 @@ export function FourRowModal(props: {
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                   createLabel="Create a room for a friend"

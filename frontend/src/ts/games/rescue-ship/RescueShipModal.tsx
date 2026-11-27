@@ -463,6 +463,7 @@ export function RescueShipModal(props: {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text="Launch the ship!"
                     onClick={startSolo}
                   />
@@ -473,6 +474,7 @@ export function RescueShipModal(props: {
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                   createLabel="Host a ship for friends"

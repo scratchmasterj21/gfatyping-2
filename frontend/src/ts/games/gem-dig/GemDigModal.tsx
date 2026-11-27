@@ -577,6 +577,7 @@ export function GemDigModal(props: {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text={
                       kind() === "explore"
                         ? `Explore ${worldById(world()).name}`
@@ -593,6 +594,7 @@ export function GemDigModal(props: {
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                   createLabel="Create a dig room"

@@ -694,6 +694,7 @@ export function TypeRacerModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text={
                       kind() === "gp"
                         ? "Start the Grand Prix"
@@ -711,6 +712,7 @@ export function TypeRacerModal(props: Props): JSXElement {
                   joinCode={joinCode()}
                   createLabel="Create race room"
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                 />

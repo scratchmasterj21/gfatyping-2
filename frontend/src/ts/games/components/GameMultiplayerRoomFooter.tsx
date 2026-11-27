@@ -9,6 +9,8 @@ export function GameMultiplayerRoomFooter(props: {
   onJoinCodeChange: (code: string) => void;
   onCreateRoom: () => void;
   onJoinRoom: () => void;
+  /** e.g. the student's word level is still loading */
+  createDisabled?: boolean;
   createLabel?: string;
   /** games-data id; shows "wait for an invite" */
   gameId?: string;
@@ -22,7 +24,7 @@ export function GameMultiplayerRoomFooter(props: {
       <GameSetupPrimaryAction
         text={createText()}
         showArrow={false}
-        disabled={props.roomBusy}
+        disabled={props.roomBusy || props.createDisabled === true}
         onClick={() => props.onCreateRoom()}
       />
       <div class="text-center text-em-xs text-sub">or join a room</div>

@@ -276,6 +276,7 @@ export function FruitNinjaModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text="Start game"
                     onClick={() => void startGame()}
                   />
@@ -283,6 +284,7 @@ export function FruitNinjaModal(props: Props): JSXElement {
               >
                 <ScoreRaceFooter
                   race={race}
+                  createDisabled={!lv.ready()}
                   onCreate={() => void createRace()}
                 />
               </Show>

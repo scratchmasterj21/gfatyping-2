@@ -548,6 +548,7 @@ export function GhostHunterModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text={daily() ? "Start daily haunting" : "Start solo game"}
                     onClick={() =>
                       void startGame(
@@ -566,6 +567,7 @@ export function GhostHunterModal(props: Props): JSXElement {
                   roomBusy={roomBusy()}
                   joinCode={joinCode()}
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                 />

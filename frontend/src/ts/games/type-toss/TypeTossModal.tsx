@@ -428,6 +428,7 @@ export function TypeTossModal(props: Props): JSXElement {
                 when={mode() === "together"}
                 fallback={
                   <GameSetupPrimaryAction
+                    disabled={!lv.ready()}
                     text={
                       stall() === "daily"
                         ? "Start today's toss"
@@ -443,6 +444,7 @@ export function TypeTossModal(props: Props): JSXElement {
                   joinCode={joinCode()}
                   createLabel="Open a stall for friends"
                   onJoinCodeChange={setJoinCode}
+                  createDisabled={!lv.ready()}
                   onCreateRoom={() => void createRoom()}
                   onJoinRoom={() => void joinRoom()}
                 />

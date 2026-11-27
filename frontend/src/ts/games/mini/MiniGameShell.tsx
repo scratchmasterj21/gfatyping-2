@@ -252,6 +252,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                 >
                   <ScoreRaceFooter
                     race={race}
+                    createDisabled={!lv.ready()}
                     onCreate={() => void createRace()}
                   />
                 </Show>
