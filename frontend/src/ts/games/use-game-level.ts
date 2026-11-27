@@ -4,6 +4,7 @@ import { createEffect } from "solid-js";
 import { isCurrentUserStaff } from "../auth";
 import { getAllProgress } from "../lessons/lesson-progress";
 import { lessonGroups } from "../lessons/lessons-data";
+import { gameListGroups } from "./word-defender/systems/vocab-pool";
 import { getUserId, isAuthenticated } from "../states/core";
 import { getSnapshot } from "../states/snapshot";
 import { getGameAccess, QuestLevel, resolvePolicy } from "./game-access";
@@ -60,7 +61,7 @@ export function useGameLevel(enabled: () => boolean): GameLevel {
   };
   const level = (): QuestLevel => wordLevelFor(groupDone, teacher());
   const lists = (): ((id: string) => string | undefined) =>
-    wordListLock(lessonGroups, lessonDone, teacher());
+    wordListLock(gameListGroups, lessonDone, teacher());
   return {
     ready: () =>
       staff() ||
