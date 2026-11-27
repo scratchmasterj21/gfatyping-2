@@ -10,9 +10,8 @@ import {
   untrack,
 } from "solid-js";
 
-import type { QuestLevel } from "../game-access";
-
 import { isCurrentUserStaff } from "../../auth";
+import { Fa } from "../../components/common/Fa";
 import { UserAvatar } from "../../components/common/UserAvatar";
 import { getAuthenticatedUser } from "../../firebase";
 import { queryClient } from "../../queries";
@@ -40,7 +39,7 @@ import {
 import { sfx } from "../mini/mini-sounds";
 import { HERO_ART } from "./hero-art";
 import { HeroPicker, useQuestHeroes } from "./HeroPicker";
-import { questLevelLock } from "./quest-heroes";
+import { QUEST_LEVEL_STEPS } from "./quest-heroes";
 import {
   closeTimedOut,
   createQuestRoom,
@@ -140,6 +139,23 @@ export function MonsterQuestModal(props: {
   const staff = (): boolean => isCurrentUserStaff();
   const difficulty = (): QuestDifficulty =>
     staff() ? picked() : questDifficultyFor(heroes.level());
+  const [help, setHelp] = createSignal(false);
+  /** "📚 Easy words · Medium after Top Row" */
+  const wordsNote = (): string => {
+    if (weekly()) return `🗓️ Weekly quest · ${WEEKLY_DIFFICULTY} words`;
+    const level = difficulty().label;
+    if (staff()) return `📚 ${level} words`;
+    if (heroes.levelByTeacher()) {
+      return `📚 ${level} words · set by your teacher`;
+    }
+    const order = QUEST_DIFFICULTIES.map((d) => d.label);
+    const next = QUEST_LEVEL_STEPS.find(
+      (st) => order.indexOf(st.level) > order.indexOf(level),
+    );
+    return next === undefined
+      ? `📚 ${level} words`
+      : `📚 ${level} words · ${next.level} after ${next.requiresName}`;
+  };
   // a bought hero switched off (or not owned on this account): back to knight
   createEffect(() => {
     if (!heroes.canPlay(cls())) setCls("knight");
@@ -585,6 +601,7 @@ export function MonsterQuestModal(props: {
           phase() === "playing" || phase() === "result" ? "playing" : "pick"
         }
         needsKeyboard={false}
+        wide
         onClose={() => props.onClose()}
       >
         <Show when={phase() === "pick"}>
@@ -596,112 +613,143 @@ export function MonsterQuestModal(props: {
               />
             }
             footer={
-              <Show
-                when={mode() === "together"}
-                fallback={
-                  <GameSetupPrimaryAction
-                    text="Start the quest!"
-                    disabled={!weekly() && !heroes.levelReady()}
-                    onClick={startSolo}
+              <div class="grid gap-2">
+                <div class="text-center font-kid text-sm text-sub">
+                  {wordsNote()}
+                </div>
+                <Show
+                  when={mode() === "together"}
+                  fallback={
+                    <GameSetupPrimaryAction
+                      text="Start the quest!"
+                      disabled={!weekly() && !heroes.levelReady()}
+                      onClick={startSolo}
+                    />
+                  }
+                >
+                  <GameMultiplayerRoomFooter
+                    gameId={GAME_ID}
+                    roomBusy={roomBusy() || (!weekly() && !heroes.levelReady())}
+                    joinCode={joinCode()}
+                    onJoinCodeChange={setJoinCode}
+                    onCreateRoom={() => void createRoom()}
+                    onJoinRoom={() => void joinRoom()}
+                    createLabel="Host a quest for friends"
                   />
-                }
-              >
-                <GameMultiplayerRoomFooter
-                  gameId={GAME_ID}
-                  roomBusy={roomBusy() || (!weekly() && !heroes.levelReady())}
-                  joinCode={joinCode()}
-                  onJoinCodeChange={setJoinCode}
-                  onCreateRoom={() => void createRoom()}
-                  onJoinRoom={() => void joinRoom()}
-                  createLabel="Host a quest for friends"
-                />
-              </Show>
+                </Show>
+              </div>
             }
           >
-            <GameSetupSection title="How to play" accent>
-              <ul class="grid gap-2 font-kid text-base text-text">
-                <li>🔁 Heroes and monsters take turns.</li>
-                <li>
-                  ⌨️ On your turn, type a move&apos;s name (like
-                  &ldquo;attack&rdquo;), then type its words - fast and no
-                  mistakes = ⭐ critical hit! Clean turns in a row = 🔥 streak.
-                </li>
-                <li>
-                  🛡️ When a monster attacks you, type the guard word quickly to
-                  take less damage.
-                </li>
-                <li>🗺️ Vote for a land, then pick which boss to face.</li>
-                <li>
-                  🧰 Between fights: treasure, traps, fairies and a shop - and a
-                  ⭐ level up after the first fight with a super move that
-                  recharges!
-                </li>
-                <li>
-                  💡 Every monster has a trick - read the tip when it appears!
-                </li>
-                <li>
-                  💥 Use special moves one after another for a COMBO. Good
-                  typing fills 🌟 Team Spirit - then everyone types together for
-                  a TEAM ATTACK!
-                </li>
-                <li>
-                  🏷️ Little badges show what&apos;s going on: 🛡️ shields, 🎯
-                  marked monsters, 💤 sleeping monsters, 🌟 spirit friends and
-                  more.
-                </li>
-                <li>
-                  🦸 Finish lesson groups to unlock new hero sets (and new
-                  lands!) - buy them with coins below, if your teacher has them
-                  on.
-                </li>
-                <li>
-                  📚 Your words get harder as you finish lessons: Medium after
-                  Top Row, Hard after All Keys.
-                </li>
-                <li>👑 Win 2 battles, then beat the boss!</li>
-                <li>
-                  🪙 Earn coins for up to {MONSTER_QUEST_PAID_RUNS_PER_DAY}{" "}
-                  quests a day - more typing means more coins.
-                </li>
-              </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Pick your hero">
-              <HeroPicker heroes={heroes} selected={cls()} onSelect={setCls} />
-            </GameSetupSection>
-            <GameSetupSection title="Who do you want to play with?">
-              <SoloTogetherToggle
-                mode={mode()}
-                multiplayerUnlocked={props.multiplayerUnlocked === true}
-                unlockHint={MULTIPLAYER_UNLOCK_HINT_GENERIC}
-                onModeChange={setMode}
-                soloLabel="me + helpers"
-                togetherLabel={`friends (up to ${PARTY_SIZE})`}
-              />
-            </GameSetupSection>
-            <GameSetupSection title="Which quest?">
-              <WeeklyQuestCard
-                week={questWeek()}
-                selected={weekly()}
-                onSelect={setWeekly}
-              />
-            </GameSetupSection>
-            <Show when={!weekly()}>
-              <GameSetupSection title="Words">
-                <DifficultySegmented
-                  options={QUEST_DIFFICULTIES}
-                  selectedLabel={difficulty().label}
-                  onSelect={(d) => setPicked(() => d)}
-                  lockedReason={(d) =>
-                    staff()
-                      ? undefined
-                      : questLevelLock(
-                          d.label as QuestLevel,
-                          heroes.level(),
-                          heroes.levelByTeacher(),
-                        )
-                  }
+            <Show
+              when={!help()}
+              fallback={
+                <GameSetupSection title="How to play" accent>
+                  <ul class="grid gap-2 font-kid text-base text-text">
+                    <li>🔁 Heroes and monsters take turns.</li>
+                    <li>
+                      ⌨️ On your turn, type a move&apos;s name (like
+                      &ldquo;attack&rdquo;), then type its words - fast and no
+                      mistakes = ⭐ critical hit! Clean turns in a row = 🔥
+                      streak.
+                    </li>
+                    <li>
+                      🛡️ When a monster attacks you, type the guard word quickly
+                      to take less damage.
+                    </li>
+                    <li>🗺️ Vote for a land, then pick which boss to face.</li>
+                    <li>
+                      🧰 Between fights: treasure, traps, fairies and a shop -
+                      and a ⭐ level up after the first fight with a super move
+                      that recharges!
+                    </li>
+                    <li>
+                      💡 Every monster has a trick - read the tip when it
+                      appears!
+                    </li>
+                    <li>
+                      💥 Use special moves one after another for a COMBO. Good
+                      typing fills 🌟 Team Spirit - then everyone types together
+                      for a TEAM ATTACK!
+                    </li>
+                    <li>
+                      🏷️ Little badges show what&apos;s going on: 🛡️ shields, 🎯
+                      marked monsters, 💤 sleeping monsters, 🌟 spirit friends
+                      and more.
+                    </li>
+                    <li>
+                      🦸 Finish lesson groups to unlock new hero sets (and new
+                      lands!) - tap a hero tab to see them and buy them with
+                      coins, if your teacher has them on.
+                    </li>
+                    <li>
+                      📚 Your words get harder as you finish lessons: Medium
+                      after Top Row, Hard after All Keys.
+                    </li>
+                    <li>👑 Win 2 battles, then beat the boss!</li>
+                    <li>
+                      🪙 Earn coins for up to {MONSTER_QUEST_PAID_RUNS_PER_DAY}{" "}
+                      quests a day - more typing means more coins.
+                    </li>
+                  </ul>
+                  <button
+                    type="button"
+                    class="press-3d min-h-11 cursor-pointer rounded-xl bg-main font-kid font-bold text-bg"
+                    onClick={() => setHelp(false)}
+                  >
+                    ← Back to the quest
+                  </button>
+                </GameSetupSection>
+              }
+            >
+              <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-sub-alt/60 px-3 py-2 font-kid text-sm text-text">
+                <span>⌨️ Type the move</span>
+                <span>🛡️ Guard when hit</span>
+                <span>👑 Beat the boss</span>
+                <button
+                  type="button"
+                  class="ml-auto flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full bg-main px-3 font-bold text-bg"
+                  onClick={() => setHelp(true)}
+                >
+                  <Fa icon="fa-question-circle" />
+                  How to play
+                </button>
+              </div>
+              <div class="grid gap-x-4 md:grid-cols-2">
+                <GameSetupSection title="Play with">
+                  <SoloTogetherToggle
+                    mode={mode()}
+                    multiplayerUnlocked={props.multiplayerUnlocked === true}
+                    unlockHint={MULTIPLAYER_UNLOCK_HINT_GENERIC}
+                    onModeChange={setMode}
+                    soloLabel="me + helpers"
+                    togetherLabel={`friends (up to ${PARTY_SIZE})`}
+                  />
+                </GameSetupSection>
+                <GameSetupSection title="Quest">
+                  <WeeklyQuestCard
+                    week={questWeek()}
+                    selected={weekly()}
+                    onSelect={setWeekly}
+                  />
+                </GameSetupSection>
+              </div>
+              <GameSetupSection title="Pick your hero">
+                <HeroPicker
+                  heroes={heroes}
+                  selected={cls()}
+                  onSelect={setCls}
                 />
               </GameSetupSection>
+              <Show when={staff() && !weekly()}>
+                <GameSetupSection title="Words (staff)">
+                  <DifficultySegmented
+                    compact
+                    options={QUEST_DIFFICULTIES}
+                    selectedLabel={difficulty().label}
+                    onSelect={(d) => setPicked(() => d)}
+                  />
+                </GameSetupSection>
+              </Show>
             </Show>
           </GamePickLayout>
         </Show>

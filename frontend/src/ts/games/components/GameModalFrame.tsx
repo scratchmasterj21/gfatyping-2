@@ -22,6 +22,8 @@ export function GameModalFrame(props: {
   onClose: () => void;
   showBackButton?: boolean;
   needsKeyboard?: boolean;
+  /** pick screen wider on big screens (lots to choose from) */
+  wide?: boolean;
   children: JSXElement;
 }): JSXElement {
   const showBack = (): boolean => props.showBackButton !== false;
@@ -37,7 +39,10 @@ export function GameModalFrame(props: {
           props.layout === "playing"
             ? "h-[90vh] w-[95vw] max-w-5xl supports-[height:100dvh]:h-[90dvh]"
             : props.layout === "pick"
-              ? "max-h-[94vh] w-full max-w-lg supports-[height:100dvh]:max-h-[94dvh]"
+              ? cn(
+                  "max-h-[94vh] w-full supports-[height:100dvh]:max-h-[94dvh]",
+                  props.wide === true ? "max-w-4xl" : "max-w-lg",
+                )
               : "w-full max-w-lg p-5",
         )}
       >
