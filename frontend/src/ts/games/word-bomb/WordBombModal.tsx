@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
 import { getSnapshot } from "../../states/snapshot";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -462,7 +463,12 @@ export function WordBombModal(props: {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "💣 Type the word to pass the bomb",
+                "💥 Holding it at BOOM loses a ❤️",
+              ]}
+            >
               <ul class="grid gap-2 font-kid text-base text-text">
                 <li>💣 A bomb is passed around the circle.</li>
                 <li>
@@ -472,8 +478,8 @@ export function WordBombModal(props: {
                 <li>💥 Holding it when it goes BOOM? You lose a ❤️.</li>
                 <li>🏆 Last player with hearts left wins!</li>
               </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Who do you want to play?">
+            </GameHowTo>
+            <GameSetupSection title="Play with">
               <SoloTogetherToggle
                 mode={mode()}
                 multiplayerUnlocked={true}

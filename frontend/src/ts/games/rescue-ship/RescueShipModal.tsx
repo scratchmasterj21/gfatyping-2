@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -479,7 +480,13 @@ export function RescueShipModal(props: {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "🚀 Rescue lost pets",
+                "⌨️ Type jobs to fly the ship",
+                "🏠 Get home safe",
+              ]}
+            >
               <div class="mb-2 flex justify-center gap-2">
                 <For each={["bunny", "pup", "kitty", "duck"] as const}>
                   {(p) => (
@@ -512,8 +519,8 @@ export function RescueShipModal(props: {
                 </li>
                 <li>🏠 Get home safe with as many pets as you can.</li>
               </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Who do you want to play with?">
+            </GameHowTo>
+            <GameSetupSection title="Play with">
               <SoloTogetherToggle
                 mode={mode()}
                 multiplayerUnlocked={props.multiplayerUnlocked === true}

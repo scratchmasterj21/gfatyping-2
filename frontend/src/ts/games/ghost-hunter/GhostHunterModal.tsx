@@ -589,7 +589,7 @@ export function GhostHunterModal(props: Props): JSXElement {
             </Show>
 
             <Show when={mode() === "together" || !daily()}>
-              <GameSetupSection title="Choose difficulty">
+              <GameSetupSection title="Speed">
                 <DifficultySegmented
                   options={availableDifficulties()}
                   lockedReason={lv.speedLock}
@@ -601,7 +601,7 @@ export function GhostHunterModal(props: Props): JSXElement {
             </Show>
 
             <GameSetupMore>
-              <GameSetupSection title="Mode">
+              <GameSetupSection title="Play with">
                 <SoloTogetherToggle
                   mode={mode()}
                   multiplayerUnlocked={props.multiplayerUnlocked === true}
@@ -632,7 +632,7 @@ export function GhostHunterModal(props: Props): JSXElement {
                 </GameSetupSection>
               </Show>
               <Show when={mode() === "together" || !daily()}>
-                <GameSetupSection title="Choose a word list">
+                <GameSetupSection title="Word list">
                   <WordListPicker
                     lockedReason={lv.listLock}
                     groups={groups()}

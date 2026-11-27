@@ -15,16 +15,27 @@ export function WordListPicker(props: {
   lockedReason?: (option: WordListOption) => string | undefined;
 }): JSXElement {
   const [filter, setFilter] = createSignal("");
+  const [showLocked, setShowLocked] = createSignal(false);
+  const isLocked = (o: WordListOption): boolean =>
+    props.lockedReason?.(o) !== undefined;
+  const lockedCount = createMemo((): number => {
+    let n = 0;
+    for (const g of props.groups) {
+      for (const o of g.items) if (isLocked(o)) n++;
+    }
+    return n;
+  });
   const filteredGroups = createMemo((): WordListGroup[] => {
     const q = filter().trim().toLowerCase();
-    if (q.length === 0) return props.groups;
     return props.groups
       .map((g) => ({
         group: g.group,
         items: g.items.filter(
           (item) =>
-            item.label.toLowerCase().includes(q) ||
-            g.group.toLowerCase().includes(q),
+            (showLocked() || !isLocked(item)) &&
+            (q.length === 0 ||
+              item.label.toLowerCase().includes(q) ||
+              g.group.toLowerCase().includes(q)),
         ),
       }))
       .filter((g) => g.items.length > 0);
@@ -87,6 +98,17 @@ export function WordListPicker(props: {
           )}
         </For>
       </div>
+      <Show when={lockedCount() > 0}>
+        <button
+          type="button"
+          class="justify-self-start text-em-sm text-sub underline hover:text-text"
+          onClick={() => setShowLocked((v) => !v)}
+        >
+          {showLocked()
+            ? "Hide locked lists"
+            : `Show locked lists (${lockedCount()})`}
+        </button>
+      </Show>
     </div>
   );
 }

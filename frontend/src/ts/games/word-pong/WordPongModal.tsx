@@ -15,6 +15,7 @@ import { getSnapshot } from "../../states/snapshot";
 import { cn } from "../../utils/cn";
 import { DailyClassBoard } from "../components/DailyClassBoard";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -754,7 +755,13 @@ export function WordPongModal(props: {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "🏓 Type the ball's word to hit back",
+                "💥 Fast + clean = SMASH",
+                `🏆 First to ${WIN_POINTS}`,
+              ]}
+            >
               <ul class="grid gap-2 font-kid text-base text-text">
                 <li>
                   🏓 A ball with a word flies to you - type it to hit back.
@@ -771,8 +778,8 @@ export function WordPongModal(props: {
                   wins!
                 </li>
               </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Who do you want to play?">
+            </GameHowTo>
+            <GameSetupSection title="Play with">
               <SoloTogetherToggle
                 mode={mode()}
                 multiplayerUnlocked={true}
@@ -844,7 +851,7 @@ export function WordPongModal(props: {
               </GameSetupSection>
             </Show>
             <Show when={mode() === "together" || soloKind() === "match"}>
-              <GameSetupSection title="Ball speed">
+              <GameSetupSection title="Speed">
                 <DifficultySegmented
                   options={PONG_DIFFICULTIES}
                   lockedReason={lv.speedLock}
@@ -855,7 +862,7 @@ export function WordPongModal(props: {
             </Show>
             <Show when={mode() === "together" || soloKind() !== "rally"}>
               <GameSetupMore>
-                <GameSetupSection title="Choose a word list">
+                <GameSetupSection title="Word list">
                   <WordListPicker
                     lockedReason={lv.listLock}
                     groups={GROUPS}

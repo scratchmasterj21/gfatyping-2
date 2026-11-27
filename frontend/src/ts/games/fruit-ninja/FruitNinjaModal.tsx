@@ -293,7 +293,7 @@ export function FruitNinjaModal(props: Props): JSXElement {
                 Type the words on falling fruits before they hit the ground!
               </p>
             </GameSetupSection>
-            <GameSetupSection title="Choose difficulty">
+            <GameSetupSection title="Speed">
               <DifficultySegmented
                 options={FRUIT_NINJA_DIFFICULTIES}
                 lockedReason={lv.speedLock}
@@ -309,7 +309,7 @@ export function FruitNinjaModal(props: Props): JSXElement {
               onLengthChange={setRaceLength}
             />
             <GameSetupMore>
-              <GameSetupSection title="Choose a word list">
+              <GameSetupSection title="Word list">
                 <WordListPicker
                   lockedReason={lv.listLock}
                   groups={GROUPS}

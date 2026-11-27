@@ -15,6 +15,7 @@ import { showErrorNotification } from "../../states/notifications";
 import { getSnapshot } from "../../states/snapshot";
 import { DailyClassBoard } from "../components/DailyClassBoard";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -599,7 +600,13 @@ export function GemDigModal(props: {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "⛏️ Type the block's word to dig",
+                "✨ Find gems",
+                `🏆 First to block ${DIG_DEPTH}`,
+              ]}
+            >
               <ul class="grid gap-2 font-kid text-base text-text">
                 <li>⛏️ Type the word on the block to dig through it.</li>
                 <li>
@@ -619,8 +626,8 @@ export function GemDigModal(props: {
                   then get {FINISH_GRACE_MS / 1000} seconds to finish.
                 </li>
               </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Who do you want to race?">
+            </GameHowTo>
+            <GameSetupSection title="Play with">
               <SoloTogetherToggle
                 mode={mode()}
                 multiplayerUnlocked={true}
@@ -731,7 +738,7 @@ export function GemDigModal(props: {
               />
             </GameSetupSection>
             <GameSetupMore>
-              <GameSetupSection title="Choose a word list">
+              <GameSetupSection title="Word list">
                 <WordListPicker
                   lockedReason={lv.listLock}
                   groups={GROUPS}

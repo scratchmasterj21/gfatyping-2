@@ -20,6 +20,11 @@ export function SnackShopModal(props: {
       gameId="snack-shop"
       title="Snack Shop"
       difficulties={SNACK_DIFFICULTIES}
+      tips={[
+        "🍔 Type each order exactly",
+        "⏰ Before patience runs out",
+        "🔥 Streaks = rush hour",
+      ]}
       howToPlay={
         <>
           <p>

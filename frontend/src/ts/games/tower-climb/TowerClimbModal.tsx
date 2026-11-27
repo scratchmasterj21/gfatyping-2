@@ -20,6 +20,11 @@ export function TowerClimbModal(props: {
       gameId="tower-climb"
       title="Tappy's Tower Climb"
       difficulties={TOWER_DIFFICULTIES}
+      tips={[
+        "⌨️ Type the next block's word",
+        "⭐ Perfect streak = double jump",
+        "💥 Typos crack the block",
+      ]}
       howToPlay={
         <>
           <p>

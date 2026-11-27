@@ -479,7 +479,7 @@ export function BalloonPopModal(props: Props): JSXElement {
                       when you both run out of hearts) the most points wins.
                     </p>
                   </GameSetupSection>
-                  <GameSetupSection title="Balloon speed">
+                  <GameSetupSection title="Speed">
                     <DifficultySegmented
                       options={VERSUS_SPEEDS}
                       lockedReason={lv.speedLock}
@@ -547,7 +547,7 @@ export function BalloonPopModal(props: Props): JSXElement {
                   onModeChange={setMode}
                 />
               </GameSetupSection>
-              <GameSetupSection title="Choose a word list">
+              <GameSetupSection title="Word list">
                 <WordListPicker
                   lockedReason={lv.listLock}
                   groups={GROUPS}

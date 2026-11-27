@@ -17,6 +17,7 @@ import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import { DailyClassBoard } from "../components/DailyClassBoard";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -406,7 +407,13 @@ export function WordDefenderModal(props: Props): JSXElement {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "⌨️ Type a ship's word to zap it",
+                "🛡️ Protect your base",
+                "🛸 Mothership every 5th wave",
+              ]}
+            >
               <p class="text-em-sm text-sub">
                 Type a ship&apos;s word to zap it before it reaches your base.
                 🛡️ Shield ships need their word twice, 🦠 splitters break in
@@ -414,7 +421,7 @@ export function WordDefenderModal(props: Props): JSXElement {
                 row power up your laser! After each wave, pick an upgrade. Every
                 5th wave: the mothership! 🛸
               </p>
-            </GameSetupSection>
+            </GameHowTo>
             <Show when={mode() === "solo"}>
               <div class="grid grid-cols-2 gap-2">
                 <For each={[false, true]}>
@@ -461,7 +468,7 @@ export function WordDefenderModal(props: Props): JSXElement {
               </Show>
             </Show>
             <Show when={mode() === "together" || !daily()}>
-              <GameSetupSection title="Choose difficulty">
+              <GameSetupSection title="Speed">
                 <DifficultySegmented
                   options={DEFENDER_DIFFICULTIES}
                   lockedReason={lv.speedLock}
@@ -471,7 +478,7 @@ export function WordDefenderModal(props: Props): JSXElement {
               </GameSetupSection>
             </Show>
             <GameSetupMore>
-              <GameSetupSection title="Mode">
+              <GameSetupSection title="Play with">
                 <SoloTogetherToggle
                   mode={mode()}
                   soloLabel="Play alone"
@@ -482,7 +489,7 @@ export function WordDefenderModal(props: Props): JSXElement {
                 />
               </GameSetupSection>
               <Show when={mode() === "together" || !daily()}>
-                <GameSetupSection title="Choose a word list">
+                <GameSetupSection title="Word list">
                   <WordListPicker
                     lockedReason={lv.listLock}
                     groups={GROUPS}

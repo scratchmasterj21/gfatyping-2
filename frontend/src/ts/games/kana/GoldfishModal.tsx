@@ -526,6 +526,11 @@ export function GoldfishModal(props: {
           <KanaGameSetup
             gameId="goldfish"
             title="Goldfish Scooping"
+            tips={[
+              "⌨️ Type a fish's word in romaji",
+              "🐠 Golden fish = double",
+              "⏰ 60 seconds",
+            ]}
             howTo={[
               "🐟 Goldfish swim across the pond with hiragana words.",
               "⌨️ Type a fish's word in romaji to scoop it - before anyone else!",

@@ -16,6 +16,7 @@ import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
 import { DailyClassBoard } from "../components/DailyClassBoard";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -448,14 +449,20 @@ export function TypeTossModal(props: Props): JSXElement {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "🎯 Type a target's word to throw",
+                "🎟️ Win tickets",
+                "💣 Never hit the bomb",
+              ]}
+            >
               <p class="text-em-sm text-sub">
                 🎪 Type a target&apos;s word to throw a ball at it and win 🎟️
                 tickets! {HOT_HAND_TEXT} Hit 🏆 for 5× tickets, ⏱️ for more
                 time, ✨ for double tickets - but never the 💣! Spend your
                 tickets at the prize booth.
               </p>
-            </GameSetupSection>
+            </GameHowTo>
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <For
                 each={
@@ -503,7 +510,7 @@ export function TypeTossModal(props: Props): JSXElement {
               </GameSetupSection>
             </Show>
             <Show when={mode() === "solo" && stall() !== "daily"}>
-              <GameSetupSection title="Choose difficulty">
+              <GameSetupSection title="Speed">
                 <DifficultySegmented
                   options={TOSS_DIFFICULTIES}
                   lockedReason={lv.speedLock}
@@ -527,7 +534,7 @@ export function TypeTossModal(props: Props): JSXElement {
               </span>
             </button>
             <GameSetupMore>
-              <GameSetupSection title="Mode">
+              <GameSetupSection title="Play with">
                 <SoloTogetherToggle
                   mode={mode()}
                   soloLabel="Play alone"
@@ -537,7 +544,7 @@ export function TypeTossModal(props: Props): JSXElement {
                   onModeChange={setMode}
                 />
               </GameSetupSection>
-              <GameSetupSection title="Choose a word list">
+              <GameSetupSection title="Word list">
                 <WordListPicker
                   lockedReason={lv.listLock}
                   groups={GROUPS}

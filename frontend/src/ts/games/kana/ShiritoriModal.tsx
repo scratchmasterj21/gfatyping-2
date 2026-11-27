@@ -674,6 +674,11 @@ export function ShiritoriModal(props: {
           <KanaGameSetup
             gameId="shiritori"
             title="Shiritori Bomb"
+            tips={[
+              "🔗 Next word starts with the last kana",
+              "⌨️ Type it in romaji",
+              "💥 BOOM loses a ❤️",
+            ]}
             howTo={[
               "💣 A bomb is passed around - with a word chain!",
               "🔗 The next word must start with the last kana (りんご → ごりら).",

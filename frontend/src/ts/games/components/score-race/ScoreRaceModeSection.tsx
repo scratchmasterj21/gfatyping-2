@@ -15,7 +15,7 @@ export function ScoreRaceModeSection(props: {
 }): JSXElement {
   return (
     <>
-      <GameSetupSection title="Mode">
+      <GameSetupSection title="Play with">
         <SoloTogetherToggle
           mode={props.mode}
           multiplayerUnlocked

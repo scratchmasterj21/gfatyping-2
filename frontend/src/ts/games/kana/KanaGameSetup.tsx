@@ -1,6 +1,7 @@
 import { For, JSXElement, Show } from "solid-js";
 
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
 import { GamePickLayout } from "../components/GamePickLayout";
@@ -14,6 +15,8 @@ export function KanaGameSetup(props: {
   gameId: string;
   title: string;
   howTo: string[];
+  /** 2-3 short tips always shown above the full rules */
+  tips: string[];
   mode: "solo" | "together";
   onModeChange: (m: "solo" | "together") => void;
   togetherLabel: string;
@@ -56,12 +59,12 @@ export function KanaGameSetup(props: {
         </Show>
       }
     >
-      <GameSetupSection title="How to play" accent>
+      <GameHowTo tips={props.tips}>
         <ul class="grid gap-2 font-kid text-base text-text">
           <For each={props.howTo}>{(line) => <li>{line}</li>}</For>
         </ul>
-      </GameSetupSection>
-      <GameSetupSection title="Who do you want to play?">
+      </GameHowTo>
+      <GameSetupSection title="Play with">
         <SoloTogetherToggle
           mode={props.mode}
           multiplayerUnlocked={true}

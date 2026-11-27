@@ -769,7 +769,7 @@ export function TypeRacerModal(props: Props): JSXElement {
               </Show>
 
               <Show when={kind() !== "daily"}>
-                <GameSetupSection title="Choose difficulty">
+                <GameSetupSection title="Speed">
                   <DifficultySegmented
                     options={RACE_DIFFICULTIES}
                     lockedReason={lv.speedLock}
@@ -828,7 +828,7 @@ export function TypeRacerModal(props: Props): JSXElement {
             </button>
 
             <GameSetupMore>
-              <GameSetupSection title="Mode">
+              <GameSetupSection title="Play with">
                 <SoloTogetherToggle
                   mode={mode()}
                   soloLabel="Race the computer"
@@ -839,7 +839,7 @@ export function TypeRacerModal(props: Props): JSXElement {
                 />
               </GameSetupSection>
               <Show when={mode() === "together" || kind() !== "daily"}>
-                <GameSetupSection title="Choose a word list">
+                <GameSetupSection title="Word list">
                   <WordListPicker
                     lockedReason={lv.listLock}
                     groups={GROUPS}

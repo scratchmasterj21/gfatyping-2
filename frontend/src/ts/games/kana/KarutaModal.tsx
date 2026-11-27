@@ -540,6 +540,11 @@ export function KarutaModal(props: {
           <KanaGameSetup
             gameId="karuta"
             title="Karuta Battle"
+            tips={[
+              "👀 Look at the picture",
+              "⌨️ Type its card in romaji first",
+              "🏆 Most cards wins",
+            ]}
             howTo={[
               "🎴 Hiragana cards are on the table.",
               "👀 A picture and an English word appear.",

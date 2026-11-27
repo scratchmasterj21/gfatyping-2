@@ -25,6 +25,11 @@ export function ZooShiftModal(props: {
       usesWordList={false}
       levelWords
       difficultyLock={(d) => (d.level === 0 ? undefined : props.hardLock)}
+      tips={[
+        "🐾 Type the word in an animal's bubble",
+        "🔥 Streaks = double points",
+        "😢 Don't keep them waiting",
+      ]}
       howToPlay={
         <>
           <p>

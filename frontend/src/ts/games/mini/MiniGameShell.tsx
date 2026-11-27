@@ -16,6 +16,7 @@ import {
   DifficultyOption,
   DifficultySegmented,
 } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GamePickLayout } from "../components/GamePickLayout";
@@ -87,6 +88,8 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
   raceDurationSec?: (difficulty: D) => number;
   title: string;
   howToPlay: JSXElement;
+  /** 2-3 short tips shown above the full rules (behind a button) */
+  tips: string[];
   difficulties: D[];
   /** Echo Keys works from key sets, not word lists. */
   usesWordList?: boolean;
@@ -254,9 +257,9 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                 </Show>
               }
             >
-              <GameSetupSection title="How to play" accent>
+              <GameHowTo tips={props.tips}>
                 <div class="grid gap-2 text-sm text-sub">{props.howToPlay}</div>
-              </GameSetupSection>
+              </GameHowTo>
               <ScoreRaceModeSection
                 mode={mode()}
                 onModeChange={setMode}
@@ -266,7 +269,9 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
                 length={raceLength()}
                 onLengthChange={setRaceLength}
               />
-              <GameSetupSection title="Choose difficulty">
+              <GameSetupSection
+                title={props.levelWords === true ? "Words" : "Speed"}
+              >
                 <DifficultySegmented
                   options={props.difficulties}
                   selectedLabel={difficulty().label}
@@ -281,7 +286,7 @@ export function MiniGameShell<D extends DifficultyOption>(props: {
               </p>
               <Show when={props.usesWordList !== false}>
                 <GameSetupMore>
-                  <GameSetupSection title="Choose a word list">
+                  <GameSetupSection title="Word list">
                     <WordListPicker
                       lockedReason={lv.listLock}
                       groups={GROUPS}

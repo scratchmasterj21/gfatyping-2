@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../../firebase";
 import { showErrorNotification } from "../../states/notifications";
 import { getSnapshot } from "../../states/snapshot";
 import { DifficultySegmented } from "../components/DifficultySegmented";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GameMultiplayerRoomFooter } from "../components/GameMultiplayerRoomFooter";
@@ -401,7 +402,13 @@ export function FourRowModal(props: {
               </Show>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "⌨️ Type a column's word",
+                "⚡ Faster piece lands first",
+                "🏆 4 in a row wins",
+              ]}
+            >
               <ul class="grid gap-2 font-kid text-base text-text">
                 <li>🔴 Every column has a word on top.</li>
                 <li>⌨️ Type a word to drop your piece in that column.</li>
@@ -412,8 +419,8 @@ export function FourRowModal(props: {
                 <li>⏰ Too slow and you miss your turn.</li>
                 <li>🏆 Get 4 in a row to win a board. Win 2 boards to win!</li>
               </ul>
-            </GameSetupSection>
-            <GameSetupSection title="Who do you want to play?">
+            </GameHowTo>
+            <GameSetupSection title="Play with">
               <SoloTogetherToggle
                 mode={mode()}
                 multiplayerUnlocked={true}

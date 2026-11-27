@@ -21,6 +21,11 @@ export function EchoKeysModal(props: {
       difficulties={ECHO_DIFFICULTIES}
       usesWordList={false}
       levelWords
+      tips={[
+        "👀 Watch the keys light up",
+        "⌨️ Type them in the same order",
+        `❤️ ${ECHO_LIVES} lives`,
+      ]}
       howToPlay={
         <>
           <p>

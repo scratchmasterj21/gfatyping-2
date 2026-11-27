@@ -16,6 +16,7 @@ import { getAuthenticatedUser } from "../../firebase";
 import { realWords } from "../../lessons/lessons-data";
 import { showErrorNotification } from "../../states/notifications";
 import { cn } from "../../utils/cn";
+import { GameHowTo } from "../components/GameHowTo";
 import { GameModalFrame } from "../components/GameModalFrame";
 import { GameModalHeader } from "../components/GameModalHeader";
 import { GamePickLayout } from "../components/GamePickLayout";
@@ -460,7 +461,13 @@ export function TypingRpgModal(props: Props): JSXElement {
               </div>
             }
           >
-            <GameSetupSection title="How to play" accent>
+            <GameHowTo
+              tips={[
+                "🗺️ Walk with the arrows",
+                "⚔️ Bump a monster to battle",
+                "⌨️ Type moves to fight",
+              ]}
+            >
               <ul class="grid gap-3 font-kid text-base text-text">
                 <HowToLine icon="🗺️">
                   Walk with the arrow keys (or WASD).
@@ -482,7 +489,7 @@ export function TypingRpgModal(props: Props): JSXElement {
                   Beat every monster, then keep going or leave with coins.
                 </HowToLine>
               </ul>
-            </GameSetupSection>
+            </GameHowTo>
             <GameSetupMore>
               <GameSetupSection title="Controls">
                 <p class="text-em-sm text-sub">
